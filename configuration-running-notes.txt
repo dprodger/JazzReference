@@ -1,0 +1,6 @@
+Configuration information:
+
+Database is on Supabase. Connection info is available via logging in to the Supabase
+console and going to Connect.
+
+Flash deployment on Render.
