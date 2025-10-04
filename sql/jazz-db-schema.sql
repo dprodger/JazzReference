@@ -142,12 +142,12 @@ CREATE TABLE audit_log (
 
 -- Song indexes
 CREATE INDEX idx_songs_title ON songs(title);
-CREATE INDEX idx_songs_title_trgm ON songs USING gin(title gin_trgm_ops);
+-- CREATE INDEX idx_songs_title_trgm ON songs USING gin(title gin_trgm_ops);
 CREATE INDEX idx_songs_composer ON songs(composer);
 
 -- Performer indexes
 CREATE INDEX idx_performers_name ON performers(name);
-CREATE INDEX idx_performers_name_trgm ON performers USING gin(name gin_trgm_ops);
+-- CREATE INDEX idx_performers_name_trgm ON performers USING gin(name gin_trgm_ops);
 
 -- Recording indexes
 CREATE INDEX idx_recordings_song_id ON recordings(song_id);
@@ -234,7 +234,7 @@ ON CONFLICT (name) DO NOTHING;
 
 -- View for songs with canonical recording information
 CREATE OR REPLACE VIEW songs_with_canonical_recordings AS
-SELECT 
+SELECT
     s.id as song_id,
     s.title,
     s.composer,
@@ -248,7 +248,7 @@ LEFT JOIN recordings r ON s.id = r.song_id AND r.is_canonical = true;
 
 -- View for performer discography
 CREATE OR REPLACE VIEW performer_discography AS
-SELECT 
+SELECT
     p.id as performer_id,
     p.name as performer_name,
     s.id as song_id,
