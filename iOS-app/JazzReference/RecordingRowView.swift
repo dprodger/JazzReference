@@ -28,7 +28,7 @@ struct RecordingRowView: View {
             }
             
             if let year = recording.recordingYear {
-                Text("\(year)")
+                Text(String(year))
                     .font(.subheadline)
                     .foregroundColor(.secondary)
             }
