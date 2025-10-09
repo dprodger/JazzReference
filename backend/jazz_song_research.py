@@ -123,8 +123,14 @@ class JazzSongResearcher:
                 recordings = []
                 
                 for rec in data.get('recordings', [])[:5]:
+                    # Get album title from first release
+                    album_title = None
+                    if rec.get('releases'):
+                        album_title = rec['releases'][0].get('title')
+                    
                     recording_info = {
-                        'title': rec.get('title'),
+                        'musicbrainz_id': rec.get('id'), 
+                        'title': album_title or rec.get('title'),
                         'artist': None,
                         'date': None,
                         'length': rec.get('length'),
@@ -397,6 +403,7 @@ WHERE p.name = '{name.replace("'", "''")}'
                 album = recording.get('title', f'Recording {i}')
                 artist = recording.get('artist', '')
                 year = recording.get('date')
+                mb_id = recording.get('musicbrainz_id', '')
                 
                 is_canonical = 'true' if i == 1 else 'false'  # Mark first as canonical
                 
@@ -412,13 +419,14 @@ BEGIN
     
     IF v_song_id IS NOT NULL THEN
         -- Insert recording if not exists
-        INSERT INTO recordings (song_id, album_title, recording_year, is_canonical)
+        INSERT INTO recordings (song_id, album_title, recording_year, is_canonical, musicbrainz_id)
         SELECT v_song_id, '{album.replace("'", "''")}', 
-               {year if year else "NULL"}, {is_canonical}
+                {year if year else "NULL"}, {is_canonical},
+                {f"'{mb_id}'" if mb_id else "NULL"}
         WHERE NOT EXISTS (
             SELECT 1 FROM recordings 
-            WHERE song_id = v_song_id 
-            AND album_title = '{album.replace("'", "''")}'
+            WHERE musicbrainz_id = {f"'{mb_id}'" if mb_id else "NULL"}
+            {f"AND song_id = v_song_id AND album_title = '{album.replace("'", "''")}'" if not mb_id else ""}
         )
         RETURNING id INTO v_recording_id;
         

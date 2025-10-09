@@ -68,7 +68,8 @@ CREATE TABLE recordings (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     created_by VARCHAR(100),
-    updated_by VARCHAR(100)
+    updated_by VARCHAR(100),
+    musicbrainz_id VARCHAR(255) UNIQUE
 );
 
 -- Recording performers (junction table with instrument role)
