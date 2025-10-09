@@ -1,0 +1,40 @@
+# Jazz Songs to Research
+# One song per line
+# Lines starting with # are comments
+
+# Bebop Era
+Take Five
+Blue Bossa
+Maiden Voyage
+Recordame
+Footprints
+
+# Standards
+Body and Soul
+Misty
+Satin Doll
+In a Sentimental Mood
+Sophisticated Lady
+
+# Ballads
+Round Midnight
+Lush Life
+Naima
+In Your Own Sweet Way
+
+# Up-tempo
+Cherokee
+Donna Lee
+Ornithology
+Anthropology
+
+# Bossa Nova
+Wave
+How Insensitive
+Once I Loved
+Quiet Nights of Quiet Stars
+
+# Modal Jazz
+Impressions
+Milestones
+Nardis
