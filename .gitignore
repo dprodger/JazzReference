@@ -8,7 +8,10 @@
 **/xcshareddata/WorkspaceSettings.xcsettings
 
 
-xcuserdata/
+xcuserdata
+xcuserdata/*
+*.xcuserstate
+
 codebase.md
 backend/output
 
