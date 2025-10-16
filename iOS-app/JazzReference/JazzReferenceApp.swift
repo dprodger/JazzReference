@@ -148,6 +148,7 @@ struct JazzReferenceApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .ignoresSafeArea()
         }
     }
 }
