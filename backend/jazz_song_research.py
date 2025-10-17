@@ -108,12 +108,12 @@ class JazzSongResearcher:
         return recordings[:3] if recordings else None
     
     def search_musicbrainz_recordings(self, song_name):
-        """Search MusicBrainz for actual recordings of the song"""
+        """Search MusicBrainz for actual recordings of the song with improved filtering"""
         search_url = "https://musicbrainz.org/ws/2/recording/"
         params = {
-            'query': f'recording:"{song_name}"',
+            'query': f'recording:"{song_name}" AND status:official',  # Official releases only
             'fmt': 'json',
-            'limit': 10
+            'limit': 30  # Request more to filter from
         }
         
         try:
@@ -122,17 +122,36 @@ class JazzSongResearcher:
                 data = response.json()
                 recordings = []
                 
-                for rec in data.get('recordings', [])[:5]:
-                    # Get album title from first release
-                    album_title = None
-                    if rec.get('releases'):
-                        album_title = rec['releases'][0].get('title')
+                for rec in data.get('recordings', []):
+                    # Skip if no releases
+                    if not rec.get('releases'):
+                        continue
+                    
+                    # Get official releases only
+                    official_releases = [r for r in rec['releases']
+                                       if r.get('status') == 'Official']
+                    
+                    if not official_releases:
+                        continue
+                    
+                    # Sort by date to get earliest (canonical recordings tend to be older)
+                    sorted_releases = sorted(official_releases,
+                                           key=lambda x: x.get('date', '9999'))
+                    
+                    release = sorted_releases[0]
+                    
+                    # Skip compilations and tributes
+                    title_lower = release.get('title', '').lower()
+                    skip_words = ['compilation', 'tribute', 'best of', 'greatest hits',
+                                 'collection', 'anthology']
+                    if any(word in title_lower for word in skip_words):
+                        continue
                     
                     recording_info = {
-                        'musicbrainz_id': rec.get('id'), 
-                        'title': album_title or rec.get('title'),
+                        'musicbrainz_id': rec.get('id'),
+                        'title': release.get('title'),
                         'artist': None,
-                        'date': None,
+                        'date': release.get('date', '')[:4] if release.get('date') else None,
                         'length': rec.get('length'),
                     }
                     
@@ -144,14 +163,11 @@ class JazzSongResearcher:
                                 artists.append(artist['artist'].get('name'))
                         recording_info['artist'] = ', '.join(artists) if artists else None
                     
-                    # Try to get date
-                    if rec.get('releases'):
-                        for release in rec['releases']:
-                            if release.get('date'):
-                                recording_info['date'] = release['date'][:4]  # Just year
-                                break
-                    
                     recordings.append(recording_info)
+                    
+                    # Stop once we have 10 good recordings
+                    if len(recordings) >= 10:
+                        break
                 
                 return recordings
         except Exception as e:
@@ -275,7 +291,7 @@ class JazzSongResearcher:
         mb_recordings = self.search_musicbrainz_recordings(song_name)
         if mb_recordings:
             result['recordings'] = mb_recordings
-            print(f"✓ Found {len(mb_recordings)} MusicBrainz recordings", file=sys.stderr)
+            print(f"✓ Found {len(mb_recordings)} quality MusicBrainz recordings", file=sys.stderr)
             
             # Add artists as performers
             for rec in mb_recordings:
@@ -331,7 +347,7 @@ class JazzSongResearcher:
                 'year': extracted.get('year')
             },
             'performers': performers[:10],  # Limit to top 10
-            'recordings': research_data.get('recordings', [])[:5]  # Limit to top 5
+            'recordings': research_data.get('recordings', [])[:10]  # Now 10 recordings
         }
         
         return structured
