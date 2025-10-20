@@ -501,74 +501,85 @@ class JazzSongResearcher:
         
         return result
     
-    def format_for_database(self, research_data):
-        """Format research data for database insertion"""
-        song_name = research_data['song_name']
-        extracted = research_data.get('extracted_data', {})
-        sources = research_data.get('sources', {})
-        
-        external_refs = {}
-        if 'jazzstandards' in sources:
-            external_refs['jazzstandards'] = sources['jazzstandards'].get('url')
-        if 'wikipedia' in sources:
-            external_refs['wikipedia'] = sources['wikipedia'].get('url')
-        
-        performers_dict = {}
-        for p in research_data.get('performers', []):
-            name = p['name']
-            if name not in performers_dict:
-                performers_dict[name] = p
-            elif p.get('instrument') and not performers_dict[name].get('instrument'):
-                performers_dict[name] = p
-        
-        performers = list(performers_dict.values())
-        
-        structured = {
-            'song': {
-                'title': song_name,
-                'composer': extracted.get('composer'),
-                'structure': None,
-                'external_references': external_refs,
-                'notes': extracted.get('description'),
-                'year': extracted.get('year'),
-                'musical_info': extracted.get('musical_info', {})
-            },
-            'performers': performers[:10],
-            'recordings': research_data.get('recordings', [])[:10]
-        }
-        
-        return structured
-    
-    def generate_complete_sql(self, structured_data):
-        """Generate complete SQL INSERT statements for all tables"""
-        sql_parts = []
-        song = structured_data['song']
-        performers = structured_data.get('performers', [])
-        recordings = structured_data.get('recordings', [])
-        
-        title = song['title']
-        composer = song.get('composer', '')
-        structure = song.get('structure', '')
-        ext_refs = json.dumps(song.get('external_references', {}))
-        
-        sql_parts.append(f"""
--- ============================================================================
--- Song: {title}
--- Source: JazzStandards.com (priority) + Wikipedia + MusicBrainz
--- ============================================================================
+	def format_for_database(self, research_data):
+		"""Format research data for database insertion"""
+		song_name = research_data['song_name']
+		extracted = research_data.get('extracted_data', {})
+		sources = research_data.get('sources', {})
+		
+		external_refs = {}
+		if 'jazzstandards' in sources:
+			external_refs['jazzstandards'] = sources['jazzstandards'].get('url')
+		if 'wikipedia' in sources:
+			external_refs['wikipedia'] = sources['wikipedia'].get('url')
+		
+		performers_dict = {}
+		for p in research_data.get('performers', []):
+			name = p['name']
+			if name not in performers_dict:
+				performers_dict[name] = p
+			elif p.get('instrument') and not performers_dict[name].get('instrument'):
+				performers_dict[name] = p
+		
+		performers = list(performers_dict.values())
+		
+		# Extract MusicBrainz ID if available
+		musicbrainz_id = None
+		if 'musicbrainz' in sources:
+			musicbrainz_id = sources['musicbrainz'].get('work_id')
+		
+		structured = {
+			'song': {
+				'title': song_name,
+				'composer': extracted.get('composer'),
+				'structure': None,
+				'external_references': external_refs,
+				'notes': extracted.get('description'),
+				'year': extracted.get('year'),
+				'musical_info': extracted.get('musical_info', {}),
+				'musicbrainz_id': musicbrainz_id
+			},
+			'performers': performers[:10],
+			'recordings': research_data.get('recordings', [])[:10]
+		}
+		
+		return structured
 
--- Insert song (only if not exists)
-INSERT INTO songs (title, composer, structure, external_references)
-SELECT 
-    '{title.replace("'", "''")}',
-    {f"'{composer.replace("'", "''")}'" if composer else "NULL"},
-    {f"'{structure.replace("'", "''")}'" if structure else "NULL"},
-    '{ext_refs}'::jsonb
-WHERE NOT EXISTS (
-    SELECT 1 FROM songs WHERE title = '{title.replace("'", "''")}'
-);
-""")
-        
+	def generate_complete_sql(self, structured_data):
+		"""Generate complete SQL INSERT statements for all tables"""
+		sql_parts = []
+		song = structured_data['song']
+		performers = structured_data.get('performers', [])
+		recordings = structured_data.get('recordings', [])
+		
+		title = song['title']
+		composer = song.get('composer', '')
+		structure = song.get('structure', '')
+		ext_refs = json.dumps(song.get('external_references', {}))
+		musicbrainz_id = song.get('musicbrainz_id')
+		
+		sql_parts.append(f"""
+	-- ============================================================================
+	-- Song: {title}
+	-- Source: JazzStandards.com (priority) + Wikipedia + MusicBrainz
+	-- MusicBrainz ID: {musicbrainz_id or 'N/A'}
+	-- ============================================================================
+	
+	-- Insert song (only if not exists)
+	INSERT INTO songs (title, composer, structure, external_references, musicbrainz_id)
+	SELECT 
+		'{title.replace("'", "''")}',
+		{f"'{composer.replace("'", "''")}'" if composer else "NULL"},
+		{f"'{structure.replace("'", "''")}'" if structure else "NULL"},
+		'{ext_refs}'::jsonb,
+		{f"'{musicbrainz_id}'" if musicbrainz_id else "NULL"}
+	WHERE NOT EXISTS (
+		SELECT 1 FROM songs 
+		WHERE title = '{title.replace("'", "''")}'
+		{f"OR musicbrainz_id = '{musicbrainz_id}'" if musicbrainz_id else ""}
+	);
+	""")
+		
         if performers:
             sql_parts.append("\n-- Insert performers (only if not exists)")
             for performer in performers:

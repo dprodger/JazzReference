@@ -192,8 +192,8 @@ def get_songs():
     try:
         if search_query:
             query = """
-                SELECT id, title, composer, structure, song_reference, external_references, 
-                       created_at, updated_at
+                SELECT id, title, composer, structure, song_reference, external_references,
+                       musicbrainz_id, created_at, updated_at
                 FROM songs
                 WHERE title ILIKE %s OR composer ILIKE %s
                 ORDER BY title
@@ -202,7 +202,7 @@ def get_songs():
         else:
             query = """
                 SELECT id, title, composer, structure, song_reference, external_references,
-                       created_at, updated_at
+                       musicbrainz_id, created_at, updated_at
                 FROM songs
                 ORDER BY title
             """
@@ -222,7 +222,7 @@ def get_song_detail(song_id):
         # Get song information
         song_query = """
             SELECT id, title, composer, structure, song_reference, external_references,
-                   created_at, updated_at
+                   musicbrainz_id, created_at, updated_at
             FROM songs
             WHERE id = %s
         """
@@ -269,7 +269,7 @@ def get_song_detail(song_id):
     except Exception as e:
         logger.error(f"Error fetching song detail: {e}")
         return jsonify({'error': 'Failed to fetch song detail', 'detail': str(e)}), 500
-
+        
 @app.route('/api/recordings/<recording_id>', methods=['GET'])
 def get_recording_detail(recording_id):
     """Get detailed information about a specific recording"""

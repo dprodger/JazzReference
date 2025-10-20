@@ -12,8 +12,10 @@ CREATE TABLE songs (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     title VARCHAR(255) NOT NULL,
     composer VARCHAR(500),
+    song_reference TEXT, -- written background information about the song
     structure TEXT, -- Chord progressions, form description
     external_references JSONB, -- Store Wikipedia links, book references, etc.
+	musicbrainz_id VARCHAR(36) UNIQUE;
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     created_by VARCHAR(100),
@@ -145,6 +147,8 @@ CREATE TABLE audit_log (
 CREATE INDEX idx_songs_title ON songs(title);
 -- CREATE INDEX idx_songs_title_trgm ON songs USING gin(title gin_trgm_ops);
 CREATE INDEX idx_songs_composer ON songs(composer);
+CREATE INDEX idx_songs_musicbrainz_id ON songs(musicbrainz_id);
+
 
 -- Performer indexes
 CREATE INDEX idx_performers_name ON performers(name);
@@ -271,6 +275,7 @@ ORDER BY p.name, r.recording_year DESC;
 -- ============================================================================
 
 COMMENT ON TABLE songs IS 'Core table storing jazz standard songs and compositions';
+COMMENT ON COLUMN songs.musicbrainz_id IS 'MusicBrainz Work ID for this song/composition';
 COMMENT ON TABLE recordings IS 'Specific recordings of songs with album and streaming information';
 COMMENT ON TABLE performers IS 'Jazz musicians and vocalists';
 COMMENT ON TABLE instruments IS 'Reference table for musical instruments';
