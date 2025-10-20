@@ -21,72 +21,94 @@ struct SongDetailView: View {
                 ProgressView("Loading...")
                     .padding()
             } else if let song = song {
-                VStack(alignment: .leading, spacing: 20) {
-                    // Song Information
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Song: " + song.title)
-                            .font(.largeTitle)
-                            .bold()
-                        
-                        if let composer = song.composer {
-                            Label {
-                                Text(composer)
-                                    .font(.title3)
-                            } icon: {
-                                Image(systemName: "music.note.list")
-                            }
-                            .foregroundColor(.secondary)
-                        }
-                        
-                        // Song Reference section - appears before Structure
-                        if let songReference = song.songReference {
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text("Information")
-                                    .font(.headline)
-                                Text(songReference)
-                                    .font(.body)
-                                    .foregroundColor(.secondary)
-                            }
-                            .padding()
-                            .background(Color(.systemGray6))
-                            .cornerRadius(10)
-                        }
-                        
-                        if let structure = song.structure {
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text("Structure")
-                                    .font(.headline)
-                                Text(structure)
-                                    .font(.body)
-                                    .foregroundColor(.secondary)
-                            }
-                            .padding()
-                            .background(Color(.systemGray6))
-                            .cornerRadius(10)
-                        }
+                VStack(alignment: .leading, spacing: 0) {
+                    // Styled Header
+                    HStack {
+                        Image(systemName: "music.note")
+                            .font(.title2)
+                            .foregroundColor(.white)
+                        Text("SONG")
+                            .font(.headline)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.white)
+                        Spacer()
                     }
                     .padding()
+                    .background(
+                        LinearGradient(
+                            gradient: Gradient(colors: [Color.blue, Color.blue.opacity(0.8)]),
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
                     
-                    Divider()
-                    
-                    // Recordings Section
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Recordings (\(song.recordings?.count ?? 0))")
-                            .font(.title2)
-                            .bold()
-                            .padding(.horizontal)
-                        
-                        if let recordings = song.recordings, !recordings.isEmpty {
-                            ForEach(recordings) { recording in
-                                NavigationLink(destination: RecordingDetailView(recordingId: recording.id)) {
-                                    RecordingRowView(recording: recording)
+                    VStack(alignment: .leading, spacing: 20) {
+                        // Song Information
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text(song.title)
+                                .font(.largeTitle)
+                                .bold()
+                            
+                            if let composer = song.composer {
+                                Label {
+                                    Text(composer)
+                                        .font(.title3)
+                                } icon: {
+                                    Image(systemName: "music.note.list")
                                 }
-                                .buttonStyle(.plain)
-                            }
-                        } else {
-                            Text("No recordings available")
                                 .foregroundColor(.secondary)
+                            }
+                            
+                            // Song Reference section
+                            if let songReference = song.songReference {
+                                VStack(alignment: .leading, spacing: 8) {
+                                    Text("Information")
+                                        .font(.headline)
+                                    Text(songReference)
+                                        .font(.body)
+                                        .foregroundColor(.secondary)
+                                }
                                 .padding()
+                                .background(Color(.systemGray6))
+                                .cornerRadius(10)
+                            }
+                            
+                            if let structure = song.structure {
+                                VStack(alignment: .leading, spacing: 8) {
+                                    Text("Structure")
+                                        .font(.headline)
+                                    Text(structure)
+                                        .font(.body)
+                                        .foregroundColor(.secondary)
+                                }
+                                .padding()
+                                .background(Color(.systemGray6))
+                                .cornerRadius(10)
+                            }
+                        }
+                        .padding()
+                        
+                        Divider()
+                        
+                        // Recordings Section
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Recordings (\(song.recordings?.count ?? 0))")
+                                .font(.title2)
+                                .bold()
+                                .padding(.horizontal)
+                            
+                            if let recordings = song.recordings, !recordings.isEmpty {
+                                ForEach(recordings) { recording in
+                                    NavigationLink(destination: RecordingDetailView(recordingId: recording.id)) {
+                                        RecordingRowView(recording: recording)
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            } else {
+                                Text("No recordings available")
+                                    .foregroundColor(.secondary)
+                                    .padding()
+                            }
                         }
                     }
                 }
@@ -108,4 +130,3 @@ struct SongDetailView: View {
 #Preview {
     SongDetailView(songId: "2e287025-9996-4fe3-aea6-872cd5f0b70c")
 }
-

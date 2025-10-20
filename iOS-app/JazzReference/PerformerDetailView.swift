@@ -38,91 +38,113 @@ struct PerformerDetailView: View {
                 ProgressView("Loading...")
                     .padding()
             } else if let performer = performer {
-                VStack(alignment: .leading, spacing: 20) {
-                    // Performer Information
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text(performer.name)
-                            .font(.largeTitle)
-                            .bold()
-                        
-                        // Birth and Death Dates
-                        if performer.birthDate != nil || performer.deathDate != nil {
-                            HStack {
-                                if let birthDate = performer.birthDate {
-                                    Text("Born: \(birthDate)")
-                                        .font(.subheadline)
-                                        .foregroundColor(.secondary)
-                                }
-                                
-                                if performer.birthDate != nil && performer.deathDate != nil {
-                                    Text("•")
-                                        .foregroundColor(.secondary)
-                                }
-                                
-                                if let deathDate = performer.deathDate {
-                                    Text("Died: \(deathDate)")
-                                        .font(.subheadline)
-                                        .foregroundColor(.secondary)
-                                }
-                            }
-                        }
-                        
-                        // Instruments
-                        if let instruments = performer.instruments, !instruments.isEmpty {
-                            HStack {
-                                Image(systemName: "music.note")
-                                    .foregroundColor(.blue)
-                                Text(instruments.map { $0.name }.joined(separator: ", "))
-                                    .font(.subheadline)
-                                    .foregroundColor(.secondary)
-                            }
-                        }
-                        
-                        // Biography
-                        if let biography = performer.biography {
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text("Biography")
-                                    .font(.headline)
-                                Text(biography)
-                                    .font(.body)
-                                    .foregroundColor(.secondary)
-                            }
-                            .padding()
-                            .background(Color(.systemGray6))
-                            .cornerRadius(10)
-                        }
+                VStack(alignment: .leading, spacing: 0) {
+                    // Styled Header
+                    HStack {
+                        Image(systemName: "person.fill")
+                            .font(.title2)
+                            .foregroundColor(.white)
+                        Text("ARTIST")
+                            .font(.headline)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.white)
+                        Spacer()
                     }
                     .padding()
+                    .background(
+                        LinearGradient(
+                            gradient: Gradient(colors: [Color.orange, Color.orange.opacity(0.8)]),
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
                     
-                    Divider()
-                    
-                    // Recordings Section
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Recordings (\(filteredRecordings.count))")
-                            .font(.title2)
-                            .bold()
-                            .padding(.horizontal)
-                        
-                        // Filter Picker
-                        Picker("Filter", selection: $selectedFilter) {
-                            ForEach(RecordingFilter.allCases, id: \.self) { filter in
-                                Text(filter.rawValue).tag(filter)
+                    VStack(alignment: .leading, spacing: 20) {
+                        // Performer Information
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text(performer.name)
+                                .font(.largeTitle)
+                                .bold()
+                            
+                            // Birth and Death Dates
+                            if performer.birthDate != nil || performer.deathDate != nil {
+                                HStack {
+                                    if let birthDate = performer.birthDate {
+                                        Text("Born: \(birthDate)")
+                                            .font(.subheadline)
+                                            .foregroundColor(.secondary)
+                                    }
+                                    
+                                    if performer.birthDate != nil && performer.deathDate != nil {
+                                        Text("•")
+                                            .foregroundColor(.secondary)
+                                    }
+                                    
+                                    if let deathDate = performer.deathDate {
+                                        Text("Died: \(deathDate)")
+                                            .font(.subheadline)
+                                            .foregroundColor(.secondary)
+                                    }
+                                }
+                            }
+                            
+                            // Instruments
+                            if let instruments = performer.instruments, !instruments.isEmpty {
+                                HStack {
+                                    Image(systemName: "music.note")
+                                        .foregroundColor(.blue)
+                                    Text(instruments.map { $0.name }.joined(separator: ", "))
+                                        .font(.subheadline)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                            
+                            // Biography
+                            if let biography = performer.biography {
+                                VStack(alignment: .leading, spacing: 8) {
+                                    Text("Biography")
+                                        .font(.headline)
+                                    Text(biography)
+                                        .font(.body)
+                                        .foregroundColor(.secondary)
+                                }
+                                .padding()
+                                .background(Color(.systemGray6))
+                                .cornerRadius(10)
                             }
                         }
-                        .pickerStyle(.segmented)
-                        .padding(.horizontal)
+                        .padding()
                         
-                        if !filteredRecordings.isEmpty {
-                            ForEach(filteredRecordings) { recording in
-                                NavigationLink(destination: RecordingDetailView(recordingId: recording.recordingId)) {
-                                    PerformerRecordingRowView(recording: recording)
+                        Divider()
+                        
+                        // Recordings Section
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Recordings (\(filteredRecordings.count))")
+                                .font(.title2)
+                                .bold()
+                                .padding(.horizontal)
+                            
+                            // Filter Picker
+                            Picker("Filter", selection: $selectedFilter) {
+                                ForEach(RecordingFilter.allCases, id: \.self) { filter in
+                                    Text(filter.rawValue).tag(filter)
                                 }
-                                .buttonStyle(.plain)
                             }
-                        } else {
-                            Text("No recordings found")
-                                .foregroundColor(.secondary)
-                                .padding()
+                            .pickerStyle(.segmented)
+                            .padding(.horizontal)
+                            
+                            if !filteredRecordings.isEmpty {
+                                ForEach(filteredRecordings) { recording in
+                                    NavigationLink(destination: RecordingDetailView(recordingId: recording.recordingId)) {
+                                        PerformerRecordingRowView(recording: recording)
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            } else {
+                                Text("No recordings found")
+                                    .foregroundColor(.secondary)
+                                    .padding()
+                            }
                         }
                     }
                 }
