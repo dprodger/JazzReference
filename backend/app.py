@@ -22,15 +22,25 @@ DB_CONFIG = {
 }
 
 def get_db_connection():
-    """Create and return a database connection"""
-    return psycopg.connect(
-        host=DB_CONFIG['host'],
-        dbname=DB_CONFIG['database'],
-        user=DB_CONFIG['user'],
-        password=DB_CONFIG['password'],
-        port=DB_CONFIG['port'],
-        row_factory=dict_row)
-
+    """Create and return a database connection with better error handling"""
+    try:
+        return psycopg.connect(
+            host=DB_CONFIG['host'],
+            dbname=DB_CONFIG['database'],
+            user=DB_CONFIG['user'],
+            password=DB_CONFIG['password'],
+            port=DB_CONFIG['port'],
+            row_factory=dict_row,
+            connect_timeout=10,
+            keepalives=1,
+            keepalives_idle=30,
+            keepalives_interval=10,
+            keepalives_count=5
+        )
+    except psycopg.OperationalError as e:
+        print(f"Database connection failed: {e}")
+        raise
+        
 @app.route('/api/songs', methods=['GET'])
 def get_songs():
     """Get all songs or search songs by title"""
