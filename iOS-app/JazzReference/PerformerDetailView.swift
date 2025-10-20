@@ -157,6 +157,17 @@ struct PerformerDetailView: View {
         }
         .navigationBarTitleDisplayMode(.inline)
         .task {
+            #if DEBUG
+            if ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1" {
+                // Use mock data for previews
+                let networkManager = NetworkManager()
+                performer = networkManager.fetchPerformerDetailSync(id: performerId)
+                isLoading = false
+                return
+            }
+            #endif
+            
+            // Real network call for production
             let networkManager = NetworkManager()
             performer = await networkManager.fetchPerformerDetail(id: performerId)
             isLoading = false
@@ -221,8 +232,14 @@ struct PerformerRecordingRowView: View {
     }
 }
 
-#Preview {
+#Preview("Performer - Full Details") {
     NavigationStack {
-        PerformerDetailView(performerId: "sample-id")
+        PerformerDetailView(performerId: "preview-performer-detail-1")
+    }
+}
+
+#Preview("Performer - Minimal") {
+    NavigationStack {
+        PerformerDetailView(performerId: "preview-performer-detail-2")
     }
 }

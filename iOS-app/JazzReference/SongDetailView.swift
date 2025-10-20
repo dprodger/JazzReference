@@ -120,6 +120,17 @@ struct SongDetailView: View {
         }
         .navigationBarTitleDisplayMode(.inline)
         .task {
+            #if DEBUG
+            if ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1" {
+                // Use mock data for previews
+                let networkManager = NetworkManager()
+                song = networkManager.fetchSongDetailSync(id: songId)
+                isLoading = false
+                return
+            }
+            #endif
+            
+            // Real network call for production
             let networkManager = NetworkManager()
             song = await networkManager.fetchSongDetail(id: songId)
             isLoading = false
@@ -127,6 +138,17 @@ struct SongDetailView: View {
     }
 }
 
-#Preview {
-    SongDetailView(songId: "2e287025-9996-4fe3-aea6-872cd5f0b70c")
+#Preview("Song with Recordings") {
+    NavigationStack {
+        SongDetailView(songId: "preview-song-1")
+            .onAppear {
+                // This simulates the data being loaded
+            }
+    }
+}
+
+#Preview("Song - Loading State") {
+    NavigationStack {
+        SongDetailView(songId: "loading-test")
+    }
 }

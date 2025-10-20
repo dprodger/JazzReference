@@ -167,9 +167,32 @@ struct RecordingDetailView: View {
         }
         .navigationBarTitleDisplayMode(.inline)
         .task {
+            #if DEBUG
+            if ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1" {
+                // Use mock data for previews
+                let networkManager = NetworkManager()
+                recording = networkManager.fetchRecordingDetailSync(id: recordingId)
+                isLoading = false
+                return
+            }
+            #endif
+            
+            // Real network call for production
             let networkManager = NetworkManager()
             recording = await networkManager.fetchRecordingDetail(id: recordingId)
             isLoading = false
         }
+    }
+}
+
+#Preview("Recording Detail - Full") {
+    NavigationStack {
+        RecordingDetailView(recordingId: "preview-recording-1")
+    }
+}
+
+#Preview("Recording Detail - Minimal") {
+    NavigationStack {
+        RecordingDetailView(recordingId: "preview-recording-3")
     }
 }
