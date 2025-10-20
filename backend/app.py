@@ -256,6 +256,88 @@ def get_performer_detail(performer_id):
     
     return jsonify(performer)
 
+@app.route('/api/performers', methods=['GET'])
+def get_performers():
+    """Get all performers or search performers by name"""
+    search_query = request.args.get('search', '')
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    if search_query:
+        cur.execute("""
+            SELECT id, name, biography, birth_date, death_date, external_links
+            FROM performers
+            WHERE name ILIKE %s
+            ORDER BY name
+        """, (f'%{search_query}%',))
+    else:
+        cur.execute("""
+            SELECT id, name, biography, birth_date, death_date, external_links
+            FROM performers
+            ORDER BY name
+        """)
+    
+    performers = cur.fetchall()
+    cur.close()
+    conn.close()
+    
+    return jsonify(performers)
+
+@app.route('/api/performers/<performer_id>', methods=['GET'])
+def get_performer_detail(performer_id):
+    """Get detailed information about a specific performer"""
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    # Get performer information
+    cur.execute("""
+        SELECT id, name, biography, birth_date, death_date, external_links
+        FROM performers
+        WHERE id = %s
+    """, (performer_id,))
+    
+    performer = cur.fetchone()
+    
+    if not performer:
+        cur.close()
+        conn.close()
+        return jsonify({'error': 'Performer not found'}), 404
+    
+    # Get instruments
+    cur.execute("""
+        SELECT i.name, pi.is_primary
+        FROM performer_instruments pi
+        JOIN instruments i ON pi.instrument_id = i.id
+        WHERE pi.performer_id = %s
+        ORDER BY pi.is_primary DESC, i.name
+    """, (performer_id,))
+    
+    instruments = cur.fetchall()
+    
+    # Get recordings where performer is a leader
+    cur.execute("""
+        SELECT DISTINCT s.id as song_id, s.title as song_title, 
+               r.id as recording_id, r.album_title, r.recording_year, 
+               r.is_canonical, rp.role
+        FROM recording_performers rp
+        JOIN recordings r ON rp.recording_id = r.id
+        JOIN songs s ON r.song_id = s.id
+        WHERE rp.performer_id = %s
+        ORDER BY r.recording_year DESC NULLS LAST, s.title
+    """, (performer_id,))
+    
+    recordings = cur.fetchall()
+    
+    performer = dict(performer)
+    performer['instruments'] = instruments
+    performer['recordings'] = recordings
+    
+    cur.close()
+    conn.close()
+    
+    return jsonify(performer)
+    
 @app.route('/api/health', methods=['GET'])
 def health_check():
     """Health check endpoint"""
