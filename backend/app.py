@@ -79,7 +79,7 @@ def get_song_detail(song_id):
     
     # Get song information
     cur.execute("""
-        SELECT id, title, composer, structure, external_references,
+        SELECT id, title, composer, structure, song_reference, external_references,
                created_at, updated_at
         FROM songs
         WHERE id = %s
