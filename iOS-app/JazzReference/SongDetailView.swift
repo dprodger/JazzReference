@@ -104,3 +104,8 @@ struct SongDetailView: View {
         }
     }
 }
+
+#Preview {
+    SongDetailView(songId: "2e287025-9996-4fe3-aea6-872cd5f0b70c")
+}
+
