@@ -90,8 +90,13 @@ def init_connection_pool(max_retries=3, retry_delay=2):
 @contextmanager
 def get_db_connection():
     """Get a database connection from the pool with error handling"""
+    global pool
+    
+    # Lazy initialization - create pool on first request if not exists
     if pool is None:
-        raise RuntimeError("Connection pool not initialized")
+        logger.info("Connection pool not initialized, initializing now...")
+        if not init_connection_pool():
+            raise RuntimeError("Failed to initialize connection pool")
     
     conn = None
     try:
@@ -393,10 +398,10 @@ def log_response(response):
     return response
 
 if __name__ == '__main__':
-    # Initialize connection pool before starting the app
-    if not init_connection_pool():
-        logger.error("Failed to initialize database connection pool. Exiting.")
-        exit(1)
+    # Don't initialize pool at startup - let it initialize on first request
+    # This prevents deployment failures if DB is temporarily unavailable
+    logger.info("Starting Flask application...")
+    logger.info("Database connection pool will initialize on first request")
     
     try:
         app.run(debug=True, host='0.0.0.0', port=5001)
