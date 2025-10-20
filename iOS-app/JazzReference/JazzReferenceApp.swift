@@ -71,75 +71,74 @@ struct Performer: Codable, Identifiable {
     }
 }
 
-// MARK: - Main View
-
-struct ContentView: View {
-    @StateObject private var networkManager = NetworkManager()
-    @State private var searchText = ""
-    @State private var searchTask: Task<Void, Never>?
+struct PerformerDetail: Codable, Identifiable {
+    let id: String
+    let name: String
+    let biography: String?
+    let birthDate: String?
+    let deathDate: String?
+    let externalLinks: [String: String]?
+    let instruments: [PerformerInstrument]?
+    let recordings: [PerformerRecording]?
     
-    var body: some View {
-        NavigationStack {
-            VStack {
-                if networkManager.isLoading {
-                    ProgressView("Loading songs...")
-                        .padding()
-                } else if let error = networkManager.errorMessage {
-                    VStack(spacing: 16) {
-                        Image(systemName: "exclamationmark.triangle")
-                            .font(.system(size: 50))
-                            .foregroundColor(.orange)
-                        Text("Error")
-                            .font(.headline)
-                        Text(error)
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal)
-                        Button("Retry") {
-                            Task {
-                                await networkManager.fetchSongs()
-                            }
-                        }
-                        .buttonStyle(.borderedProminent)
-                    }
-                    .padding()
-                } else {
-                    List(networkManager.songs) { song in
-                        NavigationLink(destination: SongDetailView(songId: song.id)) {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(song.title)
-                                    .font(.headline)
-                                if let composer = song.composer {
-                                    Text(composer)
-                                        .font(.subheadline)
-                                        .foregroundColor(.secondary)
-                                }
-                            }
-                            .padding(.vertical, 4)
-                        }
-                    }
-                    .listStyle(.insetGrouped)
-                }
-            }
-            .navigationTitle("Jazz Standards")
-            .searchable(text: $searchText, prompt: "Search songs")
-            .onChange(of: searchText) { oldValue, newValue in
-                searchTask?.cancel()
-                searchTask = Task {
-                    try? await Task.sleep(nanoseconds: 300_000_000) // 0.3 second debounce
-                    if !Task.isCancelled {
-                        await networkManager.fetchSongs(searchQuery: newValue)
-                    }
-                }
-            }
-            .task {
-                await networkManager.fetchSongs()
-            }
-        }
+    enum CodingKeys: String, CodingKey {
+        case id, name, biography, instruments, recordings
+        case birthDate = "birth_date"
+        case deathDate = "death_date"
+        case externalLinks = "external_links"
     }
 }
 
+struct PerformerInstrument: Codable {
+    let name: String
+    let isPrimary: Bool?
+    
+    enum CodingKeys: String, CodingKey {
+        case name
+        case isPrimary = "is_primary"
+    }
+}
+
+struct PerformerRecording: Codable, Identifiable {
+    let songId: String
+    let songTitle: String
+    let recordingId: String
+    let albumTitle: String?
+    let recordingYear: Int?
+    let isCanonical: Bool?
+    let role: String?
+    
+    var id: String { recordingId }
+    
+    enum CodingKeys: String, CodingKey {
+        case songId = "song_id"
+        case songTitle = "song_title"
+        case recordingId = "recording_id"
+        case albumTitle = "album_title"
+        case recordingYear = "recording_year"
+        case isCanonical = "is_canonical"
+        case role
+    }
+}
+// MARK: - Main View
+
+// MARK: - Main View
+
+struct ContentView: View {
+    var body: some View {
+        TabView {
+            SongsListView()
+                .tabItem {
+                    Label("Songs", systemImage: "music.note.list")
+                }
+            
+            ArtistsListView()
+                .tabItem {
+                    Label("Artists", systemImage: "person.2.fill")
+                }
+        }
+    }
+}
 
 
 // MARK: - App Entry Point

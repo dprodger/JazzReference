@@ -3,12 +3,10 @@ import SwiftUI
 import Combine
 
 class NetworkManager: ObservableObject {
-    // Change this to your Flask API URL
-    // For local testing: "http://localhost:5001"
-    // For simulator with local Flask: "http://127.0.0.1:5001"
     static let baseURL = "https://jazzreference.onrender.com/api"
     
     @Published var songs: [Song] = []
+    @Published var performers: [Performer] = []
     @Published var isLoading = false
     @Published var errorMessage: String?
     
@@ -47,6 +45,41 @@ class NetworkManager: ObservableObject {
         }
     }
     
+    func fetchPerformers(searchQuery: String = "") async {
+        await MainActor.run {
+            isLoading = true
+            errorMessage = nil
+        }
+        
+        var urlString = "\(NetworkManager.baseURL)/performers"
+        if !searchQuery.isEmpty {
+            urlString += "?search=\(searchQuery.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")"
+        }
+        
+        guard let url = URL(string: urlString) else {
+            await MainActor.run {
+                errorMessage = "Invalid URL"
+                isLoading = false
+            }
+            return
+        }
+        
+        do {
+            let (data, _) = try await URLSession.shared.data(from: url)
+            let decodedPerformers = try JSONDecoder().decode([Performer].self, from: data)
+            
+            await MainActor.run {
+                self.performers = decodedPerformers
+                self.isLoading = false
+            }
+        } catch {
+            await MainActor.run {
+                self.errorMessage = "Failed to fetch performers: \(error.localizedDescription)"
+                self.isLoading = false
+            }
+        }
+    }
+    
     func fetchSongDetail(id: String) async -> Song? {
         guard let url = URL(string: "\(NetworkManager.baseURL)/songs/\(id)") else {
             return nil
@@ -73,6 +106,21 @@ class NetworkManager: ObservableObject {
             return recording
         } catch {
             print("Error fetching recording detail: \(error)")
+            return nil
+        }
+    }
+    
+    func fetchPerformerDetail(id: String) async -> PerformerDetail? {
+        guard let url = URL(string: "\(NetworkManager.baseURL)/performers/\(id)") else {
+            return nil
+        }
+        
+        do {
+            let (data, _) = try await URLSession.shared.data(from: url)
+            let performer = try JSONDecoder().decode(PerformerDetail.self, from: data)
+            return performer
+        } catch {
+            print("Error fetching performer detail: \(error)")
             return nil
         }
     }
