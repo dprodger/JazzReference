@@ -24,7 +24,7 @@ struct SongDetailView: View {
                 VStack(alignment: .leading, spacing: 20) {
                     // Song Information
                     VStack(alignment: .leading, spacing: 12) {
-                        Text(song.title)
+                        Text("Song: " + song.title)
                             .font(.largeTitle)
                             .bold()
                         
@@ -38,6 +38,19 @@ struct SongDetailView: View {
                             .foregroundColor(.secondary)
                         }
                         
+                        if let song_reference = song.song_reference {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Information")
+                                    .font(.headline)
+                                Text(song_reference)
+                                    .font(.body)
+                                    .foregroundColor(.secondary)
+                            }
+                            .padding()
+                            .background(Color(.systemGray6))
+                            .cornerRadius(10)
+                        }
+
                         if let structure = song.structure {
                             VStack(alignment: .leading, spacing: 8) {
                                 Text("Structure")

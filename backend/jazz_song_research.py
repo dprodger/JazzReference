@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Jazz Song Information Gatherer - Enhanced Version
+Jazz Song Information Gatherer - Enhanced Version with JazzStandards.com
 Searches for detailed information about a jazz standard including recordings and performers
 """
 
@@ -11,13 +11,206 @@ import requests
 from bs4 import BeautifulSoup
 from urllib.parse import quote, urljoin
 from datetime import datetime
+import time
 
 class JazzSongResearcher:
     def __init__(self):
         self.session = requests.Session()
         self.session.headers.update({
-            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.5',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1'
         })
+    
+    def normalize_song_name_for_url(self, song_name):
+        """Convert song name to JazzStandards.com URL format"""
+        # Remove articles, apostrophes, and special characters
+        name = song_name.lower()
+        name = re.sub(r'^(a|an|the)\s+', '', name)
+        name = re.sub(r'[\'"\(\),\.]', '', name)
+        name = re.sub(r'\s+', '', name)
+        name = re.sub(r'[^\w]', '', name)
+        return name
+    
+    def search_jazzstandards_com(self, song_name):
+        """
+        Search JazzStandards.com for song information and recommended recordings
+        """
+        print(f"Searching JazzStandards.com for: {song_name}", file=sys.stderr)
+        
+        # Try to construct direct URL (JazzStandards.com uses lowercase, no spaces)
+        normalized_name = self.normalize_song_name_for_url(song_name)
+        
+        # Try different directory patterns (they organize by first character)
+        first_char = normalized_name[0] if normalized_name else 'a'
+        # Map numbers to their word equivalents
+        char_map = {
+            '0': '0', '1': '1', '2': '2', '3': '3', '4': '4',
+            '5': '5', '6': '6', '7': '7', '8': '8', '9': '9'
+        }
+        dir_num = char_map.get(first_char, first_char)
+        
+        possible_urls = [
+            f"https://www.jazzstandards.com/compositions-{dir_num}/{normalized_name}.htm",
+            f"https://www.jazzstandards.com/compositions/{normalized_name}.htm",
+            f"https://www.jazzstandards.com/compositions-0/{normalized_name}.htm",
+        ]
+        
+        for url in possible_urls:
+            try:
+                time.sleep(1)  # Be respectful
+                response = self.session.get(url, timeout=10)
+                
+                if response.status_code == 200:
+                    print(f"✓ Found page: {url}", file=sys.stderr)
+                    return self.parse_jazzstandards_page(response.text, url)
+                    
+            except Exception as e:
+                print(f"  Tried {url}: {e}", file=sys.stderr)
+                continue
+        
+        print("✗ Could not find song on JazzStandards.com", file=sys.stderr)
+        return None
+    
+    def parse_jazzstandards_page(self, html_content, url):
+        """Parse JazzStandards.com page to extract information"""
+        soup = BeautifulSoup(html_content, 'html.parser')
+        
+        result = {
+            'url': url,
+            'composer': None,
+            'year': None,
+            'description': None,
+            'recommended_recordings': [],
+            'musical_info': {}
+        }
+        
+        # Extract composer information
+        composer_patterns = [
+            (r'Music by ([^,\n<]+)', 'composer'),
+            (r'Lyrics by ([^,\n<]+)', 'lyricist'),
+            (r'Composed by ([^,\n<]+)', 'composer'),
+        ]
+        
+        text_content = soup.get_text()
+        for pattern, role in composer_patterns:
+            match = re.search(pattern, text_content, re.IGNORECASE)
+            if match:
+                result[role] = match.group(1).strip()
+        
+        # Extract year
+        year_match = re.search(r'\b(19\d{2}|20\d{2})\b', text_content)
+        if year_match:
+            result['year'] = int(year_match.group(1))
+        
+        # Look for "Recommendations for this Tune" section
+        recommendations_section = soup.find(string=re.compile(r'Recommendations?\s+for\s+this\s+Tune', re.IGNORECASE))
+        
+        if recommendations_section:
+            # Find the parent element and look for recording information
+            parent = recommendations_section.find_parent()
+            if parent:
+                # Look for subsequent text or tables
+                recordings = self.extract_recommendations(parent)
+                result['recommended_recordings'] = recordings
+        
+        # Alternative: Look for any bold text followed by album/year info
+        if not result['recommended_recordings']:
+            result['recommended_recordings'] = self.extract_recordings_alternative(soup)
+        
+        # Extract key, tempo, form if available
+        musical_terms = ['Key:', 'Form:', 'Tempo:', 'Time Signature:']
+        for term in musical_terms:
+            match = re.search(f'{term}\\s*([^\\n<]+)', text_content, re.IGNORECASE)
+            if match:
+                key = term.replace(':', '').lower().replace(' ', '_')
+                result['musical_info'][key] = match.group(1).strip()
+        
+        # Get description (first substantial paragraph)
+        paragraphs = soup.find_all('p')
+        for p in paragraphs:
+            text = p.get_text().strip()
+            if len(text) > 100:  # Substantial paragraph
+                result['description'] = text[:500]
+                break
+        
+        return result
+    
+    def extract_recommendations(self, parent_element):
+        """Extract recommended recordings from JazzStandards.com recommendations section"""
+        recordings = []
+        
+        # Look for patterns like: "Artist - Album (Year)"
+        text = parent_element.get_text()
+        
+        # Pattern 1: Artist - Album (Year)
+        pattern1 = r'([A-Z][^-\n]+?)\s*[-–]\s*([^(\n]+?)\s*\((\d{4})\)'
+        matches = re.finditer(pattern1, text)
+        for match in matches:
+            artist = match.group(1).strip()
+            album = match.group(2).strip()
+            year = match.group(3).strip()
+            
+            if len(artist) > 2 and len(album) > 2:
+                recordings.append({
+                    'artist': artist,
+                    'album': album,
+                    'year': int(year) if year.isdigit() else None,
+                    'source': 'jazzstandards.com',
+                    'is_recommended': True
+                })
+        
+        # Pattern 2: Look for table rows if structured differently
+        if not recordings:
+            # Try finding in lists or table structures
+            for li in parent_element.find_all('li'):
+                text = li.get_text()
+                match = re.search(r'([^-\n]+?)\s*[-–]\s*([^(\n]+?)\s*\((\d{4})\)', text)
+                if match:
+                    recordings.append({
+                        'artist': match.group(1).strip(),
+                        'album': match.group(2).strip(),
+                        'year': int(match.group(3)) if match.group(3).isdigit() else None,
+                        'source': 'jazzstandards.com',
+                        'is_recommended': True
+                    })
+        
+        return recordings[:10]  # Limit to top 10
+    
+    def extract_recordings_alternative(self, soup):
+        """Alternative method to extract recordings from page"""
+        recordings = []
+        
+        # Look for bold text (artist names) followed by album info
+        bold_elements = soup.find_all(['b', 'strong'])
+        
+        for bold in bold_elements:
+            artist = bold.get_text().strip()
+            
+            # Get the next sibling text
+            next_text = ''
+            next_sibling = bold.next_sibling
+            if next_sibling:
+                if isinstance(next_sibling, str):
+                    next_text = next_sibling
+                else:
+                    next_text = next_sibling.get_text()
+            
+            # Look for album and year in the next text
+            album_match = re.search(r'[-–]\s*([^(\n]+?)\s*\((\d{4})\)', next_text)
+            if album_match and len(artist) > 2:
+                recordings.append({
+                    'artist': artist,
+                    'album': album_match.group(1).strip(),
+                    'year': int(album_match.group(2)),
+                    'source': 'jazzstandards.com',
+                    'is_recommended': True
+                })
+        
+        return recordings[:10]
     
     def search_wikipedia(self, song_name):
         """Search Wikipedia for song information"""
@@ -35,7 +228,6 @@ class JazzSongResearcher:
             data = response.json()
             
             if data.get('query', {}).get('search'):
-                # Get the first result
                 page_title = data['query']['search'][0]['title']
                 return self.get_wikipedia_page(page_title)
         except Exception as e:
@@ -65,7 +257,6 @@ class JazzSongResearcher:
                 page = list(pages.values())[0]
                 extract = page.get('extract', '')
                 
-                # Try to find canonical recording info in the extract
                 canonical_info = self.extract_canonical_recording(extract)
                 
                 return {
@@ -84,7 +275,6 @@ class JazzSongResearcher:
         if not text:
             return None
         
-        # Look for patterns like "recorded by", "famous recording by", etc.
         patterns = [
             r'(?:recorded|performed|version) by ([^,.\n]+?)(?:in|on|\(|,|\.)(\d{4})?',
             r'([A-Z][a-z]+ [A-Z][a-z]+)(?:\'s| (?:recorded|version|recording))',
@@ -98,7 +288,6 @@ class JazzSongResearcher:
                 artist = match.group(1).strip()
                 year = match.group(2) if len(match.groups()) > 1 else None
                 
-                # Filter out common false positives
                 if len(artist) > 3 and not any(word in artist.lower() for word in ['the song', 'the tune', 'this']):
                     recordings.append({
                         'artist': artist,
@@ -108,12 +297,12 @@ class JazzSongResearcher:
         return recordings[:3] if recordings else None
     
     def search_musicbrainz_recordings(self, song_name):
-        """Search MusicBrainz for actual recordings of the song with improved filtering"""
+        """Search MusicBrainz for actual recordings of the song (fallback)"""
         search_url = "https://musicbrainz.org/ws/2/recording/"
         params = {
-            'query': f'recording:"{song_name}" AND status:official',  # Official releases only
+            'query': f'recording:"{song_name}"',
             'fmt': 'json',
-            'limit': 30  # Request more to filter from
+            'limit': 10
         }
         
         try:
@@ -122,40 +311,20 @@ class JazzSongResearcher:
                 data = response.json()
                 recordings = []
                 
-                for rec in data.get('recordings', []):
-                    # Skip if no releases
-                    if not rec.get('releases'):
-                        continue
-                    
-                    # Get official releases only
-                    official_releases = [r for r in rec['releases']
-                                       if r.get('status') == 'Official']
-                    
-                    if not official_releases:
-                        continue
-                    
-                    # Sort by date to get earliest (canonical recordings tend to be older)
-                    sorted_releases = sorted(official_releases,
-                                           key=lambda x: x.get('date', '9999'))
-                    
-                    release = sorted_releases[0]
-                    
-                    # Skip compilations and tributes
-                    title_lower = release.get('title', '').lower()
-                    skip_words = ['compilation', 'tribute', 'best of', 'greatest hits',
-                                 'collection', 'anthology']
-                    if any(word in title_lower for word in skip_words):
-                        continue
+                for rec in data.get('recordings', [])[:5]:
+                    album_title = None
+                    if rec.get('releases'):
+                        album_title = rec['releases'][0].get('title')
                     
                     recording_info = {
-                        'musicbrainz_id': rec.get('id'),
-                        'title': release.get('title'),
+                        'musicbrainz_id': rec.get('id'), 
+                        'title': album_title or rec.get('title'),
                         'artist': None,
-                        'date': release.get('date', '')[:4] if release.get('date') else None,
+                        'date': None,
                         'length': rec.get('length'),
+                        'source': 'musicbrainz'
                     }
                     
-                    # Get artist info
                     if rec.get('artist-credit'):
                         artists = []
                         for artist in rec['artist-credit']:
@@ -163,11 +332,13 @@ class JazzSongResearcher:
                                 artists.append(artist['artist'].get('name'))
                         recording_info['artist'] = ', '.join(artists) if artists else None
                     
-                    recordings.append(recording_info)
+                    if rec.get('releases'):
+                        for release in rec['releases']:
+                            if release.get('date'):
+                                recording_info['date'] = release['date'][:4]
+                                break
                     
-                    # Stop once we have 10 good recordings
-                    if len(recordings) >= 10:
-                        break
+                    recordings.append(recording_info)
                 
                 return recordings
         except Exception as e:
@@ -180,7 +351,6 @@ class JazzSongResearcher:
         if not text:
             return None
         
-        # Common patterns for composer attribution
         patterns = [
             r'composed by ([^,.\n]+?)(?:\.|,|\n|and)',
             r'music by ([^,.\n]+?)(?:\.|,|\n|and)',
@@ -192,7 +362,6 @@ class JazzSongResearcher:
             match = re.search(pattern, text, re.IGNORECASE)
             if match:
                 composer = match.group(1).strip()
-                # Clean up common artifacts
                 composer = re.sub(r'\s+and\s+.*$', '', composer, flags=re.IGNORECASE)
                 return composer
         
@@ -203,7 +372,6 @@ class JazzSongResearcher:
         if not text:
             return None
         
-        # Look for year patterns near composition/written indicators
         patterns = [
             r'(?:written|composed|recorded) in (\d{4})',
             r'\((\d{4})\)',
@@ -215,7 +383,6 @@ class JazzSongResearcher:
             match = re.search(pattern, text)
             if match:
                 year = int(match.group(1))
-                # Sanity check - jazz standards range
                 if 1900 <= year <= 2025:
                     return year
         
@@ -225,7 +392,6 @@ class JazzSongResearcher:
         """Extract performer names and try to identify instruments"""
         performers = []
         
-        # Common jazz instrument patterns
         instrument_patterns = [
             (r'([A-Z][a-z]+ [A-Z][a-z]+)\s+(?:on |plays? )?(?:the )?(trumpet|piano|bass|drums|saxophone|sax|guitar|trombone|clarinet|vibraphone|organ)', 'instrument_explicit'),
             (r'([A-Z][a-z]+ [A-Z][a-z]+),?\s+(trumpet|piano|bass|drums|saxophone|sax|guitar|trombone|clarinet|vibraphone|organ)(?:ist)?', 'instrument_suffix'),
@@ -237,7 +403,6 @@ class JazzSongResearcher:
                 name = match.group(1).strip()
                 instrument = match.group(2).strip().lower()
                 
-                # Normalize instrument names
                 if 'sax' in instrument and instrument != 'saxophone':
                     instrument = 'saxophone'
                 
@@ -250,7 +415,7 @@ class JazzSongResearcher:
         return performers
     
     def research_song(self, song_name):
-        """Main research function"""
+        """Main research function with JazzStandards.com priority"""
         print(f"Researching: {song_name}", file=sys.stderr)
         print("=" * 60, file=sys.stderr)
         
@@ -262,53 +427,76 @@ class JazzSongResearcher:
             'performers': []
         }
         
-        # Search Wikipedia
+        # PRIORITY: Search JazzStandards.com first
+        print("Searching JazzStandards.com...", file=sys.stderr)
+        js_data = self.search_jazzstandards_com(song_name)
+        if js_data:
+            result['sources']['jazzstandards'] = js_data
+            print(f"✓ Found on JazzStandards.com", file=sys.stderr)
+            
+            # Prefer JazzStandards.com data
+            if js_data.get('composer'):
+                result['extracted_data']['composer'] = js_data['composer']
+            if js_data.get('year'):
+                result['extracted_data']['year'] = js_data['year']
+            if js_data.get('description'):
+                result['extracted_data']['description'] = js_data['description']
+            if js_data.get('musical_info'):
+                result['extracted_data']['musical_info'] = js_data['musical_info']
+            
+            # Add recommended recordings (these are canonical!)
+            if js_data.get('recommended_recordings'):
+                result['recordings'].extend(js_data['recommended_recordings'])
+                print(f"✓ Found {len(js_data['recommended_recordings'])} recommended recordings", file=sys.stderr)
+        else:
+            print("✗ Not found on JazzStandards.com", file=sys.stderr)
+        
+        # Search Wikipedia as secondary source
         print("Searching Wikipedia...", file=sys.stderr)
         wiki_data = self.search_wikipedia(song_name)
         if wiki_data:
             result['sources']['wikipedia'] = wiki_data
             print(f"✓ Found Wikipedia article: {wiki_data.get('title')}", file=sys.stderr)
             
-            # Extract data
             extract = wiki_data.get('extract', '')
-            result['extracted_data']['composer'] = self.extract_composer_info(extract)
-            result['extracted_data']['year'] = self.extract_year(extract)
-            result['extracted_data']['description'] = extract[:500] if extract else None
             
-            # Extract canonical recordings from Wikipedia
+            # Only fill in missing data
+            if not result['extracted_data'].get('composer'):
+                result['extracted_data']['composer'] = self.extract_composer_info(extract)
+            if not result['extracted_data'].get('year'):
+                result['extracted_data']['year'] = self.extract_year(extract)
+            if not result['extracted_data'].get('description'):
+                result['extracted_data']['description'] = extract[:500] if extract else None
+            
             if wiki_data.get('canonical_recording'):
                 result['extracted_data']['canonical_recordings'] = wiki_data['canonical_recording']
             
-            # Extract performers mentioned in the text
             performers = self.parse_performers_from_text(extract, result['extracted_data'].get('year'))
             result['performers'].extend(performers)
-            
         else:
             print("✗ No Wikipedia article found", file=sys.stderr)
         
-        # Search MusicBrainz for recordings
-        print("Searching MusicBrainz for recordings...", file=sys.stderr)
-        mb_recordings = self.search_musicbrainz_recordings(song_name)
-        if mb_recordings:
-            result['recordings'] = mb_recordings
-            print(f"✓ Found {len(mb_recordings)} quality MusicBrainz recordings", file=sys.stderr)
-            
-            # Add artists as performers
-            for rec in mb_recordings:
-                if rec.get('artist'):
-                    # Split multiple artists
-                    artists = [a.strip() for a in rec['artist'].split(',')]
-                    for artist in artists:
-                        if artist and len(artist) > 2:
-                            result['performers'].append({
-                                'name': artist,
-                                'instrument': None,
-                                'year': rec.get('date')
-                            })
-        else:
-            print("✗ No MusicBrainz recordings found", file=sys.stderr)
+        # Only use MusicBrainz if we don't have recordings from JazzStandards
+        if not result['recordings']:
+            print("Searching MusicBrainz for recordings (fallback)...", file=sys.stderr)
+            mb_recordings = self.search_musicbrainz_recordings(song_name)
+            if mb_recordings:
+                result['recordings'] = mb_recordings
+                print(f"✓ Found {len(mb_recordings)} MusicBrainz recordings", file=sys.stderr)
+                
+                for rec in mb_recordings:
+                    if rec.get('artist'):
+                        artists = [a.strip() for a in rec['artist'].split(',')]
+                        for artist in artists:
+                            if artist and len(artist) > 2:
+                                result['performers'].append({
+                                    'name': artist,
+                                    'instrument': None,
+                                    'year': rec.get('date')
+                                })
+            else:
+                print("✗ No MusicBrainz recordings found", file=sys.stderr)
         
-        # Generate structured output
         result['structured_output'] = self.format_for_database(result)
         
         return result
@@ -319,24 +507,22 @@ class JazzSongResearcher:
         extracted = research_data.get('extracted_data', {})
         sources = research_data.get('sources', {})
         
-        # Build external references
         external_refs = {}
+        if 'jazzstandards' in sources:
+            external_refs['jazzstandards'] = sources['jazzstandards'].get('url')
         if 'wikipedia' in sources:
             external_refs['wikipedia'] = sources['wikipedia'].get('url')
         
-        # Deduplicate performers
         performers_dict = {}
         for p in research_data.get('performers', []):
             name = p['name']
             if name not in performers_dict:
                 performers_dict[name] = p
             elif p.get('instrument') and not performers_dict[name].get('instrument'):
-                # Update with instrument info if we have it
                 performers_dict[name] = p
         
         performers = list(performers_dict.values())
         
-        # Build structured data
         structured = {
             'song': {
                 'title': song_name,
@@ -344,10 +530,11 @@ class JazzSongResearcher:
                 'structure': None,
                 'external_references': external_refs,
                 'notes': extracted.get('description'),
-                'year': extracted.get('year')
+                'year': extracted.get('year'),
+                'musical_info': extracted.get('musical_info', {})
             },
-            'performers': performers[:10],  # Limit to top 10
-            'recordings': research_data.get('recordings', [])[:10]  # Now 10 recordings
+            'performers': performers[:10],
+            'recordings': research_data.get('recordings', [])[:10]
         }
         
         return structured
@@ -359,7 +546,6 @@ class JazzSongResearcher:
         performers = structured_data.get('performers', [])
         recordings = structured_data.get('recordings', [])
         
-        # Generate song insert
         title = song['title']
         composer = song.get('composer', '')
         structure = song.get('structure', '')
@@ -368,6 +554,7 @@ class JazzSongResearcher:
         sql_parts.append(f"""
 -- ============================================================================
 -- Song: {title}
+-- Source: JazzStandards.com (priority) + Wikipedia + MusicBrainz
 -- ============================================================================
 
 -- Insert song (only if not exists)
@@ -382,7 +569,6 @@ WHERE NOT EXISTS (
 );
 """)
         
-        # Generate performer inserts
         if performers:
             sql_parts.append("\n-- Insert performers (only if not exists)")
             for performer in performers:
@@ -397,7 +583,6 @@ WHERE NOT EXISTS (
 );
 """)
                 
-                # If we have instrument info, link it
                 if instrument:
                     sql_parts.append(f"""
 -- Link {name} to instrument (only if not exists)
@@ -412,41 +597,37 @@ WHERE p.name = '{name.replace("'", "''")}'
   );
 """)
         
-        # Generate recording inserts
         if recordings:
-            sql_parts.append("\n-- Insert recordings")
+            sql_parts.append("\n-- Insert recordings (JazzStandards.com recommendations marked as canonical)")
             for i, recording in enumerate(recordings, 1):
-                album = recording.get('title', f'Recording {i}')
+                album = recording.get('album') or recording.get('title', f'Recording {i}')
                 artist = recording.get('artist', '')
-                year = recording.get('date')
-                mb_id = recording.get('musicbrainz_id', '')
+                year = recording.get('year') or recording.get('date')
                 
-                is_canonical = 'true' if i == 1 else 'false'  # Mark first as canonical
+                # Mark JazzStandards.com recommendations as canonical
+                is_recommended = recording.get('is_recommended', False)
+                is_canonical = 'true' if is_recommended else 'false'
+                source = recording.get('source', 'unknown')
                 
                 sql_parts.append(f"""
--- Recording: {album} by {artist}
+-- Recording: {album} by {artist} [Source: {source}]
 DO $$
 DECLARE
     v_song_id UUID;
     v_recording_id UUID;
 BEGIN
-    -- Get song ID
     SELECT id INTO v_song_id FROM songs WHERE title = '{title.replace("'", "''")}';
     
     IF v_song_id IS NOT NULL THEN
-        -- Insert recording if not exists
-        INSERT INTO recordings (song_id, album_title, recording_year, is_canonical, musicbrainz_id)
+        INSERT INTO recordings (song_id, album_title, recording_year, is_canonical)
         SELECT v_song_id, '{album.replace("'", "''")}', 
-                {year if year else "NULL"}, {is_canonical},
-                {f"'{mb_id}'" if mb_id else "NULL"}
+                {year if year else "NULL"}, {is_canonical}
         WHERE NOT EXISTS (
             SELECT 1 FROM recordings 
-            WHERE musicbrainz_id = {f"'{mb_id}'" if mb_id else "NULL"}
-            {f"AND song_id = v_song_id AND album_title = '{album.replace("'", "''")}'" if not mb_id else ""}
+            WHERE song_id = v_song_id AND album_title = '{album.replace("'", "''")}'
         )
         RETURNING id INTO v_recording_id;
         
-        -- Get recording ID if it already existed
         IF v_recording_id IS NULL THEN
             SELECT id INTO v_recording_id FROM recordings
             WHERE song_id = v_song_id 
@@ -454,13 +635,10 @@ BEGIN
         END IF;
 """)
                 
-                # Link performer to recording if we have artist info
                 if artist:
-                    # Handle multiple artists
                     artists = [a.strip() for a in artist.split(',')]
-                    for artist_name in artists[:3]:  # Limit to first 3
+                    for artist_name in artists[:3]:
                         sql_parts.append(f"""
-        -- Link {artist_name} to recording
         IF v_recording_id IS NOT NULL THEN
             INSERT INTO recording_performers (recording_id, performer_id, role)
             SELECT v_recording_id, p.id, 'leader'
@@ -491,15 +669,12 @@ def main():
     researcher = JazzSongResearcher()
     results = researcher.research_song(song_name)
     
-    # Output results
     print("\n" + "=" * 60, file=sys.stderr)
     print("RESULTS", file=sys.stderr)
     print("=" * 60, file=sys.stderr)
     
-    # Print JSON to stdout
     print(json.dumps(results, indent=2))
     
-    # Print SQL to stderr for easy viewing
     print("\n" + "=" * 60, file=sys.stderr)
     print("COMPLETE SQL INSERT STATEMENTS", file=sys.stderr)
     print("=" * 60, file=sys.stderr)
