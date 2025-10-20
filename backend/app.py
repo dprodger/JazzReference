@@ -41,7 +41,7 @@ def get_songs():
     
     if search_query:
         cur.execute("""
-            SELECT id, title, composer, structure, external_references, 
+            SELECT id, title, composer, structure, song_reference, external_references, 
                    created_at, updated_at
             FROM songs
             WHERE title ILIKE %s OR composer ILIKE %s
@@ -49,7 +49,7 @@ def get_songs():
         """, (f'%{search_query}%', f'%{search_query}%'))
     else:
         cur.execute("""
-            SELECT id, title, composer, structure, external_references,
+            SELECT id, title, composer, structure, song_reference, external_references,
                    created_at, updated_at
             FROM songs
             ORDER BY title
@@ -69,7 +69,7 @@ def get_song_detail(song_id):
     
     # Get song information
     cur.execute("""
-        SELECT id, title, composer, structure, external_references,
+        SELECT id, title, composer, structure, song_reference, external_references,
                created_at, updated_at
         FROM songs
         WHERE id = %s

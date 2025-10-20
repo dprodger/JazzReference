@@ -38,12 +38,12 @@ struct SongDetailView: View {
                             .foregroundColor(.secondary)
                         }
                         
-/*
-                        if let song_reference = song.song_reference {
+                        // Song Reference section - appears before Structure
+                        if let songReference = song.songReference {
                             VStack(alignment: .leading, spacing: 8) {
                                 Text("Information")
                                     .font(.headline)
-                                Text(song_reference)
+                                Text(songReference)
                                     .font(.body)
                                     .foregroundColor(.secondary)
                             }
@@ -51,7 +51,7 @@ struct SongDetailView: View {
                             .background(Color(.systemGray6))
                             .cornerRadius(10)
                         }
-*/
+                        
                         if let structure = song.structure {
                             VStack(alignment: .leading, spacing: 8) {
                                 Text("Structure")
