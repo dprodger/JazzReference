@@ -67,4 +67,3 @@ struct RecordingRowView: View {
         .padding(.horizontal)
     }
 }
-
