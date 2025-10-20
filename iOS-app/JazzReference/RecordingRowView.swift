@@ -2,14 +2,11 @@
 //  RecordingRowView.swift
 //  JazzReference
 //
-//  Created by Dave Rodger on 10/8/25.
+//  Updated with JazzTheme color palette
 //
 
 import SwiftUI
 import Combine
-
-
-// MARK: - Recording Row View
 
 struct RecordingRowView: View {
     let recording: Recording
@@ -28,7 +25,7 @@ struct RecordingRowView: View {
             // Canonical indicator
             if recording.isCanonical == true {
                 Image(systemName: "star.fill")
-                    .foregroundColor(.yellow)
+                    .foregroundColor(JazzTheme.gold)
                     .font(.subheadline)
                     .frame(width: 20)
             } else {
@@ -41,12 +38,13 @@ struct RecordingRowView: View {
                 // Album name
                 Text(recording.albumTitle ?? "Unknown Album")
                     .font(.headline)
+                    .foregroundColor(JazzTheme.charcoal)
                     .lineLimit(1)
                 
                 // Lead artists
                 Text(leadArtists)
                     .font(.subheadline)
-                    .foregroundColor(.primary)
+                    .foregroundColor(JazzTheme.smokeGray)
                     .lineLimit(1)
             }
             
@@ -56,13 +54,13 @@ struct RecordingRowView: View {
             if let year = recording.recordingYear {
                 Text(String(year))
                     .font(.subheadline)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(JazzTheme.smokeGray)
                     .frame(minWidth: 40, alignment: .trailing)
             }
         }
         .padding(.vertical, 12)
         .padding(.horizontal, 16)
-        .background(Color(.systemGray6))
+        .background(JazzTheme.cardBackground)
         .cornerRadius(8)
         .padding(.horizontal)
     }

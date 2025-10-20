@@ -2,13 +2,11 @@
 //  RecordingDetailView.swift
 //  JazzReference
 //
-//  Created by Dave Rodger on 10/8/25.
+//  Updated with JazzTheme color palette
 //
 
 import SwiftUI
 import Combine
-
-// MARK: - Recording Detail View
 
 struct RecordingDetailView: View {
     let recordingId: String
@@ -18,29 +16,29 @@ struct RecordingDetailView: View {
     var body: some View {
         ScrollView {
             if isLoading {
-                ProgressView("Loading...")
-                    .padding()
+                VStack {
+                    Spacer()
+                    ProgressView("Loading...")
+                        .tint(JazzTheme.brass)
+                    Spacer()
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(JazzTheme.backgroundLight)
             } else if let recording = recording {
                 VStack(alignment: .leading, spacing: 0) {
-                    // Styled Header
+                    // Styled Header with Jazz Theme
                     HStack {
                         Image(systemName: "opticaldisc")
                             .font(.title2)
-                            .foregroundColor(.white)
+                            .foregroundColor(JazzTheme.cream)
                         Text("RECORDING")
                             .font(.headline)
                             .fontWeight(.semibold)
-                            .foregroundColor(.white)
+                            .foregroundColor(JazzTheme.cream)
                         Spacer()
                     }
                     .padding()
-                    .background(
-                        LinearGradient(
-                            gradient: Gradient(colors: [Color.purple, Color.purple.opacity(0.8)]),
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                    )
+                    .background(JazzTheme.brassGradient)
                     
                     VStack(alignment: .leading, spacing: 20) {
                         // Album Information
@@ -48,24 +46,25 @@ struct RecordingDetailView: View {
                             HStack {
                                 if recording.isCanonical == true {
                                     Image(systemName: "star.fill")
-                                        .foregroundColor(.yellow)
+                                        .foregroundColor(JazzTheme.gold)
                                         .font(.title2)
                                 }
                                 Text(recording.albumTitle ?? "Unknown Album")
                                     .font(.largeTitle)
                                     .bold()
+                                    .foregroundColor(JazzTheme.charcoal)
                             }
                             
                             if let songTitle = recording.songTitle {
                                 Text(songTitle)
                                     .font(.title2)
-                                    .foregroundColor(.secondary)
+                                    .foregroundColor(JazzTheme.smokeGray)
                             }
                             
                             if let composer = recording.composer {
                                 Text("Composed by \(composer)")
                                     .font(.subheadline)
-                                    .foregroundColor(.secondary)
+                                    .foregroundColor(JazzTheme.smokeGray)
                             }
                         }
                         .padding()
@@ -73,19 +72,31 @@ struct RecordingDetailView: View {
                         // Recording Details
                         VStack(alignment: .leading, spacing: 12) {
                             if let year = recording.recordingYear {
-                                DetailRow(icon: "calendar", label: "Year", value: "\(year)")
+                                DetailRow(
+                                    icon: "calendar",
+                                    label: "Year",
+                                    value: "\(year)"
+                                )
                             }
                             
                             if let date = recording.recordingDate {
-                                DetailRow(icon: "calendar.badge.clock", label: "Recorded", value: date)
+                                DetailRow(
+                                    icon: "calendar.badge.clock",
+                                    label: "Recorded",
+                                    value: date
+                                )
                             }
                             
                             if let label = recording.label {
-                                DetailRow(icon: "music.note.house", label: "Label", value: label)
+                                DetailRow(
+                                    icon: "music.note.house",
+                                    label: "Label",
+                                    value: label
+                                )
                             }
                         }
                         .padding()
-                        .background(Color(.systemGray6))
+                        .background(JazzTheme.cardBackground)
                         .cornerRadius(10)
                         .padding(.horizontal)
                         
@@ -94,24 +105,37 @@ struct RecordingDetailView: View {
                             VStack(alignment: .leading, spacing: 12) {
                                 Text("Listen")
                                     .font(.headline)
+                                    .foregroundColor(JazzTheme.charcoal)
                                     .padding(.horizontal)
                                 
                                 HStack(spacing: 16) {
                                     if let spotifyUrl = recording.spotifyUrl {
                                         Link(destination: URL(string: spotifyUrl)!) {
-                                            StreamingButton(icon: "music.note", color: .green, label: "Spotify")
+                                            StreamingButton(
+                                                icon: "music.note",
+                                                color: JazzTheme.teal,
+                                                label: "Spotify"
+                                            )
                                         }
                                     }
                                     
                                     if let youtubeUrl = recording.youtubeUrl {
                                         Link(destination: URL(string: youtubeUrl)!) {
-                                            StreamingButton(icon: "play.rectangle.fill", color: .red, label: "YouTube")
+                                            StreamingButton(
+                                                icon: "play.rectangle.fill",
+                                                color: JazzTheme.burgundy,
+                                                label: "YouTube"
+                                            )
                                         }
                                     }
                                     
                                     if let appleMusicUrl = recording.appleMusicUrl {
                                         Link(destination: URL(string: appleMusicUrl)!) {
-                                            StreamingButton(icon: "applelogo", color: .pink, label: "Apple")
+                                            StreamingButton(
+                                                icon: "applelogo",
+                                                color: JazzTheme.amber,
+                                                label: "Apple"
+                                            )
                                         }
                                     }
                                 }
@@ -123,12 +147,13 @@ struct RecordingDetailView: View {
                             VStack(alignment: .leading, spacing: 8) {
                                 Text("Notes")
                                     .font(.headline)
+                                    .foregroundColor(JazzTheme.charcoal)
                                 Text(notes)
                                     .font(.body)
-                                    .foregroundColor(.secondary)
+                                    .foregroundColor(JazzTheme.smokeGray)
                             }
                             .padding()
-                            .background(Color(.systemGray6))
+                            .background(JazzTheme.cardBackground)
                             .cornerRadius(10)
                             .padding(.horizontal)
                         }
@@ -141,6 +166,7 @@ struct RecordingDetailView: View {
                             Text("Performers")
                                 .font(.title2)
                                 .bold()
+                                .foregroundColor(JazzTheme.charcoal)
                                 .padding(.horizontal)
                             
                             if let performers = recording.performers, !performers.isEmpty {
@@ -152,7 +178,7 @@ struct RecordingDetailView: View {
                                 }
                             } else {
                                 Text("No performer information available")
-                                    .foregroundColor(.secondary)
+                                    .foregroundColor(JazzTheme.smokeGray)
                                     .padding()
                             }
                         }
@@ -160,16 +186,21 @@ struct RecordingDetailView: View {
                     .padding(.vertical)
                 }
             } else {
-                Text("Recording not found")
-                    .foregroundColor(.secondary)
-                    .padding()
+                VStack {
+                    Spacer()
+                    Text("Recording not found")
+                        .foregroundColor(JazzTheme.smokeGray)
+                    Spacer()
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(JazzTheme.backgroundLight)
             }
         }
+        .background(JazzTheme.backgroundLight)
         .navigationBarTitleDisplayMode(.inline)
         .task {
             #if DEBUG
             if ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1" {
-                // Use mock data for previews
                 let networkManager = NetworkManager()
                 recording = networkManager.fetchRecordingDetailSync(id: recordingId)
                 isLoading = false
@@ -177,7 +208,6 @@ struct RecordingDetailView: View {
             }
             #endif
             
-            // Real network call for production
             let networkManager = NetworkManager()
             recording = await networkManager.fetchRecordingDetail(id: recordingId)
             isLoading = false
@@ -190,7 +220,6 @@ struct RecordingDetailView: View {
         RecordingDetailView(recordingId: "preview-recording-1")
     }
 }
-
 #Preview("Recording Detail - Minimal") {
     NavigationStack {
         RecordingDetailView(recordingId: "preview-recording-3")

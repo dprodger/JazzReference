@@ -2,7 +2,7 @@
 //  PerformerDetailView.swift
 //  JazzReference
 //
-//  Created by Dave Rodger on 10/19/25.
+//  Updated with JazzTheme color palette
 //
 
 import SwiftUI
@@ -35,29 +35,29 @@ struct PerformerDetailView: View {
     var body: some View {
         ScrollView {
             if isLoading {
-                ProgressView("Loading...")
-                    .padding()
+                VStack {
+                    Spacer()
+                    ProgressView("Loading...")
+                        .tint(JazzTheme.amber)
+                    Spacer()
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(JazzTheme.backgroundLight)
             } else if let performer = performer {
                 VStack(alignment: .leading, spacing: 0) {
-                    // Styled Header
+                    // Styled Header with Jazz Theme
                     HStack {
                         Image(systemName: "person.fill")
                             .font(.title2)
-                            .foregroundColor(.white)
+                            .foregroundColor(JazzTheme.cream)
                         Text("ARTIST")
                             .font(.headline)
                             .fontWeight(.semibold)
-                            .foregroundColor(.white)
+                            .foregroundColor(JazzTheme.cream)
                         Spacer()
                     }
                     .padding()
-                    .background(
-                        LinearGradient(
-                            gradient: Gradient(colors: [Color.orange, Color.orange.opacity(0.8)]),
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                    )
+                    .background(JazzTheme.amberGradient)
                     
                     VStack(alignment: .leading, spacing: 20) {
                         // Performer Information
@@ -65,6 +65,7 @@ struct PerformerDetailView: View {
                             Text(performer.name)
                                 .font(.largeTitle)
                                 .bold()
+                                .foregroundColor(JazzTheme.charcoal)
                             
                             // Birth and Death Dates
                             if performer.birthDate != nil || performer.deathDate != nil {
@@ -72,18 +73,18 @@ struct PerformerDetailView: View {
                                     if let birthDate = performer.birthDate {
                                         Text("Born: \(birthDate)")
                                             .font(.subheadline)
-                                            .foregroundColor(.secondary)
+                                            .foregroundColor(JazzTheme.smokeGray)
                                     }
                                     
                                     if performer.birthDate != nil && performer.deathDate != nil {
                                         Text("•")
-                                            .foregroundColor(.secondary)
+                                            .foregroundColor(JazzTheme.smokeGray)
                                     }
                                     
                                     if let deathDate = performer.deathDate {
                                         Text("Died: \(deathDate)")
                                             .font(.subheadline)
-                                            .foregroundColor(.secondary)
+                                            .foregroundColor(JazzTheme.smokeGray)
                                     }
                                 }
                             }
@@ -92,10 +93,10 @@ struct PerformerDetailView: View {
                             if let instruments = performer.instruments, !instruments.isEmpty {
                                 HStack {
                                     Image(systemName: "music.note")
-                                        .foregroundColor(.blue)
+                                        .foregroundColor(JazzTheme.brass)
                                     Text(instruments.map { $0.name }.joined(separator: ", "))
                                         .font(.subheadline)
-                                        .foregroundColor(.secondary)
+                                        .foregroundColor(JazzTheme.smokeGray)
                                 }
                             }
                             
@@ -104,12 +105,13 @@ struct PerformerDetailView: View {
                                 VStack(alignment: .leading, spacing: 8) {
                                     Text("Biography")
                                         .font(.headline)
+                                        .foregroundColor(JazzTheme.charcoal)
                                     Text(biography)
                                         .font(.body)
-                                        .foregroundColor(.secondary)
+                                        .foregroundColor(JazzTheme.smokeGray)
                                 }
                                 .padding()
-                                .background(Color(.systemGray6))
+                                .background(JazzTheme.cardBackground)
                                 .cornerRadius(10)
                             }
                         }
@@ -122,9 +124,10 @@ struct PerformerDetailView: View {
                             Text("Recordings (\(filteredRecordings.count))")
                                 .font(.title2)
                                 .bold()
+                                .foregroundColor(JazzTheme.charcoal)
                                 .padding(.horizontal)
                             
-                            // Filter Picker
+                            // Filter Picker - styled with Jazz Theme
                             Picker("Filter", selection: $selectedFilter) {
                                 ForEach(RecordingFilter.allCases, id: \.self) { filter in
                                     Text(filter.rawValue).tag(filter)
@@ -132,6 +135,7 @@ struct PerformerDetailView: View {
                             }
                             .pickerStyle(.segmented)
                             .padding(.horizontal)
+                            .tint(JazzTheme.burgundy)
                             
                             if !filteredRecordings.isEmpty {
                                 ForEach(filteredRecordings) { recording in
@@ -142,7 +146,7 @@ struct PerformerDetailView: View {
                                 }
                             } else {
                                 Text("No recordings found")
-                                    .foregroundColor(.secondary)
+                                    .foregroundColor(JazzTheme.smokeGray)
                                     .padding()
                             }
                         }
@@ -150,16 +154,21 @@ struct PerformerDetailView: View {
                 }
                 .padding(.vertical)
             } else {
-                Text("Performer not found")
-                    .foregroundColor(.secondary)
-                    .padding()
+                VStack {
+                    Spacer()
+                    Text("Performer not found")
+                        .foregroundColor(JazzTheme.smokeGray)
+                    Spacer()
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(JazzTheme.backgroundLight)
             }
         }
+        .background(JazzTheme.backgroundLight)
         .navigationBarTitleDisplayMode(.inline)
         .task {
             #if DEBUG
             if ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1" {
-                // Use mock data for previews
                 let networkManager = NetworkManager()
                 performer = networkManager.fetchPerformerDetailSync(id: performerId)
                 isLoading = false
@@ -167,7 +176,6 @@ struct PerformerDetailView: View {
             }
             #endif
             
-            // Real network call for production
             let networkManager = NetworkManager()
             performer = await networkManager.fetchPerformerDetail(id: performerId)
             isLoading = false
@@ -183,7 +191,7 @@ struct PerformerRecordingRowView: View {
             // Canonical indicator
             if recording.isCanonical == true {
                 Image(systemName: "star.fill")
-                    .foregroundColor(.yellow)
+                    .foregroundColor(JazzTheme.gold)
                     .font(.subheadline)
                     .frame(width: 20)
             } else {
@@ -196,13 +204,14 @@ struct PerformerRecordingRowView: View {
                 // Song title
                 Text(recording.songTitle)
                     .font(.headline)
+                    .foregroundColor(JazzTheme.charcoal)
                     .lineLimit(1)
                 
                 // Album name
                 if let albumTitle = recording.albumTitle {
                     Text(albumTitle)
                         .font(.subheadline)
-                        .foregroundColor(.primary)
+                        .foregroundColor(JazzTheme.smokeGray)
                         .lineLimit(1)
                 }
                 
@@ -210,7 +219,7 @@ struct PerformerRecordingRowView: View {
                 if let role = recording.role {
                     Text(role.capitalized)
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(JazzTheme.smokeGray)
                 }
             }
             
@@ -220,13 +229,13 @@ struct PerformerRecordingRowView: View {
             if let year = recording.recordingYear {
                 Text(String(year))
                     .font(.subheadline)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(JazzTheme.smokeGray)
                     .frame(minWidth: 40, alignment: .trailing)
             }
         }
         .padding(.vertical, 12)
         .padding(.horizontal, 16)
-        .background(Color(.systemGray6))
+        .background(JazzTheme.cardBackground)
         .cornerRadius(8)
         .padding(.horizontal)
     }
@@ -237,7 +246,6 @@ struct PerformerRecordingRowView: View {
         PerformerDetailView(performerId: "preview-performer-detail-1")
     }
 }
-
 #Preview("Performer - Minimal") {
     NavigationStack {
         PerformerDetailView(performerId: "preview-performer-detail-2")

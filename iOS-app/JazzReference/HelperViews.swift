@@ -2,11 +2,12 @@
 //  HelperViews.swift
 //  JazzReference
 //
-//  Created by Dave Rodger on 10/8/25.
+//  Updated with JazzTheme color palette
 //
 
 import SwiftUI
 import Combine
+
 // MARK: - Helper Views
 
 struct DetailRow: View {
@@ -19,15 +20,16 @@ struct DetailRow: View {
             Label {
                 Text(label)
                     .font(.subheadline)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(JazzTheme.smokeGray)
             } icon: {
                 Image(systemName: icon)
-                    .foregroundColor(.blue)
+                    .foregroundColor(JazzTheme.brass)
             }
             Spacer()
             Text(value)
                 .font(.subheadline)
                 .bold()
+                .foregroundColor(JazzTheme.charcoal)
         }
     }
 }
@@ -41,14 +43,14 @@ struct StreamingButton: View {
         VStack(spacing: 8) {
             Image(systemName: icon)
                 .font(.title2)
-                .foregroundColor(.white)
+                .foregroundColor(JazzTheme.cream)
                 .frame(width: 60, height: 60)
                 .background(color)
                 .clipShape(Circle())
             
             Text(label)
                 .font(.caption)
-                .foregroundColor(.secondary)
+                .foregroundColor(JazzTheme.smokeGray)
         }
     }
 }
@@ -61,11 +63,12 @@ struct PerformerRowView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(performer.name)
                     .font(.headline)
+                    .foregroundColor(JazzTheme.charcoal)
                 
                 if let instrument = performer.instrument {
                     Text(instrument)
                         .font(.subheadline)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(JazzTheme.smokeGray)
                 }
             }
             
@@ -74,14 +77,15 @@ struct PerformerRowView: View {
             if let role = performer.role {
                 Text(role.capitalized)
                     .font(.caption)
+                    .foregroundColor(JazzTheme.cream)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
-                    .background(role == "leader" ? Color.blue.opacity(0.2) : Color.gray.opacity(0.2))
+                    .background(role == "leader" ? JazzTheme.burgundy : JazzTheme.brass.opacity(0.7))
                     .cornerRadius(8)
             }
         }
         .padding()
-        .background(Color(.systemGray6))
+        .background(JazzTheme.cardBackground)
         .cornerRadius(10)
         .padding(.horizontal)
     }

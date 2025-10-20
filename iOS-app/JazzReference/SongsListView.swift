@@ -2,7 +2,7 @@
 //  SongsListView.swift
 //  JazzReference
 //
-//  Created by Dave Rodger on 10/19/25.
+//  Updated with JazzTheme color palette
 //
 
 import SwiftUI
@@ -14,20 +14,27 @@ struct SongsListView: View {
     
     var body: some View {
         NavigationStack {
-            VStack {
+            VStack(spacing: 0) {
                 if networkManager.isLoading {
-                    ProgressView("Loading songs...")
-                        .padding()
+                    VStack {
+                        Spacer()
+                        ProgressView("Loading songs...")
+                            .tint(JazzTheme.burgundy)
+                        Spacer()
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(JazzTheme.backgroundLight)
                 } else if let error = networkManager.errorMessage {
                     VStack(spacing: 16) {
                         Image(systemName: "exclamationmark.triangle")
                             .font(.system(size: 50))
-                            .foregroundColor(.orange)
+                            .foregroundColor(JazzTheme.amber)
                         Text("Error")
                             .font(.headline)
+                            .foregroundColor(JazzTheme.charcoal)
                         Text(error)
                             .font(.subheadline)
-                            .foregroundColor(.secondary)
+                            .foregroundColor(JazzTheme.smokeGray)
                             .multilineTextAlignment(.center)
                             .padding(.horizontal)
                         Button("Retry") {
@@ -36,27 +43,37 @@ struct SongsListView: View {
                             }
                         }
                         .buttonStyle(.borderedProminent)
+                        .tint(JazzTheme.burgundy)
                     }
-                    .padding()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(JazzTheme.backgroundLight)
                 } else {
                     List(networkManager.songs) { song in
                         NavigationLink(destination: SongDetailView(songId: song.id)) {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(song.title)
                                     .font(.headline)
+                                    .foregroundColor(JazzTheme.charcoal)
                                 if let composer = song.composer {
                                     Text(composer)
                                         .font(.subheadline)
-                                        .foregroundColor(.secondary)
+                                        .foregroundColor(JazzTheme.smokeGray)
                                 }
                             }
                             .padding(.vertical, 4)
                         }
+                        .listRowBackground(JazzTheme.cardBackground)
                     }
                     .listStyle(.insetGrouped)
+                    .scrollContentBackground(.hidden)
+                    .background(JazzTheme.backgroundLight)
                 }
             }
+            .background(JazzTheme.backgroundLight)
             .navigationTitle("Jazz Standards")
+            .toolbarBackground(JazzTheme.burgundy, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbarColorScheme(.dark, for: .navigationBar)
             .searchable(text: $searchText, prompt: "Search songs")
             .onChange(of: searchText) { oldValue, newValue in
                 searchTask?.cancel()
@@ -71,6 +88,7 @@ struct SongsListView: View {
                 await networkManager.fetchSongs()
             }
         }
+        .tint(JazzTheme.burgundy)
     }
 }
 
