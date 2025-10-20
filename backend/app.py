@@ -79,7 +79,7 @@ def get_song_detail(song_id):
     
     # Get song information
     cur.execute("""
-        SELECT id, title, composer, structure, song_reference, external_references,
+        SELECT id, title, composer, structure, external_references,
                created_at, updated_at
         FROM songs
         WHERE id = %s
@@ -104,6 +104,25 @@ def get_song_detail(song_id):
     
     recordings = cur.fetchall()
     
+    # For each recording, fetch the performers
+    for recording in recordings:
+        cur.execute("""
+            SELECT p.id, p.name, i.name as instrument, rp.role
+            FROM recording_performers rp
+            JOIN performers p ON rp.performer_id = p.id
+            LEFT JOIN instruments i ON rp.instrument_id = i.id
+            WHERE rp.recording_id = %s
+            ORDER BY 
+                CASE rp.role 
+                    WHEN 'leader' THEN 1 
+                    WHEN 'sideman' THEN 2 
+                    ELSE 3 
+                END,
+                p.name
+        """, (recording['id'],))
+        
+        recording['performers'] = cur.fetchall()
+    
     # Add recording count to song
     song = dict(song)
     song['recordings'] = recordings
@@ -113,7 +132,7 @@ def get_song_detail(song_id):
     conn.close()
     
     return jsonify(song)
-
+    
 @app.route('/api/recordings/<recording_id>', methods=['GET'])
 def get_recording_detail(recording_id):
     """Get detailed information about a specific recording"""
