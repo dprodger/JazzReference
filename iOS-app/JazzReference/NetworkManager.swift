@@ -80,6 +80,8 @@ class NetworkManager: ObservableObject {
         }
     }
     
+    // Update your NetworkManager fetch methods to handle cancellation gracefully
+    
     func fetchSongDetail(id: String) async -> Song? {
         guard let url = URL(string: "\(NetworkManager.baseURL)/songs/\(id)") else {
             return nil
@@ -90,7 +92,10 @@ class NetworkManager: ObservableObject {
             let song = try JSONDecoder().decode(Song.self, from: data)
             return song
         } catch {
-            print("Error fetching song detail: \(error)")
+            // Only log non-cancellation errors
+            if (error as NSError).code != NSURLErrorCancelled {
+                print("Error fetching song detail: \(error)")
+            }
             return nil
         }
     }
@@ -105,7 +110,10 @@ class NetworkManager: ObservableObject {
             let recording = try JSONDecoder().decode(Recording.self, from: data)
             return recording
         } catch {
-            print("Error fetching recording detail: \(error)")
+            // Only log non-cancellation errors
+            if (error as NSError).code != NSURLErrorCancelled {
+                print("Error fetching recording detail: \(error)")
+            }
             return nil
         }
     }
@@ -120,7 +128,10 @@ class NetworkManager: ObservableObject {
             let performer = try JSONDecoder().decode(PerformerDetail.self, from: data)
             return performer
         } catch {
-            print("Error fetching performer detail: \(error)")
+            // Only log non-cancellation errors
+            if (error as NSError).code != NSURLErrorCancelled {
+                print("Error fetching performer detail: \(error)")
+            }
             return nil
         }
     }
