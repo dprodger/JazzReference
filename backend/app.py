@@ -13,6 +13,7 @@ import logging
 from contextlib import contextmanager
 import time
 from typing import Optional
+import threading
 
 # Configure logging
 logging.basicConfig(
@@ -42,45 +43,86 @@ CONNECTION_STRING = (
 
 # Global connection pool
 pool: Optional[ConnectionPool] = None
+keepalive_thread: Optional[threading.Thread] = None
+keepalive_stop = threading.Event()
+
+def connection_keepalive():
+    """Background thread to keep connections alive during idle periods"""
+    logger.info("Starting connection keepalive thread...")
+    
+    while not keepalive_stop.is_set():
+        try:
+            # Wait 5 minutes between keepalive pings
+            if keepalive_stop.wait(300):  # 300 seconds = 5 minutes
+                break
+            
+            if pool is not None:
+                logger.debug("Sending keepalive ping to database...")
+                try:
+                    with pool.connection() as conn:
+                        with conn.cursor() as cur:
+                            cur.execute("SELECT 1")
+                    logger.debug("Keepalive ping successful")
+                except Exception as e:
+                    logger.warning(f"Keepalive ping failed: {e}")
+                    
+        except Exception as e:
+            logger.error(f"Error in keepalive thread: {e}")
+    
+    logger.info("Connection keepalive thread stopped")
 
 def init_connection_pool(max_retries=3, retry_delay=2):
-    """Initialize the connection pool with retry logic"""
+    """Initialize the connection pool with retry logic optimized for port 6543"""
     global pool
     
     for attempt in range(max_retries):
         try:
             logger.info(f"Initializing connection pool (attempt {attempt + 1}/{max_retries})...")
             
+            # Use more conservative settings for port 6543 transaction mode
             pool = ConnectionPool(
                 CONNECTION_STRING,
-                min_size=2,
-                max_size=10,
-                open=True,
+                min_size=1,  # Start with just 1 connection
+                max_size=5,  # Reduce max to avoid overwhelming port 6543
+                open=False,  # Don't pre-open connections - open on demand
+                timeout=15,  # Reduce pool timeout from 30s to 15s
+                max_waiting=3,  # Limit number of requests waiting for connection
                 kwargs={
                     'row_factory': dict_row,
-                    'connect_timeout': 10,
+                    'connect_timeout': 5,  # Reduce from 10s to 5s
                     'keepalives': 1,
                     'keepalives_idle': 30,
                     'keepalives_interval': 10,
-                    'keepalives_count': 5,
-                    'options': '-c statement_timeout=30000'  # 30 second query timeout
+                    'keepalives_count': 3,  # Reduce from 5 to 3
+                    'options': '-c statement_timeout=30000'
                 }
             )
             
-            # Test the connection
+            # Test with a single connection instead of opening all min_size connections
+            logger.info("Testing connection pool with single connection...")
             with pool.connection() as conn:
                 with conn.cursor() as cur:
-                    cur.execute("SELECT 1")
+                    cur.execute("SELECT 1 as test")
                     result = cur.fetchone()
-                    logger.info(f"✓ Connection pool initialized successfully (test query: {result})")
+                    logger.info(f"✓ Connection pool initialized successfully (test: {result})")
             
             return True
             
         except Exception as e:
             logger.error(f"✗ Connection pool initialization failed (attempt {attempt + 1}/{max_retries}): {e}")
+            
+            # Clean up failed pool
+            if pool is not None:
+                try:
+                    pool.close()
+                except:
+                    pass
+                pool = None
+            
             if attempt < max_retries - 1:
                 logger.info(f"Retrying in {retry_delay} seconds...")
                 time.sleep(retry_delay)
+                retry_delay *= 1.5  # Exponential backoff
             else:
                 logger.error("Failed to initialize connection pool after all retries")
                 return False
@@ -99,21 +141,44 @@ def get_db_connection():
             raise RuntimeError("Failed to initialize connection pool")
     
     conn = None
-    try:
-        conn = pool.getconn()
-        yield conn
-    except psycopg.OperationalError as e:
-        logger.error(f"Database operational error: {e}")
-        raise
-    except Exception as e:
-        logger.error(f"Unexpected database error: {e}")
-        raise
-    finally:
-        if conn:
-            try:
-                pool.putconn(conn)
-            except Exception as e:
-                logger.error(f"Error returning connection to pool: {e}")
+    max_retries = 2
+    retry_delay = 0.5
+    
+    for attempt in range(max_retries):
+        try:
+            conn = pool.getconn(timeout=10)  # 10 second timeout to get connection from pool
+            yield conn
+            return  # Success, exit the function
+            
+        except psycopg.OperationalError as e:
+            logger.error(f"Database operational error (attempt {attempt + 1}/{max_retries}): {e}")
+            
+            # If this was a connection error and we have retries left, try again
+            if attempt < max_retries - 1:
+                logger.info(f"Retrying connection in {retry_delay}s...")
+                time.sleep(retry_delay)
+                retry_delay *= 2
+                
+                # Return the bad connection if we got one
+                if conn:
+                    try:
+                        pool.putconn(conn)
+                    except:
+                        pass
+                conn = None
+            else:
+                raise
+                
+        except Exception as e:
+            logger.error(f"Unexpected database error: {e}")
+            raise
+            
+        finally:
+            if conn:
+                try:
+                    pool.putconn(conn)
+                except Exception as e:
+                    logger.error(f"Error returning connection to pool: {e}")
 
 def execute_query(query, params=None, fetch_one=False, fetch_all=True):
     """Execute a query with proper error handling and logging"""
@@ -192,8 +257,8 @@ def get_songs():
     try:
         if search_query:
             query = """
-                SELECT id, title, composer, structure, song_reference, external_references,
-                       musicbrainz_id, created_at, updated_at
+                SELECT id, title, composer, structure, song_reference, external_references, 
+                       created_at, updated_at
                 FROM songs
                 WHERE title ILIKE %s OR composer ILIKE %s
                 ORDER BY title
@@ -202,7 +267,7 @@ def get_songs():
         else:
             query = """
                 SELECT id, title, composer, structure, song_reference, external_references,
-                       musicbrainz_id, created_at, updated_at
+                       created_at, updated_at
                 FROM songs
                 ORDER BY title
             """
@@ -217,11 +282,12 @@ def get_songs():
 
 @app.route('/api/songs/<song_id>', methods=['GET'])
 def get_song_detail(song_id):
-    """Get detailed information about a specific song - OPTIMIZED VERSION"""
+    """Get detailed information about a specific song"""
     try:
         # Get song information
         song_query = """
-            SELECT id, title, composer, structure, song_reference, external_references
+            SELECT id, title, composer, structure, song_reference, external_references,
+                   created_at, updated_at
             FROM songs
             WHERE id = %s
         """
@@ -230,47 +296,34 @@ def get_song_detail(song_id):
         if not song:
             return jsonify({'error': 'Song not found'}), 404
         
-        # Get ALL recordings with their performers in ONE query using JSON aggregation
+        # Get recordings for this song
         recordings_query = """
-            SELECT 
-                r.id,
-                r.album_title,
-                r.recording_date,
-                r.recording_year,
-                r.label,
-                r.spotify_url,
-                r.youtube_url,
-                r.apple_music_url,
-                r.is_canonical,
-                r.notes,
-                COALESCE(
-                    json_agg(
-                        json_build_object(
-                            'id', p.id,
-                            'name', p.name,
-                            'instrument', i.name,
-                            'role', rp.role
-                        ) ORDER BY 
-                            CASE rp.role 
-                                WHEN 'leader' THEN 1 
-                                WHEN 'sideman' THEN 2 
-                                ELSE 3 
-                            END,
-                            p.name
-                    ) FILTER (WHERE p.id IS NOT NULL),
-                    '[]'::json
-                ) as performers
+            SELECT r.id, r.album_title, r.recording_date, r.recording_year,
+                   r.label, r.spotify_url, r.youtube_url, r.apple_music_url,
+                   r.is_canonical, r.notes
             FROM recordings r
-            LEFT JOIN recording_performers rp ON r.id = rp.recording_id
-            LEFT JOIN performers p ON rp.performer_id = p.id
-            LEFT JOIN instruments i ON rp.instrument_id = i.id
             WHERE r.song_id = %s
-            GROUP BY r.id, r.album_title, r.recording_date, r.recording_year,
-                     r.label, r.spotify_url, r.youtube_url, r.apple_music_url,
-                     r.is_canonical, r.notes
             ORDER BY r.is_canonical DESC, r.recording_year DESC
         """
         recordings = execute_query(recordings_query, (song_id,))
+        
+        # For each recording, fetch the performers
+        for recording in recordings:
+            performers_query = """
+                SELECT p.id, p.name, i.name as instrument, rp.role
+                FROM recording_performers rp
+                JOIN performers p ON rp.performer_id = p.id
+                LEFT JOIN instruments i ON rp.instrument_id = i.id
+                WHERE rp.recording_id = %s
+                ORDER BY 
+                    CASE rp.role 
+                        WHEN 'leader' THEN 1 
+                        WHEN 'sideman' THEN 2 
+                        ELSE 3 
+                    END,
+                    p.name
+            """
+            recording['performers'] = execute_query(performers_query, (recording['id'],))
         
         # Add recording info to song
         song['recordings'] = recordings
@@ -281,7 +334,7 @@ def get_song_detail(song_id):
     except Exception as e:
         logger.error(f"Error fetching song detail: {e}")
         return jsonify({'error': 'Failed to fetch song detail', 'detail': str(e)}), 500
-                
+
 @app.route('/api/recordings/<recording_id>', methods=['GET'])
 def get_recording_detail(recording_id):
     """Get detailed information about a specific recording"""
@@ -415,11 +468,23 @@ if __name__ == '__main__':
     logger.info("Starting Flask application...")
     logger.info("Database connection pool will initialize on first request")
     
+    # Start keepalive thread
+    keepalive_thread = threading.Thread(target=connection_keepalive, daemon=True)
+    keepalive_thread.start()
+    
     try:
         app.run(debug=True, host='0.0.0.0', port=5001)
     finally:
+        # Stop keepalive thread
+        logger.info("Stopping keepalive thread...")
+        keepalive_stop.set()
+        if keepalive_thread:
+            keepalive_thread.join(timeout=5)
+        
         # Close the connection pool on shutdown
         if pool:
             logger.info("Closing connection pool...")
             pool.close()
             logger.info("Connection pool closed")
+            
+            
