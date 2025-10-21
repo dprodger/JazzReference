@@ -136,7 +136,13 @@ struct ContentView: View {
                 .tabItem {
                     Label("Artists", systemImage: "person.2.fill")
                 }
+            
+            AboutView()
+                .tabItem {
+                    Label("About", systemImage: "info.circle")
+                }
         }
+        .tint(JazzTheme.burgundy) // Sets the active tab color
     }
 }
 
