@@ -13,8 +13,9 @@ import os
 import base64
 from datetime import datetime
 import requests
-import psycopg
-from psycopg.rows import dict_row
+
+# Import shared database utilities
+from db_utils import get_db_connection
 
 # Configure logging
 logging.basicConfig(
@@ -27,14 +28,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Database configuration - read from environment or use defaults
-DB_CONFIG = {
-    'host': os.environ.get('DB_HOST', 'aws-1-us-east-2.pooler.supabase.com'),
-    'database': os.environ.get('DB_NAME', 'postgres'),
-    'user': os.environ.get('DB_USER', 'postgres.wxinjyotnrqxrwqrtvkp'),
-    'password': os.environ.get('DB_PASSWORD', 'jovpeW-pukgu0-nifron'),
-    'port': os.environ.get('DB_PORT', '6543')
-}
 
 class SpotifyMatcher:
     def __init__(self, dry_run=False):
@@ -49,77 +42,6 @@ class SpotifyMatcher:
             'recordings_skipped': 0,
             'errors': 0
         }
-        
-    def get_db_connection(self):
-        """Create database connection"""
-        try:
-            # Supabase requires IPv6 for direct connections
-            # Use connection pooler for IPv4 compatibility
-            host = DB_CONFIG['host']
-            
-            # If using default Supabase host, try connection pooler for IPv4
-            if 'supabase.co' in host and not host.startswith('aws-0-'):
-                # Extract project reference from db.PROJECT_REF.supabase.co
-                parts = host.split('.')
-                if len(parts) >= 3 and parts[0] == 'db':
-                    project_ref = parts[1]
-                    # Supabase pooler format: aws-0-REGION.pooler.supabase.com
-                    # Most Supabase projects are in us-east-1
-                    pooler_host = f"aws-0-us-east-1.pooler.supabase.com"
-                    
-                    logger.debug(f"Detected Supabase host: {host}")
-                    logger.debug(f"Project reference: {project_ref}")
-                    logger.debug(f"Attempting connection via pooler: {pooler_host}")
-                    
-                    try:
-                        conn = psycopg.connect(
-                            host=pooler_host,
-                            dbname=DB_CONFIG['database'],
-                            user=f"postgres.{project_ref}",  # Pooler requires this format
-                            password=DB_CONFIG['password'],
-                            port='6543',  # Transaction mode pooler port
-                            row_factory=dict_row,
-                            options='-c statement_timeout=30000',
-                            prepare_threshold=None	# cursor management--maybe get rid of this later
-                        )
-                        logger.debug("✓ Connection pooler connection established")
-                        return conn
-                    except Exception as pooler_error:
-                        logger.debug(f"✗ Pooler connection failed: {pooler_error}")
-                        logger.debug("Falling back to direct connection (requires IPv6)...")
-            
-            # Try direct connection (requires IPv6)
-            logger.debug(f"Attempting direct connection to: {DB_CONFIG['host']}")
-            conn = psycopg.connect(
-                host=DB_CONFIG['host'],
-                dbname=DB_CONFIG['database'],
-                user=DB_CONFIG['user'],
-                password=DB_CONFIG['password'],
-                port=DB_CONFIG['port'],
-                row_factory=dict_row,
-                prepare_threshold=None	# cursor management--maybe get rid of this later
-            )
-            logger.debug("✓ Direct database connection established")
-            return conn
-            
-        except Exception as e:
-            logger.error(f"Failed to connect to database: {e}")
-            logger.error("")
-            logger.error("Connection troubleshooting:")
-            logger.error("  1. Verify your DB_HOST setting")
-            logger.error(f"     Current: {DB_CONFIG.get('host', 'not set')}")
-            logger.error("")
-            logger.error("  2. If using Supabase, direct connections require IPv6")
-            logger.error("     Check IPv6: curl -6 https://ifconfig.co")
-            logger.error("")
-            logger.error("  3. For IPv4-only machines, manually set pooler connection:")
-            logger.error("     export DB_HOST='aws-0-us-east-1.pooler.supabase.com'")
-            logger.error("     export DB_USER='postgres.YOUR_PROJECT_REF'")
-            logger.error("     export DB_PORT='6543'")
-            logger.error("")
-            logger.error("  4. Find your project ref at: https://supabase.com/dashboard/project/_/settings/database")
-            logger.error("")
-            raise
     
     def get_spotify_token(self):
         """Get Spotify access token using client credentials flow"""
@@ -129,7 +51,8 @@ class SpotifyMatcher:
         
         if not client_id or not client_secret:
             logger.error("Spotify credentials not found!")
-            logger.error("Please set environment variables:")
+            logger.error("")
+            logger.error("Please set the following environment variables:")
             logger.error("  export SPOTIFY_CLIENT_ID='your_client_id'")
             logger.error("  export SPOTIFY_CLIENT_SECRET='your_client_secret'")
             logger.error("")
@@ -140,23 +63,25 @@ class SpotifyMatcher:
         if self.access_token and time.time() < self.token_expires:
             return self.access_token
         
+        # Get new token
         logger.info("Fetching Spotify access token...")
         
-        # Encode credentials
         auth_str = f"{client_id}:{client_secret}"
-        auth_bytes = auth_str.encode('utf-8')
-        auth_b64 = base64.b64encode(auth_bytes).decode('utf-8')
+        auth_b64 = base64.b64encode(auth_str.encode()).decode()
         
-        # Request token
-        url = "https://accounts.spotify.com/api/token"
         headers = {
             'Authorization': f'Basic {auth_b64}',
             'Content-Type': 'application/x-www-form-urlencoded'
         }
+        
         data = {'grant_type': 'client_credentials'}
         
         try:
-            response = requests.post(url, headers=headers, data=data)
+            response = requests.post(
+                'https://accounts.spotify.com/api/token',
+                headers=headers,
+                data=data
+            )
             response.raise_for_status()
             
             token_data = response.json()
@@ -167,21 +92,22 @@ class SpotifyMatcher:
             logger.info(f"✓ Spotify token obtained (expires in {expires_in}s)")
             return self.access_token
             
-        except Exception as e:
+        except requests.exceptions.RequestException as e:
             logger.error(f"Failed to get Spotify token: {e}")
             raise
     
     def find_song_by_name(self, song_name):
-        """Find a song in the database by name"""
+        """Find a song by name in the database"""
         logger.info(f"Searching for song: {song_name}")
         
-        with self.get_db_connection() as conn:
+        with get_db_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute("""
                     SELECT id, title, composer
                     FROM songs
                     WHERE title ILIKE %s
                     ORDER BY title
+                    LIMIT 5
                 """, (f'%{song_name}%',))
                 
                 results = cur.fetchall()
@@ -190,21 +116,27 @@ class SpotifyMatcher:
                     logger.warning(f"No songs found matching: {song_name}")
                     return None
                 
-                if len(results) > 1:
-                    logger.info(f"Found {len(results)} matching songs:")
-                    for i, song in enumerate(results, 1):
-                        logger.info(f"  {i}. {song['title']} by {song['composer']}")
-                        logger.info(f"     ID: {song['id']}")
-                    
-                    logger.info(f"Using first result: {results[0]['title']}")
+                if len(results) == 1:
+                    return results[0]
                 
-                return results[0]
+                # Multiple matches - show options
+                logger.info(f"Found {len(results)} songs matching '{song_name}':")
+                for i, song in enumerate(results, 1):
+                    logger.info(f"  {i}. {song['title']} - {song['composer']}")
+                
+                choice = input("\nSelect song number (or 0 to cancel): ")
+                try:
+                    idx = int(choice) - 1
+                    if 0 <= idx < len(results):
+                        return results[idx]
+                except ValueError:
+                    pass
+                
+                return None
     
     def find_song_by_id(self, song_id):
-        """Find a song in the database by ID"""
-        logger.info(f"Looking up song ID: {song_id}")
-        
-        with self.get_db_connection() as conn:
+        """Find a song by ID in the database"""
+        with get_db_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute("""
                     SELECT id, title, composer
@@ -212,61 +144,51 @@ class SpotifyMatcher:
                     WHERE id = %s
                 """, (song_id,))
                 
-                result = cur.fetchone()
-                
-                if not result:
-                    logger.error(f"Song not found with ID: {song_id}")
-                    return None
-                
-                return result
+                return cur.fetchone()
     
     def get_recordings_for_song(self, song_id):
         """Get all recordings for a song with performer information"""
-        with self.get_db_connection() as conn:
+        with get_db_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute("""
                     SELECT 
                         r.id,
                         r.album_title,
                         r.recording_year,
-                        r.recording_date,
                         r.spotify_url,
-                        r.notes,
-                        s.title as song_title
+                        COALESCE(
+                            json_agg(
+                                json_build_object(
+                                    'name', p.name,
+                                    'role', rp.role
+                                )
+                                ORDER BY 
+                                    CASE rp.role 
+                                        WHEN 'leader' THEN 1 
+                                        ELSE 2 
+                                    END
+                            ) FILTER (WHERE p.id IS NOT NULL),
+                            '[]'
+                        ) as performers
                     FROM recordings r
-                    JOIN songs s ON r.song_id = s.id
+                    LEFT JOIN recording_performers rp ON r.id = rp.recording_id
+                    LEFT JOIN performers p ON rp.performer_id = p.id
                     WHERE r.song_id = %s
-                    ORDER BY r.recording_year DESC NULLS LAST
+                    GROUP BY r.id, r.album_title, r.recording_year, r.spotify_url
+                    ORDER BY r.recording_year DESC NULLS LAST, r.album_title
                 """, (song_id,))
                 
-                recordings = cur.fetchall()
-                
-                # Get performers for each recording
-                for recording in recordings:
-                    cur.execute("""
-                        SELECT p.name, rp.role
-                        FROM recording_performers rp
-                        JOIN performers p ON rp.performer_id = p.id
-                        WHERE rp.recording_id = %s
-                        ORDER BY 
-                            CASE rp.role 
-                                WHEN 'leader' THEN 1 
-                                WHEN 'sideman' THEN 2 
-                                ELSE 3 
-                            END,
-                            p.name
-                    """, (recording['id'],))
-                    
-                    recording['performers'] = cur.fetchall()
-                
-                return recordings
+                return cur.fetchall()
     
     def search_spotify_track(self, song_title, album_title, artist_name, year=None):
         """Search Spotify for a track"""
         token = self.get_spotify_token()
         
+        headers = {
+            'Authorization': f'Bearer {token}'
+        }
+        
         # Build search query
-        # Format: track:song artist:artist album:album year:year
         query_parts = [f'track:"{song_title}"']
         
         if artist_name:
@@ -280,10 +202,7 @@ class SpotifyMatcher:
         
         query = ' '.join(query_parts)
         
-        url = "https://api.spotify.com/v1/search"
-        headers = {
-            'Authorization': f'Bearer {token}'
-        }
+        url = 'https://api.spotify.com/v1/search'
         params = {
             'q': query,
             'type': 'track',
@@ -329,38 +248,35 @@ class SpotifyMatcher:
                 # Token expired, clear it
                 self.access_token = None
                 logger.warning("Spotify token expired, will refresh on next request")
-            else:
-                logger.error(f"Spotify API error: {e}")
-            self.stats['errors'] += 1
+                return None
+            logger.error(f"Spotify search failed: {e}")
             return None
         except Exception as e:
             logger.error(f"Error searching Spotify: {e}")
-            self.stats['errors'] += 1
             return None
     
     def update_recording_spotify_url(self, conn, recording_id, spotify_url):
-        """Update a recording with Spotify URL"""
+        """Update recording with Spotify URL"""
         if self.dry_run:
-            logger.info(f"    [DRY RUN] Would update recording with Spotify URL")
-            return True
+            logger.info(f"    [DRY RUN] Would update recording with: {spotify_url}")
+            return
         
         with conn.cursor() as cur:
             cur.execute("""
                 UPDATE recordings
-                SET spotify_url = %s
+                SET spotify_url = %s,
+                    updated_at = CURRENT_TIMESTAMP
                 WHERE id = %s
             """, (spotify_url, recording_id))
             
             conn.commit()
-            cur.close()
-            logger.info(f"    ✓ Updated recording with Spotify URL")
+            logger.info(f"    ✓ Updated with Spotify URL")
             self.stats['recordings_updated'] += 1
-            return True
     
     def match_recordings_for_song(self, song_identifier):
-        """Main method to match Spotify tracks for all recordings of a song"""
+        """Main method to match Spotify tracks for a song's recordings"""
         logger.info("="*80)
-        logger.info("Spotify Track Matcher")
+        logger.info("Spotify Track Matching")
         logger.info("="*80)
         
         if self.dry_run:
@@ -369,8 +285,10 @@ class SpotifyMatcher:
         
         # Find the song
         if song_identifier.startswith('song-') or len(song_identifier) == 36:
+            # Looks like a UUID
             song = self.find_song_by_id(song_identifier)
         else:
+            # Treat as song name
             song = self.find_song_by_name(song_identifier)
         
         if not song:
@@ -394,7 +312,7 @@ class SpotifyMatcher:
         logger.info("")
         
         # Process each recording
-        with self.get_db_connection() as conn:
+        with get_db_connection() as conn:
             for i, recording in enumerate(recordings, 1):
                 self.stats['recordings_processed'] += 1
                 
@@ -452,6 +370,7 @@ class SpotifyMatcher:
         logger.info("="*80)
         
         return True
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -514,6 +433,7 @@ Examples:
     except Exception as e:
         logger.error(f"Unexpected error: {e}", exc_info=True)
         sys.exit(1)
+
 
 if __name__ == "__main__":
     main()

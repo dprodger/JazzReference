@@ -33,9 +33,6 @@ DB_CONFIG = {
     'user': os.environ.get('DB_USER', 'postgres.wxinjyotnrqxrwqrtvkp'),
     'password': os.environ.get('DB_PASSWORD', 'jovpeW-pukgu0-nifron'),
     'port': os.environ.get('DB_PORT', '6543')
-    
-    
-# postgresql://postgres.wxinjyotnrqxrwqrtvkp:[YOUR-PASSWORD]@aws-1-us-east-2.pooler.supabase.com:6543/postgres    
 }
 
 class MusicBrainzImporter:
@@ -142,6 +139,7 @@ class MusicBrainzImporter:
                     logger.warning(f"No songs found matching: {song_name}")
                     return None
                 
+                logger.info(f"Results is {results}")
                 if len(results) > 1:
                     logger.info(f"Found {len(results)} matching songs:")
                     for i, song in enumerate(results, 1):
