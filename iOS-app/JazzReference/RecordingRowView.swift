@@ -35,11 +35,20 @@ struct RecordingRowView: View {
             
             // Recording info
             VStack(alignment: .leading, spacing: 4) {
-                // Album name
-                Text(recording.albumTitle ?? "Unknown Album")
-                    .font(.headline)
-                    .foregroundColor(JazzTheme.charcoal)
-                    .lineLimit(1)
+                // Album name with Spotify indicator inline
+                HStack(spacing: 6) {
+                    Text(recording.albumTitle ?? "Unknown Album")
+                        .font(.headline)
+                        .foregroundColor(JazzTheme.charcoal)
+                        .lineLimit(1)
+                    
+                    // Spotify indicator (if available)
+                    if recording.spotifyUrl != nil {
+                        Image(systemName: "play.circle.fill")
+                            .foregroundColor(.green)
+                            .font(.subheadline)
+                    }
+                }
                 
                 // Lead artists
                 Text(leadArtists)
@@ -50,20 +59,11 @@ struct RecordingRowView: View {
             
             Spacer()
             
-            // Spotify indicator (if available)
-            if recording.spotifyUrl != nil {
-                Image(systemName: "play.circle.fill")
-                    .foregroundColor(.green)
-                    .font(.title3)
-            }
-            
-            // Year
-            if let year = recording.recordingYear {
-                Text(String(year))
-                    .font(.subheadline)
-                    .foregroundColor(JazzTheme.smokeGray)
-                    .frame(minWidth: 40, alignment: .trailing)
-            }
+            // Year - always reserve space for consistent alignment
+            Text(recording.recordingYear != nil ? String(recording.recordingYear!) : "")
+                .font(.subheadline)
+                .foregroundColor(JazzTheme.smokeGray)
+                .frame(minWidth: 45, alignment: .trailing)
         }
         .padding(.vertical, 12)
         .padding(.horizontal, 16)
