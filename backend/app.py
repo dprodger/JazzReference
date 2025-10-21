@@ -84,7 +84,7 @@ def init_connection_pool(max_retries=3, retry_delay=2):
                 CONNECTION_STRING,
                 min_size=1,  # Start with just 1 connection
                 max_size=5,  # Reduce max to avoid overwhelming port 6543
-                open=False,  # Don't pre-open connections - open on demand
+                open=True,  # Open the pool immediately
                 timeout=15,  # Reduce pool timeout from 30s to 15s
                 max_waiting=3,  # Limit number of requests waiting for connection
                 kwargs={
@@ -98,8 +98,8 @@ def init_connection_pool(max_retries=3, retry_delay=2):
                 }
             )
             
-            # Test with a single connection instead of opening all min_size connections
-            logger.info("Testing connection pool with single connection...")
+            # Test the connection
+            logger.info("Testing connection pool...")
             with pool.connection() as conn:
                 with conn.cursor() as cur:
                     cur.execute("SELECT 1 as test")
@@ -486,5 +486,3 @@ if __name__ == '__main__':
             logger.info("Closing connection pool...")
             pool.close()
             logger.info("Connection pool closed")
-            
-            
