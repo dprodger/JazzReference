@@ -2,7 +2,7 @@
 //  RecordingRowView.swift
 //  JazzReference
 //
-//  Updated with JazzTheme color palette
+//  Updated with Spotify icon indicator
 //
 
 import SwiftUI
@@ -49,6 +49,13 @@ struct RecordingRowView: View {
             }
             
             Spacer()
+            
+            // Spotify indicator (if available)
+            if recording.spotifyUrl != nil {
+                Image(systemName: "play.circle.fill")
+                    .foregroundColor(.green)
+                    .font(.title3)
+            }
             
             // Year
             if let year = recording.recordingYear {

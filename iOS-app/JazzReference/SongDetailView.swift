@@ -2,16 +2,34 @@
 //  SongDetailView.swift
 //  JazzReference
 //
-//  Updated with JazzTheme color palette
+//  Updated with Spotify filtering and icons
 //
 
 import SwiftUI
 import Combine
 
+// MARK: - Recording Filter Enum
+enum SongRecordingFilter: String, CaseIterable {
+    case withSpotify = "With Spotify"
+    case all = "All"
+}
+
 struct SongDetailView: View {
     let songId: String
     @State private var song: Song?
     @State private var isLoading = true
+    @State private var selectedFilter: SongRecordingFilter = .withSpotify // Default to Spotify-only
+    
+    private var filteredRecordings: [Recording] {
+        guard let recordings = song?.recordings else { return [] }
+        
+        switch selectedFilter {
+        case .withSpotify:
+            return recordings.filter { $0.spotifyUrl != nil }
+        case .all:
+            return recordings
+        }
+    }
     
     var body: some View {
         ScrollView {
@@ -92,23 +110,35 @@ struct SongDetailView: View {
                         
                         Divider()
                         
-                        // Recordings Section
+                        // Recordings Section with Filter
                         VStack(alignment: .leading, spacing: 12) {
-                            Text("Recordings (\(song.recordings?.count ?? 0))")
+                            Text("Recordings (\(filteredRecordings.count))")
                                 .font(.title2)
                                 .bold()
                                 .foregroundColor(JazzTheme.charcoal)
                                 .padding(.horizontal)
                             
-                            if let recordings = song.recordings, !recordings.isEmpty {
-                                ForEach(recordings) { recording in
+                            // Filter Picker
+                            Picker("Filter", selection: $selectedFilter) {
+                                ForEach(SongRecordingFilter.allCases, id: \.self) { filter in
+                                    Text(filter.rawValue).tag(filter)
+                                }
+                            }
+                            .pickerStyle(.segmented)
+                            .padding(.horizontal)
+                            .tint(JazzTheme.burgundy)
+                            
+                            if !filteredRecordings.isEmpty {
+                                ForEach(filteredRecordings) { recording in
                                     NavigationLink(destination: RecordingDetailView(recordingId: recording.id)) {
                                         RecordingRowView(recording: recording)
                                     }
                                     .buttonStyle(.plain)
                                 }
                             } else {
-                                Text("No recordings available")
+                                Text(selectedFilter == .withSpotify ?
+                                     "No recordings with Spotify available" :
+                                     "No recordings available")
                                     .foregroundColor(JazzTheme.smokeGray)
                                     .padding()
                             }
@@ -156,4 +186,3 @@ struct SongDetailView: View {
         SongDetailView(songId: "loading-test")
     }
 }
-
