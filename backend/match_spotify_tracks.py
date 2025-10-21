@@ -79,7 +79,8 @@ class SpotifyMatcher:
                             password=DB_CONFIG['password'],
                             port='6543',  # Transaction mode pooler port
                             row_factory=dict_row,
-                            options='-c statement_timeout=30000'
+                            options='-c statement_timeout=30000',
+                            prepare_threshold=None	# cursor management--maybe get rid of this later
                         )
                         logger.debug("✓ Connection pooler connection established")
                         return conn
@@ -95,7 +96,8 @@ class SpotifyMatcher:
                 user=DB_CONFIG['user'],
                 password=DB_CONFIG['password'],
                 port=DB_CONFIG['port'],
-                row_factory=dict_row
+                row_factory=dict_row,
+                prepare_threshold=None	# cursor management--maybe get rid of this later
             )
             logger.debug("✓ Direct database connection established")
             return conn
@@ -350,6 +352,7 @@ class SpotifyMatcher:
             """, (spotify_url, recording_id))
             
             conn.commit()
+            cur.close()
             logger.info(f"    ✓ Updated recording with Spotify URL")
             self.stats['recordings_updated'] += 1
             return True
