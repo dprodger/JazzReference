@@ -79,21 +79,21 @@ def init_connection_pool(max_retries=3, retry_delay=2):
         try:
             logger.info(f"Initializing connection pool (attempt {attempt + 1}/{max_retries})...")
             
-            # Use more conservative settings for port 6543 transaction mode
+            # Use VERY conservative settings for Supabase free tier
             pool = ConnectionPool(
                 CONNECTION_STRING,
-                min_size=1,  # Start with just 1 connection
-                max_size=5,  # Reduce max to avoid overwhelming port 6543
-                open=True,  # Open the pool immediately
-                timeout=15,  # Reduce pool timeout from 30s to 15s
-                max_waiting=3,  # Limit number of requests waiting for connection
+                min_size=1,  # Only 1 connection
+                max_size=2,  # Max 2 connections per worker
+                open=True,
+                timeout=10,  # Reduce timeout
+                max_waiting=2,  # Fewer waiting requests
                 kwargs={
                     'row_factory': dict_row,
-                    'connect_timeout': 5,  # Reduce from 10s to 5s
+                    'connect_timeout': 5,
                     'keepalives': 1,
                     'keepalives_idle': 30,
                     'keepalives_interval': 10,
-                    'keepalives_count': 3,  # Reduce from 5 to 3
+                    'keepalives_count': 3,
                     'options': '-c statement_timeout=30000'
                 }
             )
