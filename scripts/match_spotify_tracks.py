@@ -16,6 +16,9 @@ import requests
 
 # Import shared database utilities
 from db_utils import get_db_connection
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Configure logging
 logging.basicConfig(
