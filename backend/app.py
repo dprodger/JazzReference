@@ -282,11 +282,12 @@ def get_songs():
 
 @app.route('/api/songs/<song_id>', methods=['GET'])
 def get_song_detail(song_id):
-    """Get detailed information about a specific song"""
+    """Get detailed information about a specific song - OPTIMIZED VERSION"""
     try:
         # Get song information
         song_query = """
-            SELECT id, title, composer, structure, song_reference, musicbrainz_id, external_references, created_at, updated_at
+            SELECT id, title, composer, structure, song_reference, musicbrainz_id, 
+                   external_references, created_at, updated_at
             FROM songs
             WHERE id = %s
         """
@@ -295,34 +296,47 @@ def get_song_detail(song_id):
         if not song:
             return jsonify({'error': 'Song not found'}), 404
         
-        # Get recordings for this song
+        # Get ALL recordings with their performers in ONE query using JSON aggregation
         recordings_query = """
-            SELECT r.id, r.album_title, r.recording_date, r.recording_year,
-                   r.label, r.spotify_url, r.youtube_url, r.apple_music_url,
-                   r.is_canonical, r.notes
+            SELECT 
+                r.id,
+                r.album_title,
+                r.recording_date,
+                r.recording_year,
+                r.label,
+                r.spotify_url,
+                r.youtube_url,
+                r.apple_music_url,
+                r.is_canonical,
+                r.notes,
+                COALESCE(
+                    json_agg(
+                        json_build_object(
+                            'id', p.id,
+                            'name', p.name,
+                            'instrument', i.name,
+                            'role', rp.role
+                        ) ORDER BY 
+                            CASE rp.role 
+                                WHEN 'leader' THEN 1 
+                                WHEN 'sideman' THEN 2 
+                                ELSE 3 
+                            END,
+                            p.name
+                    ) FILTER (WHERE p.id IS NOT NULL),
+                    '[]'::json
+                ) as performers
             FROM recordings r
+            LEFT JOIN recording_performers rp ON r.id = rp.recording_id
+            LEFT JOIN performers p ON rp.performer_id = p.id
+            LEFT JOIN instruments i ON rp.instrument_id = i.id
             WHERE r.song_id = %s
+            GROUP BY r.id, r.album_title, r.recording_date, r.recording_year,
+                     r.label, r.spotify_url, r.youtube_url, r.apple_music_url,
+                     r.is_canonical, r.notes
             ORDER BY r.is_canonical DESC, r.recording_year DESC
         """
         recordings = execute_query(recordings_query, (song_id,))
-        
-        # For each recording, fetch the performers
-        for recording in recordings:
-            performers_query = """
-                SELECT p.id, p.name, i.name as instrument, rp.role
-                FROM recording_performers rp
-                JOIN performers p ON rp.performer_id = p.id
-                LEFT JOIN instruments i ON rp.instrument_id = i.id
-                WHERE rp.recording_id = %s
-                ORDER BY 
-                    CASE rp.role 
-                        WHEN 'leader' THEN 1 
-                        WHEN 'sideman' THEN 2 
-                        ELSE 3 
-                    END,
-                    p.name
-            """
-            recording['performers'] = execute_query(performers_query, (recording['id'],))
         
         # Add recording info to song
         song['recordings'] = recordings
@@ -333,7 +347,7 @@ def get_song_detail(song_id):
     except Exception as e:
         logger.error(f"Error fetching song detail: {e}")
         return jsonify({'error': 'Failed to fetch song detail', 'detail': str(e)}), 500
-
+        
 @app.route('/api/recordings/<recording_id>', methods=['GET'])
 def get_recording_detail(recording_id):
     """Get detailed information about a specific recording"""
