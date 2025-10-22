@@ -131,7 +131,7 @@ def init_connection_pool(max_retries=3, retry_delay=2):
 
 @contextmanager
 def get_db_connection():
-    """Get a database connection from the pool with error handling"""
+    """Get a database connection from the pool with explicit transaction management"""
     global pool
     
     # Lazy initialization - create pool on first request if not exists
@@ -147,11 +147,24 @@ def get_db_connection():
     for attempt in range(max_retries):
         try:
             conn = pool.getconn(timeout=10)  # 10 second timeout to get connection from pool
+            
+            # Yield the connection for use
             yield conn
+            
+            # If we get here, the code block succeeded
+            # Explicitly commit the transaction
+            conn.commit()
             return  # Success, exit the function
             
         except psycopg.OperationalError as e:
             logger.error(f"Database operational error (attempt {attempt + 1}/{max_retries}): {e}")
+            
+            # Rollback on error
+            if conn:
+                try:
+                    conn.rollback()
+                except Exception as rollback_error:
+                    logger.error(f"Error rolling back transaction: {rollback_error}")
             
             # If this was a connection error and we have retries left, try again
             if attempt < max_retries - 1:
@@ -170,10 +183,19 @@ def get_db_connection():
                 raise
                 
         except Exception as e:
+            # Rollback on any error
+            if conn:
+                try:
+                    conn.rollback()
+                    logger.debug("Transaction rolled back due to error")
+                except Exception as rollback_error:
+                    logger.error(f"Error rolling back transaction: {rollback_error}")
+            
             logger.error(f"Unexpected database error: {e}")
             raise
             
         finally:
+            # Always return connection to pool
             if conn:
                 try:
                     pool.putconn(conn)
