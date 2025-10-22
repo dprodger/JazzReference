@@ -529,7 +529,7 @@ def get_performer_detail(performer_id):
     try:
         # Get performer information
         performer_query = """
-            SELECT id, name, biography, birth_date, death_date, external_links, external_references
+            SELECT id, name, biography, birth_date, death_date, external_links, 
             FROM performers
             WHERE id = %s
         """
