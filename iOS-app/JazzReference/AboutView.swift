@@ -24,12 +24,12 @@ struct AboutView: View {
             VStack(spacing: 20) {
                 Spacer()
                 
-                Text("Jazz Reference")
+                Text("The Knowledge")
                     .font(.system(size: 48, weight: .bold))
                     .foregroundColor(.white)
                     .shadow(color: .black.opacity(0.7), radius: 10, x: 0, y: 5)
                 
-                Text("Your comprehensive guide to jazz standards")
+                Text("Your comprehensive guide to jazz recordings")
                     .font(.title3)
                     .foregroundColor(.white)
                     .multilineTextAlignment(.center)
@@ -60,6 +60,12 @@ struct AboutView: View {
                     .font(.caption)
                     .foregroundColor(.white.opacity(0.8))
                     .padding(.bottom, 40)
+
+                Text("Written by Dave Rodger")
+                    .font(.caption)
+                    .foregroundColor(.white.opacity(0.8))
+                    .padding(.bottom, 40)
+
             }
         }
         .navigationBarTitleDisplayMode(.inline)
