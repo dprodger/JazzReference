@@ -19,9 +19,10 @@ import argparse
 import logging
 from pathlib import Path
 
-# Import db_utils from same directory
+# Import db_utils and mb_utils from same directory
 sys.path.insert(0, str(Path(__file__).parent))
 from db_utils import get_db_connection
+from mb_utils import MusicBrainzSearcher
 
 # Configure logging
 logging.basicConfig(
@@ -42,6 +43,8 @@ class JazzSongResearcher:
             'Accept-Encoding': 'gzip, deflate, br',
             'Connection': 'keep-alive',
         })
+        # Initialize MusicBrainz searcher
+        self.mb_searcher = MusicBrainzSearcher()
     
     def normalize_song_name_for_url(self, song_name):
         """Convert song name to JazzStandards.com URL format"""
@@ -142,7 +145,7 @@ class JazzSongResearcher:
         recordings = []
         text = parent_element.get_text()
         
-        pattern = r'([A-Z][^-\n]+?)\s*[-—]\s*([^(\n]+?)\s*\((\d{4})\)'
+        pattern = r'([A-Z][^-\n]+?)\s*[-–]\s*([^(\n]+?)\s*\((\d{4})\)'
         matches = re.finditer(pattern, text)
         
         for match in matches:
@@ -177,7 +180,7 @@ class JazzSongResearcher:
                     next_text = next_sibling.get_text()
             
             if next_text:
-                match = re.search(r'[—-]\s*([^(]+?)\s*\((\d{4})\)', next_text)
+                match = re.search(r'[–-]\s*([^(]+?)\s*\((\d{4})\)', next_text)
                 if match:
                     album = match.group(1).strip()
                     year = match.group(2).strip()
@@ -295,6 +298,22 @@ class JazzSongResearcher:
                         logger.error(f"Could not find song: {title}")
                         return False
                     song_id = song_result['id']
+                    
+                    # Always search for MusicBrainz ID
+                    logger.info(f"Searching for MusicBrainz ID...")
+                    mb_id = self.mb_searcher.search_musicbrainz_work(title, composer)
+                    
+                    if mb_id:
+                        cur.execute("""
+                            UPDATE songs
+                            SET musicbrainz_id = %s,
+                                updated_at = CURRENT_TIMESTAMP
+                            WHERE id = %s
+                        """, (mb_id, song_id))
+                        conn.commit()
+                        logger.info(f"✓ Added MusicBrainz ID: {mb_id}")
+                    else:
+                        logger.info(f"  No MusicBrainz match found")
                     
                     # Insert performers
                     for performer in performers:
