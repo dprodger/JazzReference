@@ -121,7 +121,8 @@ def _create_connection():
                         port='6543',  # Transaction mode pooler port
                         row_factory=dict_row,
                         options='-c statement_timeout=30000',
-                        autocommit=False  # Explicit transaction management
+                        autocommit=False,  # Explicit transaction management
+                        prepare_threshold=None  # Disable prepared statements
                     )
                     logger.debug("✓ Connection pooler connection established")
                     return conn
@@ -138,7 +139,8 @@ def _create_connection():
             password=DB_CONFIG['password'],
             port=DB_CONFIG['port'],
             row_factory=dict_row,
-            autocommit=False  # Explicit transaction management
+            autocommit=False,  # Explicit transaction management
+            prepare_threshold=None  # Disable prepared statements
         )
         logger.debug("✓ Direct database connection established")
         return conn
@@ -150,8 +152,8 @@ def _create_connection():
         logger.error("  1. Verify your DB_HOST setting")
         logger.error(f"     Current: {DB_CONFIG.get('host', 'not set')}")
         logger.error("")
-        logger.error("  2. If using Supabase, direct connections require IPv6")
-        logger.error("     Check IPv6: curl -6 https://ifconfig.co")
+        logger.error("  2. Check if you have IPv6 connectivity")
+        logger.error("     Direct connection requires IPv6")
         logger.error("")
         logger.error("  3. For IPv4-only machines, manually set pooler connection:")
         logger.error("     export DB_HOST='aws-0-us-east-1.pooler.supabase.com'")
