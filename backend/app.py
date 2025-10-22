@@ -257,7 +257,7 @@ def get_songs():
     try:
         if search_query:
             query = """
-                SELECT id, title, composer, structure, song_reference, external_references, 
+                SELECT id, title, composer, structure, musicbrainz_id, song_reference, external_references, 
                        created_at, updated_at
                 FROM songs
                 WHERE title ILIKE %s OR composer ILIKE %s
@@ -266,7 +266,7 @@ def get_songs():
             params = (f'%{search_query}%', f'%{search_query}%')
         else:
             query = """
-                SELECT id, title, composer, structure, song_reference, external_references,
+                SELECT id, title, composer, structure, musicbrainz_id, song_reference, external_references,
                        created_at, updated_at
                 FROM songs
                 ORDER BY title
@@ -286,8 +286,7 @@ def get_song_detail(song_id):
     try:
         # Get song information
         song_query = """
-            SELECT id, title, composer, structure, song_reference, external_references,
-                   created_at, updated_at
+            SELECT id, title, composer, structure, song_reference, musicbrainz_id, external_references, created_at, updated_at
             FROM songs
             WHERE id = %s
         """
