@@ -196,3 +196,135 @@ if __name__ == "__main__":
     
     # Run connection test
     test_connection()
+    
+
+def execute_query(query, params=None, fetch_one=False, fetch_all=True):
+    """
+    Execute a SELECT query and return results.
+    
+    Args:
+        query: SQL query string
+        params: Query parameters tuple
+        fetch_one: If True, return only first result
+        fetch_all: If True, return all results (ignored if fetch_one is True)
+    
+    Returns:
+        Query results or None
+    """
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(query, params)
+                if fetch_one:
+                    return cur.fetchone()
+                elif fetch_all:
+                    return cur.fetchall()
+                return None
+    except psycopg.Error as e:
+        logger.error(f"Query execution error: {e}")
+        raise
+
+
+def execute_update(query, params=None, commit=True):
+    """
+    Execute an INSERT/UPDATE/DELETE query.
+    
+    Args:
+        query: SQL query string
+        params: Query parameters tuple
+        commit: If True, commit the transaction
+    
+    Returns:
+        Number of affected rows
+    """
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(query, params)
+                affected_rows = cur.rowcount
+                if commit:
+                    conn.commit()
+                return affected_rows
+    except psycopg.Error as e:
+        logger.error(f"Update execution error: {e}")
+        raise
+
+
+def find_performer_by_name(name):
+    """
+    Find a performer by name (case-insensitive).
+    
+    Args:
+        name: Performer name to search for
+    
+    Returns:
+        Performer record or None if not found
+    """
+    query = "SELECT * FROM performers WHERE LOWER(name) = LOWER(%s) LIMIT 1"
+    return execute_query(query, (name,), fetch_one=True)
+
+
+def find_performer_by_id(performer_id):
+    """
+    Find a performer by UUID.
+    
+    Args:
+        performer_id: UUID of the performer
+    
+    Returns:
+        Performer record or None if not found
+    """
+    query = "SELECT * FROM performers WHERE id = %s"
+    return execute_query(query, (performer_id,), fetch_one=True)
+
+
+def update_performer_external_references(performer_id, external_refs, dry_run=False):
+    """
+    Update external_references JSONB field for a performer.
+    
+    Args:
+        performer_id: UUID of the performer
+        external_refs: Dictionary of external references to merge
+        dry_run: If True, don't actually update the database
+    
+    Returns:
+        True if successful, False otherwise
+    """
+    if dry_run:
+        logger.info(f"[DRY RUN] Would update external_references for performer {performer_id}: {external_refs}")
+        return True
+    
+    try:
+        # Use PostgreSQL's JSONB merge operator (||) to add/update fields
+        query = """
+            UPDATE performers 
+            SET external_links = COALESCE(external_links, '{}'::jsonb) || %s::jsonb,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = %s
+        """
+        import json
+        affected = execute_update(query, (json.dumps(external_refs), performer_id))
+        return affected > 0
+    except Exception as e:
+        logger.error(f"Error updating external references: {e}")
+        return False
+
+
+def get_performer_images(performer_id):
+    """
+    Get all images for a performer.
+    
+    Args:
+        performer_id: UUID of the performer
+    
+    Returns:
+        List of image records with join data
+    """
+    query = """
+        SELECT i.*, ai.is_primary, ai.display_order
+        FROM images i
+        JOIN artist_images ai ON i.id = ai.image_id
+        WHERE ai.performer_id = %s
+        ORDER BY ai.is_primary DESC, ai.display_order, i.created_at
+    """
+    return execute_query(query, (performer_id,), fetch_all=True)

@@ -486,6 +486,155 @@ def get_performer_detail(performer_id):
         logger.error(f"Error fetching performer detail: {e}")
         return jsonify({'error': 'Failed to fetch performer detail', 'detail': str(e)}), 500
 
+# Add these new routes to your existing backend/app.py file
+# Add them before the if __name__ == '__main__' block
+
+@app.route('/api/performers/<performer_id>/images', methods=['GET'])
+def get_performer_images(performer_id):
+    """Get all images for a specific performer"""
+    try:
+        # Get all images for this performer with join data
+        query = """
+            SELECT 
+                i.id,
+                i.url,
+                i.source,
+                i.source_identifier,
+                i.license_type,
+                i.license_url,
+                i.attribution,
+                i.width,
+                i.height,
+                i.thumbnail_url,
+                i.source_page_url,
+                ai.is_primary,
+                ai.display_order
+            FROM images i
+            JOIN artist_images ai ON i.id = ai.image_id
+            WHERE ai.performer_id = %s
+            ORDER BY ai.is_primary DESC, ai.display_order, i.created_at
+        """
+        
+        images = execute_query(query, (performer_id,), fetch_all=True)
+        
+        if not images:
+            return jsonify([])
+        
+        return jsonify(images)
+        
+    except Exception as e:
+        logger.error(f"Error fetching performer images: {e}")
+        return jsonify({'error': 'Failed to fetch performer images', 'detail': str(e)}), 500
+
+
+@app.route('/api/images/<image_id>', methods=['GET'])
+def get_image_detail(image_id):
+    """Get detailed information about a specific image"""
+    try:
+        query = """
+            SELECT 
+                i.*,
+                COALESCE(
+                    json_agg(
+                        json_build_object(
+                            'performer_id', p.id,
+                            'performer_name', p.name,
+                            'is_primary', ai.is_primary,
+                            'display_order', ai.display_order
+                        ) ORDER BY ai.is_primary DESC, ai.display_order
+                    ) FILTER (WHERE p.id IS NOT NULL),
+                    '[]'::json
+                ) as performers
+            FROM images i
+            LEFT JOIN artist_images ai ON i.id = ai.image_id
+            LEFT JOIN performers p ON ai.performer_id = p.id
+            WHERE i.id = %s
+            GROUP BY i.id
+        """
+        
+        image = execute_query(query, (image_id,), fetch_one=True)
+        
+        if not image:
+            return jsonify({'error': 'Image not found'}), 404
+        
+        return jsonify(image)
+        
+    except Exception as e:
+        logger.error(f"Error fetching image detail: {e}")
+        return jsonify({'error': 'Failed to fetch image detail', 'detail': str(e)}), 500
+
+
+# Also update the get_performer_detail function to include images
+# Replace the existing function with this updated version:
+
+@app.route('/api/performers/<performer_id>', methods=['GET'])
+def get_performer_detail(performer_id):
+    """Get detailed information about a specific performer - WITH IMAGES"""
+    try:
+        # Get performer information
+        performer_query = """
+            SELECT id, name, biography, birth_date, death_date, external_links, external_references
+            FROM performers
+            WHERE id = %s
+        """
+        performer = execute_query(performer_query, (performer_id,), fetch_one=True)
+        
+        if not performer:
+            return jsonify({'error': 'Performer not found'}), 404
+        
+        # Get instruments
+        instruments_query = """
+            SELECT i.name, pi.is_primary
+            FROM performer_instruments pi
+            JOIN instruments i ON pi.instrument_id = i.id
+            WHERE pi.performer_id = %s
+            ORDER BY pi.is_primary DESC, i.name
+        """
+        performer['instruments'] = execute_query(instruments_query, (performer_id,))
+        
+        # Get recordings
+        recordings_query = """
+            SELECT DISTINCT s.id as song_id, s.title as song_title, 
+                   r.id as recording_id, r.album_title, r.recording_year, 
+                   r.is_canonical, rp.role
+            FROM recording_performers rp
+            JOIN recordings r ON rp.recording_id = r.id
+            JOIN songs s ON r.song_id = s.id
+            WHERE rp.performer_id = %s
+            ORDER BY r.recording_year DESC NULLS LAST, s.title
+        """
+        performer['recordings'] = execute_query(recordings_query, (performer_id,))
+        
+        # Get images
+        images_query = """
+            SELECT 
+                i.id,
+                i.url,
+                i.source,
+                i.source_identifier,
+                i.license_type,
+                i.license_url,
+                i.attribution,
+                i.width,
+                i.height,
+                i.thumbnail_url,
+                i.source_page_url,
+                ai.is_primary,
+                ai.display_order
+            FROM images i
+            JOIN artist_images ai ON i.id = ai.image_id
+            WHERE ai.performer_id = %s
+            ORDER BY ai.is_primary DESC, ai.display_order, i.created_at
+        """
+        performer['images'] = execute_query(images_query, (performer_id,))
+        
+        return jsonify(performer)
+        
+    except Exception as e:
+        logger.error(f"Error fetching performer detail: {e}")
+        return jsonify({'error': 'Failed to fetch performer detail', 'detail': str(e)}), 500
+
+
 @app.before_request
 def log_request():
     """Log incoming requests"""

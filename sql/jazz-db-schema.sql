@@ -111,6 +111,42 @@ CREATE TABLE video_performers (
 );
 
 -- ============================================================================
+-- Migration: Add Images Support
+-- Description: Adds images table and artist_images junction table
+-- ============================================================================
+
+-- Images table
+CREATE TABLE IF NOT EXISTS images (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    url VARCHAR(1000) NOT NULL,
+    source VARCHAR(100) NOT NULL, -- 'wikipedia', 'discogs', 'musicbrainz', etc.
+    source_identifier VARCHAR(255), -- ID from external source (e.g., Discogs artist ID)
+    license_type VARCHAR(100), -- 'cc-by-sa', 'cc-by', 'public-domain', 'all-rights-reserved', etc.
+    license_url VARCHAR(500), -- URL to license details
+    attribution TEXT, -- Required attribution text
+    width INTEGER, -- Original image width in pixels
+    height INTEGER, -- Original image height in pixels
+    thumbnail_url VARCHAR(1000), -- Smaller version if available
+    source_page_url VARCHAR(1000), -- URL to the page where image was found
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(source, source_identifier, url) -- Prevent duplicate images from same source
+);
+
+-- Artist images junction table (many-to-many)
+CREATE TABLE IF NOT EXISTS artist_images (
+    performer_id UUID NOT NULL REFERENCES performers(id) ON DELETE CASCADE,
+    image_id UUID NOT NULL REFERENCES images(id) ON DELETE CASCADE,
+    is_primary BOOLEAN DEFAULT false, -- Flag one image as the primary/profile image
+    display_order INTEGER DEFAULT 0, -- Order for displaying multiple images
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (performer_id, image_id)
+);
+
+
+
+
+-- ============================================================================
 -- ADMIN & VERSIONING TABLES
 -- ============================================================================
 
@@ -174,6 +210,18 @@ CREATE INDEX idx_videos_type ON videos(video_type);
 CREATE INDEX idx_instruments_name ON instruments(name);
 CREATE INDEX idx_instruments_category ON instruments(category);
 
+-- Add index on external_links for performers (if it doesn't exist)
+-- This will help us store Discogs IDs, Wikipedia URLs, etc.
+CREATE INDEX IF NOT EXISTS idx_performers_external_links ON performers USING gin(external_links);
+
+-- Add indexes for performance
+CREATE INDEX IF NOT EXISTS idx_images_source ON images(source);
+CREATE INDEX IF NOT EXISTS idx_images_source_identifier ON images(source_identifier);
+CREATE INDEX IF NOT EXISTS idx_artist_images_performer ON artist_images(performer_id);
+CREATE INDEX IF NOT EXISTS idx_artist_images_image ON artist_images(image_id);
+CREATE INDEX IF NOT EXISTS idx_artist_images_primary ON artist_images(is_primary) WHERE is_primary = true;
+
+
 -- ============================================================================
 -- FUNCTIONS & TRIGGERS
 -- ============================================================================
@@ -202,6 +250,21 @@ CREATE TRIGGER update_videos_updated_at BEFORE UPDATE ON videos
 
 CREATE TRIGGER update_admin_users_updated_at BEFORE UPDATE ON admin_users
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- Add updated_at trigger for images
+CREATE OR REPLACE FUNCTION update_images_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = CURRENT_TIMESTAMP;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trigger_update_images_updated_at
+    BEFORE UPDATE ON images
+    FOR EACH ROW
+    EXECUTE FUNCTION update_images_updated_at();
+
 
 -- ============================================================================
 -- INITIAL DATA
@@ -283,3 +346,13 @@ COMMENT ON TABLE recording_performers IS 'Junction table linking performers to r
 COMMENT ON TABLE videos IS 'YouTube videos linked to songs or recordings';
 COMMENT ON COLUMN recordings.is_canonical IS 'Flag indicating this is the definitive/recommended recording of the song';
 COMMENT ON COLUMN songs.external_references IS 'JSON object containing Wikipedia URLs, book references, and other external links';
+-- Comments for documentation
+COMMENT ON TABLE images IS 'Stores external image URLs with licensing and attribution information';
+COMMENT ON TABLE artist_images IS 'Many-to-many relationship between performers and images';
+COMMENT ON COLUMN images.license_type IS 'License type: cc-by-sa, cc-by, cc0, public-domain, all-rights-reserved, etc.';
+COMMENT ON COLUMN images.source IS 'Source of the image: wikipedia, discogs, musicbrainz, manual, etc.';
+COMMENT ON COLUMN images.source_identifier IS 'External ID from the source system (e.g., Discogs artist ID)';
+COMMENT ON COLUMN artist_images.is_primary IS 'Marks the primary/profile image for an artist';
+COMMENT ON COLUMN artist_images.display_order IS 'Order for displaying images in carousel (lower numbers first)';
+
+
