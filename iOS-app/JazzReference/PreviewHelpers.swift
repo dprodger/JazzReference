@@ -177,7 +177,8 @@ extension PerformerDetail {
                 isCanonical: false,
                 role: "leader"
             )
-        ]
+        ],
+        images: nil
     )
     
     static let previewMinimal = PerformerDetail(
@@ -190,7 +191,8 @@ extension PerformerDetail {
         instruments: [
             PerformerInstrument(name: "Tenor Saxophone", isPrimary: true)
         ],
-        recordings: []
+        recordings: [],
+        images: nil
     )
 }
 

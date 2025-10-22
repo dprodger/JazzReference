@@ -60,6 +60,10 @@ struct PerformerDetailView: View {
                     .background(JazzTheme.amberGradient)
                     
                     VStack(alignment: .leading, spacing: 20) {
+                        if let images = performer.images, !images.isEmpty {
+                            ArtistImageCarousel(images: images)
+                                .padding(.bottom, 8)
+                        }
                         // Performer Information
                         VStack(alignment: .leading, spacing: 12) {
                             Text(performer.name)

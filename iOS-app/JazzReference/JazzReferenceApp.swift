@@ -82,9 +82,10 @@ struct PerformerDetail: Codable, Identifiable {
     let externalLinks: [String: String]?
     let instruments: [PerformerInstrument]?
     let recordings: [PerformerRecording]?
-    
+    let images: [ArtistImage]?  // <-- ADD THIS LINE
+
     enum CodingKeys: String, CodingKey {
-        case id, name, biography, instruments, recordings
+        case id, name, biography, instruments, recordings, images
         case birthDate = "birth_date"
         case deathDate = "death_date"
         case externalLinks = "external_links"
@@ -122,7 +123,41 @@ struct PerformerRecording: Codable, Identifiable {
         case role
     }
 }
-// MARK: - Main View
+
+// ============================================================================
+// ADD THESE TO YOUR JazzReferenceApp.swift FILE
+// Add after your existing PerformerDetail struct
+// ============================================================================
+
+// MARK: - Image Models (ADD THIS)
+
+struct ArtistImage: Codable, Identifiable {
+    let id: String
+    let url: String
+    let source: String
+    let sourceIdentifier: String?
+    let licenseType: String?
+    let licenseUrl: String?
+    let attribution: String?
+    let width: Int?
+    let height: Int?
+    let thumbnailUrl: String?
+    let sourcePageUrl: String?
+    let isPrimary: Bool
+    let displayOrder: Int
+    
+    enum CodingKeys: String, CodingKey {
+        case id, url, source, width, height, attribution
+        case sourceIdentifier = "source_identifier"
+        case licenseType = "license_type"
+        case licenseUrl = "license_url"
+        case thumbnailUrl = "thumbnail_url"
+        case sourcePageUrl = "source_page_url"
+        case isPrimary = "is_primary"
+        case displayOrder = "display_order"
+    }
+}
+
 
 // MARK: - Main View
 
