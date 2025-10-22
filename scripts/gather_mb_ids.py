@@ -22,7 +22,7 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
         logging.StreamHandler(sys.stdout),
-        logging.FileHandler('mb_gather.log')
+        logging.FileHandler('log/mb_gather.log')
     ]
 )
 logger = logging.getLogger(__name__)

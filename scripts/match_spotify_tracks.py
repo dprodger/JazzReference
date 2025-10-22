@@ -23,7 +23,7 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
         logging.StreamHandler(sys.stdout),
-        logging.FileHandler('spotify_match.log')
+        logging.FileHandler('log/spotify_match.log')
     ]
 )
 logger = logging.getLogger(__name__)
