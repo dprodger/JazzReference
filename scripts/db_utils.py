@@ -8,6 +8,7 @@ import os
 import logging
 import psycopg
 from psycopg.rows import dict_row
+from contextlib import contextmanager
 
 logger = logging.getLogger(__name__)
 
@@ -21,9 +22,67 @@ DB_CONFIG = {
 }
 
 
+@contextmanager
 def get_db_connection():
     """
-    Create and return a database connection with automatic fallback handling.
+    Context manager for database connections with explicit transaction management.
+    
+    Automatically handles:
+    - Connection creation with fallback logic
+    - Transaction commit on success
+    - Transaction rollback on error
+    - Connection cleanup
+    
+    Usage:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT * FROM songs")
+                results = cur.fetchall()
+        # Transaction is automatically committed here
+    
+    Returns:
+        psycopg.Connection: Database connection with dict_row factory
+        
+    Raises:
+        Exception: If connection fails after all attempts
+    """
+    conn = None
+    try:
+        # Create connection with fallback handling
+        conn = _create_connection()
+        
+        # Yield connection for use
+        yield conn
+        
+        # If we get here, operation succeeded - commit transaction
+        conn.commit()
+        logger.debug("Transaction committed successfully")
+        
+    except Exception as e:
+        # Rollback on any error
+        if conn:
+            try:
+                conn.rollback()
+                logger.debug("Transaction rolled back due to error")
+            except Exception as rollback_error:
+                logger.error(f"Error rolling back transaction: {rollback_error}")
+        
+        # Re-raise the original exception
+        raise
+        
+    finally:
+        # Always close the connection
+        if conn:
+            try:
+                conn.close()
+                logger.debug("Database connection closed")
+            except Exception as close_error:
+                logger.error(f"Error closing connection: {close_error}")
+
+
+def _create_connection():
+    """
+    Internal function to create a database connection with automatic fallback handling.
     
     Tries connection pooler first (for IPv4 compatibility), then falls back
     to direct connection (requires IPv6).
@@ -40,7 +99,7 @@ def get_db_connection():
         host = DB_CONFIG['host']
         
         # If using default Supabase host, try connection pooler for IPv4
-        if 'supabase.co' in host and not host.startswith('aws-0-'):
+        if 'supabase.co' in host and not host.startswith('aws-'):
             # Extract project reference from db.PROJECT_REF.supabase.co
             parts = host.split('.')
             if len(parts) >= 3 and parts[0] == 'db':
@@ -62,7 +121,7 @@ def get_db_connection():
                         port='6543',  # Transaction mode pooler port
                         row_factory=dict_row,
                         options='-c statement_timeout=30000',
-                        prepare_threshold=None  # cursor management
+                        autocommit=False  # Explicit transaction management
                     )
                     logger.debug("✓ Connection pooler connection established")
                     return conn
@@ -79,7 +138,7 @@ def get_db_connection():
             password=DB_CONFIG['password'],
             port=DB_CONFIG['port'],
             row_factory=dict_row,
-            prepare_threshold=None  # cursor management
+            autocommit=False  # Explicit transaction management
         )
         logger.debug("✓ Direct database connection established")
         return conn
