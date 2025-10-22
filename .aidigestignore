@@ -3,4 +3,5 @@ backend/output
 backend/venv
 scripts/*.log
 scripts/__pcache__
+log
 

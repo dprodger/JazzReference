@@ -267,7 +267,7 @@ class SpotifyMatcher:
                 SET spotify_url = %s,
                     updated_at = CURRENT_TIMESTAMP
                 WHERE id = %s
-            """, (spotify_url, recording_id))
+            """, (spotify_url, recording_id), prepare=False)
             
             conn.commit()
             logger.info(f"    ✓ Updated with Spotify URL")
