@@ -442,50 +442,6 @@ def get_performers():
         logger.error(f"Error fetching performers: {e}")
         return jsonify({'error': 'Failed to fetch performers', 'detail': str(e)}), 500
 
-@app.route('/api/performers/<performer_id>', methods=['GET'])
-def get_performer_detail(performer_id):
-    """Get detailed information about a specific performer"""
-    try:
-        # Get performer information
-        performer_query = """
-            SELECT id, name, biography, birth_date, death_date, external_links
-            FROM performers
-            WHERE id = %s
-        """
-        performer = execute_query(performer_query, (performer_id,), fetch_one=True)
-        
-        if not performer:
-            return jsonify({'error': 'Performer not found'}), 404
-        
-        # Get instruments
-        instruments_query = """
-            SELECT i.name, pi.is_primary
-            FROM performer_instruments pi
-            JOIN instruments i ON pi.instrument_id = i.id
-            WHERE pi.performer_id = %s
-            ORDER BY pi.is_primary DESC, i.name
-        """
-        performer['instruments'] = execute_query(instruments_query, (performer_id,))
-        
-        # Get recordings
-        recordings_query = """
-            SELECT DISTINCT s.id as song_id, s.title as song_title, 
-                   r.id as recording_id, r.album_title, r.recording_year, 
-                   r.is_canonical, rp.role
-            FROM recording_performers rp
-            JOIN recordings r ON rp.recording_id = r.id
-            JOIN songs s ON r.song_id = s.id
-            WHERE rp.performer_id = %s
-            ORDER BY r.recording_year DESC NULLS LAST, s.title
-        """
-        performer['recordings'] = execute_query(recordings_query, (performer_id,))
-        
-        return jsonify(performer)
-        
-    except Exception as e:
-        logger.error(f"Error fetching performer detail: {e}")
-        return jsonify({'error': 'Failed to fetch performer detail', 'detail': str(e)}), 500
-
 # Add these new routes to your existing backend/app.py file
 # Add them before the if __name__ == '__main__' block
 
