@@ -155,22 +155,47 @@ class PerformerReferenceVerifier:
             confidence_score = 0
             reasons = []
             
+            # Check name similarity
+            page_title = soup.find('h1', {'id': 'firstHeading'})
+            if page_title:
+                page_title_text = page_title.get_text().strip()
+                # Remove disambiguation parentheses like "(saxophonist)"
+                page_name = re.sub(r'\s*\([^)]*\)\s*$', '', page_title_text).strip().lower()
+                performer_name_lower = performer_name.lower()
+                
+                name_match = False
+                if page_name == performer_name_lower:
+                    confidence_score += 30
+                    reasons.append(f"Exact name match")
+                    name_match = True
+                elif performer_name_lower in page_name or page_name in performer_name_lower:
+                    confidence_score += 15
+                    reasons.append(f"Partial name match")
+                    name_match = True
+                else:
+                    # Name doesn't match - this is suspicious
+                    reasons.append(f"Name mismatch: expected '{performer_name}', page is '{page_title_text}'")
+            
             # Look for infobox (strong signal this is a musician page)
             infobox = soup.find('table', {'class': 'infobox'})
             if infobox:
                 infobox_text = infobox.get_text().lower()
                 
-                # Check for music-related terms in infobox
-                music_terms = [
+                # Check for SPECIFIC music-related terms in infobox (not just "occupation")
+                specific_music_terms = [
                     'jazz', 'musician', 'singer', 'vocalist', 'pianist', 'composer',
                     'saxophonist', 'trumpeter', 'bassist', 'drummer', 'guitarist',
-                    'occupation', 'instruments', 'genres', 'labels', 'years active',
-                    'blues', 'soul', 'r&b', 'gospel', 'folk'
+                    'bandleader', 'blues', 'soul', 'r&b', 'gospel', 'folk',
+                    'instruments', 'genres', 'labels'
                 ]
-                found_infobox_terms = [term for term in music_terms if term in infobox_text]
-                if found_infobox_terms:
+                found_specific_terms = [term for term in specific_music_terms if term in infobox_text]
+                if found_specific_terms:
                     confidence_score += 40  # Strong signal
-                    reasons.append(f"Infobox contains music terms: {', '.join(found_infobox_terms[:3])}")
+                    reasons.append(f"Infobox contains music terms: {', '.join(found_specific_terms[:3])}")
+                elif 'occupation' in infobox_text:
+                    # Has occupation but no music-specific terms - only give small boost
+                    confidence_score += 10
+                    reasons.append(f"Infobox present but no specific music terms")
             
             # Check for jazz musician keywords in main content
             jazz_keywords = [
@@ -208,19 +233,19 @@ class PerformerReferenceVerifier:
                     reasons.append(f"Found song references: {', '.join(song_mentions[:2])}")
             
             # Determine validity based on confidence score
-            # Lower threshold to 30 to be less strict (was 50)
-            if confidence_score >= 30:
+            # Require at least 50 points (medium confidence) to accept
+            if confidence_score >= 50:
                 return {
                     'valid': True,
-                    'confidence': 'high' if confidence_score >= 70 else 'medium' if confidence_score >= 50 else 'low',
+                    'confidence': 'high' if confidence_score >= 70 else 'medium',
                     'reason': '; '.join(reasons) if reasons else 'Page appears valid (score: {})'.format(confidence_score),
-                    'score': confidence_score  # Add raw score to return value
+                    'score': confidence_score
                 }
             else:
                 return {
                     'valid': False,
-                    'confidence': 'very_low',
-                    'reason': 'Insufficient evidence of correct performer (score: {})'.format(confidence_score),
+                    'confidence': 'low' if confidence_score >= 30 else 'very_low',
+                    'reason': 'Insufficient evidence of correct performer (score: {}): {}'.format(confidence_score, '; '.join(reasons)),
                     'score': confidence_score
                 }
                 
