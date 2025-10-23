@@ -429,7 +429,7 @@ Examples:
     )
     
     # Required arguments (one of)
-    group = parser.add_mutually_exclusive_group(required=True)
+    group = parser.add_mutually_exclusive_group(required=False)
     group.add_argument('--name', help='Artist name to search for')
     group.add_argument('--id', help='Performer UUID')
     
@@ -441,30 +441,55 @@ Examples:
     
     args = parser.parse_args()
     
-    # Find the performer
+    # Fetch and save images
+    fetcher = ImageFetcher(dry_run=args.dry_run, debug=args.debug)
+    
+    # Determine which performers to process
+    performers = []
+    
     if args.name:
         logger.info(f"Searching for performer: {args.name}")
         performer = find_performer_by_name(args.name)
         if not performer:
             logger.error(f"Performer not found: {args.name}")
             sys.exit(1)
-    else:
+        performers = [performer]
+        logger.info(f"Found performer: {performer['name']} (ID: {performer['id']})")
+    elif args.id:
         logger.info(f"Looking up performer ID: {args.id}")
         performer = find_performer_by_id(args.id)
         if not performer:
             logger.error(f"Performer not found with ID: {args.id}")
             sys.exit(1)
-    
-    logger.info(f"Found performer: {performer['name']} (ID: {performer['id']})")
-    
-    # Fetch and save images
-    fetcher = ImageFetcher(dry_run=args.dry_run, debug=args.debug)
-    images_added = fetcher.fetch_and_save_images(performer)
-    
-    if images_added > 0:
-        logger.info(f"\n✓ Success! Added {images_added} image(s)")
+        performers = [performer]
+        logger.info(f"Found performer: {performer['name']} (ID: {performer['id']})")
     else:
-        logger.info(f"\n✓ No new images added (performer may already have images)")
+        # Process all performers
+        logger.info("No specific performer specified - processing all performers")
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT id, name, biography, birth_date, death_date, external_links
+                    FROM performers
+                    ORDER BY name
+                """)
+                performers = cur.fetchall()
+        logger.info(f"Found {len(performers)} performers to process")
+    
+    # Process each performer
+    total_images_added = 0
+    for performer in performers:
+        images_added = fetcher.fetch_and_save_images(performer)
+        total_images_added += images_added
+        
+        # Add delay between performers to be respectful to APIs
+        if len(performers) > 1:
+            time.sleep(2.0)
+    
+    if total_images_added > 0:
+        logger.info(f"\n✓ Success! Added {total_images_added} image(s) across {len(performers)} performer(s)")
+    else:
+        logger.info(f"\n✓ No new images added")
     
     sys.exit(0)
 
