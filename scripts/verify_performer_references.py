@@ -141,15 +141,56 @@ class PerformerReferenceVerifier:
             
             # Parse the page
             soup = BeautifulSoup(response.text, 'html.parser')
-            page_text = soup.get_text().lower()
+            
+            # Get the main content area (skip navigation/menus)
+            content_div = soup.find('div', {'id': 'mw-content-text'}) or soup.find('div', {'class': 'mw-parser-output'})
+            if content_div:
+                page_text = content_div.get_text().lower()
+            else:
+                page_text = soup.get_text().lower()
             
             # Check if this is a disambiguation or redirect to wrong page
+            # Method 1: Check for explicit disambiguation text
+            logger.debug(f"Checking for 'disambiguation' in first 500 chars...")
             if 'disambiguation' in page_text[:500]:
+                logger.debug(f"Found 'disambiguation' - rejecting page")
                 return {
                     'valid': False,
                     'confidence': 'high',
-                    'reason': 'Page is a disambiguation page'
+                    'reason': 'Page is a disambiguation page',
+                    'score': 0
                 }
+            
+            # Method 2: Check if page is a list of people with same name
+            # Look for "may refer to:" pattern which indicates disambiguation
+            logger.debug(f"Checking for 'may refer to:' in first 300 chars of content...")
+            logger.debug(f"First 300 chars: {page_text[:300]}")
+            if 'may refer to:' in page_text[:300]:
+                logger.debug(f"Found 'may refer to:' - rejecting page")
+                return {
+                    'valid': False,
+                    'confidence': 'high',
+                    'reason': 'Page is a disambiguation page (contains "may refer to:")',
+                    'score': 0
+                }
+            
+            # Method 3: Check if page has many bullet points with birth/death dates
+            # which suggests it's listing multiple people
+            logger.debug(f"Checking for multiple birth year patterns...")
+            ul_lists = soup.find_all('ul', limit=3)
+            if ul_lists:
+                list_text = ' '.join([ul.get_text() for ul in ul_lists[:2]])
+                # Count how many birth year patterns like "(1942–2020)" or "(born 1974)"
+                birth_patterns = re.findall(r'\((?:born\s+)?\d{4}', list_text)
+                logger.debug(f"Found {len(birth_patterns)} birth year patterns: {birth_patterns[:5]}")
+                if len(birth_patterns) >= 3:
+                    logger.debug(f"Multiple birth patterns found - rejecting as disambiguation page")
+                    return {
+                        'valid': False,
+                        'confidence': 'high',
+                        'reason': f'Page appears to be a disambiguation page (lists {len(birth_patterns)} different people)',
+                        'score': 0
+                    }
             
             # Calculate confidence based on multiple factors
             confidence_score = 0
