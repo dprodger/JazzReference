@@ -1,0 +1,3 @@
+things to do:
+1. amend fetch_artist_images to gather for all artists?
+2. amend verify_performer_references to only either look just for artists who don't already have refs, just those who do, or both
