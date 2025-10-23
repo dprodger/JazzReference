@@ -60,51 +60,68 @@ struct PerformerDetailView: View {
                     .background(JazzTheme.amberGradient)
                     
                     VStack(alignment: .leading, spacing: 20) {
+                        // Artist Name - MOVED TO TOP
+                        Text(performer.name)
+                            .font(.largeTitle)
+                            .bold()
+                            .foregroundColor(JazzTheme.charcoal)
+                            .padding(.horizontal)
+                            .padding(.top, 12)
+                        
+                        // Image Carousel - MOVED AFTER NAME
                         if let images = performer.images, !images.isEmpty {
                             ArtistImageCarousel(images: images)
-                                .padding(.bottom, 8)
+                                .padding(.top, 8)
                         }
-                        // Performer Information
+                        
+                        // Performer Information - REST OF THE INFO
                         VStack(alignment: .leading, spacing: 12) {
-                            Text(performer.name)
-                                .font(.largeTitle)
-                                .bold()
-                                .foregroundColor(JazzTheme.charcoal)
-                            
-                            // Birth and Death Dates
-                            if performer.birthDate != nil || performer.deathDate != nil {
+                            if let birthDate = performer.birthDate {
                                 HStack {
-                                    if let birthDate = performer.birthDate {
-                                        Text("Born: \(birthDate)")
-                                            .font(.subheadline)
-                                            .foregroundColor(JazzTheme.smokeGray)
-                                    }
-                                    
-                                    if performer.birthDate != nil && performer.deathDate != nil {
-                                        Text("•")
-                                            .foregroundColor(JazzTheme.smokeGray)
-                                    }
-                                    
-                                    if let deathDate = performer.deathDate {
-                                        Text("Died: \(deathDate)")
-                                            .font(.subheadline)
-                                            .foregroundColor(JazzTheme.smokeGray)
-                                    }
-                                }
-                            }
-                            
-                            // Instruments
-                            if let instruments = performer.instruments, !instruments.isEmpty {
-                                HStack {
-                                    Image(systemName: "music.note")
+                                    Image(systemName: "calendar")
                                         .foregroundColor(JazzTheme.brass)
-                                    Text(instruments.map { $0.name }.joined(separator: ", "))
+                                    Text("Born: \(birthDate)")
                                         .font(.subheadline)
                                         .foregroundColor(JazzTheme.smokeGray)
                                 }
                             }
                             
-                            // Biography
+                            if let deathDate = performer.deathDate {
+                                HStack {
+                                    Image(systemName: "calendar")
+                                        .foregroundColor(JazzTheme.brass)
+                                    Text("Died: \(deathDate)")
+                                        .font(.subheadline)
+                                        .foregroundColor(JazzTheme.smokeGray)
+                                }
+                            }
+                            
+                            if let instruments = performer.instruments, !instruments.isEmpty {
+                                VStack(alignment: .leading, spacing: 8) {
+                                    Text("Instruments")
+                                        .font(.headline)
+                                        .foregroundColor(JazzTheme.charcoal)
+                                    
+                                    ForEach(instruments, id: \.name) { instrument in
+                                        HStack {
+                                            Image(systemName: "music.note")
+                                                .foregroundColor(JazzTheme.brass)
+                                            Text(instrument.name)
+                                                .font(.subheadline)
+                                                .foregroundColor(JazzTheme.charcoal)
+                                            if instrument.isPrimary == true {
+                                                Text("(Primary)")
+                                                    .font(.caption)
+                                                    .foregroundColor(JazzTheme.smokeGray)
+                                            }
+                                        }
+                                    }
+                                }
+                                .padding()
+                                .background(JazzTheme.cardBackground)
+                                .cornerRadius(10)
+                            }
+                            
                             if let biography = performer.biography {
                                 VStack(alignment: .leading, spacing: 8) {
                                     Text("Biography")
@@ -203,7 +220,6 @@ struct PerformerRecordingRowView: View {
                     .frame(width: 20)
             }
             
-            // Recording info
             VStack(alignment: .leading, spacing: 4) {
                 // Song title
                 Text(recording.songTitle)

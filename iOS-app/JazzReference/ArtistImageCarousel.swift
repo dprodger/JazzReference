@@ -2,8 +2,7 @@
 //  ArtistImageCarousel.swift
 //  JazzReference
 //
-//  Simple horizontal scrolling image carousel
-//  ADD THIS AS A NEW FILE to your Xcode project
+//  Simple horizontal scrolling image carousel with source watermarks
 //
 
 import SwiftUI
@@ -16,17 +15,14 @@ struct ArtistImageCarousel: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Images")
-                .font(.title2)
-                .bold()
-                .foregroundColor(JazzTheme.charcoal)
-                .padding(.horizontal)
+            // Header removed as per requirements
             
             if images.isEmpty {
                 Text("No images available")
                     .foregroundColor(JazzTheme.smokeGray)
                     .padding()
             } else {
+                // Carousel with border wrapper
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 12) {
                         ForEach(images) { image in
@@ -37,8 +33,18 @@ struct ArtistImageCarousel: View {
                         }
                     }
                     .padding(.horizontal)
+                    .padding(.vertical, 12)
                 }
-                .frame(height: carouselHeight)
+                .frame(height: carouselHeight + 24) // Account for vertical padding
+                .background(
+                    RoundedRectangle(cornerRadius: 16)
+                        .strokeBorder(JazzTheme.smokeGray.opacity(0.3), lineWidth: 1.5)
+                        .background(
+                            RoundedRectangle(cornerRadius: 16)
+                                .fill(Color.white.opacity(0.5))
+                        )
+                )
+                .padding(.horizontal)
             }
         }
         .sheet(item: $selectedImage) { image in
@@ -62,30 +68,64 @@ private struct ImageThumbnail: View {
         return 280 * aspectRatio
     }
     
+    private var sourceName: String {
+        switch image.source.lowercased() {
+        case "wikimedia": return "Wikimedia Commons"
+        case "musicbrainz": return "MusicBrainz"
+        case "lastfm": return "Last.fm"
+        case "spotify": return "Spotify"
+        default: return image.source.capitalized
+        }
+    }
+    
     var body: some View {
-        Group {
-            if let uiImage = uiImage {
-                Image(uiImage: uiImage)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .frame(width: cardWidth, height: 280)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-            } else if isLoading {
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.gray.opacity(0.2))
-                    .frame(width: cardWidth, height: 280)
-                    .overlay(ProgressView().tint(JazzTheme.amber))
-            } else {
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.gray.opacity(0.3))
-                    .frame(width: cardWidth, height: 280)
-                    .overlay(
-                        Image(systemName: "photo")
-                            .font(.largeTitle)
-                            .foregroundColor(.gray)
-                    )
+        ZStack(alignment: .bottomLeading) {
+            // Main image
+            Group {
+                if let uiImage = uiImage {
+                    Image(uiImage: uiImage)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: cardWidth, height: 280)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                } else if isLoading {
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color.gray.opacity(0.2))
+                        .frame(width: cardWidth, height: 280)
+                        .overlay(ProgressView().tint(JazzTheme.amber))
+                } else {
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color.gray.opacity(0.3))
+                        .frame(width: cardWidth, height: 280)
+                        .overlay(
+                            Image(systemName: "photo")
+                                .font(.largeTitle)
+                                .foregroundColor(.gray)
+                        )
+                }
+            }
+            
+            // Source watermark overlay
+            if uiImage != nil {
+                HStack(spacing: 4) {
+                    Image(systemName: "photo.badge.checkmark")
+                        .font(.caption2)
+                    Text(sourceName)
+                        .font(.caption2)
+                        .fontWeight(.medium)
+                }
+                .foregroundColor(.white)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(Color.black.opacity(0.6))
+                        .shadow(color: .black.opacity(0.3), radius: 2, x: 0, y: 1)
+                )
+                .padding(8)
             }
         }
+        .frame(width: cardWidth, height: 280)
         .onAppear { loadImage() }
     }
     
@@ -113,6 +153,16 @@ private struct ImageDetailSheet: View {
     let image: ArtistImage
     @Environment(\.dismiss) var dismiss
     @State private var uiImage: UIImage?
+    
+    private var sourceName: String {
+        switch image.source.lowercased() {
+        case "wikimedia": return "Wikimedia Commons"
+        case "musicbrainz": return "MusicBrainz"
+        case "lastfm": return "Last.fm"
+        case "spotify": return "Spotify"
+        default: return image.source.capitalized
+        }
+    }
     
     var body: some View {
         NavigationView {
@@ -153,27 +203,26 @@ private struct ImageDetailSheet: View {
                             InfoRow(title: "Dimensions", value: "\(width) × \(height) pixels")
                         }
                         
-                        // View source button
-                        if let sourceUrl = image.sourcePageUrl, let url = URL(string: sourceUrl) {
+                        if let sourcePageUrl = image.sourcePageUrl,
+                           let url = URL(string: sourcePageUrl) {
                             Link(destination: url) {
                                 HStack {
                                     Text("View on \(sourceName)")
-                                        .foregroundColor(JazzTheme.charcoal)
-                                    Spacer()
-                                    Image(systemName: "arrow.up.right.square")
-                                        .foregroundColor(JazzTheme.burgundy)
+                                        .font(.subheadline)
+                                    Image(systemName: "arrow.up.forward.square")
+                                        .font(.caption)
                                 }
-                                .padding()
-                                .background(JazzTheme.amber.opacity(0.1))
-                                .cornerRadius(8)
+                                .foregroundColor(JazzTheme.brass)
                             }
                         }
                     }
                     .padding()
+                    .background(Color(.systemGray6))
+                    .cornerRadius(12)
+                    .padding(.horizontal)
                 }
-                .padding()
+                .padding(.vertical)
             }
-            .background(JazzTheme.backgroundLight)
             .navigationTitle("Image Details")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -181,20 +230,11 @@ private struct ImageDetailSheet: View {
                     Button("Done") {
                         dismiss()
                     }
-                    .foregroundColor(JazzTheme.burgundy)
+                    .foregroundColor(JazzTheme.brass)
                 }
             }
         }
         .onAppear { loadFullImage() }
-    }
-    
-    private var sourceName: String {
-        switch image.source.lowercased() {
-        case "wikipedia": return "Wikipedia"
-        case "discogs": return "Discogs"
-        case "musicbrainz": return "MusicBrainz"
-        default: return image.source.capitalized
-        }
     }
     
     private func licenseName(_ license: String) -> String {
@@ -243,3 +283,4 @@ private struct InfoRow: View {
         }
     }
 }
+
