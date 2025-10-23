@@ -14,6 +14,8 @@ from contextlib import contextmanager
 import time
 from typing import Optional
 import threading
+from api_doc import api_docs
+
 
 # Configure logging
 logging.basicConfig(
@@ -24,6 +26,8 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 CORS(app)
+app.register_blueprint(api_docs)
+
 
 # Database configuration
 DB_CONFIG = {

@@ -1,0 +1,575 @@
+{% extends "base.html" %}
+
+{% block title %}Examples - Jazz Reference API Documentation{% endblock %}
+
+{% block content %}
+<h1>Usage Examples</h1>
+<p>Practical examples demonstrating common use cases and integration patterns.</p>
+
+<section class="endpoint-section">
+    <h2>JavaScript / Fetch API</h2>
+    
+    <h3>Fetching and Displaying Songs</h3>
+    <div class="code-block">
+        <div class="code-header">
+            <span class="code-language">JavaScript</span>
+        </div>
+        <pre><code>// Fetch all songs
+async function getAllSongs() {
+  try {
+    const response = await fetch('{{ base_url }}/api/songs');
+    const songs = await response.json();
+    
+    // Display songs
+    songs.forEach(song => {
+      console.log(`${song.title} by ${song.composer}`);
+    });
+    
+    return songs;
+  } catch (error) {
+    console.error('Error fetching songs:', error);
+  }
+}
+
+// Search for specific songs
+async function searchSongs(query) {
+  try {
+    const response = await fetch(
+      `{{ base_url }}/api/songs?search=${encodeURIComponent(query)}`
+    );
+    const songs = await response.json();
+    return songs;
+  } catch (error) {
+    console.error('Error searching songs:', error);
+  }
+}
+
+// Get song details with recordings
+async function getSongWithRecordings(songId) {
+  try {
+    // Fetch song details
+    const songResponse = await fetch(`{{ base_url }}/api/songs/${songId}`);
+    const song = await songResponse.json();
+    
+    // Fetch recordings
+    const recordingsResponse = await fetch(
+      `{{ base_url }}/api/songs/${songId}/recordings`
+    );
+    const recordings = await recordingsResponse.json();
+    
+    return { song, recordings };
+  } catch (error) {
+    console.error('Error fetching song details:', error);
+  }
+}
+
+// Usage
+getAllSongs();
+searchSongs('blue');
+getSongWithRecordings(1);</code></pre>
+    </div>
+</section>
+
+<section class="endpoint-section">
+    <h2>Python / Requests</h2>
+    
+    <h3>Building a Jazz Catalog Script</h3>
+    <div class="code-block">
+        <div class="code-header">
+            <span class="code-language">Python</span>
+        </div>
+        <pre><code>import requests
+import json
+
+BASE_URL = '{{ base_url }}'
+
+class JazzAPI:
+    def __init__(self):
+        self.base_url = BASE_URL
+        
+    def get_songs(self, search=None):
+        """Get all songs or search by query"""
+        url = f"{self.base_url}/api/songs"
+        params = {'search': search} if search else {}
+        
+        response = requests.get(url, params=params)
+        response.raise_for_status()
+        return response.json()
+    
+    def get_song_detail(self, song_id):
+        """Get detailed information about a song"""
+        url = f"{self.base_url}/api/songs/{song_id}"
+        response = requests.get(url)
+        response.raise_for_status()
+        return response.json()
+    
+    def get_performer(self, performer_id):
+        """Get performer details with discography"""
+        url = f"{self.base_url}/api/performers/{performer_id}"
+        response = requests.get(url)
+        response.raise_for_status()
+        return response.json()
+    
+    def get_performer_images(self, performer_id):
+        """Get all images for a performer"""
+        url = f"{self.base_url}/api/performers/{performer_id}/images"
+        response = requests.get(url)
+        response.raise_for_status()
+        return response.json()
+
+# Usage example
+api = JazzAPI()
+
+# Search for songs
+blue_songs = api.get_songs(search='blue')
+print(f"Found {len(blue_songs)} songs with 'blue' in the title")
+
+# Get specific song
+song = api.get_song_detail(1)
+print(f"Song: {song['title']} by {song['composer']}")
+
+# Get performer info
+performer = api.get_performer(1)
+print(f"Performer: {performer['performer']['name']}")
+print(f"Recordings: {len(performer['recordings'])}")</code></pre>
+    </div>
+</section>
+
+<section class="endpoint-section">
+    <h2>React Integration</h2>
+    
+    <h3>Song Search Component</h3>
+    <div class="code-block">
+        <div class="code-header">
+            <span class="code-language">JavaScript (React)</span>
+        </div>
+        <pre><code>import React, { useState, useEffect } from 'react';
+
+function SongSearch() {
+  const [query, setQuery] = useState('');
+  const [songs, setSongs] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (query.length < 2) {
+      setSongs([]);
+      return;
+    }
+
+    const searchSongs = async () => {
+      setLoading(true);
+      try {
+        const response = await fetch(
+          `{{ base_url }}/api/songs?search=${encodeURIComponent(query)}`
+        );
+        const data = await response.json();
+        setSongs(data);
+      } catch (error) {
+        console.error('Error searching songs:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    // Debounce search
+    const timeoutId = setTimeout(searchSongs, 300);
+    return () => clearTimeout(timeoutId);
+  }, [query]);
+
+  return (
+    <div className="song-search">
+      <input
+        type="text"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder="Search for jazz songs..."
+      />
+      
+      {loading && <p>Searching...</p>}
+      
+      <ul>
+        {songs.map(song => (
+          <li key={song.id}>
+            <strong>{song.title}</strong>
+            <br />
+            <span>by {song.composer}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+export default SongSearch;</code></pre>
+    </div>
+</section>
+
+<section class="endpoint-section">
+    <h2>Swift / iOS Integration</h2>
+    
+    <h3>Jazz API Service</h3>
+    <div class="code-block">
+        <div class="code-header">
+            <span class="code-language">Swift</span>
+        </div>
+        <pre><code>import Foundation
+
+struct Song: Codable {
+    let id: Int
+    let title: String
+    let composer: String?
+    let structure: String?
+    let externalReferences: [String: String]?
+    
+    enum CodingKeys: String, CodingKey {
+        case id, title, composer, structure
+        case externalReferences = "external_references"
+    }
+}
+
+struct Performer: Codable {
+    let id: Int
+    let name: String
+    let biography: String?
+    let birthDate: String?
+    let deathDate: String?
+    
+    enum CodingKeys: String, CodingKey {
+        case id, name, biography
+        case birthDate = "birth_date"
+        case deathDate = "death_date"
+    }
+}
+
+class JazzAPIService {
+    static let shared = JazzAPIService()
+    private let baseURL = "{{ base_url }}"
+    
+    func fetchSongs(search: String? = nil) async throws -> [Song] {
+        var urlString = "\(baseURL)/api/songs"
+        if let search = search {
+            urlString += "?search=\(search.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")"
+        }
+        
+        guard let url = URL(string: urlString) else {
+            throw URLError(.badURL)
+        }
+        
+        let (data, _) = try await URLSession.shared.data(from: url)
+        let songs = try JSONDecoder().decode([Song].self, from: data)
+        return songs
+    }
+    
+    func fetchSongDetail(id: Int) async throws -> Song {
+        guard let url = URL(string: "\(baseURL)/api/songs/\(id)") else {
+            throw URLError(.badURL)
+        }
+        
+        let (data, _) = try await URLSession.shared.data(from: url)
+        let song = try JSONDecoder().decode(Song.self, from: data)
+        return song
+    }
+    
+    func searchPerformers(query: String) async throws -> [Performer] {
+        let urlString = "\(baseURL)/api/performers?search=\(query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")"
+        
+        guard let url = URL(string: urlString) else {
+            throw URLError(.badURL)
+        }
+        
+        let (data, _) = try await URLSession.shared.data(from: url)
+        let performers = try JSONDecoder().decode([Performer].self, from: data)
+        return performers
+    }
+}
+
+// Usage in a SwiftUI View
+struct SongListView: View {
+    @State private var songs: [Song] = []
+    
+    var body: some View {
+        List(songs, id: \.id) { song in
+            VStack(alignment: .leading) {
+                Text(song.title).font(.headline)
+                if let composer = song.composer {
+                    Text(composer).font(.subheadline)
+                }
+            }
+        }
+        .task {
+            do {
+                songs = try await JazzAPIService.shared.fetchSongs()
+            } catch {
+                print("Error fetching songs: \(error)")
+            }
+        }
+    }
+}</code></pre>
+    </div>
+</section>
+
+<section class="endpoint-section">
+    <h2>Command Line (cURL)</h2>
+    
+    <h3>Common cURL Commands</h3>
+    <div class="code-block">
+        <div class="code-header">
+            <span class="code-language">Bash</span>
+        </div>
+        <pre><code># Get all songs
+curl {{ base_url }}/api/songs
+
+# Pretty print JSON response
+curl {{ base_url }}/api/songs | python -m json.tool
+
+# Search for songs with "blue" in title
+curl "{{ base_url }}/api/songs?search=blue"
+
+# Get specific song details
+curl {{ base_url }}/api/songs/1
+
+# Get recordings for a song
+curl {{ base_url }}/api/songs/1/recordings
+
+# Search for performers
+curl "{{ base_url }}/api/performers?search=miles"
+
+# Get performer with discography
+curl {{ base_url }}/api/performers/1
+
+# Get performer images
+curl {{ base_url }}/api/performers/1/images
+
+# Check API health
+curl {{ base_url }}/api/health
+
+# Save response to file
+curl {{ base_url }}/api/songs > songs.json
+
+# Include response headers
+curl -i {{ base_url }}/api/songs</code></pre>
+    </div>
+</section>
+
+<section class="endpoint-section">
+    <h2>Common Use Cases</h2>
+    
+    <div class="endpoint-card">
+        <div class="endpoint-header">
+            <h3>Building a Jazz Playlist Generator</h3>
+        </div>
+        <div class="endpoint-body">
+            <p>Fetch songs and their canonical recordings to build playlists:</p>
+            <div class="code-block">
+                <div class="code-header">
+                    <span class="code-language">JavaScript</span>
+                </div>
+                <pre><code>async function buildPlaylist(songIds) {
+  const playlist = [];
+  
+  for (const songId of songIds) {
+    // Get song details
+    const songResponse = await fetch(`{{ base_url }}/api/songs/${songId}`);
+    const song = await songResponse.json();
+    
+    // Get recordings
+    const recordingsResponse = await fetch(
+      `{{ base_url }}/api/songs/${songId}/recordings`
+    );
+    const recordings = await recordingsResponse.json();
+    
+    // Find canonical recording
+    const canonical = recordings.find(r => r.is_canonical);
+    
+    if (canonical && canonical.spotify_url) {
+      playlist.push({
+        title: song.title,
+        composer: song.composer,
+        spotify_url: canonical.spotify_url,
+        album: canonical.album_title
+      });
+    }
+  }
+  
+  return playlist;
+}
+
+// Usage
+const jazzStandards = [1, 5, 12, 23, 45];
+const playlist = await buildPlaylist(jazzStandards);
+console.log('Playlist:', playlist);</code></pre>
+            </div>
+        </div>
+    </div>
+
+    <div class="endpoint-card">
+        <div class="endpoint-header">
+            <h3>Creating a Performer Biography Page</h3>
+        </div>
+        <div class="endpoint-body">
+            <p>Fetch comprehensive performer information including bio, images, and discography:</p>
+            <div class="code-block">
+                <div class="code-header">
+                    <span class="code-language">JavaScript</span>
+                </div>
+                <pre><code>async function getPerformerProfile(performerId) {
+  try {
+    // Get performer details and recordings
+    const performerResponse = await fetch(
+      `{{ base_url }}/api/performers/${performerId}`
+    );
+    const performerData = await performerResponse.json();
+    
+    // Get performer images
+    const imagesResponse = await fetch(
+      `{{ base_url }}/api/performers/${performerId}/images`
+    );
+    const images = await imagesResponse.json();
+    
+    // Find primary image
+    const primaryImage = images.find(img => img.is_primary) || images[0];
+    
+    return {
+      ...performerData,
+      primaryImage,
+      allImages: images
+    };
+  } catch (error) {
+    console.error('Error fetching performer profile:', error);
+    throw error;
+  }
+}
+
+// Usage
+const profile = await getPerformerProfile(1);
+console.log(`${profile.performer.name}`);
+console.log(`Recordings: ${profile.recordings.length}`);
+console.log(`Primary Image: ${profile.primaryImage?.url}`);</code></pre>
+            </div>
+        </div>
+    </div>
+
+    <div class="endpoint-card">
+        <div class="endpoint-header">
+            <h3>Building a Song Discovery Interface</h3>
+        </div>
+        <div class="endpoint-body">
+            <p>Create an autocomplete search with detailed results:</p>
+            <div class="code-block">
+                <div class="code-header">
+                    <span class="code-language">JavaScript</span>
+                </div>
+                <pre><code>class SongDiscovery {
+  constructor() {
+    this.baseUrl = '{{ base_url }}';
+    this.cache = new Map();
+  }
+  
+  async searchSongs(query) {
+    // Check cache
+    if (this.cache.has(query)) {
+      return this.cache.get(query);
+    }
+    
+    // Search songs
+    const response = await fetch(
+      `${this.baseUrl}/api/songs?search=${encodeURIComponent(query)}`
+    );
+    const songs = await response.json();
+    
+    // Enrich with recording count
+    const enrichedSongs = await Promise.all(
+      songs.map(async (song) => {
+        const recordingsResponse = await fetch(
+          `${this.baseUrl}/api/songs/${song.id}/recordings`
+        );
+        const recordings = await recordingsResponse.json();
+        
+        return {
+          ...song,
+          recordingCount: recordings.length,
+          hasCanonical: recordings.some(r => r.is_canonical)
+        };
+      })
+    );
+    
+    // Cache results
+    this.cache.set(query, enrichedSongs);
+    return enrichedSongs;
+  }
+  
+  clearCache() {
+    this.cache.clear();
+  }
+}
+
+// Usage
+const discovery = new SongDiscovery();
+const results = await discovery.searchSongs('blue');
+results.forEach(song => {
+  console.log(`${song.title} - ${song.recordingCount} recordings`);
+});</code></pre>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="endpoint-section">
+    <h2>Error Handling Best Practices</h2>
+    
+    <div class="code-block">
+        <div class="code-header">
+            <span class="code-language">JavaScript</span>
+        </div>
+        <pre><code>async function fetchWithErrorHandling(url) {
+  try {
+    const response = await fetch(url);
+    
+    // Check if response is ok (status 200-299)
+    if (!response.ok) {
+      if (response.status === 404) {
+        throw new Error('Resource not found');
+      } else if (response.status === 500) {
+        throw new Error('Server error - please try again later');
+      } else if (response.status === 503) {
+        throw new Error('Service temporarily unavailable');
+      } else {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+    }
+    
+    const data = await response.json();
+    return { success: true, data };
+    
+  } catch (error) {
+    console.error('API request failed:', error);
+    return { 
+      success: false, 
+      error: error.message 
+    };
+  }
+}
+
+// Usage with retry logic
+async function fetchWithRetry(url, maxRetries = 3) {
+  for (let i = 0; i < maxRetries; i++) {
+    const result = await fetchWithErrorHandling(url);
+    
+    if (result.success) {
+      return result.data;
+    }
+    
+    // Wait before retry (exponential backoff)
+    if (i < maxRetries - 1) {
+      await new Promise(resolve => 
+        setTimeout(resolve, Math.pow(2, i) * 1000)
+      );
+    }
+  }
+  
+  throw new Error(`Failed after ${maxRetries} attempts`);
+}</code></pre>
+    </div>
+</section>
+
+{% endblock %}
