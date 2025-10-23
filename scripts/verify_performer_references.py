@@ -38,7 +38,7 @@ logger = logging.getLogger(__name__)
 class PerformerReferenceVerifier:
     """Verify and update external references for performers"""
     
-    def __init__(self, dry_run=False, name_filter=None, id_filter=None, reftype_filter=None):
+    def __init__(self, dry_run=False, name_filter=None, id_filter=None, reftype_filter=None, only_new=False):
         """
         Initialize verifier
         
@@ -47,11 +47,13 @@ class PerformerReferenceVerifier:
             name_filter: If provided, only process performer with this name
             id_filter: If provided, only process performer with this UUID
             reftype_filter: If provided, only check this reference type ('wikipedia' or 'musicbrainz')
+            only_new: If True, only process performers missing the specified reference type(s)
         """
         self.dry_run = dry_run
         self.name_filter = name_filter
         self.id_filter = id_filter
         self.reftype_filter = reftype_filter
+        self.only_new = only_new
         self.session = requests.Session()
         self.session.headers.update({
             'User-Agent': 'JazzReference/1.0 (Educational)',
@@ -239,18 +241,32 @@ class PerformerReferenceVerifier:
                     reasons.append(f"Infobox present but no specific music terms")
             
             # Check for jazz musician keywords in main content
-            jazz_keywords = [
-                'jazz', 'musician', 'singer', 'vocalist', 'performer', 'artist',
-                'saxophonist', 'pianist', 'trumpeter', 'bassist', 'drummer', 
-                'guitarist', 'composer', 'bandleader', 'music', 'song',
-                'album', 'recording', 'blues', 'soul', 'r&b', 'rhythm and blues',
-                'performance', 'concert', 'stage', 'recorded', 'released'
+            # Use more specific terms that are clearly music-related
+            specific_music_keywords = [
+                'jazz', 'musician', 'singer', 'vocalist', 'pianist', 
+                'saxophonist', 'trumpeter', 'bassist', 'drummer', 
+                'guitarist', 'composer', 'bandleader',
+                'album', 'recording', 'blues', 'soul', 'r&b', 
+                'gospel', 'folk', 'orchestra', 'symphony',
+                'concerto', 'sonata', 'opera'
             ]
-            # Search in first 2000 characters instead of 1000
-            found_keywords = [kw for kw in jazz_keywords if kw in page_text[:2000]]
-            if found_keywords:
-                confidence_score += 20  # Reduced since infobox is stronger
-                reasons.append(f"Found music keywords: {', '.join(found_keywords[:3])}")
+            # More generic terms that need context (could be sports, business, etc)
+            generic_music_keywords = [
+                'music', 'song', 'performance', 'concert', 'stage'
+            ]
+            
+            # Search in first 2000 characters
+            found_specific = [kw for kw in specific_music_keywords if kw in page_text[:2000]]
+            found_generic = [kw for kw in generic_music_keywords if kw in page_text[:2000]]
+            
+            if found_specific:
+                # Specific music terms get full points
+                confidence_score += 20
+                reasons.append(f"Found music keywords: {', '.join(found_specific[:3])}")
+            elif found_generic:
+                # Generic terms only get partial credit and only if we have other signals
+                confidence_score += 5
+                reasons.append(f"Found generic music keywords: {', '.join(found_generic[:2])}")
             
             # Check birth/death dates if available
             if context.get('birth_date'):
@@ -538,6 +554,23 @@ class PerformerReferenceVerifier:
             wikipedia_url = external_links.get('wikipedia')
             musicbrainz_id = external_links.get('musicbrainz')
             
+            # Check if we should skip this performer based on --onlynew flag
+            if self.only_new:
+                # Determine which refs we're checking
+                check_wikipedia = self.reftype_filter is None or self.reftype_filter == 'wikipedia'
+                check_musicbrainz = self.reftype_filter is None or self.reftype_filter == 'musicbrainz'
+                
+                # Skip if all the refs we're checking already exist
+                skip = True
+                if check_wikipedia and not wikipedia_url:
+                    skip = False  # Wikipedia is missing, so don't skip
+                if check_musicbrainz and not musicbrainz_id:
+                    skip = False  # MusicBrainz is missing, so don't skip
+                
+                if skip:
+                    logger.info(f"  Skipping (already has all requested references)")
+                    return True
+            
             # Build context for verification
             context = {
                 'birth_date': performer['birth_date'],
@@ -553,34 +586,43 @@ class PerformerReferenceVerifier:
             check_wikipedia = self.reftype_filter is None or self.reftype_filter == 'wikipedia'
             check_musicbrainz = self.reftype_filter is None or self.reftype_filter == 'musicbrainz'
             
-            # 1. Verify existing references
-            if check_wikipedia and wikipedia_url:
-                logger.info(f"  Checking existing Wikipedia: {wikipedia_url}")
-                result = self.verify_wikipedia_reference(performer['name'], wikipedia_url, context)
-                
-                if result['valid']:
-                    logger.info(f"  ✓ Wikipedia reference is valid (confidence: {result['confidence']}, score: {result.get('score', 0)})")
-                    logger.info(f"    {result['reason']}")
-                    self.stats['valid_references'] += 1
-                else:
-                    logger.warning(f"  ✗ Wikipedia reference may be invalid (confidence: {result['confidence']}, score: {result.get('score', 0)})")
-                    logger.warning(f"    {result['reason']}")
-                    logger.warning(f"    NOT removing reference - manual review recommended")
-                    self.stats['invalid_references'] += 1
+            # If --onlynew is set, only search for missing refs, don't verify existing ones
+            if self.only_new:
+                # Skip verification of existing refs
+                if check_wikipedia and wikipedia_url:
+                    check_wikipedia = False  # Don't check it
+                if check_musicbrainz and musicbrainz_id:
+                    check_musicbrainz = False  # Don't check it
             
-            if check_musicbrainz and musicbrainz_id:
-                logger.info(f"  Checking existing MusicBrainz: {musicbrainz_id}")
-                result = self.verify_musicbrainz_reference(performer['name'], musicbrainz_id, context)
+            # 1. Verify existing references (unless --onlynew is set)
+            if not self.only_new:
+                if check_wikipedia and wikipedia_url:
+                    logger.info(f"  Checking existing Wikipedia: {wikipedia_url}")
+                    result = self.verify_wikipedia_reference(performer['name'], wikipedia_url, context)
+                    
+                    if result['valid']:
+                        logger.info(f"  ✓ Wikipedia reference is valid (confidence: {result['confidence']}, score: {result.get('score', 0)})")
+                        logger.info(f"    {result['reason']}")
+                        self.stats['valid_references'] += 1
+                    else:
+                        logger.warning(f"  ✗ Wikipedia reference may be invalid (confidence: {result['confidence']}, score: {result.get('score', 0)})")
+                        logger.warning(f"    {result['reason']}")
+                        logger.warning(f"    NOT removing reference - manual review recommended")
+                        self.stats['invalid_references'] += 1
                 
-                if result['valid']:
-                    logger.info(f"  ✓ MusicBrainz reference is valid (confidence: {result['confidence']})")
-                    logger.info(f"    {result['reason']}")
-                    self.stats['valid_references'] += 1
-                else:
-                    logger.warning(f"  ✗ MusicBrainz reference may be invalid (confidence: {result['confidence']})")
-                    logger.warning(f"    {result['reason']}")
-                    logger.warning(f"    NOT removing reference - manual review recommended")
-                    self.stats['invalid_references'] += 1
+                if check_musicbrainz and musicbrainz_id:
+                    logger.info(f"  Checking existing MusicBrainz: {musicbrainz_id}")
+                    result = self.verify_musicbrainz_reference(performer['name'], musicbrainz_id, context)
+                    
+                    if result['valid']:
+                        logger.info(f"  ✓ MusicBrainz reference is valid (confidence: {result['confidence']})")
+                        logger.info(f"    {result['reason']}")
+                        self.stats['valid_references'] += 1
+                    else:
+                        logger.warning(f"  ✗ MusicBrainz reference may be invalid (confidence: {result['confidence']})")
+                        logger.warning(f"    {result['reason']}")
+                        logger.warning(f"    NOT removing reference - manual review recommended")
+                        self.stats['invalid_references'] += 1
             
             # 2. Search for missing references
             if check_wikipedia and not wikipedia_url:
@@ -642,8 +684,10 @@ class PerformerReferenceVerifier:
             logger.info(f"Filter: Processing only performer with ID '{self.id_filter}'")
         if self.reftype_filter:
             logger.info(f"Filter: Checking only {self.reftype_filter} references")
+        if self.only_new:
+            logger.info(f"Filter: Only processing performers missing the specified reference(s)")
         
-        if self.name_filter or self.id_filter or self.reftype_filter:
+        if self.name_filter or self.id_filter or self.reftype_filter or self.only_new:
             logger.info("")
         
         # Get all performers
@@ -749,6 +793,12 @@ This script:
     )
     
     parser.add_argument(
+        '--onlynew',
+        action='store_true',
+        help='Only process performers missing the specified reference type(s)'
+    )
+    
+    parser.add_argument(
         '--dry-run',
         action='store_true',
         help='Show what would be done without making changes'
@@ -771,7 +821,8 @@ This script:
         dry_run=args.dry_run,
         name_filter=args.name,
         id_filter=args.id,
-        reftype_filter=args.reftype
+        reftype_filter=args.reftype,
+        only_new=args.onlynew
     )
     
     try:
