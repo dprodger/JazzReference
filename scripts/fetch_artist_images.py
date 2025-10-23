@@ -15,8 +15,9 @@ import argparse
 import logging
 import requests
 import json
+import re
 from typing import Optional, Dict, Any, List
-from urllib.parse import quote, urljoin
+from urllib.parse import quote, urljoin, unquote
 import time
 
 # Import our database utilities
@@ -50,41 +51,57 @@ class ImageFetcher:
         if debug:
             logger.setLevel(logging.DEBUG)
     
-    def fetch_wikipedia_image(self, artist_name: str) -> Optional[Dict[str, Any]]:
+    def fetch_wikipedia_image(self, artist_name: str, wikipedia_url: Optional[str] = None) -> Optional[Dict[str, Any]]:
         """
         Fetch image from Wikipedia for an artist.
         
         Args:
             artist_name: Name of the artist to search for
+            wikipedia_url: Optional Wikipedia URL from database (skips search if provided)
         
         Returns:
             Dictionary with image data or None
         """
         try:
-            logger.info(f"Searching Wikipedia for {artist_name}...")
+            # If we have a Wikipedia URL from the database, extract the page title
+            if wikipedia_url:
+                logger.info(f"Using Wikipedia URL from database: {wikipedia_url}")
+                # Extract page title from URL like https://en.wikipedia.org/wiki/Miles_Davis
+                match = re.search(r'/wiki/(.+)$', wikipedia_url)
+                if match:
+                    page_title = unquote(match.group(1))
+                    logger.debug(f"Extracted page title: {page_title}")
+                else:
+                    logger.warning(f"Could not extract page title from URL: {wikipedia_url}")
+                    wikipedia_url = None  # Fall back to search
             
-            # Step 1: Search for the Wikipedia page
-            search_url = "https://en.wikipedia.org/w/api.php"
-            search_params = {
-                'action': 'query',
-                'format': 'json',
-                'list': 'search',
-                'srsearch': artist_name,
-                'srlimit': 1
-            }
-            
-            response = self.session.get(search_url, params=search_params, timeout=10)
-            response.raise_for_status()
-            search_data = response.json()
-            
-            if not search_data.get('query', {}).get('search'):
-                logger.info(f"No Wikipedia page found for {artist_name}")
-                return None
-            
-            page_title = search_data['query']['search'][0]['title']
-            logger.debug(f"Found Wikipedia page: {page_title}")
+            # If no Wikipedia URL provided, search for the page
+            if not wikipedia_url:
+                logger.info(f"Searching Wikipedia for {artist_name}...")
+                
+                # Step 1: Search for the Wikipedia page
+                search_url = "https://en.wikipedia.org/w/api.php"
+                search_params = {
+                    'action': 'query',
+                    'format': 'json',
+                    'list': 'search',
+                    'srsearch': artist_name,
+                    'srlimit': 1
+                }
+                
+                response = self.session.get(search_url, params=search_params, timeout=10)
+                response.raise_for_status()
+                search_data = response.json()
+                
+                if not search_data.get('query', {}).get('search'):
+                    logger.info(f"No Wikipedia page found for {artist_name}")
+                    return None
+                
+                page_title = search_data['query']['search'][0]['title']
+                logger.debug(f"Found Wikipedia page: {page_title}")
             
             # Step 2: Get the main image from the page
+            search_url = "https://en.wikipedia.org/w/api.php"
             image_params = {
                 'action': 'query',
                 'format': 'json',
@@ -377,8 +394,12 @@ class ImageFetcher:
             for img in existing_images:
                 logger.info(f"  - {img['source']}: {img['url']}")
         
+        # Get Wikipedia URL from external_links if available
+        external_links = performer.get('external_links') or {}
+        wikipedia_url = external_links.get('wikipedia')
+        
         # Fetch from Wikipedia
-        wiki_image = self.fetch_wikipedia_image(performer_name)
+        wiki_image = self.fetch_wikipedia_image(performer_name, wikipedia_url=wikipedia_url)
         if wiki_image:
             # Update external_references with Wikipedia page
             external_refs = {}
