@@ -29,8 +29,10 @@ logger = logging.getLogger(__name__)
 
 
 class MusicBrainzGatherer:
-    def __init__(self, dry_run=False):
+    def __init__(self, dry_run=False, song_name=None, song_id=None):
         self.dry_run = dry_run
+        self.song_name = song_name
+        self.song_id = song_id
         self.mb_searcher = MusicBrainzSearcher()
         self.stats = {
             'songs_processed': 0,
@@ -42,15 +44,32 @@ class MusicBrainzGatherer:
         }
     
     def get_songs_without_mb_id(self):
-        """Get all songs that don't have a MusicBrainz ID"""
+        """Get all songs that don't have a MusicBrainz ID, optionally filtered by name or ID"""
         with get_db_connection() as conn:
             with conn.cursor() as cur:
-                cur.execute("""
-                    SELECT id, title, composer
-                    FROM songs
-                    WHERE musicbrainz_id IS NULL
-                    ORDER BY title
-                """)
+                if self.song_id:
+                    # Filter by specific song ID
+                    cur.execute("""
+                        SELECT id, title, composer
+                        FROM songs
+                        WHERE id = %s AND musicbrainz_id IS NULL
+                    """, (self.song_id,))
+                elif self.song_name:
+                    # Filter by song name (case-insensitive partial match)
+                    cur.execute("""
+                        SELECT id, title, composer
+                        FROM songs
+                        WHERE title ILIKE %s AND musicbrainz_id IS NULL
+                        ORDER BY title
+                    """, (f'%{self.song_name}%',))
+                else:
+                    # Get all songs without MB IDs
+                    cur.execute("""
+                        SELECT id, title, composer
+                        FROM songs
+                        WHERE musicbrainz_id IS NULL
+                        ORDER BY title
+                    """)
                 return cur.fetchall()
     
     def update_song_mb_id(self, conn, song_id, mb_id):
@@ -79,6 +98,14 @@ class MusicBrainzGatherer:
         
         if self.dry_run:
             logger.info("*** DRY RUN MODE - No database changes will be made ***")
+            logger.info("")
+        
+        # Show any active filters
+        if self.song_name:
+            logger.info(f"Filter: Processing only songs matching '{self.song_name}'")
+            logger.info("")
+        elif self.song_id:
+            logger.info(f"Filter: Processing only song with ID '{self.song_id}'")
             logger.info("")
         
         # Get songs without MB IDs
@@ -138,11 +165,20 @@ This script searches for MusicBrainz Work IDs for songs in the database that don
 have them. It uses the MusicBrainz API to search by song title and composer.
 
 Examples:
-  # Run in normal mode
+  # Run in normal mode (process all songs)
   python gather_mb_ids.py
+  
+  # Process a specific song by name
+  python gather_mb_ids.py --name "Take Five"
+  
+  # Process a specific song by ID
+  python gather_mb_ids.py --id a1b2c3d4-e5f6-7890-abcd-ef1234567890
   
   # Dry run to see what would be found
   python gather_mb_ids.py --dry-run
+  
+  # Dry run for a specific song
+  python gather_mb_ids.py --name "Blue in Green" --dry-run
   
   # Enable debug logging
   python gather_mb_ids.py --debug
@@ -152,6 +188,17 @@ Notes:
   - The script looks for exact or very close title matches
   - Results are logged to mb_gather.log
         """
+    )
+    
+    # Song selection arguments (optional)
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument(
+        '--name',
+        help='Process only the song with this name (partial match)'
+    )
+    group.add_argument(
+        '--id',
+        help='Process only the song with this ID'
     )
     
     parser.add_argument(
@@ -173,7 +220,11 @@ Notes:
         logging.getLogger().setLevel(logging.DEBUG)
     
     # Create gatherer and run
-    gatherer = MusicBrainzGatherer(dry_run=args.dry_run)
+    gatherer = MusicBrainzGatherer(
+        dry_run=args.dry_run,
+        song_name=args.name if hasattr(args, 'name') and args.name else None,
+        song_id=args.id if hasattr(args, 'id') and args.id else None
+    )
     
     try:
         success = gatherer.gather_mb_ids()
