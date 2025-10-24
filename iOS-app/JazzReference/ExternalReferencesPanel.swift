@@ -71,7 +71,7 @@ struct ExternalReferencesPanel: View {
     var body: some View {
         if wikipediaURL != nil || jazzStandardsURL != nil || musicbrainzURL != nil {
             VStack(alignment: .leading, spacing: 12) {
-                Text("External References")
+                Text("Learn More")
                     .font(.headline)
                     .foregroundColor(JazzTheme.charcoal)
                 
