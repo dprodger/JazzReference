@@ -68,6 +68,11 @@ class MusicBrainzSearcher:
         """
         Search MusicBrainz for a work by title and composer
         
+        Uses multiple search strategies to maximize chances of finding a match:
+        1. Try with exact phrase in quotes (most precise)
+        2. Fall back to unquoted search if needed (broader)
+        3. Don't over-constrain with composer (can filter results instead)
+        
         Args:
             title: Song title
             composer: Composer name(s)
@@ -77,16 +82,10 @@ class MusicBrainzSearcher:
         """
         self.rate_limit()
         
-        # Build search query
-        # Search by title and optionally composer
-        query_parts = [f'work:"{title}"']
-        
-        if composer:
-            # Extract first composer if multiple
-            first_composer = composer.split(',')[0].split(' and ')[0].strip()
-            query_parts.append(f'artist:"{first_composer}"')
-        
-        query = ' AND '.join(query_parts)
+        # Strategy 1: Search with exact title phrase (no composer constraint)
+        # We don't add composer to query because it's often too restrictive
+        # Better to get more results and filter by title match
+        query = f'work:"{title}"'
         
         logger.debug(f"    Searching MusicBrainz: {query}")
         
@@ -96,7 +95,7 @@ class MusicBrainzSearcher:
                 params={
                     'query': query,
                     'fmt': 'json',
-                    'limit': 5
+                    'limit': 10  # Get more results since we're not filtering by composer
                 },
                 timeout=10
             )
@@ -104,6 +103,27 @@ class MusicBrainzSearcher:
             
             data = response.json()
             works = data.get('works', [])
+            
+            # If no results with quoted search, try unquoted
+            if not works:
+                logger.debug(f"    No results with quoted search, trying unquoted...")
+                self.rate_limit()
+                
+                query = title
+                logger.debug(f"    Searching MusicBrainz: {query}")
+                
+                response = self.session.get(
+                    'https://musicbrainz.org/ws/2/work/',
+                    params={
+                        'query': query,
+                        'fmt': 'json',
+                        'limit': 10
+                    },
+                    timeout=10
+                )
+                response.raise_for_status()
+                data = response.json()
+                works = data.get('works', [])
             
             if not works:
                 logger.debug(f"    ✗ No MusicBrainz works found")
