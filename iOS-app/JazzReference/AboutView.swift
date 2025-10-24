@@ -24,7 +24,7 @@ struct AboutView: View {
             VStack(spacing: 20) {
                 Spacer()
                 
-                Text("The Knowledge")
+                Text("Jazz Liner Notes")
                     .font(.system(size: 48, weight: .bold))
                     .foregroundColor(.white)
                     .shadow(color: .black.opacity(0.7), radius: 10, x: 0, y: 5)
@@ -64,6 +64,11 @@ struct AboutView: View {
                 Text("Written by Dave Rodger")
                     .font(.caption)
                     .foregroundColor(.white.opacity(0.8))
+                    .padding(.bottom, 10)
+                
+                Link("www.linernotesjazz.com", destination: URL(string: "linernotesjazz.com")!)
+                    .font(.caption)
+                    .tint(.white.opacity(0.8))
                     .padding(.bottom, 40)
 
             }
