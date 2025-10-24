@@ -1,3 +1,34 @@
 things to do:
-1. amend fetch_artist_images to gather for all artists?
-2. amend verify_performer_references to only either look just for artists who don't already have refs, just those who do, or both
+3. amend fetch_artist_images to use the wikipedia reference if it exists (rather than search)
+4. for verify_performer_references -- provide a mode that explicitly removes references if they no longer pass the confidence threshhold
+	4a. look for a way to log whether a reference has been "hand-entered"
+9. give me a list of artist names and wikipedia URLs that aren't an exact match, to identify cases to exclude
+10. Deal with this:
+	Processing: Thelonious Monk
+	2025-10-23 15:08:38,910 - INFO - ============================================================
+	2025-10-23 15:08:38,910 - INFO -   Checking existing Wikipedia: https://en.wikipedia.org/wiki/Thelonious_Monk
+	2025-10-23 15:08:38,911 - DEBUG - Verifying Wikipedia URL: https://en.wikipedia.org/wiki/Thelonious_Monk
+	2025-10-23 15:08:38,946 - DEBUG - https://en.wikipedia.org:443 "GET /wiki/Thelonious_Monk HTTP/1.1" 200 60478
+	2025-10-23 15:08:40,068 - DEBUG - Checking for 'disambiguation' in first 500 chars...
+	2025-10-23 15:08:40,068 - DEBUG - Found 'disambiguation' - rejecting page
+	2025-10-23 15:08:40,068 - WARNING -   ✗ Wikipedia reference may be invalid (confidence: high, score: 0)
+	2025-10-23 15:08:40,068 - WARNING -     Page is a disambiguation page
+	2025-10-23 15:08:40,068 - WARNING -     NOT removing reference - manual review recommended
+	2025-10-23 15:08:41,573 - INFO - 
+11. create a "bad reference" table and system -- allow me to indicate while using the App that something (musicbrainz, Wikipedia, image) is not right. 
+	Use that as an exclusion, but also as possible training data for the future.
+12. refactor the wikipedia image stuff so that fetch_artist_images and the standalone image inserter use common code
+13. update the master research code to use the various components rather than recreate them
+14. Incorporate the metadata around the caption for images like this:
+	https://en.wikipedia.org/wiki/Miles_Davis#/media/File:Howard_McGhee,_Brick_Fleagle_and_Miles_Davis,_ca_September_1947_(Gottlieb).jpg
+15. Lena Horne image is in the public domain, but is stored as 'all rights reserved' in the db. Figure tha tout
+	
+	
+	
+Done:
+xxxx 1. amend fetch_artist_images to gather for all artists?
+xxxx 6. Ensure multiple images perform ok
+xxxx 8. given a Wikipedia image page (like this), correctly import it https://en.wikipedia.org/wiki/Miles_Davis#/media/File:Charlie_Parker,_Tommy_Potter,_Miles_Davis,_Duke_Jordan,_Max_Roach_(Gottlieb_06851).jpg
+xxxx 2. amend verify_performer_references to only either look just for artists who don't already have refs, just those who do, or both
+5. remove "Images" heading from Artist view
+7. Add watermark on the images
