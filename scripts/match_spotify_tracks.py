@@ -388,22 +388,28 @@ Setup:
 
 Examples:
   # Match by song name
-  python match_spotify_tracks.py "Take Five"
+  python match_spotify_tracks.py --name "Take Five"
   
   # Match by song ID
-  python match_spotify_tracks.py a1b2c3d4-e5f6-7890-abcd-ef1234567890
+  python match_spotify_tracks.py --id a1b2c3d4-e5f6-7890-abcd-ef1234567890
   
   # Dry run to see what would be matched
-  python match_spotify_tracks.py "Blue in Green" --dry-run
+  python match_spotify_tracks.py --name "Blue in Green" --dry-run
   
   # Enable debug logging
-  python match_spotify_tracks.py "Autumn Leaves" --debug
+  python match_spotify_tracks.py --name "Autumn Leaves" --debug
         """
     )
     
-    parser.add_argument(
-        'song',
-        help='Song name or database ID'
+    # Song selection arguments
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument(
+        '--name',
+        help='Song name'
+    )
+    group.add_argument(
+        '--id',
+        help='Song database ID'
     )
     
     parser.add_argument(
@@ -427,8 +433,11 @@ Examples:
     # Create matcher and run
     matcher = SpotifyMatcher(dry_run=args.dry_run)
     
+    # Determine song identifier
+    song_identifier = args.name if args.name else args.id
+    
     try:
-        success = matcher.match_recordings_for_song(args.song)
+        success = matcher.match_recordings_for_song(song_identifier)
         sys.exit(0 if success else 1)
     except KeyboardInterrupt:
         logger.info("\nMatching cancelled by user")
