@@ -10,6 +10,26 @@ import SwiftUI
 struct ExternalReferencesPanel: View {
     let externalReferences: [String: String]?
     let musicbrainzId: String?
+    let musicbrainzType: MusicBrainzType
+    
+    enum MusicBrainzType {
+        case work   // For songs
+        case artist // For performers
+    }
+    
+    // Convenience initializer for songs (with separate musicbrainzId field)
+    init(externalReferences: [String: String]?, musicbrainzId: String?) {
+        self.externalReferences = externalReferences
+        self.musicbrainzId = musicbrainzId
+        self.musicbrainzType = .work
+    }
+    
+    // Convenience initializer for artists (musicbrainz in externalLinks)
+    init(externalLinks: [String: String]?) {
+        self.externalReferences = externalLinks
+        self.musicbrainzId = externalLinks?["musicbrainz"]
+        self.musicbrainzType = .artist
+    }
     
     var wikipediaURL: String? {
         externalReferences?["wikipedia"]
@@ -21,7 +41,12 @@ struct ExternalReferencesPanel: View {
     
     var musicbrainzURL: String? {
         guard let mbId = musicbrainzId else { return nil }
-        return "https://musicbrainz.org/work/\(mbId)"
+        switch musicbrainzType {
+        case .work:
+            return "https://musicbrainz.org/work/\(mbId)"
+        case .artist:
+            return "https://musicbrainz.org/artist/\(mbId)"
+        }
     }
     
     var body: some View {

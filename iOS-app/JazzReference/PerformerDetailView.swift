@@ -2,7 +2,7 @@
 //  PerformerDetailView.swift
 //  JazzReference
 //
-//  Updated with JazzTheme color palette
+//  Updated with JazzTheme color palette and ExternalReferencesPanel
 //
 
 import SwiftUI
@@ -135,6 +135,9 @@ struct PerformerDetailView: View {
                                 .background(JazzTheme.cardBackground)
                                 .cornerRadius(10)
                             }
+                            
+                            // External References Panel
+                            ExternalReferencesPanel(externalLinks: performer.externalLinks)
                         }
                         .padding()
                         
@@ -187,6 +190,9 @@ struct PerformerDetailView: View {
         }
         .background(JazzTheme.backgroundLight)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(JazzTheme.amber, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
+        .toolbarColorScheme(.dark, for: .navigationBar)
         .task {
             #if DEBUG
             if ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1" {
