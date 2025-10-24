@@ -27,6 +27,9 @@ from urllib.parse import quote, urljoin, unquote
 from dataclasses import dataclass
 import time
 
+# Third-party imports
+from bs4 import BeautifulSoup
+
 # Import our database utilities
 from db_utils import (
     get_db_connection,
@@ -147,8 +150,10 @@ class ImageFetcher:
             
             # Get image URL
             if 'original' not in page:
-                logger.info(f"No image found on Wikipedia page for {artist_name}")
-                return None
+                # API didn't return image - try HTML scraping fallback
+                logger.debug(f"No image from pageimages API, trying HTML scraping fallback...")
+                page_url = page.get('fullurl', f"https://en.wikipedia.org/wiki/{quote(page_title)}")
+                return self._scrape_wikipedia_page_for_image(page_title, page_url, artist_name)
             
             image_url = page['original']['source']
             thumbnail_url = page.get('thumbnail', {}).get('source')
@@ -271,6 +276,153 @@ class ImageFetcher:
             return 'fair_use'
         else:
             return 'other'
+    
+    def _scrape_wikipedia_page_for_image(self, page_title: str, page_url: str, 
+                                         artist_name: str) -> Optional[ImageData]:
+        """
+        Scrape Wikipedia page HTML to find images in the infobox.
+        This is a fallback when the pageimages API doesn't return an image.
+        
+        Args:
+            page_title: Wikipedia page title
+            page_url: Full Wikipedia page URL
+            artist_name: Artist name (for logging)
+        
+        Returns:
+            ImageData object or None
+        """
+        try:
+            logger.debug(f"Scraping page HTML: {page_url}")
+            
+            # Fetch the page HTML
+            response = self.session.get(page_url, timeout=10)
+            response.raise_for_status()
+            time.sleep(1.0)  # Rate limiting
+            
+            # Parse with BeautifulSoup
+            soup = BeautifulSoup(response.text, 'html.parser')
+            
+            # Look for image in the infobox
+            infobox = soup.find('table', {'class': 'infobox'})
+            if not infobox:
+                logger.debug("No infobox found on page")
+                logger.info(f"No image found on Wikipedia page for {artist_name}")
+                return None
+            
+            # Find the first image in the infobox
+            img_tag = infobox.find('img')
+            if not img_tag or not img_tag.get('src'):
+                logger.debug("No image found in infobox")
+                logger.info(f"No image found on Wikipedia page for {artist_name}")
+                return None
+            
+            # Extract image URL
+            img_src = img_tag.get('src')
+            if img_src.startswith('//'):
+                img_src = 'https:' + img_src
+            elif img_src.startswith('/'):
+                img_src = 'https://en.wikipedia.org' + img_src
+            
+            logger.debug(f"Found image in infobox: {img_src}")
+            
+            # Get the full-resolution image URL
+            # Wikipedia thumbnail URLs: .../thumb/.../filename.jpg/220px-filename.jpg
+            # We want the original: .../filename.jpg
+            full_img_url = img_src
+            if '/thumb/' in img_src:
+                # Remove /thumb/ and size suffix to get original
+                full_img_url = re.sub(r'/thumb/', '/', img_src)
+                # Extract actual filename and rebuild URL
+                match = re.search(r'/([^/]+)$', img_src)
+                if match:
+                    filename = match.group(1)
+                    # Remove size prefix like "220px-"
+                    filename = re.sub(r'^\d+px-', '', filename)
+                    full_img_url = re.sub(r'/[^/]+$', '/' + filename, full_img_url)
+            
+            logger.debug(f"Full resolution URL: {full_img_url}")
+            
+            # Extract image filename for license lookup
+            image_filename = full_img_url.split('/')[-1]
+            
+            # Try to get license information via API
+            api_url = "https://en.wikipedia.org/w/api.php"
+            license_params = {
+                'action': 'query',
+                'format': 'json',
+                'titles': f'File:{image_filename}',
+                'prop': 'imageinfo',
+                'iiprop': 'extmetadata|size|url'
+            }
+            
+            license_type = 'unknown'
+            license_url = None
+            attribution = None
+            width = img_tag.get('width')
+            height = img_tag.get('height')
+            
+            try:
+                response = self.session.get(api_url, params=license_params, timeout=10)
+                response.raise_for_status()
+                license_data = response.json()
+                
+                if license_data.get('query', {}).get('pages'):
+                    file_page = next(iter(license_data['query']['pages'].values()))
+                    if 'imageinfo' in file_page and file_page['imageinfo']:
+                        imageinfo = file_page['imageinfo'][0]
+                        
+                        # Use the full URL from the API if available
+                        if 'url' in imageinfo:
+                            full_img_url = imageinfo['url']
+                            logger.debug(f"Updated to API URL: {full_img_url}")
+                        
+                        # Extract metadata
+                        extmetadata = imageinfo.get('extmetadata', {})
+                        
+                        if 'License' in extmetadata:
+                            license_type = extmetadata['License'].get('value', 'unknown')
+                        if 'LicenseUrl' in extmetadata:
+                            license_url = extmetadata['LicenseUrl'].get('value')
+                        if 'Artist' in extmetadata:
+                            attribution = extmetadata['Artist'].get('value')
+                        elif 'Credit' in extmetadata:
+                            attribution = extmetadata['Credit'].get('value')
+                        
+                        # Get dimensions
+                        if 'width' in imageinfo:
+                            width = imageinfo['width']
+                        if 'height' in imageinfo:
+                            height = imageinfo['height']
+            except Exception as e:
+                logger.debug(f"Could not fetch license info: {e}")
+            
+            # Normalize license type
+            license_type_normalized = self._normalize_license(license_type)
+            
+            image_data = ImageData(
+                url=full_img_url,
+                thumbnail_url=img_src,
+                source='wikipedia',
+                source_identifier=page_title,
+                source_page_url=page_url,
+                license_type=license_type_normalized,
+                license_url=license_url,
+                attribution=attribution,
+                width=width,
+                height=height
+            )
+            
+            logger.info(f"✓ Found Wikipedia image via HTML scraping: {full_img_url}")
+            logger.debug(f"Image details: {image_data}")
+            
+            return image_data
+            
+        except Exception as e:
+            logger.error(f"Error scraping Wikipedia page for image: {e}")
+            if self.debug:
+                logger.exception(e)
+            logger.info(f"No image found on Wikipedia page for {artist_name}")
+            return None
 
 
 class ImageDatabaseManager:
