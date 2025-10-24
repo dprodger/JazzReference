@@ -70,7 +70,7 @@ struct SongsListView: View {
                 }
             }
             .background(JazzTheme.backgroundLight)
-            .navigationTitle("Jazz Standards")
+            .navigationTitle("Songs")
             .toolbarBackground(JazzTheme.burgundy, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbarColorScheme(.dark, for: .navigationBar)
