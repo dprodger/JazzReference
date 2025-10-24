@@ -2,7 +2,7 @@
 //  AboutView.swift
 //  JazzReference
 //
-//  About screen with splash screen background
+//  About screen with splash screen background and visible navigation bar
 //
 
 import SwiftUI
@@ -69,6 +69,9 @@ struct AboutView: View {
             }
         }
         .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(JazzTheme.burgundy, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
+        .toolbarColorScheme(.dark, for: .navigationBar)
     }
 }
 
