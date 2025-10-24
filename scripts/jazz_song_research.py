@@ -397,13 +397,13 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python jazz_song_research_2.py "Take Five"
-  python jazz_song_research_2.py "Blue in Green" --dry-run
-  python jazz_song_research_2.py "Autumn Leaves" --debug
+  python jazz_song_research.py --name "Take Five"
+  python jazz_song_research.py --name "Blue in Green" --dry-run
+  python jazz_song_research.py --name "Autumn Leaves" --debug
         """
     )
     
-    parser.add_argument('song', help='Song name')
+    parser.add_argument('--name', required=True, help='Song name')
     parser.add_argument('--dry-run', action='store_true', 
                        help='Show what would be imported without making changes')
     parser.add_argument('--debug', action='store_true',
@@ -417,7 +417,7 @@ Examples:
     researcher = JazzSongResearcher(dry_run=args.dry_run)
     
     try:
-        success = researcher.import_to_database(args.song)
+        success = researcher.import_to_database(args.name)
         sys.exit(0 if success else 1)
     except KeyboardInterrupt:
         logger.info("\nCancelled by user")
