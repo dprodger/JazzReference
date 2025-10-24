@@ -110,8 +110,9 @@ class LOCImageFetcher:
                 'q': artist_name,
                 'fo': 'json',  # Request JSON format
                 'c': 100,  # Number of results
-                'at': 'results',  # Return results
-                'fa': 'partof:photographs'  # Filter to photographs
+                'at': 'results'  # Return results
+                # Note: Not filtering by 'partof:photographs' as it's too restrictive
+                # We'll filter by validating image_url presence instead
             }
             
             response = self.session.get(search_url, params=params, timeout=15)
@@ -126,28 +127,48 @@ class LOCImageFetcher:
             # Parse JSON response
             try:
                 data = response.json()
+                
+                # Check if we got valid results
+                if not isinstance(data, dict):
+                    logger.warning(f"LOC returned unexpected data type: {type(data)}")
+                    logger.debug(f"Response content: {str(data)[:200]}")
+                    return []
+                
                 results = data.get('results', [])
                 
                 if not results:
                     logger.info(f"No results found in LOC for {artist_name}")
+                    logger.debug(f"Response keys: {data.keys()}")
                     return []
                 
                 logger.info(f"Found {len(results)} potential results from LOC")
-                logger.debug(f"Sample result: {results[0] if results else 'none'}")
+                if self.debug and results:
+                    logger.debug(f"Sample result keys: {results[0].keys() if results else 'none'}")
+                    logger.debug(f"Sample title: {results[0].get('title', 'no title')}")
                 
                 # Filter and process results
                 images = []
-                for result in results:
+                for idx, result in enumerate(results):
+                    logger.debug(f"Processing result {idx + 1}/{len(results)}: {result.get('title', 'N/A')[:60]}")
                     image_data = self._process_loc_result(result, artist_name)
                     if image_data:
                         images.append(image_data)
                         self.stats['images_found'] += 1
+                        logger.debug(f"  ✓ Image data extracted")
+                    else:
+                        logger.debug(f"  ✗ No image data extracted")
                 
+                logger.info(f"Extracted {len(images)} usable images from {len(results)} results")
                 return images
                 
             except json.JSONDecodeError as e:
-                logger.warning(f"Could not parse JSON from LOC response: {e}")
+                logger.error(f"Could not parse JSON from LOC response: {e}")
                 logger.debug(f"Response text: {response.text[:500]}")
+                return []
+            except Exception as e:
+                logger.error(f"Error processing LOC response: {e}")
+                if self.debug:
+                    logger.exception(e)
                 return []
                 
         except requests.RequestException as e:
@@ -182,28 +203,49 @@ class LOCImageFetcher:
                 logger.debug(f"Skipping result - doesn't match artist: {title}")
                 return None
             
-            # Get image URLs
-            image_url = result.get('image_url')
-            if not image_url:
-                # Try to construct from resources
+            # Get image URLs - LOC provides multiple resolutions
+            image_url_list = result.get('image_url', [])
+            if not image_url_list:
+                # Try to get from resources
                 resources = result.get('resources', [])
                 if resources and len(resources) > 0:
-                    # LOC provides images at different URLs
-                    image_url = resources[0].get('url')
+                    image_url_list = [resources[0].get('image', '')]
             
-            if not image_url or len(image_url) == 0:
+            # If image_url_list is a string, convert to list
+            if isinstance(image_url_list, str):
+                image_url_list = [image_url_list]
+            
+            if not image_url_list or len(image_url_list) == 0:
                 logger.debug(f"No image URL found for result: {title}")
                 return None
             
-            # If image_url is a list, take the first one
-            if isinstance(image_url, list):
-                image_url = image_url[0] if len(image_url) > 0 else None
+            # Choose the best resolution (LOC provides multiple sizes)
+            # The format is typically: pct:6.25, pct:12.5, pct:25.0, pct:50.0, pct:100.0
+            # We want a good balance - 50% is usually perfect for display
+            image_url = None
+            thumbnail_url = None
+            
+            for url in image_url_list:
+                if 'pct:50.0' in url or 'pct:25.0' in url:
+                    image_url = url.split('#')[0]  # Remove the #h=xxx&w=xxx part
+                    break
+            
+            # If we didn't find a medium size, just use the last (usually full size)
+            if not image_url and len(image_url_list) > 0:
+                image_url = image_url_list[-1].split('#')[0]
+            
+            # Use smallest for thumbnail
+            if len(image_url_list) > 0:
+                thumbnail_url = image_url_list[0].split('#')[0]
             
             if not image_url:
+                logger.debug(f"Could not determine image URL from: {image_url_list}")
                 return None
             
             # Build full URLs
-            item_url = result.get('url') or f"https://www.loc.gov/item/{item_id}/"
+            item_url = result.get('url', '')
+            if not item_url and item_id:
+                item_url = f"https://www.loc.gov/item/{item_id.split('/')[-2]}/"
             
             # Get collection information
             partof = result.get('partof', [])
@@ -212,14 +254,27 @@ class LOCImageFetcher:
             # Determine license based on collection
             license_info = self._determine_license(result)
             
-            # Extract dimensions if available
-            width = result.get('width')
-            height = result.get('height')
+            # Extract dimensions from image_url if available (they're in the #h=xxx&w=xxx format)
+            width = None
+            height = None
+            if image_url_list and len(image_url_list) > 0:
+                # Try to get dimensions from the full-size image URL
+                full_size_url = image_url_list[-1]
+                if '#h=' in full_size_url:
+                    try:
+                        dims = full_size_url.split('#')[1]
+                        for param in dims.split('&'):
+                            if param.startswith('h='):
+                                height = int(param.split('=')[1])
+                            elif param.startswith('w='):
+                                width = int(param.split('=')[1])
+                    except (IndexError, ValueError):
+                        pass
             
             # Build image data
             image_data = {
                 'url': image_url,
-                'thumbnail_url': result.get('thumb'),
+                'thumbnail_url': thumbnail_url,
                 'source': 'loc',
                 'source_identifier': item_id,
                 'source_page_url': item_url,
@@ -232,7 +287,7 @@ class LOCImageFetcher:
                 'collection': collection_name
             }
             
-            logger.debug(f"Processed LOC image: {title}")
+            logger.debug(f"Successfully processed LOC image: {title[:60]}")
             return image_data
             
         except Exception as e:
@@ -260,19 +315,39 @@ class LOCImageFetcher:
         name_parts = [part.lower() for part in artist_name.split() if len(part) > 2]
         
         # Check if all significant name parts appear in title
-        matches = sum(1 for part in name_parts if part in title)
+        matches_in_title = sum(1 for part in name_parts if part in title)
         
-        if matches >= len(name_parts):
+        if matches_in_title >= len(name_parts):
+            logger.debug(f"  Validation: All name parts in title")
             return True
         
-        # Also check description/subject fields
+        # Also check description/subject fields (LOC uses subject for artist names)
         description = str(result.get('description', '')).lower()
-        subject = str(result.get('subject', [])).lower()
+        subjects = result.get('subject', [])
         
-        combined_text = f"{title} {description} {subject}"
+        # Subjects can be a list or string
+        if isinstance(subjects, list):
+            subjects_text = ' '.join(str(s) for s in subjects).lower()
+        else:
+            subjects_text = str(subjects).lower()
+        
+        # Check subjects field (this is where LOC typically has artist names)
+        if artist_lower in subjects_text:
+            logger.debug(f"  Validation: Artist name in subjects")
+            return True
+        
+        # Check for name parts in combined fields
+        combined_text = f"{title} {description} {subjects_text}"
         matches = sum(1 for part in name_parts if part in combined_text)
         
-        return matches >= max(1, len(name_parts) - 1)
+        # More lenient - accept if we find at least half the name parts (rounded up)
+        required_matches = (len(name_parts) + 1) // 2
+        if matches >= required_matches:
+            logger.debug(f"  Validation: {matches}/{len(name_parts)} name parts found")
+            return True
+        
+        logger.debug(f"  Validation failed: only {matches}/{len(name_parts)} name parts found")
+        return False
     
     def _determine_license(self, result: Dict[str, Any]) -> Dict[str, str]:
         """
