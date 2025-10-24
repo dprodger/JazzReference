@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Add Wikipedia Image Script
 Takes a Wikipedia image page URL, identifies the artist, and adds the image to the database.
@@ -477,10 +476,10 @@ Examples:
     python add_wikipedia_image.py "https://en.wikipedia.org/wiki/File:Miles_Davis_1955.jpg"
     
     # Specify the artist by name
-    python add_wikipedia_image.py "https://en.wikipedia.org/wiki/File:Group_Photo.jpg" --artist "Miles Davis"
+    python add_wikipedia_image.py "https://en.wikipedia.org/wiki/File:Group_Photo.jpg" --name "Miles Davis"
     
     # Specify the artist by ID
-    python add_wikipedia_image.py "https://en.wikipedia.org/wiki/File:Concert.jpg" --artistid "123e4567-e89b-12d3-a456-426614174000"
+    python add_wikipedia_image.py "https://en.wikipedia.org/wiki/File:Concert.jpg" --id "123e4567-e89b-12d3-a456-426614174000"
     
     # Add from Wikimedia Commons
     python add_wikipedia_image.py "https://commons.wikimedia.org/wiki/File:Nina_Simone.jpg"
@@ -494,7 +493,7 @@ Examples:
 The script will:
 1. Extract the filename from the URL
 2. Fetch image metadata (license, size, etc.)
-3. Attempt to identify the artist (unless --artist or --artistid is specified)
+3. Attempt to identify the artist (unless --name or --id is specified)
 4. Add the image to the database and link it to the artist
         """
     )
@@ -504,8 +503,8 @@ The script will:
     
     # Artist identification options
     group = parser.add_mutually_exclusive_group()
-    group.add_argument('--artist', help='Artist name (skips auto-identification)')
-    group.add_argument('--artistid', help='Artist UUID (skips auto-identification)')
+    group.add_argument('--name', help='Artist name (skips auto-identification)')
+    group.add_argument('--id', help='Artist UUID (skips auto-identification)')
     
     # Optional arguments
     parser.add_argument('--dry-run', action='store_true',
@@ -526,18 +525,18 @@ The script will:
     
     # Find performer if specified
     performer = None
-    if args.artist:
-        logger.info(f"Looking up artist: {args.artist}")
-        performer = find_performer_by_name(args.artist)
+    if args.name:
+        logger.info(f"Looking up artist: {args.name}")
+        performer = find_performer_by_name(args.name)
         if not performer:
-            logger.error(f"Artist not found: {args.artist}")
+            logger.error(f"Artist not found: {args.name}")
             sys.exit(1)
         logger.info(f"Found artist: {performer['name']} (ID: {performer['id']})")
-    elif args.artistid:
-        logger.info(f"Looking up artist ID: {args.artistid}")
-        performer = find_performer_by_id(args.artistid)
+    elif args.id:
+        logger.info(f"Looking up artist ID: {args.id}")
+        performer = find_performer_by_id(args.id)
         if not performer:
-            logger.error(f"Artist not found with ID: {args.artistid}")
+            logger.error(f"Artist not found with ID: {args.id}")
             sys.exit(1)
         logger.info(f"Found artist: {performer['name']} (ID: {performer['id']})")
     
