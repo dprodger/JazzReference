@@ -23,6 +23,14 @@ things to do:
 	https://en.wikipedia.org/wiki/Miles_Davis#/media/File:Howard_McGhee,_Brick_Fleagle_and_Miles_Davis,_ca_September_1947_(Gottlieb).jpg
 * Lena Horne image is in the public domain, but is stored as 'all rights reserved' in the db. Figure tha tout
 * Look at Dave Catney wikipedia	
+* decide on whether musicbrainz, wikipedia etc. are in a combined field (external references) or discrete fields
+* figure out consistency of external_references (_references or _links)
+* check for propagation of DNS settings: Go here, for instance: http://linernotesjazz.com/docs
+* implement the 'bad link' code
+* hook up bad-link logging on images
+* fix the default (I type in a song name; get to that song; then go back -- the text box has my song name, but the page has no search restriction)
+* run jazz_song_research.py with 'There's No You' -- got nothing in terms of references. Why? Also -- stripping out apostrophe?
+* add a single-song path for gather_mb_ids.py
 	
 Done:
 * amend fetch_artist_images to gather for all artists?
