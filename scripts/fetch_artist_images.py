@@ -3,6 +3,12 @@
 Fetch Artist Images Script
 Fetches images for jazz artists from Wikipedia and Discogs, storing them in the database.
 
+ARCHITECTURE:
+This script separates database operations from slow API calls to prevent connection timeouts:
+1. Fetch performer data (short DB connection)
+2. Fetch images from external APIs (no DB connection)
+3. Save results to database (short DB connection)
+
 Usage:
     python fetch_artist_images.py --name "Miles Davis"
     python fetch_artist_images.py --id <uuid>
@@ -18,6 +24,7 @@ import json
 import re
 from typing import Optional, Dict, Any, List
 from urllib.parse import quote, urljoin, unquote
+from dataclasses import dataclass
 import time
 
 # Import our database utilities
@@ -37,6 +44,21 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+@dataclass
+class ImageData:
+    """Data class for image information."""
+    url: str
+    source: str
+    thumbnail_url: Optional[str] = None
+    source_identifier: Optional[str] = None
+    source_page_url: Optional[str] = None
+    license_type: Optional[str] = None
+    license_url: Optional[str] = None
+    attribution: Optional[str] = None
+    width: Optional[int] = None
+    height: Optional[int] = None
+
+
 class ImageFetcher:
     """Handles fetching images from various sources."""
     
@@ -51,7 +73,7 @@ class ImageFetcher:
         if debug:
             logger.setLevel(logging.DEBUG)
     
-    def fetch_wikipedia_image(self, artist_name: str, wikipedia_url: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    def fetch_wikipedia_image(self, artist_name: str, wikipedia_url: Optional[str] = None) -> Optional[ImageData]:
         """
         Fetch image from Wikipedia for an artist.
         
@@ -60,7 +82,7 @@ class ImageFetcher:
             wikipedia_url: Optional Wikipedia URL from database (skips search if provided)
         
         Returns:
-            Dictionary with image data or None
+            ImageData object or None
         """
         try:
             # If we have a Wikipedia URL from the database, extract the page title
@@ -179,18 +201,18 @@ class ImageFetcher:
             # Normalize license type
             license_type_normalized = self._normalize_license(license_type)
             
-            image_data = {
-                'url': image_url,
-                'thumbnail_url': thumbnail_url,
-                'source': 'wikipedia',
-                'source_identifier': page_title,
-                'source_page_url': page_url,
-                'license_type': license_type_normalized,
-                'license_url': license_url,
-                'attribution': attribution,
-                'width': width,
-                'height': height
-            }
+            image_data = ImageData(
+                url=image_url,
+                thumbnail_url=thumbnail_url,
+                source='wikipedia',
+                source_identifier=page_title,
+                source_page_url=page_url,
+                license_type=license_type_normalized,
+                license_url=license_url,
+                attribution=attribution,
+                width=width,
+                height=height
+            )
             
             logger.info(f"✓ Found Wikipedia image: {image_url}")
             logger.debug(f"Image details: {image_data}")
@@ -198,7 +220,9 @@ class ImageFetcher:
             return image_data
             
         except requests.RequestException as e:
-            logger.error(f"Error fetching Wikipedia image: {e}")
+            logger.error(f"Error fetching from Wikipedia: {e}")
+            if self.debug:
+                logger.exception(e)
             return None
         except Exception as e:
             logger.error(f"Unexpected error fetching Wikipedia image: {e}")
@@ -206,108 +230,145 @@ class ImageFetcher:
                 logger.exception(e)
             return None
     
-    def fetch_discogs_image(self, artist_name: str) -> Optional[Dict[str, Any]]:
+    def fetch_discogs_image(self, artist_name: str) -> Optional[ImageData]:
         """
         Fetch image from Discogs for an artist.
-        
-        Note: Discogs requires API authentication. This is a placeholder
-        that would need to be implemented with proper API credentials.
         
         Args:
             artist_name: Name of the artist to search for
         
         Returns:
-            Dictionary with image data or None
+            ImageData object or None
         """
-        try:
-            logger.info(f"Searching Discogs for {artist_name}...")
-            
-            # Discogs requires authentication - this is simplified
-            # In production, you'd need to:
-            # 1. Register for Discogs API credentials
-            # 2. Add them to environment variables
-            # 3. Use OAuth or token authentication
-            
-            discogs_token = None  # Would read from environment
-            
-            if not discogs_token:
-                logger.info("Discogs API token not configured, skipping Discogs search")
-                return None
-            
-            # This would be the actual implementation:
-            # search_url = "https://api.discogs.com/database/search"
-            # params = {
-            #     'q': artist_name,
-            #     'type': 'artist',
-            #     'token': discogs_token
-            # }
-            # response = self.session.get(search_url, params=params, timeout=10)
-            # ... process response ...
-            
-            return None
-            
-        except Exception as e:
-            logger.error(f"Error fetching Discogs image: {e}")
-            if self.debug:
-                logger.exception(e)
-            return None
+        # Placeholder - Discogs requires authentication
+        logger.debug(f"Discogs image fetch not yet implemented for {artist_name}")
+        return None
     
     def _normalize_license(self, license_str: str) -> str:
-        """Normalize license strings to standard types."""
-        if not license_str:
+        """
+        Normalize license type to standard values.
+        
+        Args:
+            license_str: Raw license string
+        
+        Returns:
+            Normalized license type
+        """
+        if not license_str or license_str == 'unknown':
             return 'unknown'
         
         license_lower = license_str.lower()
         
-        # Creative Commons licenses
-        if 'cc-by-sa' in license_lower or 'cc by-sa' in license_lower:
-            return 'cc-by-sa'
-        elif 'cc-by' in license_lower or 'cc by' in license_lower:
-            return 'cc-by'
-        elif 'cc0' in license_lower or 'cc zero' in license_lower:
+        if 'public domain' in license_lower or 'pd' in license_lower:
+            return 'public_domain'
+        elif 'cc0' in license_lower:
             return 'cc0'
-        elif 'public domain' in license_lower or 'pd' in license_lower:
-            return 'public-domain'
+        elif 'cc-by-sa' in license_lower or 'cc by-sa' in license_lower:
+            return 'cc_by_sa'
+        elif 'cc-by' in license_lower or 'cc by' in license_lower:
+            return 'cc_by'
         elif 'fair use' in license_lower:
-            return 'fair-use'
+            return 'fair_use'
         else:
-            return 'all-rights-reserved'
+            return 'other'
+
+
+class ImageDatabaseManager:
+    """Handles database operations for images - separated from API fetching."""
     
-    def save_image_to_db(self, performer_id: str, image_data: Dict[str, Any], 
-                        is_primary: bool = False, display_order: int = 0) -> bool:
+    def __init__(self, dry_run: bool = False, debug: bool = False):
+        self.dry_run = dry_run
+        self.debug = debug
+    
+    def get_existing_images(self, performer_id: str) -> List[Dict[str, Any]]:
         """
-        Save an image to the database and link it to a performer.
+        Get existing images for a performer.
+        Uses a short-lived database connection.
         
         Args:
             performer_id: UUID of the performer
-            image_data: Dictionary containing image information
-            is_primary: Whether this is the primary/profile image
-            display_order: Order for displaying in carousel
         
         Returns:
-            True if successful, False otherwise
+            List of existing image records
         """
-        if self.dry_run:
-            logger.info(f"[DRY RUN] Would save image to database:")
-            logger.info(f"  URL: {image_data.get('url')}")
-            logger.info(f"  Source: {image_data.get('source')}")
-            logger.info(f"  License: {image_data.get('license_type')}")
-            logger.info(f"  Primary: {is_primary}")
-            return True
+        try:
+            existing_images = get_performer_images(performer_id)
+            if existing_images:
+                logger.info(f"Performer already has {len(existing_images)} image(s)")
+                for img in existing_images:
+                    logger.info(f"  - {img['source']}: {img['url']}")
+            return existing_images or []
+        except Exception as e:
+            logger.error(f"Error getting existing images: {e}")
+            if self.debug:
+                logger.exception(e)
+            return []
+    
+    def is_duplicate_image(self, performer_id: str, image_url: str) -> bool:
+        """
+        Check if an image URL is already associated with this performer.
         
+        Args:
+            performer_id: UUID of the performer
+            image_url: URL of the image to check
+        
+        Returns:
+            True if this image is already linked to this performer, False otherwise
+        """
         try:
             with get_db_connection() as conn:
                 with conn.cursor() as cur:
-                    # First, check if image already exists
-                    check_query = """
-                        SELECT id FROM images 
-                        WHERE source = %s AND source_identifier = %s AND url = %s
+                    # Check if this URL is already linked to this performer
+                    query = """
+                        SELECT 1 
+                        FROM images i
+                        JOIN artist_images ai ON i.id = ai.image_id
+                        WHERE ai.performer_id = %s AND i.url = %s
+                        LIMIT 1
                     """
-                    cur.execute(check_query, (
-                        image_data['source'],
-                        image_data.get('source_identifier'),
-                        image_data['url']
-                    ))
+                    cur.execute(query, (performer_id, image_url))
+                    result = cur.fetchone()
+                    return result is not None
+        except Exception as e:
+            logger.error(f"Error checking for duplicate image: {e}")
+            if self.debug:
+                logger.exception(e)
+            # On error, assume it's not a duplicate to avoid blocking new images
+            return False
+    
+    def save_image(self, performer_id: str, image_data: ImageData, 
+                   is_primary: bool = False, display_order: int = 0) -> bool:
+        """
+        Save an image to the database with a short-lived connection.
+        Skips saving if the image is already linked to this performer.
+        
+        Args:
+            performer_id: UUID of the performer
+            image_data: ImageData object containing image information
+            is_primary: Whether this is the primary image
+            display_order: Display order for the image
+        
+        Returns:
+            True if saved successfully, False if duplicate or error
+        """
+        # First check if this is a duplicate
+        if self.is_duplicate_image(performer_id, image_data.url):
+            logger.info(f"⊘ Image already linked to performer, skipping: {image_data.url}")
+            return False
+        
+        if self.dry_run:
+            logger.info(f"[DRY RUN] Would save image: {image_data.url}")
+            logger.info(f"  Source: {image_data.source}")
+            logger.info(f"  Primary: {is_primary}, Order: {display_order}")
+            return True
+        
+        try:
+            # Use a short-lived connection just for this operation
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    # Check if image URL already exists in images table
+                    check_query = "SELECT id FROM images WHERE url = %s"
+                    cur.execute(check_query, (image_data.url,))
                     existing = cur.fetchone()
                     
                     if existing:
@@ -325,21 +386,21 @@ class ImageFetcher:
                             RETURNING id
                         """
                         cur.execute(insert_image_query, (
-                            image_data['url'],
-                            image_data['source'],
-                            image_data.get('source_identifier'),
-                            image_data.get('license_type'),
-                            image_data.get('license_url'),
-                            image_data.get('attribution'),
-                            image_data.get('width'),
-                            image_data.get('height'),
-                            image_data.get('thumbnail_url'),
-                            image_data.get('source_page_url')
+                            image_data.url,
+                            image_data.source,
+                            image_data.source_identifier,
+                            image_data.license_type,
+                            image_data.license_url,
+                            image_data.attribution,
+                            image_data.width,
+                            image_data.height,
+                            image_data.thumbnail_url,
+                            image_data.source_page_url
                         ))
                         image_id = cur.fetchone()['id']
                         logger.info(f"✓ Inserted new image: {image_id}")
                     
-                    # Check if relationship already exists
+                    # Check if relationship already exists (extra safety check)
                     check_rel_query = """
                         SELECT 1 FROM artist_images 
                         WHERE performer_id = %s AND image_id = %s
@@ -347,7 +408,8 @@ class ImageFetcher:
                     cur.execute(check_rel_query, (performer_id, image_id))
                     
                     if cur.fetchone():
-                        logger.info(f"Image already linked to performer")
+                        logger.info(f"⊘ Image already linked to performer (shouldn't happen - duplicate check failed)")
+                        return False
                     else:
                         # Link image to performer
                         insert_rel_query = """
@@ -360,8 +422,10 @@ class ImageFetcher:
                         ))
                         logger.info(f"✓ Linked image to performer")
                     
-                    conn.commit()
+                    # Commit happens automatically when exiting context
                     return True
+            
+            # Connection is now closed
                     
         except Exception as e:
             logger.error(f"Error saving image to database: {e}")
@@ -369,63 +433,111 @@ class ImageFetcher:
                 logger.exception(e)
             return False
     
-    def fetch_and_save_images(self, performer: Dict[str, Any]) -> int:
+    def update_external_references(self, performer_id: str, 
+                                   external_refs: Dict[str, str]) -> bool:
         """
-        Fetch images from all available sources and save them.
+        Update performer external references.
+        Uses a short-lived database connection.
         
         Args:
-            performer: Performer record from database
+            performer_id: UUID of the performer
+            external_refs: Dictionary of external reference data
         
         Returns:
-            Number of new images added
+            True if updated successfully, False otherwise
         """
-        performer_id = str(performer['id'])
-        performer_name = performer['name']
-        images_added = 0
+        try:
+            update_performer_external_references(performer_id, external_refs, self.dry_run)
+            return True
+        except Exception as e:
+            logger.error(f"Error updating external references: {e}")
+            if self.debug:
+                logger.exception(e)
+            return False
+
+
+def process_performer(performer: Dict[str, Any], fetcher: ImageFetcher, 
+                     db_manager: ImageDatabaseManager) -> int:
+    """
+    Process a single performer: fetch images and save to database.
+    This function clearly separates API calls from database operations.
+    
+    Args:
+        performer: Performer record from database
+        fetcher: ImageFetcher instance for API calls
+        db_manager: ImageDatabaseManager for database operations
+    
+    Returns:
+        Number of new images added
+    """
+    performer_id = str(performer['id'])
+    performer_name = performer['name']
+    images_added = 0
+    
+    logger.info(f"\n{'='*60}")
+    logger.info(f"Fetching images for: {performer_name}")
+    logger.info(f"{'='*60}")
+    
+    # STEP 1: Get existing images (short DB connection)
+    existing_images = db_manager.get_existing_images(performer_id)
+    
+    # STEP 2: Fetch images from external APIs (NO database connection)
+    external_links = performer.get('external_links') or {}
+    wikipedia_url = external_links.get('wikipedia')
+    
+    # Fetch Wikipedia image
+    wiki_image = fetcher.fetch_wikipedia_image(performer_name, wikipedia_url=wikipedia_url)
+    
+    # Fetch Discogs image
+    discogs_image = fetcher.fetch_discogs_image(performer_name)
+    
+    # STEP 3: Save results to database (short DB connections for each operation)
+    if wiki_image:
+        # Update external references if we got Wikipedia data
+        external_refs = {}
+        if wiki_image.source_identifier:
+            external_refs['wikipedia_title'] = wiki_image.source_identifier
+        if wiki_image.source_page_url:
+            external_refs['wikipedia_url'] = wiki_image.source_page_url
         
-        logger.info(f"\n{'='*60}")
-        logger.info(f"Fetching images for: {performer_name}")
-        logger.info(f"{'='*60}")
+        if external_refs:
+            db_manager.update_external_references(performer_id, external_refs)
         
-        # Check existing images
-        existing_images = get_performer_images(performer_id)
-        if existing_images:
-            logger.info(f"Performer already has {len(existing_images)} image(s)")
-            for img in existing_images:
-                logger.info(f"  - {img['source']}: {img['url']}")
-        
-        # Get Wikipedia URL from external_links if available
-        external_links = performer.get('external_links') or {}
-        wikipedia_url = external_links.get('wikipedia')
-        
-        # Fetch from Wikipedia
-        wiki_image = self.fetch_wikipedia_image(performer_name, wikipedia_url=wikipedia_url)
-        if wiki_image:
-            # Update external_references with Wikipedia page
-            external_refs = {}
-            if wiki_image.get('source_identifier'):
-                external_refs['wikipedia_title'] = wiki_image['source_identifier']
-            if wiki_image.get('source_page_url'):
-                external_refs['wikipedia_url'] = wiki_image['source_page_url']
-            
-            if external_refs:
-                update_performer_external_references(performer_id, external_refs, self.dry_run)
-            
-            # Save the image
-            if self.save_image_to_db(performer_id, wiki_image, is_primary=not existing_images, display_order=0):
-                images_added += 1
-        
-        # Fetch from Discogs (placeholder for now)
-        discogs_image = self.fetch_discogs_image(performer_name)
-        if discogs_image:
-            if self.save_image_to_db(performer_id, discogs_image, is_primary=False, display_order=1):
-                images_added += 1
-        
-        logger.info(f"\n{'='*60}")
-        logger.info(f"✓ Added {images_added} new image(s) for {performer_name}")
-        logger.info(f"{'='*60}\n")
-        
-        return images_added
+        # Save the image (will skip if duplicate)
+        if db_manager.save_image(performer_id, wiki_image, 
+                                is_primary=not existing_images, display_order=0):
+            images_added += 1
+    
+    if discogs_image:
+        if db_manager.save_image(performer_id, discogs_image, 
+                                is_primary=False, display_order=1):
+            images_added += 1
+    
+    logger.info(f"\n{'='*60}")
+    logger.info(f"✓ Added {images_added} new image(s) for {performer_name}")
+    logger.info(f"{'='*60}\n")
+    
+    return images_added
+
+
+def get_all_performers() -> List[Dict[str, Any]]:
+    """
+    Get all performers from the database.
+    Uses a short-lived connection.
+    
+    Returns:
+        List of performer records
+    """
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT id, name, biography, birth_date, death_date, external_links
+                FROM performers
+                ORDER BY name
+            """)
+            performers = cur.fetchall()
+    # Connection is now closed
+    return performers
 
 
 def main():
@@ -462,14 +574,16 @@ Examples:
     
     args = parser.parse_args()
     
-    # Fetch and save images
+    # Create fetcher and database manager
     fetcher = ImageFetcher(dry_run=args.dry_run, debug=args.debug)
+    db_manager = ImageDatabaseManager(dry_run=args.dry_run, debug=args.debug)
     
     # Determine which performers to process
     performers = []
     
     if args.name:
         logger.info(f"Searching for performer: {args.name}")
+        # Short DB connection to find performer
         performer = find_performer_by_name(args.name)
         if not performer:
             logger.error(f"Performer not found: {args.name}")
@@ -478,6 +592,7 @@ Examples:
         logger.info(f"Found performer: {performer['name']} (ID: {performer['id']})")
     elif args.id:
         logger.info(f"Looking up performer ID: {args.id}")
+        # Short DB connection to find performer
         performer = find_performer_by_id(args.id)
         if not performer:
             logger.error(f"Performer not found with ID: {args.id}")
@@ -485,26 +600,23 @@ Examples:
         performers = [performer]
         logger.info(f"Found performer: {performer['name']} (ID: {performer['id']})")
     else:
-        # Process all performers
+        # Process all performers - short DB connection to get list
         logger.info("No specific performer specified - processing all performers")
-        with get_db_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    SELECT id, name, biography, birth_date, death_date, external_links
-                    FROM performers
-                    ORDER BY name
-                """)
-                performers = cur.fetchall()
+        performers = get_all_performers()
         logger.info(f"Found {len(performers)} performers to process")
     
     # Process each performer
+    # Note: Each call to process_performer() uses separate short-lived connections
     total_images_added = 0
-    for performer in performers:
-        images_added = fetcher.fetch_and_save_images(performer)
+    for i, performer in enumerate(performers, 1):
+        logger.info(f"\nProcessing performer {i}/{len(performers)}")
+        
+        images_added = process_performer(performer, fetcher, db_manager)
         total_images_added += images_added
         
         # Add delay between performers to be respectful to APIs
-        if len(performers) > 1:
+        if len(performers) > 1 and i < len(performers):
+            logger.debug(f"Waiting 2 seconds before next performer...")
             time.sleep(2.0)
     
     if total_images_added > 0:
