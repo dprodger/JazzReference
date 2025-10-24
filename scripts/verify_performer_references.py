@@ -152,10 +152,27 @@ class PerformerReferenceVerifier:
                 page_text = soup.get_text().lower()
             
             # Check if this is a disambiguation or redirect to wrong page
-            # Method 1: Check for explicit disambiguation text
-            logger.debug(f"Checking for 'disambiguation' in first 500 chars...")
-            if 'disambiguation' in page_text[:500]:
-                logger.debug(f"Found 'disambiguation' - rejecting page")
+            # Method 1: Check if page title explicitly ends with "(disambiguation)"
+            page_title = soup.find('h1', {'id': 'firstHeading'})
+            if page_title:
+                page_title_text = page_title.get_text().strip()
+                if page_title_text.endswith('(disambiguation)'):
+                    logger.debug(f"Page title ends with '(disambiguation)' - rejecting page")
+                    return {
+                        'valid': False,
+                        'confidence': 'high',
+                        'reason': 'Page is a disambiguation page',
+                        'score': 0
+                    }
+            
+            # Method 1b: Check for actual disambiguation page indicators
+            # Look for patterns like "may refer to" at the start, which indicates a real disambiguation page
+            # Note: We ignore hatnotes like "For other uses, see X (disambiguation)" which just reference disambiguation pages
+            logger.debug(f"Checking for disambiguation page indicators...")
+            first_paragraph = page_text[:800]
+            # Real disambiguation pages typically start with "[Name] may refer to:"
+            if re.search(r'^[^.]*?\bmay refer to\b', first_paragraph):
+                logger.debug(f"Found 'may refer to' pattern indicating disambiguation page")
                 return {
                     'valid': False,
                     'confidence': 'high',
@@ -163,20 +180,7 @@ class PerformerReferenceVerifier:
                     'score': 0
                 }
             
-            # Method 2: Check if page is a list of people with same name
-            # Look for "may refer to:" pattern which indicates disambiguation
-            logger.debug(f"Checking for 'may refer to:' in first 300 chars of content...")
-            logger.debug(f"First 300 chars: {page_text[:300]}")
-            if 'may refer to:' in page_text[:300]:
-                logger.debug(f"Found 'may refer to:' - rejecting page")
-                return {
-                    'valid': False,
-                    'confidence': 'high',
-                    'reason': 'Page is a disambiguation page (contains "may refer to:")',
-                    'score': 0
-                }
-            
-            # Method 3: Check if page has many bullet points with birth/death dates
+            # Method 2: Check if page has many bullet points with birth/death dates
             # which suggests it's listing multiple people
             logger.debug(f"Checking for multiple birth year patterns...")
             ul_lists = soup.find_all('ul', limit=3)
@@ -202,6 +206,45 @@ class PerformerReferenceVerifier:
             page_title = soup.find('h1', {'id': 'firstHeading'})
             if page_title:
                 page_title_text = page_title.get_text().strip()
+                
+                # Check if the title disambiguation clearly indicates a NON-musician
+                # Extract the disambiguation term in parentheses (e.g., "(basketball)" from "Sam Jones (basketball)")
+                disambiguation_match = re.search(r'\(([^)]+)\)$', page_title_text)
+                if disambiguation_match:
+                    disambiguation_term = disambiguation_match.group(1).lower()
+                    
+                    # Non-musician professions/fields
+                    non_musician_terms = [
+                        'basketball', 'football', 'baseball', 'hockey', 'soccer', 'cricket',
+                        'athlete', 'sports', 'player', 'coach',
+                        'politician', 'politics', 'senator', 'congressman', 'mayor',
+                        'businessman', 'business', 'entrepreneur', 'ceo', 'executive',
+                        'actor', 'actress', 'film', 'television',
+                        'writer', 'author', 'journalist', 'poet',
+                        'scientist', 'physicist', 'chemist', 'biologist',
+                        'military', 'general', 'admiral', 'colonel'
+                    ]
+                    
+                    # Musician-related terms that should NOT reject
+                    musician_terms = [
+                        'musician', 'singer', 'vocalist', 'pianist', 'guitarist', 'bassist',
+                        'drummer', 'saxophonist', 'trumpeter', 'composer', 'conductor',
+                        'bandleader', 'jazz', 'blues', 'rock', 'folk', 'country'
+                    ]
+                    
+                    # Check if disambiguation term indicates non-musician
+                    is_non_musician = any(term in disambiguation_term for term in non_musician_terms)
+                    is_musician = any(term in disambiguation_term for term in musician_terms)
+                    
+                    if is_non_musician and not is_musician:
+                        logger.debug(f"Page title indicates non-musician: '{page_title_text}'")
+                        return {
+                            'valid': False,
+                            'confidence': 'high',
+                            'reason': f'Page is about a {disambiguation_term}, not a musician',
+                            'score': 0
+                        }
+                
                 # Remove disambiguation parentheses like "(saxophonist)"
                 page_name = re.sub(r'\s*\([^)]*\)\s*$', '', page_title_text).strip().lower()
                 performer_name_lower = performer_name.lower()

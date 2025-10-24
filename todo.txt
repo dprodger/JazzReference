@@ -22,7 +22,7 @@ things to do:
 14. Incorporate the metadata around the caption for images like this:
 	https://en.wikipedia.org/wiki/Miles_Davis#/media/File:Howard_McGhee,_Brick_Fleagle_and_Miles_Davis,_ca_September_1947_(Gottlieb).jpg
 15. Lena Horne image is in the public domain, but is stored as 'all rights reserved' in the db. Figure tha tout
-	
+16. Look at Ron Carter and wikipedia logic. We have the wrong URL for Wikipedia for him	
 	
 	
 Done:
