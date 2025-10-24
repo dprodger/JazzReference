@@ -11,6 +11,19 @@ struct ExternalReferencesPanel: View {
     let externalReferences: [String: String]?
     let musicbrainzId: String?
     let musicbrainzType: MusicBrainzType
+    let entityType: String
+    let entityId: String
+    let entityName: String
+    
+    @State private var reportingInfo: ReportingInfo?
+    @State private var longPressOccurred = false
+    @Environment(\.openURL) var openURL
+    
+    struct ReportingInfo: Identifiable {
+        let id = UUID()
+        let source: String
+        let url: String
+    }
     
     enum MusicBrainzType {
         case work   // For songs
@@ -18,17 +31,23 @@ struct ExternalReferencesPanel: View {
     }
     
     // Convenience initializer for songs (with separate musicbrainzId field)
-    init(externalReferences: [String: String]?, musicbrainzId: String?) {
+    init(externalReferences: [String: String]?, musicbrainzId: String?, entityId: String, entityName: String) {
         self.externalReferences = externalReferences
         self.musicbrainzId = musicbrainzId
         self.musicbrainzType = .work
+        self.entityType = "Song"
+        self.entityId = entityId
+        self.entityName = entityName
     }
     
     // Convenience initializer for artists (musicbrainz in externalLinks)
-    init(externalLinks: [String: String]?) {
+    init(externalLinks: [String: String]?, entityId: String, entityName: String) {
         self.externalReferences = externalLinks
         self.musicbrainzId = externalLinks?["musicbrainz"]
         self.musicbrainzType = .artist
+        self.entityType = "Artist"
+        self.entityId = entityId
+        self.entityName = entityName
     }
     
     var wikipediaURL: String? {
@@ -58,7 +77,13 @@ struct ExternalReferencesPanel: View {
                 
                 HStack(spacing: 16) {
                     if let wikipediaURL = wikipediaURL, let url = URL(string: wikipediaURL) {
-                        Link(destination: url) {
+                        let urlString = wikipediaURL  // Capture explicitly
+                        Button {
+                            if !longPressOccurred {
+                                openURL(url)
+                            }
+                            longPressOccurred = false
+                        } label: {
                             VStack(spacing: 4) {
                                 Image(systemName: "book.circle.fill")
                                     .font(.title2)
@@ -68,10 +93,23 @@ struct ExternalReferencesPanel: View {
                                     .foregroundColor(JazzTheme.smokeGray)
                             }
                         }
+                        .simultaneousGesture(
+                            LongPressGesture(minimumDuration: 0.5)
+                                .onEnded { _ in
+                                    longPressOccurred = true
+                                    reportingInfo = ReportingInfo(source: "Wikipedia", url: urlString)
+                                }
+                        )
                     }
                     
                     if let jazzStandardsURL = jazzStandardsURL, let url = URL(string: jazzStandardsURL) {
-                        Link(destination: url) {
+                        let urlString = jazzStandardsURL  // Capture explicitly
+                        Button {
+                            if !longPressOccurred {
+                                openURL(url)
+                            }
+                            longPressOccurred = false
+                        } label: {
                             VStack(spacing: 4) {
                                 Image(systemName: "music.note.list")
                                     .font(.title2)
@@ -81,10 +119,23 @@ struct ExternalReferencesPanel: View {
                                     .foregroundColor(JazzTheme.smokeGray)
                             }
                         }
+                        .simultaneousGesture(
+                            LongPressGesture(minimumDuration: 0.5)
+                                .onEnded { _ in
+                                    longPressOccurred = true
+                                    reportingInfo = ReportingInfo(source: "Jazz Standards", url: urlString)
+                                }
+                        )
                     }
                     
                     if let musicbrainzURL = musicbrainzURL, let url = URL(string: musicbrainzURL) {
-                        Link(destination: url) {
+                        let urlString = musicbrainzURL  // Capture explicitly
+                        Button {
+                            if !longPressOccurred {
+                                openURL(url)
+                            }
+                            longPressOccurred = false
+                        } label: {
                             VStack(spacing: 4) {
                                 Image(systemName: "music.mic.circle.fill")
                                     .font(.title2)
@@ -94,6 +145,13 @@ struct ExternalReferencesPanel: View {
                                     .foregroundColor(JazzTheme.smokeGray)
                             }
                         }
+                        .simultaneousGesture(
+                            LongPressGesture(minimumDuration: 0.5)
+                                .onEnded { _ in
+                                    longPressOccurred = true
+                                    reportingInfo = ReportingInfo(source: "MusicBrainz", url: urlString)
+                                }
+                        )
                     }
                 }
                 .padding(.top, 4)
@@ -103,6 +161,115 @@ struct ExternalReferencesPanel: View {
             .background(JazzTheme.cardBackground)
             .cornerRadius(10)
             .padding(.horizontal)
+            .sheet(item: $reportingInfo) { info in
+                ReportLinkIssueView(
+                    entityType: entityType,
+                    entityId: entityId,
+                    entityName: entityName,
+                    externalSource: info.source,
+                    externalUrl: info.url,
+                    onSubmit: { explanation in
+                        submitLinkReport(
+                            entityType: entityType,
+                            entityId: entityId,
+                            entityName: entityName,
+                            externalSource: info.source,
+                            externalUrl: info.url,
+                            explanation: explanation
+                        )
+                        reportingInfo = nil
+                    },
+                    onCancel: {
+                        reportingInfo = nil
+                    }
+                )
+            }
+        }
+    }
+    
+    // MARK: - Stub submission method
+    private func submitLinkReport(entityType: String, entityId: String, entityName: String, externalSource: String, externalUrl: String, explanation: String) {
+        // TODO: Implement actual submission logic
+        // For now, this is just a stub
+        print("Link report submitted:")
+        print("  Entity Type: \(entityType)")
+        print("  Entity ID: \(entityId)")
+        print("  Entity Name: \(entityName)")
+        print("  External Source: \(externalSource)")
+        print("  External URL: \(externalUrl)")
+        print("  Explanation: \(explanation)")
+    }
+}
+
+// MARK: - Report Link Issue Dialog
+struct ReportLinkIssueView: View {
+    let entityType: String
+    let entityId: String
+    let entityName: String
+    let externalSource: String
+    let externalUrl: String
+    let onSubmit: (String) -> Void
+    let onCancel: () -> Void
+    
+    @State private var explanation: String = ""
+    @Environment(\.dismiss) var dismiss
+    
+    var body: some View {
+        NavigationView {
+            Form {
+                Section {
+                    Text("Report a problem with this external reference link")
+                        .font(.subheadline)
+                        .foregroundColor(JazzTheme.smokeGray)
+                }
+                
+                Section(header: Text("Entity Information")) {
+                    LabeledContent("Type", value: entityType)
+                    LabeledContent("Name", value: entityName)
+                    LabeledContent("ID", value: entityId)
+                        .font(.caption)
+                        .foregroundColor(JazzTheme.smokeGray)
+                }
+                
+                Section(header: Text("External Reference")) {
+                    LabeledContent("Source", value: externalSource)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("URL")
+                            .font(.caption)
+                            .foregroundColor(JazzTheme.smokeGray)
+                        Text(externalUrl)
+                            .font(.caption)
+                            .foregroundColor(JazzTheme.smokeGray)
+                            .lineLimit(3)
+                    }
+                }
+                
+                Section(header: Text("Issue Description")) {
+                    TextEditor(text: $explanation)
+                        .frame(minHeight: 100)
+                        .font(.body)
+                    
+                    Text("Please describe the issue with this link (e.g., broken link, incorrect information, wrong page)")
+                        .font(.caption)
+                        .foregroundColor(JazzTheme.smokeGray)
+                }
+            }
+            .navigationTitle("Report Link Issue")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") {
+                        onCancel()
+                    }
+                }
+                
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Submit") {
+                        onSubmit(explanation)
+                    }
+                    .disabled(explanation.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
         }
     }
 }

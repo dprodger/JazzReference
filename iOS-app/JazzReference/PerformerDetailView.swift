@@ -137,7 +137,11 @@ struct PerformerDetailView: View {
                             }
                             
                             // External References Panel
-                            ExternalReferencesPanel(externalLinks: performer.externalLinks)
+                            ExternalReferencesPanel(
+                                externalLinks: performer.externalLinks,
+                                entityId: performer.id,
+                                entityName: performer.name
+                            )
                         }
                         .padding()
                         

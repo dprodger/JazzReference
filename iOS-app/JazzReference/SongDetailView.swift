@@ -93,7 +93,9 @@ struct SongDetailView: View {
                         // External References Panel
                         ExternalReferencesPanel(
                             externalReferences: song.externalReferences,
-                            musicbrainzId: song.musicbrainzId
+                            musicbrainzId: song.musicbrainzId,
+                            entityId: song.id,
+                            entityName: song.title
                         )
                         
                     }
