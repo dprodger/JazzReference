@@ -2,7 +2,7 @@
 //  SongDetailView.swift
 //  JazzReference
 //
-//  Updated with Spotify filtering, icons, and external references panel
+//  Updated with Spotify filtering, icons, external references panel, and toolbar styling
 //
 
 import SwiftUI
@@ -22,72 +22,75 @@ struct ExternalReferencesPanel: View {
     var wikipediaURL: String? {
         externalReferences?["wikipedia"]
     }
-        
-    var hasReferences: Bool {
-        wikipediaURL != nil || musicbrainzId != nil
+    
+    var jazzStandardsURL: String? {
+        externalReferences?["jazzstandards"]
+    }
+    
+    var musicbrainzURL: String? {
+        guard let mbId = musicbrainzId else { return nil }
+        return "https://musicbrainz.org/work/\(mbId)"
     }
     
     var body: some View {
-        if hasReferences {
+        if wikipediaURL != nil || jazzStandardsURL != nil || musicbrainzURL != nil {
             VStack(alignment: .leading, spacing: 12) {
-                Text("External Resources")
+                Text("External References")
                     .font(.headline)
                     .foregroundColor(JazzTheme.charcoal)
                 
-                VStack(spacing: 8) {
-                    if let wikipedia = wikipediaURL, let url = URL(string: wikipedia) {
+                HStack(spacing: 16) {
+                    if let wikipediaURL = wikipediaURL, let url = URL(string: wikipediaURL) {
                         Link(destination: url) {
-                            HStack {
-                                Image(systemName: "book.fill")
-                                    .foregroundColor(JazzTheme.charcoal)
-                                    .frame(width: 24)
+                            VStack(spacing: 4) {
+                                Image(systemName: "book.circle.fill")
+                                    .font(.title2)
+                                    .foregroundColor(JazzTheme.brass)
                                 Text("Wikipedia")
-                                    .foregroundColor(JazzTheme.charcoal)
-                                Spacer()
-                                Image(systemName: "arrow.up.right")
                                     .font(.caption)
                                     .foregroundColor(JazzTheme.smokeGray)
                             }
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 10)
-                            .background(JazzTheme.cardBackground)
-                            .cornerRadius(8)
                         }
                     }
                     
-                    if let musicbrainz = musicbrainzId, let url = URL(string: "https://musicbrainz.org/work/" + musicbrainz) {
+                    if let jazzStandardsURL = jazzStandardsURL, let url = URL(string: jazzStandardsURL) {
                         Link(destination: url) {
-                            HStack {
+                            VStack(spacing: 4) {
                                 Image(systemName: "music.note.list")
-                                    .foregroundColor(JazzTheme.charcoal)
-                                    .frame(width: 24)
-                                Text("MusicBrainz")
-                                    .foregroundColor(JazzTheme.charcoal)
-                                Spacer()
-                                Image(systemName: "arrow.up.right")
+                                    .font(.title2)
+                                    .foregroundColor(JazzTheme.brass)
+                                Text("Jazz Standards")
                                     .font(.caption)
                                     .foregroundColor(JazzTheme.smokeGray)
                             }
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 10)
-                            .background(JazzTheme.cardBackground)
-                            .cornerRadius(8)
+                        }
+                    }
+                    
+                    if let musicbrainzURL = musicbrainzURL, let url = URL(string: musicbrainzURL) {
+                        Link(destination: url) {
+                            VStack(spacing: 4) {
+                                Image(systemName: "music.mic.circle.fill")
+                                    .font(.title2)
+                                    .foregroundColor(JazzTheme.brass)
+                                Text("MusicBrainz")
+                                    .font(.caption)
+                                    .foregroundColor(JazzTheme.smokeGray)
+                            }
                         }
                     }
                 }
+                .padding(.top, 4)
             }
             .padding()
-            .background(JazzTheme.cream.opacity(0.3))
-            .cornerRadius(12)
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(JazzTheme.brass.opacity(0.3), lineWidth: 1)
-            )
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(JazzTheme.cardBackground)
+            .cornerRadius(10)
             .padding(.horizontal)
         }
     }
 }
 
+// MARK: - Song Detail View
 struct SongDetailView: View {
     let songId: String
     @State private var song: Song?
@@ -162,10 +165,11 @@ struct SongDetailView: View {
                             .background(JazzTheme.cardBackground)
                             .cornerRadius(10)
                         }
+                        
                         // External References Panel
                         ExternalReferencesPanel(
                             externalReferences: song.externalReferences,
-                            musicbrainzId: song.musicbrainzId  // ← NEW
+                            musicbrainzId: song.musicbrainzId
                         )
                         
                     }
@@ -226,6 +230,9 @@ struct SongDetailView: View {
         }
         .background(JazzTheme.backgroundLight)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(JazzTheme.burgundy, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
+        .toolbarColorScheme(.dark, for: .navigationBar)
         .task {
             #if DEBUG
             if ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1" {
