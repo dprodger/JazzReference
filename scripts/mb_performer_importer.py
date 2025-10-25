@@ -358,9 +358,15 @@ class PerformerImporter:
         Returns:
             Number of performers linked
         """
-        # Parse artist credits (for fallback if no relationships)
+        # Parse artist credits to identify the leader(s)
         artists_from_credits = self.parse_artist_credits(recording_data.get('artist-credit', []))
         logger.debug(f"      Parsed {len(artists_from_credits)} artists from recording credits")
+        
+        # Create a set of leader MBIDs and names for quick lookup
+        leader_mbids = {a['mbid'] for a in artists_from_credits if a['mbid']}
+        leader_names = {a['name'].lower() for a in artists_from_credits if a['name']}
+        
+        logger.debug(f"      Leaders from artist-credit: {', '.join([a['name'] for a in artists_from_credits])}")
         
         # Parse artist relationships to get instrument information
         relations = recording_data.get('relations', [])
@@ -399,8 +405,22 @@ class PerformerImporter:
             logger.info(f"[DRY RUN]   Performers:")
             for p in performers_to_import:
                 role_str = p.get('role', 'performer')
-                instruments_str = ', '.join(p['instruments']) if p['instruments'] else f'{role_str} (no instruments)'
-                logger.info(f"[DRY RUN]     - {p['name']} ({instruments_str})")
+                
+                # Determine if this is a leader based on artist-credit
+                is_leader = (
+                    (p.get('mbid') and p['mbid'] in leader_mbids) or
+                    (p.get('name') and p['name'].lower() in leader_names)
+                )
+                
+                if is_leader:
+                    role_display = 'leader'
+                elif role_str in ['engineer', 'producer', 'vocal', 'mix', 'mastering']:
+                    role_display = role_str
+                else:
+                    role_display = 'sideman'
+                
+                instruments_str = ', '.join(p['instruments']) if p['instruments'] else f'{role_display}'
+                logger.info(f"[DRY RUN]     - {p['name']} ({role_display} - {instruments_str})")
             return len(performers_to_import)
         
         performers_linked = 0
@@ -428,14 +448,21 @@ class PerformerImporter:
                         logger.debug(f"  Skipping {performer_data['name']} - already linked to this recording")
                         continue
                     
-                    # Determine role: first performer is leader, others are sidemen
-                    # Unless they have a specific role like 'engineer' or 'producer'
+                    # Determine role based on artist-credit, not position in list
                     performer_role = performer_data.get('role', 'performer')
+                    performer_mbid = performer_data.get('mbid')
+                    performer_name = performer_data.get('name', '')
+                    
+                    # Check if this performer is in the artist-credit (they're a leader)
+                    is_leader = (
+                        (performer_mbid and performer_mbid in leader_mbids) or
+                        (performer_name and performer_name.lower() in leader_names)
+                    )
                     
                     if performer_role in ['engineer', 'producer', 'vocal', 'mix', 'mastering']:
                         # These are technical/production roles, not performance roles
-                        db_role = 'other'  # Or map to your database's role enum
-                    elif i == 0:
+                        db_role = 'other'
+                    elif is_leader:
                         db_role = 'leader'
                     else:
                         db_role = 'sideman'
