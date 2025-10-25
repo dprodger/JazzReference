@@ -2,7 +2,7 @@
 //  SongDetailView.swift
 //  JazzReference
 //
-//  Updated with Spotify filtering, icons, external references panel, and toolbar styling
+//  Updated with instrument filtering capability
 //
 
 import SwiftUI
@@ -21,15 +21,52 @@ struct SongDetailView: View {
     @State private var isLoading = true
     @State private var selectedFilter: SongRecordingFilter = .withSpotify
     
+    // Instrument filter states
+    @State private var selectedInstrument: String? = nil
+    @State private var isInstrumentFilterExpanded: Bool = false
+    
+    // Extract unique instruments from recordings
+    var availableInstruments: [String] {
+        guard let recordings = song?.recordings else { return [] }
+        
+        var instruments = Set<String>()
+        for recording in recordings {
+            if let performers = recording.performers {
+                for performer in performers {
+                    if let instrument = performer.instrument {
+                        instruments.insert(instrument)
+                    }
+                }
+            }
+        }
+        
+        return instruments.sorted()
+    }
+    
+    // Apply filters in order: first instrument, then Spotify
     var filteredRecordings: [Recording] {
         guard let recordings = song?.recordings else { return [] }
         
+        // First, apply instrument filter if selected
+        var result = recordings
+        if let instrument = selectedInstrument {
+            result = result.filter { recording in
+                guard let performers = recording.performers else { return false }
+                return performers.contains { performer in
+                    performer.instrument == instrument
+                }
+            }
+        }
+        
+        // Then, apply Spotify filter
         switch selectedFilter {
         case .withSpotify:
-            return recordings.filter { $0.spotifyUrl != nil }
+            result = result.filter { $0.spotifyUrl != nil }
         case .all:
-            return recordings
+            break
         }
+        
+        return result
     }
     
     var body: some View {
@@ -97,13 +134,99 @@ struct SongDetailView: View {
                             entityId: song.id,
                             entityName: song.title
                         )
-                        
                     }
                     .padding()
                     
                     Divider()
                         .padding(.horizontal)
                     
+                    // MARK: - NEW INSTRUMENT FILTER
+                    // Collapsible Instrument Filter (between Learn More and Spotify filter)
+                    if !availableInstruments.isEmpty {
+                        VStack(alignment: .leading, spacing: 0) {
+                            DisclosureGroup(
+                                isExpanded: $isInstrumentFilterExpanded,
+                                content: {
+                                    VStack(alignment: .leading, spacing: 12) {
+                                        // Clear filter button if instrument is selected
+                                        if selectedInstrument != nil {
+                                            Button(action: {
+                                                selectedInstrument = nil
+                                            }) {
+                                                HStack {
+                                                    Image(systemName: "xmark.circle.fill")
+                                                        .foregroundColor(JazzTheme.burgundy)
+                                                    Text("Show All Instruments")
+                                                        .foregroundColor(JazzTheme.burgundy)
+                                                }
+                                                .padding(.vertical, 8)
+                                            }
+                                        }
+                                        
+                                        // Instrument buttons
+                                        ForEach(availableInstruments, id: \.self) { instrument in
+                                            Button(action: {
+                                                if selectedInstrument == instrument {
+                                                    selectedInstrument = nil
+                                                } else {
+                                                    selectedInstrument = instrument
+                                                }
+                                            }) {
+                                                HStack {
+                                                    Image(systemName: selectedInstrument == instrument ? "checkmark.circle.fill" : "circle")
+                                                        .foregroundColor(selectedInstrument == instrument ? JazzTheme.brass : JazzTheme.smokeGray)
+                                                    Text(instrument)
+                                                        .foregroundColor(JazzTheme.charcoal)
+                                                    Spacer()
+                                                }
+                                                .padding(.vertical, 8)
+                                                .padding(.horizontal, 12)
+                                                .background(
+                                                    selectedInstrument == instrument
+                                                        ? JazzTheme.brass.opacity(0.1)
+                                                        : Color.clear
+                                                )
+                                                .cornerRadius(8)
+                                            }
+                                        }
+                                    }
+                                    .padding(.top, 8)
+                                },
+                                label: {
+                                    HStack {
+                                        Image(systemName: "guitars.fill")
+                                            .foregroundColor(JazzTheme.brass)
+                                        Text("Filter by Instrument")
+                                            .font(.headline)
+                                            .foregroundColor(JazzTheme.charcoal)
+                                        
+                                        if let instrument = selectedInstrument {
+                                            Spacer()
+                                            Text(instrument)
+                                                .font(.subheadline)
+                                                .foregroundColor(JazzTheme.brass)
+                                                .padding(.horizontal, 8)
+                                                .padding(.vertical, 4)
+                                                .background(JazzTheme.brass.opacity(0.2))
+                                                .cornerRadius(6)
+                                        }
+                                    }
+                                    .padding(.vertical, 8)
+                                }
+                            )
+                            .tint(JazzTheme.brass)
+                            .padding(.horizontal)
+                            .padding(.vertical, 8)
+                        }
+                        .background(JazzTheme.cardBackground)
+                        .cornerRadius(10)
+                        .padding(.horizontal)
+                        
+                        Divider()
+                            .padding(.horizontal)
+                    }
+                    
+                    // MARK: - EXISTING SPOTIFY FILTER
                     // Recording Filter Picker
                     VStack(spacing: 0) {
                         Picker("Filter", selection: $selectedFilter) {
@@ -126,39 +249,45 @@ struct SongDetailView: View {
                     }
                     
                     // Recordings List
-                    VStack(spacing: 8) {
+                    VStack(alignment: .leading, spacing: 12) {
                         if !filteredRecordings.isEmpty {
                             ForEach(filteredRecordings) { recording in
                                 NavigationLink(destination: RecordingDetailView(recordingId: recording.id)) {
                                     RecordingRowView(recording: recording)
                                 }
-                                .buttonStyle(PlainButtonStyle())
+                                .buttonStyle(.plain)
                             }
                         } else {
-                            Text(selectedFilter == .withSpotify ?
-                                 "No recordings with Spotify available" :
-                                 "No recordings available")
-                                .foregroundColor(JazzTheme.smokeGray)
-                                .padding()
+                            VStack(spacing: 12) {
+                                Image(systemName: "music.note.slash")
+                                    .font(.system(size: 48))
+                                    .foregroundColor(JazzTheme.smokeGray.opacity(0.5))
+                                Text("No recordings match the current filters")
+                                    .font(.subheadline)
+                                    .foregroundColor(JazzTheme.smokeGray)
+                                    .multilineTextAlignment(.center)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 40)
                         }
                     }
+                    .padding(.top)
                 }
+                .padding(.bottom)
             } else {
                 VStack {
                     Spacer()
                     Text("Song not found")
+                        .font(.title3)
                         .foregroundColor(JazzTheme.smokeGray)
                     Spacer()
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .frame(maxWidth: .infinity, minHeight: 300)
                 .background(JazzTheme.backgroundLight)
             }
         }
         .background(JazzTheme.backgroundLight)
         .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(JazzTheme.burgundy, for: .navigationBar)
-        .toolbarBackground(.visible, for: .navigationBar)
-        .toolbarColorScheme(.dark, for: .navigationBar)
         .task {
             #if DEBUG
             if ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1" {
@@ -176,14 +305,15 @@ struct SongDetailView: View {
     }
 }
 
-#Preview("Song with Recordings") {
+// MARK: - Previews
+#Preview("Song Detail - Full") {
     NavigationStack {
         SongDetailView(songId: "preview-song-1")
     }
 }
 
-#Preview("Song - Loading State") {
+#Preview("Song Detail - Minimal") {
     NavigationStack {
-        SongDetailView(songId: "loading-test")
+        SongDetailView(songId: "preview-song-2")
     }
 }
