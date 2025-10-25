@@ -16,6 +16,7 @@ import requests
 # Import shared database utilities
 sys.path.insert(0, '/mnt/project/scripts')
 from db_utils import get_db_connection
+from mb_performer_importer import PerformerImporter
 
 # Configure logging
 logging.basicConfig(
@@ -36,11 +37,11 @@ class MusicBrainzImporter:
             'User-Agent': 'JazzReference/1.0 (https://github.com/yourusername/jazzreference)',
             'Accept': 'application/json'
         })
+        self.performer_importer = PerformerImporter(dry_run=dry_run)
         self.stats = {
             'releases_found': 0,
             'releases_imported': 0,
             'releases_skipped': 0,
-            'performers_created': 0,
             'errors': 0
         }
    
@@ -168,10 +169,10 @@ class MusicBrainzImporter:
             return []
     
     def fetch_recording_detail(self, recording_id):
-        """Fetch detailed information about a specific recording"""
+        """Fetch detailed information about a specific recording including artist relationships"""
         url = f"https://musicbrainz.org/ws/2/recording/{recording_id}"
         params = {
-            'inc': 'releases+artist-credits',
+            'inc': 'releases+artist-credits+artist-rels',
             'fmt': 'json'
         }
         
@@ -211,69 +212,6 @@ class MusicBrainzImporter:
         except Exception as e:
             logger.warning(f"    ✗ Error fetching recording {recording_id}: {e}")
             return None
-    
-    def parse_artist_credits(self, artist_credits):
-        """Parse MusicBrainz artist credits into a list of artists"""
-        if not artist_credits:
-            return []
-        
-        artists = []
-        for credit in artist_credits:
-            if 'artist' in credit:
-                artist = credit['artist']
-                artists.append({
-                    'name': artist.get('name'),
-                    'mbid': artist.get('id'),
-                    'sort_name': artist.get('sort-name')
-                })
-        
-        return artists
-    
-    def get_or_create_performer(self, conn, artist_name, artist_mbid=None):
-        """Get existing performer or create new one"""
-        with conn.cursor() as cur:
-            # Try to find by MusicBrainz ID first
-            if artist_mbid:
-                cur.execute("""
-                    SELECT id, name FROM performers
-                    WHERE external_links->>'musicbrainz' = %s
-                """, (artist_mbid,))
-                result = cur.fetchone()
-                if result:
-                    logger.debug(f"Found performer by MBID: {artist_name}")
-                    return result['id']
-            
-            # Try to find by name
-            cur.execute("""
-                SELECT id, name FROM performers
-                WHERE name ILIKE %s
-            """, (artist_name,))
-            result = cur.fetchone()
-            
-            if result:
-                logger.debug(f"Found existing performer: {artist_name}")
-                return result['id']
-            
-            # Create new performer
-            if self.dry_run:
-                logger.info(f"[DRY RUN] Would create performer: {artist_name}")
-                return None
-            
-            external_links = {}
-            if artist_mbid:
-                external_links['musicbrainz'] = artist_mbid
-            
-            cur.execute("""
-                INSERT INTO performers (name, external_links)
-                VALUES (%s, %s)
-                RETURNING id
-            """, (artist_name, json.dumps(external_links)))
-            
-            performer_id = cur.fetchone()['id']
-            logger.info(f"Created new performer: {artist_name} (ID: {performer_id})")
-            self.stats['performers_created'] += 1
-            
-            return performer_id
     
     def check_recording_exists(self, conn, song_id, album_title):
         """Check if a recording already exists"""
@@ -333,13 +271,11 @@ class MusicBrainzImporter:
                 logger.debug(f"Could not parse date: {release_date}")
                 pass
         
-        # Parse artists
-        artists = self.parse_artist_credits(recording_data.get('artist-credit', []))
-        
         if self.dry_run:
             logger.info(f"[DRY RUN] Would import: {album_title} ({release_year or 'unknown year'})")
-            logger.info(f"[DRY RUN]   Artists: {', '.join([a['name'] for a in artists])}")
             logger.info(f"[DRY RUN]   Date: {formatted_date or 'None'}")
+            # Show performer info that would be imported
+            self.performer_importer.link_performers_to_recording(conn, None, recording_data)
             self.stats['releases_found'] += 1
             return True
         
@@ -356,7 +292,7 @@ class MusicBrainzImporter:
                 song_id,
                 album_title,
                 release_year,
-                formatted_date,  # Use properly formatted date or None
+                formatted_date,
                 False,  # Not canonical by default
                 f"Imported from MusicBrainz - Recording ID: {recording_data.get('id')}"
             ))
@@ -364,25 +300,8 @@ class MusicBrainzImporter:
             recording_id = cur.fetchone()['id']
             logger.info(f"✓ Imported recording: {album_title} (ID: {recording_id})")
             
-            # Link performers
-            for i, artist in enumerate(artists):
-                performer_id = self.get_or_create_performer(
-                    conn,
-                    artist['name'],
-                    artist.get('mbid')
-                )
-                
-                if performer_id:
-                    role = 'leader' if i == 0 else 'sideman'
-                    cur.execute("""
-                        INSERT INTO recording_performers (
-                            recording_id, performer_id, role
-                        )
-                        VALUES (%s, %s, %s)
-                        ON CONFLICT DO NOTHING
-                    """, (recording_id, performer_id, role))
-                    
-                    logger.debug(f"  Linked performer: {artist['name']} ({role})")
+            # Link performers using shared importer
+            self.performer_importer.link_performers_to_recording(conn, recording_id, recording_data)
             
             conn.commit()
             self.stats['releases_imported'] += 1
@@ -453,7 +372,8 @@ class MusicBrainzImporter:
         logger.info(f"Recordings found:    {self.stats['releases_found'] + self.stats['releases_imported']}")
         logger.info(f"Recordings imported: {self.stats['releases_imported']}")
         logger.info(f"Recordings skipped:  {self.stats['releases_skipped']} (already exist)")
-        logger.info(f"Performers created:  {self.stats['performers_created']}")
+        logger.info(f"Performers created:  {self.performer_importer.stats['performers_created']}")
+        logger.info(f"Instruments created: {self.performer_importer.stats['instruments_created']}")
         logger.info(f"Errors:              {self.stats['errors']}")
         logger.info("="*80)
         
