@@ -9,13 +9,26 @@ import logging
 import requests
 from bs4 import BeautifulSoup
 import re
+import os
+import json
+import hashlib
+from datetime import datetime, timedelta
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
 class WikipediaSearcher:
-    """Shared Wikipedia search functionality"""
+    """Shared Wikipedia search functionality with caching"""
     
-    def __init__(self):
+    def __init__(self, cache_dir='cache/wikipedia', cache_days=7, force_refresh=False):
+        """
+        Initialize Wikipedia searcher with caching support
+        
+        Args:
+            cache_dir: Directory to store cached Wikipedia pages
+            cache_days: Number of days before cache is considered stale
+            force_refresh: If True, always fetch fresh data ignoring cache
+        """
         self.session = requests.Session()
         self.session.headers.update({
             'User-Agent': 'JazzReference/1.0 (https://github.com/yourusername/jazzreference)',
@@ -25,6 +38,143 @@ class WikipediaSearcher:
         # Rate limiting
         self.last_request_time = 0
         self.min_request_interval = 1.0
+        
+        # Cache configuration
+        self.cache_dir = Path(cache_dir)
+        self.cache_days = cache_days
+        self.force_refresh = force_refresh
+        
+        # Create cache directory if it doesn't exist
+        self.cache_dir.mkdir(parents=True, exist_ok=True)
+        
+        logger.debug(f"Wikipedia cache: {self.cache_dir} (expires after {cache_days} days, force_refresh={force_refresh})")
+    
+    def _get_cache_path(self, url):
+        """
+        Get the cache file path for a Wikipedia URL
+        
+        Args:
+            url: Wikipedia URL
+            
+        Returns:
+            Path object for the cache file
+        """
+        # Create a safe filename from the URL using hash
+        url_hash = hashlib.md5(url.encode()).hexdigest()
+        # Also include a human-readable part from the URL
+        url_part = url.split('/')[-1][:50]  # Last part of URL, max 50 chars
+        filename = f"{url_part}_{url_hash}.json"
+        return self.cache_dir / filename
+    
+    def _is_cache_valid(self, cache_path):
+        """
+        Check if cache file exists and is not expired
+        
+        Args:
+            cache_path: Path to cache file
+            
+        Returns:
+            bool: True if cache is valid and not expired
+        """
+        if not cache_path.exists():
+            return False
+        
+        # Check file modification time
+        mtime = datetime.fromtimestamp(cache_path.stat().st_mtime)
+        age = datetime.now() - mtime
+        
+        is_valid = age.days < self.cache_days
+        if is_valid:
+            logger.debug(f"Cache valid (age: {age.days} days): {cache_path.name}")
+        else:
+            logger.debug(f"Cache expired (age: {age.days} days): {cache_path.name}")
+        
+        return is_valid
+    
+    def _load_from_cache(self, url):
+        """
+        Load Wikipedia page content from cache
+        
+        Args:
+            url: Wikipedia URL
+            
+        Returns:
+            dict with 'html' and 'fetched_at', or None if not in cache
+        """
+        cache_path = self._get_cache_path(url)
+        
+        if not self._is_cache_valid(cache_path):
+            return None
+        
+        try:
+            with open(cache_path, 'r', encoding='utf-8') as f:
+                cache_data = json.load(f)
+                logger.debug(f"Loaded from cache: {url}")
+                return cache_data
+        except Exception as e:
+            logger.warning(f"Failed to load cache file {cache_path}: {e}")
+            return None
+    
+    def _save_to_cache(self, url, html_content):
+        """
+        Save Wikipedia page content to cache
+        
+        Args:
+            url: Wikipedia URL
+            html_content: HTML content to cache
+        """
+        cache_path = self._get_cache_path(url)
+        
+        try:
+            cache_data = {
+                'url': url,
+                'html': html_content,
+                'fetched_at': datetime.now().isoformat()
+            }
+            
+            with open(cache_path, 'w', encoding='utf-8') as f:
+                json.dump(cache_data, f, ensure_ascii=False, indent=2)
+            
+            logger.debug(f"Saved to cache: {url}")
+        except Exception as e:
+            logger.warning(f"Failed to save cache file {cache_path}: {e}")
+    
+    def _fetch_wikipedia_page(self, url):
+        """
+        Fetch Wikipedia page, using cache if available
+        
+        Args:
+            url: Wikipedia URL to fetch
+            
+        Returns:
+            HTML content as string, or None if fetch failed
+        """
+        # Check cache first (unless force_refresh is enabled)
+        if not self.force_refresh:
+            cached = self._load_from_cache(url)
+            if cached:
+                logger.info(f"  Using cached Wikipedia page (fetched: {cached['fetched_at'][:10]})")
+                return cached['html']
+        
+        # Fetch from Wikipedia
+        logger.info(f"  Fetching from Wikipedia...")
+        self.rate_limit()
+        
+        try:
+            response = self.session.get(url, timeout=10)
+            
+            if response.status_code != 200:
+                logger.warning(f"Wikipedia returned status code {response.status_code}")
+                return None
+            
+            # Save to cache
+            self._save_to_cache(url, response.text)
+            
+            return response.text
+            
+        except requests.RequestException as e:
+            logger.error(f"Error fetching Wikipedia URL {url}: {e}")
+            return None
     
     def rate_limit(self):
         """Enforce rate limiting for Wikipedia API"""
@@ -49,19 +199,18 @@ class WikipediaSearcher:
         try:
             logger.debug(f"Verifying Wikipedia URL: {wikipedia_url}")
             
-            # Check if URL is reachable
-            response = self.session.get(wikipedia_url, timeout=10)
-            time.sleep(1.0)  # Rate limiting
+            # Fetch page (from cache if available)
+            html_content = self._fetch_wikipedia_page(wikipedia_url)
             
-            if response.status_code != 200:
+            if not html_content:
                 return {
                     'valid': False,
                     'confidence': 'certain',
-                    'reason': f'URL returned status code {response.status_code}'
+                    'reason': 'Failed to fetch Wikipedia page'
                 }
             
             # Parse the page
-            soup = BeautifulSoup(response.text, 'html.parser')
+            soup = BeautifulSoup(html_content, 'html.parser')
             
             # Get the main content area (skip navigation/menus)
             content_div = soup.find('div', {'id': 'mw-content-text'}) or soup.find('div', {'class': 'mw-parser-output'})
@@ -323,10 +472,9 @@ class WikipediaSearcher:
                 'format': 'json'
             }
             
+            self.rate_limit()
             response = self.session.get(search_url, params=params, timeout=10)
-            time.sleep(1.0)
-
-            logger.info            
+            
             if response.status_code != 200:
                 return None
             

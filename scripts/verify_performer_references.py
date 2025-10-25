@@ -36,7 +36,7 @@ logger = logging.getLogger(__name__)
 class PerformerReferenceVerifier:
     """Verify and update external references for performers"""
     
-    def __init__(self, dry_run=False, name_filter=None, id_filter=None, reftype_filter=None, only_new=False):
+    def __init__(self, dry_run=False, name_filter=None, id_filter=None, reftype_filter=None, only_new=False, force_refresh=False):
         """
         Initialize verifier
         
@@ -46,12 +46,15 @@ class PerformerReferenceVerifier:
             id_filter: If provided, only process performer with this UUID
             reftype_filter: If provided, only check this reference type ('wikipedia' or 'musicbrainz')
             only_new: If True, only process performers missing the specified reference type(s)
+            force_refresh: If True, bypass Wikipedia cache and fetch fresh data
         """
         self.dry_run = dry_run
         self.name_filter = name_filter
         self.id_filter = id_filter
         self.reftype_filter = reftype_filter
         self.only_new = only_new
+        self.force_refresh = force_refresh
+        
         self.session = requests.Session()
         self.session.headers.update({
             'User-Agent': 'JazzReference/1.0 (Educational)',
@@ -68,7 +71,11 @@ class PerformerReferenceVerifier:
             'errors': 0
         }
         
-        self.wiki_searcher = WikipediaSearcher()
+        self.wiki_searcher = WikipediaSearcher(
+            cache_dir='cache/wikipedia',
+            cache_days=7,
+            force_refresh=force_refresh
+        )
     
     def get_performers(self):
         """Get all performers from database with their recordings for context"""
@@ -315,6 +322,10 @@ class PerformerReferenceVerifier:
         """
         if self.dry_run:
             logger.info(f"    [DRY RUN] Would update references: {json.dumps(new_refs)}")
+            return True
+
+        if self.force_refresh:
+            logger.info(f"    FORCE REFRESH MODE - Bypassing Wikipedia cache ***")
             return True
         
         try:
@@ -632,7 +643,10 @@ Examples:
   
   # Enable debug logging
   python verify_performer_references.py --debug
-  
+
+  # Force refresh Wikipedia pages (bypass cache)
+  python verify_performer_references.py --force-refresh
+    
   # Combination
   python verify_performer_references.py --name "Miles Davis" --dry-run --debug
 
@@ -641,6 +655,7 @@ This script:
 2. Searches for missing references
 3. Updates the database with newly found references
 4. Removes references with score 0 or very_low confidence (unless --dry-run)
+5. Caches Wikipedia pages for 7 days (use --force-refresh to bypass cache)
         """
     )
     
@@ -668,6 +683,12 @@ This script:
     )
     
     parser.add_argument(
+        '--force-refresh',
+        action='store_true',
+        help='Bypass Wikipedia cache and fetch fresh data from Wikipedia'
+    )
+    
+    parser.add_argument(
         '--dry-run',
         action='store_true',
         help='Show what would be done without making changes'
@@ -691,7 +712,9 @@ This script:
         name_filter=args.name,
         id_filter=args.id,
         reftype_filter=args.reftype,
-        only_new=args.onlynew
+        only_new=args.onlynew,
+        force_refresh=args.force_refresh
+        
     )
     
     try:

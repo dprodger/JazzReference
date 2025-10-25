@@ -39,6 +39,9 @@ from db_utils import (
     get_performer_images
 )
 
+# Import Wikipedia utilities with caching
+from wiki_utils import WikipediaSearcher
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -65,13 +68,21 @@ class ImageData:
 class ImageFetcher:
     """Handles fetching images from various sources."""
     
-    def __init__(self, dry_run: bool = False, debug: bool = False):
+    def __init__(self, dry_run: bool = False, debug: bool = False, force_refresh: bool = False):
         self.dry_run = dry_run
         self.debug = debug
+        self.force_refresh = force_refresh
         self.session = requests.Session()
         self.session.headers.update({
             'User-Agent': 'JazzReferenceApp/1.0 (Educational; Contact: support@jazzreference.app)'
         })
+        
+        # Initialize Wikipedia searcher with caching
+        self.wiki_searcher = WikipediaSearcher(
+            cache_dir='cache/wikipedia',
+            cache_days=7,
+            force_refresh=force_refresh
+        )
         
         if debug:
             logger.setLevel(logging.DEBUG)
@@ -294,13 +305,15 @@ class ImageFetcher:
         try:
             logger.debug(f"Scraping page HTML: {page_url}")
             
-            # Fetch the page HTML
-            response = self.session.get(page_url, timeout=10)
-            response.raise_for_status()
-            time.sleep(1.0)  # Rate limiting
+            # Fetch the page HTML (using cache if available)
+            html_content = self.wiki_searcher._fetch_wikipedia_page(page_url)
+            
+            if not html_content:
+                logger.info(f"Failed to fetch Wikipedia page for {artist_name}")
+                return None
             
             # Parse with BeautifulSoup
-            soup = BeautifulSoup(response.text, 'html.parser')
+            soup = BeautifulSoup(html_content, 'html.parser')
             
             # Look for image in the infobox
             infobox = soup.find('table', {'class': 'infobox'})
@@ -708,6 +721,9 @@ Examples:
     # Dry run (don't save to database)
     python fetch_artist_images.py --name "John Coltrane" --dry-run
     
+    # Force refresh Wikipedia pages (bypass cache)
+    python fetch_artist_images.py --name "Miles Davis" --force-refresh
+    
     # Enable debug logging
     python fetch_artist_images.py --name "Thelonious Monk" --debug
         """
@@ -723,12 +739,17 @@ Examples:
                        help='Show what would be done without making changes')
     parser.add_argument('--debug', action='store_true',
                        help='Enable debug logging')
+    parser.add_argument('--force-refresh', action='store_true',
+                       help='Bypass Wikipedia cache and fetch fresh data from Wikipedia')
     
     args = parser.parse_args()
     
     # Create fetcher and database manager
-    fetcher = ImageFetcher(dry_run=args.dry_run, debug=args.debug)
+    fetcher = ImageFetcher(dry_run=args.dry_run, debug=args.debug, force_refresh=args.force_refresh)
     db_manager = ImageDatabaseManager(dry_run=args.dry_run, debug=args.debug)
+    
+    if args.force_refresh:
+        logger.info("*** FORCE REFRESH MODE - Bypassing Wikipedia cache ***")
     
     # Determine which performers to process
     performers = []
