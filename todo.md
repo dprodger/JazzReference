@@ -2,11 +2,13 @@ things to do:
 App
 * hook up bad-link logging on images
 * fix the default (I type in a song name; get to that song; then go back -- the text box has my song name, but the page has no search restriction)
+* provide filters on the song detail view to filter to just those with certain instruments (or performers?)
 
 Backend Server
 * amend fetch_artist_images to use the wikipedia reference if it exists (rather than search)
 
 Data
+* Look into performer_discography vs. recording_performers
 * MusicBrainz release import doesn't seem to be getting all performers
 * for verify_performer_references -- provide a mode that explicitly removes references if they no longer pass the confidence threshhold
 	* look for a way to log whether a reference has been "hand-entered"
@@ -40,10 +42,6 @@ Data
 * running jazz_song_research, not sure I'm getting wikipedia on finding a new song
 * when gathering_mb_releases, store the MB id in the table
 
-
-
-Argument standardization:
-
 	
 Done:
 * amend fetch_artist_images to gather for all artists?
@@ -56,3 +54,22 @@ Done:
 * fix import_mb_releases to use --name or --id params, not just taking the name
 * add a single-song path for gather_mb_ids.py
 * check for propagation of DNS settings: Go here, for instance: http://linernotesjazz.com/docs
+
+
+
+
+
+Overall approach:
+
+for each entity, provide a script to "research them"
+-- if the entity has any or all of the canonical identifiers, there should be an option to 
+	verify whether with current search logic, we would get the same canonical identifiers
+-- if the entity does not have canonical identifiers, we should capture and store them
+
+--if the entity has valid identifiers, there should be an option to:
+	-- verify against best search logic
+	-- only add new
+	-- remove all and populate with best-available
+	
+Maybe start this with artist
+	
