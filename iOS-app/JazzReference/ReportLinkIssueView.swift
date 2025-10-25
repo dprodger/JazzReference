@@ -20,44 +20,103 @@ struct ReportLinkIssueView: View {
     
     var body: some View {
         NavigationView {
-            Form {
-                Section {
-                    Text("Report a problem with this external reference link")
-                        .font(.subheadline)
-                        .foregroundColor(JazzTheme.smokeGray)
-                }
-                
-                Section(header: Text("Entity Information")) {
-                    LabeledContent("Type", value: entityType)
-                    LabeledContent("Name", value: entityName)
-                    LabeledContent("ID", value: entityId)
-                        .font(.caption)
-                        .foregroundColor(JazzTheme.smokeGray)
-                }
-                
-                Section(header: Text("External Reference")) {
-                    LabeledContent("Source", value: externalSource)
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("URL")
-                            .font(.caption)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    // Header section with description
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Report a Problem")
+                            .font(.title3)
+                            .fontWeight(.semibold)
+                            .foregroundColor(JazzTheme.charcoal)
+                        
+                        Text("Help us improve the quality of our external references by reporting broken or incorrect links.")
+                            .font(.subheadline)
                             .foregroundColor(JazzTheme.smokeGray)
-                        Text(externalUrl)
-                            .font(.caption)
-                            .foregroundColor(JazzTheme.smokeGray)
-                            .lineLimit(3)
                     }
-                }
-                
-                Section(header: Text("Issue Description")) {
-                    TextEditor(text: $explanation)
-                        .frame(minHeight: 100)
-                        .font(.body)
+                    .padding()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(JazzTheme.cardBackground)
+                    .cornerRadius(10)
                     
-                    Text("Please describe the issue with this link (e.g., broken link, incorrect information, wrong page)")
-                        .font(.caption)
-                        .foregroundColor(JazzTheme.smokeGray)
+                    // Entity Information Card
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("About This \(entityType)")
+                            .font(.headline)
+                            .foregroundColor(JazzTheme.charcoal)
+                        
+                        VStack(alignment: .leading, spacing: 8) {
+                            IssueInfoRow(label: "Name", value: entityName)
+                            IssueInfoRow(label: "Type", value: entityType)
+                            IssueInfoRow(label: "ID", value: entityId, isMonospace: true)
+                        }
+                    }
+                    .padding()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(JazzTheme.cardBackground)
+                    .cornerRadius(10)
+                    
+                    // External Reference Card
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("External Link")
+                            .font(.headline)
+                            .foregroundColor(JazzTheme.charcoal)
+                        
+                        VStack(alignment: .leading, spacing: 8) {
+                            IssueInfoRow(label: "Source", value: externalSource)
+                            
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("URL")
+                                    .font(.caption)
+                                    .fontWeight(.medium)
+                                    .foregroundColor(JazzTheme.smokeGray)
+                                
+                                Text(externalUrl)
+                                    .font(.caption)
+                                    .foregroundColor(JazzTheme.burgundy)
+                                    .lineLimit(3)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+                    }
+                    .padding()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(JazzTheme.cardBackground)
+                    .cornerRadius(10)
+                    
+                    // Issue Description Section (the only editable part)
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Describe the Issue")
+                            .font(.headline)
+                            .foregroundColor(JazzTheme.charcoal)
+                        
+                        Text("Please explain what's wrong with this link")
+                            .font(.caption)
+                            .foregroundColor(JazzTheme.smokeGray)
+                        
+                        TextEditor(text: $explanation)
+                            .frame(minHeight: 120)
+                            .font(.body)
+                            .padding(8)
+                            .background(Color(UIColor.systemBackground))
+                            .cornerRadius(8)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .stroke(JazzTheme.smokeGray.opacity(0.3), lineWidth: 1)
+                            )
+                        
+                        Text("Examples: broken link, incorrect information, wrong page, outdated content")
+                            .font(.caption)
+                            .foregroundColor(JazzTheme.smokeGray)
+                            .italic()
+                    }
+                    .padding()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(JazzTheme.cardBackground)
+                    .cornerRadius(10)
                 }
+                .padding()
             }
+            .background(Color(UIColor.systemGroupedBackground))
             .navigationTitle("Report Link Issue")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -72,8 +131,29 @@ struct ReportLinkIssueView: View {
                         onSubmit(explanation)
                     }
                     .disabled(explanation.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .fontWeight(.semibold)
                 }
             }
+        }
+    }
+}
+
+// MARK: - Helper View for Info Rows
+struct IssueInfoRow: View {
+    let label: String
+    let value: String
+    var isMonospace: Bool = false
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(label)
+                .font(.caption)
+                .fontWeight(.medium)
+                .foregroundColor(JazzTheme.smokeGray)
+            
+            Text(value)
+                .font(isMonospace ? .system(.body, design: .monospaced) : .body)
+                .foregroundColor(JazzTheme.charcoal)
         }
     }
 }
