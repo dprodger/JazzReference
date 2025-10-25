@@ -77,3 +77,19 @@ struct ReportLinkIssueView: View {
         }
     }
 }
+
+#Preview {
+    ReportLinkIssueView(
+        entityType: "Song",
+        entityId: "preview-song-1",
+        entityName: "Take Five",
+        externalSource: "Wikipedia",
+        externalUrl: "https://en.wikipedia.org/wiki/Take_Five",
+        onSubmit: { explanation in
+            print("Submitted: \(explanation)")
+        },
+        onCancel: {
+            print("Cancelled")
+        }
+    )
+}
