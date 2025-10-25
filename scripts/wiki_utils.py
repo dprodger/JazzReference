@@ -193,7 +193,7 @@ class WikipediaSearcher:
                     'bandleader', 'blues', 'soul', 'r&b', 'gospel', 'folk',
                     'instruments', 'genres', 'labels'
                 ]
-                found_specific_terms = [term for term in specific_music_terms if term in infobox_text]
+                found_specific_terms = [term for term in specific_music_terms if self._word_in_text(term, infobox_text)]
                 if found_specific_terms:
                     confidence_score += 40  # Strong signal
                     reasons.append(f"Infobox contains music terms: {', '.join(found_specific_terms[:3])}")
@@ -217,9 +217,10 @@ class WikipediaSearcher:
                 'music', 'song', 'performance', 'concert', 'stage'
             ]
             
-            # Search in first 2000 characters
-            found_specific = [kw for kw in specific_music_keywords if kw in page_text[:2000]]
-            found_generic = [kw for kw in generic_music_keywords if kw in page_text[:2000]]
+            # Search in first 2000 characters using word boundary matching
+            # FIXED: Use word boundaries to avoid matching "opera" in "operating"
+            found_specific = [kw for kw in specific_music_keywords if self._word_in_text(kw, page_text[:2000])]
+            found_generic = [kw for kw in generic_music_keywords if self._word_in_text(kw, page_text[:2000])]
             
             if found_specific:
                 # Specific music terms get full points
@@ -283,7 +284,21 @@ class WikipediaSearcher:
                 'reason': f'Verification error: {str(e)}'
             }
     
-
+    def _word_in_text(self, word, text):
+        """
+        Check if a word exists in text as a complete word (not as part of another word)
+        
+        Args:
+            word: The word to search for (case-insensitive)
+            text: The text to search in (should already be lowercased)
+            
+        Returns:
+            bool: True if word is found as a complete word
+        """
+        # Use word boundary regex to match only complete words
+        # \b ensures we match whole words only
+        pattern = r'\b' + re.escape(word.lower()) + r'\b'
+        return bool(re.search(pattern, text.lower()))
 
 
     def search_wikipedia(self, performer_name, context):
@@ -339,4 +354,3 @@ class WikipediaSearcher:
         except Exception as e:
             logger.error(f"Error searching Wikipedia for {performer_name}: {e}")
             return None
-    
