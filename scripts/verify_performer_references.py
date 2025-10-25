@@ -64,6 +64,7 @@ class PerformerReferenceVerifier:
             'invalid_references': 0,
             'missing_references': 0,
             'references_added': 0,
+            'references_removed': 0,  # ADDED: Track removed references
             'errors': 0
         }
         
@@ -145,7 +146,8 @@ class PerformerReferenceVerifier:
                 return {
                     'valid': False,
                     'confidence': 'certain',
-                    'reason': 'MusicBrainz ID not found (404)'
+                    'reason': 'MusicBrainz ID not found (404)',
+                    'score': 0
                 }
             elif response.status_code != 200:
                 return {
@@ -166,7 +168,8 @@ class PerformerReferenceVerifier:
                     return {
                         'valid': False,
                         'confidence': 'high',
-                        'reason': f'Name mismatch: DB has "{performer_name}", MusicBrainz has "{data.get("name")}"'
+                        'reason': f'Name mismatch: DB has "{performer_name}", MusicBrainz has "{data.get("name")}"',
+                        'score': 0
                     }
             
             # Check tags for jazz
@@ -183,7 +186,8 @@ class PerformerReferenceVerifier:
             return {
                 'valid': True,
                 'confidence': 'high' if confidence_score >= 70 else 'medium',
-                'reason': '; '.join(reasons)
+                'reason': '; '.join(reasons),
+                'score': confidence_score
             }
             
         except requests.RequestException as e:
@@ -330,6 +334,36 @@ class PerformerReferenceVerifier:
             logger.error(f"Error updating performer references: {e}", exc_info=True)
             return False
     
+    # ADDED: New method to remove a reference
+    def remove_performer_reference(self, performer_id, ref_type):
+        """
+        Remove a specific reference from external_links
+        
+        Args:
+            performer_id: UUID of the performer
+            ref_type: Reference type to remove ('wikipedia' or 'musicbrainz')
+        """
+        if self.dry_run:
+            logger.info(f"    [DRY RUN] Would remove {ref_type} reference")
+            return True
+        
+        try:
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    # Remove the specified key from the JSONB object
+                    cur.execute("""
+                        UPDATE performers
+                        SET external_links = external_links - %s,
+                            updated_at = CURRENT_TIMESTAMP
+                        WHERE id = %s
+                    """, (ref_type, performer_id))
+                    
+                    conn.commit()
+                    return True
+        except Exception as e:
+            logger.error(f"Error removing performer reference: {e}", exc_info=True)
+            return False
+    
     def process_performer(self, performer):
         """
         Process a single performer - verify existing references and/or find new ones
@@ -400,10 +434,29 @@ class PerformerReferenceVerifier:
                         logger.info(f"    {result['reason']}")
                         self.stats['valid_references'] += 1
                     else:
-                        logger.warning(f"  ✗ Wikipedia reference may be invalid (confidence: {result['confidence']}, score: {result.get('score', 0)})")
-                        logger.warning(f"    {result['reason']}")
-                        logger.warning(f"    NOT removing reference - manual review recommended")
-                        self.stats['invalid_references'] += 1
+                        # MODIFIED: Check if score is 0 or confidence is very_low - if so, remove it
+                        score = result.get('score', 0)
+                        confidence = result['confidence']
+                        
+                        if score == 0 or confidence == 'very_low':
+                            logger.warning(f"  ✗ Wikipedia reference is invalid (confidence: {confidence}, score: {score})")
+                            logger.warning(f"    {result['reason']}")
+                            logger.warning(f"  🗑️  REMOVING invalid Wikipedia reference")
+                            
+                            success = self.remove_performer_reference(performer['id'], 'wikipedia')
+                            if success:
+                                logger.info(f"  ✓ Wikipedia reference removed successfully")
+                                self.stats['references_removed'] += 1
+                            else:
+                                logger.error(f"  ✗ Failed to remove Wikipedia reference")
+                                self.stats['errors'] += 1
+                            
+                            self.stats['invalid_references'] += 1
+                        else:
+                            logger.warning(f"  ✗ Wikipedia reference may be invalid (confidence: {confidence}, score: {score})")
+                            logger.warning(f"    {result['reason']}")
+                            logger.warning(f"    NOT removing reference - manual review recommended")
+                            self.stats['invalid_references'] += 1
                 
                 if check_musicbrainz and musicbrainz_id:
                     logger.info(f"  Checking existing MusicBrainz: {musicbrainz_id}")
@@ -414,10 +467,29 @@ class PerformerReferenceVerifier:
                         logger.info(f"    {result['reason']}")
                         self.stats['valid_references'] += 1
                     else:
-                        logger.warning(f"  ✗ MusicBrainz reference may be invalid (confidence: {result['confidence']})")
-                        logger.warning(f"    {result['reason']}")
-                        logger.warning(f"    NOT removing reference - manual review recommended")
-                        self.stats['invalid_references'] += 1
+                        # MODIFIED: Check if score is 0 or confidence is very_low/certain - if so, remove it
+                        score = result.get('score', 0)
+                        confidence = result['confidence']
+                        
+                        if score == 0 or confidence in ['very_low', 'certain']:
+                            logger.warning(f"  ✗ MusicBrainz reference is invalid (confidence: {confidence}, score: {score})")
+                            logger.warning(f"    {result['reason']}")
+                            logger.warning(f"  🗑️  REMOVING invalid MusicBrainz reference")
+                            
+                            success = self.remove_performer_reference(performer['id'], 'musicbrainz')
+                            if success:
+                                logger.info(f"  ✓ MusicBrainz reference removed successfully")
+                                self.stats['references_removed'] += 1
+                            else:
+                                logger.error(f"  ✗ Failed to remove MusicBrainz reference")
+                                self.stats['errors'] += 1
+                            
+                            self.stats['invalid_references'] += 1
+                        else:
+                            logger.warning(f"  ✗ MusicBrainz reference may be invalid (confidence: {confidence}, score: {score})")
+                            logger.warning(f"    {result['reason']}")
+                            logger.warning(f"    NOT removing reference - manual review recommended")
+                            self.stats['invalid_references'] += 1
             
             # 2. Search for missing references
             if check_wikipedia and not wikipedia_url:
@@ -521,12 +593,14 @@ class PerformerReferenceVerifier:
         logger.info(f"Performers processed:     {self.stats['performers_processed']}")
         logger.info(f"Valid references:         {self.stats['valid_references']}")
         logger.info(f"Invalid references:       {self.stats['invalid_references']}")
+        logger.info(f"References removed:       {self.stats['references_removed']}")  # ADDED
         logger.info(f"Missing references:       {self.stats['missing_references']}")
         logger.info(f"New references added:     {self.stats['references_added']}")
         logger.info(f"Errors:                   {self.stats['errors']}")
         logger.info("=" * 80)
         
-        if self.stats['invalid_references'] > 0:
+        # MODIFIED: Update warning message
+        if self.stats['invalid_references'] > self.stats['references_removed']:
             logger.info("")
             logger.info("⚠️  Some references appear invalid - manual review recommended")
             logger.info("   Check the log file for details: log/verify_performer_references.log")
@@ -566,7 +640,7 @@ This script:
 1. Verifies existing Wikipedia and MusicBrainz references
 2. Searches for missing references
 3. Updates the database with newly found references
-4. Logs invalid references for manual review (does not remove them)
+4. Removes references with score 0 or very_low confidence (unless --dry-run)
         """
     )
     
