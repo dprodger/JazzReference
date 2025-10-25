@@ -4,4 +4,4 @@ backend/venv
 scripts/*.log
 scripts/__pcache__
 log
-
+scripts/cache/*
