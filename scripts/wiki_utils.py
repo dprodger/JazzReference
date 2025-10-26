@@ -232,7 +232,7 @@ class WikipediaSearcher:
         elapsed = time.time() - self.last_request_time
         if elapsed < self.min_request_interval:
             sleep_time = self.min_request_interval - elapsed
-            logger.info("sleeping in rate_limit")
+            logger.debug("sleeping in rate_limit")
             time.sleep(sleep_time)
         self.last_request_time = time.time()
 
@@ -517,7 +517,10 @@ class WikipediaSearcher:
             # Check cache first (unless force_refresh is enabled)
             if not self.force_refresh:
                 cached_results = self._load_search_from_cache(performer_name)
-                if cached_results:
+                if cached_results is not None:  # Changed from 'if cached_results:' to handle empty lists
+                    if not cached_results:  # Empty list means no results found previously
+                        logger.debug(f"  Using cached empty search results (no Wikipedia page found)")
+                        return None
                     logger.debug(f"  Using cached search results")
                     urls = cached_results
                 else:
@@ -539,6 +542,8 @@ class WikipediaSearcher:
                     
                     data = response.json()
                     if len(data) < 4 or not data[3]:
+                        # Cache empty results so we don't search again
+                        self._save_search_to_cache(performer_name, [])
                         return None
                     
                     urls = data[3]
@@ -577,6 +582,8 @@ class WikipediaSearcher:
                     logger.debug(f"    Reason: {verification['reason']}")
                     return url
             
+            # No valid URL found - cache empty results
+            self._save_search_to_cache(performer_name, [])
             return None
             
         except Exception as e:
