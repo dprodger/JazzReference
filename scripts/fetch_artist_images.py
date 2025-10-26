@@ -107,7 +107,7 @@ class ImageFetcher:
         try:
             # If we have a Wikipedia URL from the database, extract the page title
             if wikipedia_url:
-                logger.info(f"Using Wikipedia URL from database: {wikipedia_url}")
+                logger.debug(f"Using Wikipedia URL from database: {wikipedia_url}")
                 # Extract page title from URL like https://en.wikipedia.org/wiki/Miles_Davis
                 match = re.search(r'/wiki/(.+)$', wikipedia_url)
                 if match:
@@ -119,7 +119,7 @@ class ImageFetcher:
             
             # If no Wikipedia URL provided, search for the page
             if not wikipedia_url:
-                logger.info(f"Searching Wikipedia for {artist_name}...")
+                logger.debug(f"Searching Wikipedia for {artist_name}...")
                 
                 # Step 1: Search for the Wikipedia page
                 search_url = "https://en.wikipedia.org/w/api.php"
@@ -136,7 +136,7 @@ class ImageFetcher:
                 search_data = response.json()
                 
                 if not search_data.get('query', {}).get('search'):
-                    logger.info(f"No Wikipedia page found for {artist_name}")
+                    logger.debug(f"No Wikipedia page found for {artist_name}")
                     return None
                 
                 page_title = search_data['query']['search'][0]['title']
@@ -160,7 +160,7 @@ class ImageFetcher:
             
             pages = page_data.get('query', {}).get('pages', {})
             if not pages:
-                logger.info(f"No page data found for {page_title}")
+                logger.debug(f"No page data found for {page_title}")
                 return None
             
             page = next(iter(pages.values()))
@@ -236,7 +236,7 @@ class ImageFetcher:
                 height=height
             )
             
-            logger.info(f"✓ Found Wikipedia image: {image_url}")
+            logger.debug(f"✓ Found Wikipedia image: {image_url}")
             logger.debug(f"Image details: {image_data}")
             
             return image_data
@@ -325,14 +325,14 @@ class ImageFetcher:
             infobox = soup.find('table', {'class': 'infobox'})
             if not infobox:
                 logger.debug("No infobox found on page")
-                logger.info(f"No image found on Wikipedia page for {artist_name}")
+                logger.debug(f"No image found on Wikipedia page for {artist_name}")
                 return None
             
             # Find the first image in the infobox
             img_tag = infobox.find('img')
             if not img_tag or not img_tag.get('src'):
                 logger.debug("No image found in infobox")
-                logger.info(f"No image found on Wikipedia page for {artist_name}")
+                logger.debug(f"No image found on Wikipedia page for {artist_name}")
                 return None
             
             # Extract image URL
@@ -431,7 +431,7 @@ class ImageFetcher:
                 height=height
             )
             
-            logger.info(f"✓ Found Wikipedia image via HTML scraping: {full_img_url}")
+            logger.debug(f"✓ Found Wikipedia image via HTML scraping: {full_img_url}")
             logger.debug(f"Image details: {image_data}")
             
             return image_data
@@ -440,7 +440,7 @@ class ImageFetcher:
             logger.error(f"Error scraping Wikipedia page for image: {e}")
             if self.debug:
                 logger.exception(e)
-            logger.info(f"No image found on Wikipedia page for {artist_name}")
+            logger.debug(f"No image found on Wikipedia page for {artist_name}")
             return None
 
 
@@ -465,9 +465,9 @@ class ImageDatabaseManager:
         try:
             existing_images = get_performer_images(performer_id)
             if existing_images:
-                logger.info(f"Performer already has {len(existing_images)} image(s)")
+                logger.debug(f"Performer already has {len(existing_images)} image(s)")
                 for img in existing_images:
-                    logger.info(f"  - {img['source']}: {img['url']}")
+                    logger.debug(f"  - {img['source']}: {img['url']}")
             return existing_images or []
         except Exception as e:
             logger.error(f"Error getting existing images: {e}")
@@ -524,13 +524,13 @@ class ImageDatabaseManager:
         """
         # First check if this is a duplicate
         if self.is_duplicate_image(performer_id, image_data.url):
-            logger.info(f"⊘ Image already linked to performer, skipping: {image_data.url}")
+            logger.debug(f"⊘ Image already linked to performer, skipping: {image_data.url}")
             return False
         
         if self.dry_run:
-            logger.info(f"[DRY RUN] Would save image: {image_data.url}")
-            logger.info(f"  Source: {image_data.source}")
-            logger.info(f"  Primary: {is_primary}, Order: {display_order}")
+            logger.debug(f"[DRY RUN] Would save image: {image_data.url}")
+            logger.debug(f"  Source: {image_data.source}")
+            logger.debug(f"  Primary: {is_primary}, Order: {display_order}")
             return True
         
         try:
@@ -544,7 +544,7 @@ class ImageDatabaseManager:
                     
                     if existing:
                         image_id = existing['id']
-                        logger.info(f"Image already exists in database: {image_id}")
+                        logger.debug(f"Image already exists in database: {image_id}")
                     else:
                         # Insert new image
                         insert_image_query = """
@@ -569,7 +569,7 @@ class ImageDatabaseManager:
                             image_data.source_page_url
                         ))
                         image_id = cur.fetchone()['id']
-                        logger.info(f"✓ Inserted new image: {image_id}")
+                        logger.debug(f"✓ Inserted new image: {image_id}")
                     
                     # Check if relationship already exists (extra safety check)
                     check_rel_query = """
@@ -579,7 +579,7 @@ class ImageDatabaseManager:
                     cur.execute(check_rel_query, (performer_id, image_id))
                     
                     if cur.fetchone():
-                        logger.info(f"⊘ Image already linked to performer (shouldn't happen - duplicate check failed)")
+                        logger.warning(f"⊘ Image already linked to performer (shouldn't happen - duplicate check failed)")
                         return False
                     else:
                         # Link image to performer
@@ -591,7 +591,7 @@ class ImageDatabaseManager:
                         cur.execute(insert_rel_query, (
                             performer_id, image_id, is_primary, display_order
                         ))
-                        logger.info(f"✓ Linked image to performer")
+                        logger.debug(f"✓ Linked image to performer")
                     
                     # Commit happens automatically when exiting context
                     return True
