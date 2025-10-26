@@ -427,13 +427,12 @@ class WikipediaArtistLoader:
                 if self.dry_run:
                     logger.debug(f"  [DRY RUN] Would overwrite data")
             
-            # Update database if not in dry-run mode
-            if not self.dry_run:
+            # Update database if not in dry-run mode and there are changes
+            if not self.dry_run and not all_match:
                 self.update_artist(artist_id, birth_date, death_date, biography)
                 self.stats['artists_updated'] += 1
-            else:
-                if birth_status != 'match' or death_status != 'match' or bio_status != 'match':
-                    self.stats['artists_updated'] += 1
+            elif self.dry_run and not all_match:
+                self.stats['artists_updated'] += 1
             
             return True
             
