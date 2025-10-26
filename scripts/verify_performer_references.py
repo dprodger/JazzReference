@@ -386,7 +386,7 @@ class PerformerReferenceVerifier:
             True if successful, False otherwise
         """
         try:
-            logger.info(f"\nProcessing: {performer['name']}")
+            logger.info(f"Processing: {performer['name']}")
             logger.info("=" * 60)
             
             # Parse existing external links

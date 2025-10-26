@@ -44,8 +44,10 @@ class WikipediaSearcher:
         self.cache_days = cache_days
         self.force_refresh = force_refresh
         
-        # Create cache directory if it doesn't exist
+        # Create cache directories if they don't exist
         self.cache_dir.mkdir(parents=True, exist_ok=True)
+        self.search_cache_dir = self.cache_dir / 'searches'
+        self.search_cache_dir.mkdir(parents=True, exist_ok=True)
         
         logger.debug(f"Wikipedia cache: {self.cache_dir} (expires after {cache_days} days, force_refresh={force_refresh})")
     
@@ -65,6 +67,21 @@ class WikipediaSearcher:
         url_part = url.split('/')[-1][:50]  # Last part of URL, max 50 chars
         filename = f"{url_part}_{url_hash}.json"
         return self.cache_dir / filename
+    
+    def _get_search_cache_path(self, search_query):
+        """
+        Get the cache file path for a search query
+        
+        Args:
+            search_query: Search query string
+            
+        Returns:
+            Path object for the cache file
+        """
+        query_hash = hashlib.md5(search_query.encode()).hexdigest()
+        safe_query = re.sub(r'[^a-zA-Z0-9_-]', '_', search_query.lower())[:50]
+        filename = f"search_{safe_query}_{query_hash}.json"
+        return self.search_cache_dir / filename
     
     def _is_cache_valid(self, cache_path):
         """
@@ -138,6 +155,40 @@ class WikipediaSearcher:
             logger.debug(f"Saved to cache: {url}")
         except Exception as e:
             logger.warning(f"Failed to save cache file {cache_path}: {e}")
+    
+    def _load_search_from_cache(self, search_query):
+        """Load search results from cache"""
+        cache_path = self._get_search_cache_path(search_query)
+        
+        if not self._is_cache_valid(cache_path):
+            return None
+        
+        try:
+            with open(cache_path, 'r', encoding='utf-8') as f:
+                cache_data = json.load(f)
+                logger.debug(f"Loaded search from cache: {search_query}")
+                return cache_data.get('results')
+        except Exception as e:
+            logger.warning(f"Failed to load search cache: {e}")
+            return None
+    
+    def _save_search_to_cache(self, search_query, search_results):
+        """Save search results to cache"""
+        cache_path = self._get_search_cache_path(search_query)
+        
+        try:
+            cache_data = {
+                'query': search_query,
+                'results': search_results,
+                'cached_at': datetime.now().isoformat()
+            }
+            
+            with open(cache_path, 'w', encoding='utf-8') as f:
+                json.dump(cache_data, f, ensure_ascii=False, indent=2)
+            
+            logger.debug(f"Saved search to cache: {search_query}")
+        except Exception as e:
+            logger.warning(f"Failed to save search cache: {e}")
     
     def _fetch_wikipedia_page(self, url):
         """
@@ -462,36 +513,64 @@ class WikipediaSearcher:
             Wikipedia URL if found with reasonable confidence, None otherwise
         """
         try:
-            # Use Wikipedia API to search
-            search_url = "https://en.wikipedia.org/w/api.php"
-            params = {
-                'action': 'opensearch',
-                'search': performer_name,  # Simplified - just the name
-                'limit': 5,  # Check more results
-                'namespace': 0,
-                'format': 'json'
-            }
-            
-            self.rate_limit()
-            response = self.session.get(search_url, params=params, timeout=10)
-            
-            if response.status_code != 200:
-                return None
-            
-            data = response.json()
-            if len(data) < 4 or not data[3]:
-                return None
-            
-            # Get the URLs from the response
-            urls = data[3]
-            
+            # Check cache first (unless force_refresh is enabled)
+            if not self.force_refresh:
+                cached_results = self._load_search_from_cache(performer_name)
+                if cached_results:
+                    logger.info(f"  Using cached search results")
+                    urls = cached_results
+                else:
+                    # Perform API search
+                    search_url = "https://en.wikipedia.org/w/api.php"
+                    params = {
+                        'action': 'opensearch',
+                        'search': performer_name,
+                        'limit': 5,
+                        'namespace': 0,
+                        'format': 'json'
+                    }
+                    
+                    self.rate_limit()
+                    response = self.session.get(search_url, params=params, timeout=10)
+                    
+                    if response.status_code != 200:
+                        return None
+                    
+                    data = response.json()
+                    if len(data) < 4 or not data[3]:
+                        return None
+                    
+                    urls = data[3]
+                    
+                    # Save to cache
+                    self._save_search_to_cache(performer_name, urls)
+            else:
+                # Force refresh - skip cache
+                search_url = "https://en.wikipedia.org/w/api.php"
+                params = {
+                    'action': 'opensearch',
+                    'search': performer_name,
+                    'limit': 5,
+                    'namespace': 0,
+                    'format': 'json'
+                }
+                
+                self.rate_limit()
+                response = self.session.get(search_url, params=params, timeout=10)
+                
+                if response.status_code != 200:
+                    return None
+                
+                data = response.json()
+                if len(data) < 4 or not data[3]:
+                    return None
+                
+                urls = data[3]
 
-            # TODO maybe look at 5 URLs and pick the highest match?
             # Verify each URL until we find a good match
-            for url in urls[:5]:  # Check top 5 results (increased from 3)
+            for url in urls[:5]:
                 verification = self.verify_wikipedia_reference(performer_name, url, context)
                 logger.info(f"  Checked {url}: valid={verification['valid']}, confidence={verification['confidence']}, score={verification.get('score', 0)}, reason={verification['reason']}")
-#                # Accept any valid result (low, medium, or high - not very_low)
                 if verification['valid']:
                     logger.info(f"  Found Wikipedia: {url} (confidence: {verification['confidence']}, score: {verification.get('score', 0)})")
                     logger.info(f"    Reason: {verification['reason']}")
