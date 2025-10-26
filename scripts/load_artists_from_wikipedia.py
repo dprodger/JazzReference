@@ -226,9 +226,17 @@ class WikipediaArtistLoader:
         Returns:
             String with biography text, or None
         """
-        # Find the main content area - prefer mw-parser-output
-        content_div = soup.find('div', {'class': 'mw-parser-output'})
+        # Find the main content area
+        # Wikipedia pages may have multiple divs with 'mw-parser-output' class
+        # Find the one that actually has paragraph content
+        content_div = None
+        for div in soup.find_all('div', class_='mw-parser-output'):
+            if div.find('p'):  # Has at least one paragraph
+                content_div = div
+                break
+        
         if not content_div:
+            # Fallback
             content_div = soup.find('div', {'id': 'mw-content-text'})
         
         if not content_div:
