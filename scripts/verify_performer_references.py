@@ -9,12 +9,10 @@ import argparse
 import logging
 import json
 import time
-import re
 from datetime import datetime
 
 # Third-party imports
 import requests
-from bs4 import BeautifulSoup
 
 
 # Local imports - adjust path as needed
@@ -214,7 +212,7 @@ class PerformerReferenceVerifier:
     
     def search_wikipedia(self, performer_name, context):
         """
-        Search Wikipedia for a performer
+        Search Wikipedia for a performer using WikipediaSearcher from wiki_utils
         
         Args:
             performer_name: Name to search for
@@ -223,45 +221,7 @@ class PerformerReferenceVerifier:
         Returns:
             Wikipedia URL if found with reasonable confidence, None otherwise
         """
-        try:
-            # Use Wikipedia API to search
-            search_url = "https://en.wikipedia.org/w/api.php"
-            params = {
-                'action': 'opensearch',
-                'search': performer_name,  # Simplified - just the name
-                'limit': 5,  # Check more results
-                'namespace': 0,
-                'format': 'json'
-            }
-            
-            response = self.session.get(search_url, params=params, timeout=10)
-            time.sleep(1.0)
-            
-            if response.status_code != 200:
-                return None
-            
-            data = response.json()
-            if len(data) < 4 or not data[3]:
-                return None
-            
-            # Get the URLs from the response
-            urls = data[3]
-            
-            # Verify each URL until we find a good match
-            for url in urls[:5]:  # Check top 5 results (increased from 3)
-                verification = self.wiki_searcher.verify_wikipedia_reference(performer_name, url, context)
-                logger.debug(f"  Checked {url}: valid={verification['valid']}, confidence={verification['confidence']}, score={verification.get('score', 0)}, reason={verification['reason']}")
-                # Accept any valid result (low, medium, or high - not very_low)
-                if verification['valid']:
-                    logger.info(f"  Found Wikipedia: {url} (confidence: {verification['confidence']}, score: {verification.get('score', 0)})")
-                    logger.info(f"    Reason: {verification['reason']}")
-                    return url
-            
-            return None
-            
-        except Exception as e:
-            logger.error(f"Error searching Wikipedia for {performer_name}: {e}")
-            return None
+        return self.wiki_searcher.search_wikipedia(performer_name, context)
     
     def search_musicbrainz(self, performer_name, context):
         """
@@ -437,12 +397,12 @@ class PerformerReferenceVerifier:
             # 1. Verify existing references (unless --onlynew is set)
             if not self.only_new:
                 if check_wikipedia and wikipedia_url:
-                    logger.info(f"  Checking existing Wikipedia: {wikipedia_url}")
+                    logger.debug(f"  Checking existing Wikipedia: {wikipedia_url}")
                     result = self.wiki_searcher.verify_wikipedia_reference(performer['name'], wikipedia_url, context)
                     
                     if result['valid']:
-                        logger.info(f"  ✓ Wikipedia reference is valid (confidence: {result['confidence']}, score: {result.get('score', 0)})")
-                        logger.info(f"    {result['reason']}")
+                        logger.debug(f"  ✓ Wikipedia reference is valid (confidence: {result['confidence']}, score: {result.get('score', 0)})")
+                        logger.debug(f"    {result['reason']}")
                         self.stats['valid_references'] += 1
                     else:
                         # MODIFIED: Check if score is 0 or confidence is very_low - if so, remove it
