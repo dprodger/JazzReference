@@ -2,6 +2,13 @@
 """
 Verify Performer External References
 Reviews all performers in the database and validates/updates Wikipedia and MusicBrainz references
+
+Logging Approach:
+- INFO level: One-line status per performer showing name, ID, old URL, new URL, and disposition
+- DEBUG level: Detailed validation and processing steps
+- WARNING/ERROR level: Problems requiring attention
+
+This allows easy review of what changed at INFO level while preserving detailed debugging info.
 """
 
 import sys
@@ -210,6 +217,35 @@ class PerformerReferenceVerifier:
                 'reason': f'Verification error: {str(e)}'
             }
     
+    def _log_performer_status(self, name, performer_id, old_url, new_url, status):
+        """
+        Log a single-line summary for a performer showing old URL, new URL, and status
+        
+        Args:
+            name: Performer name
+            performer_id: Performer UUID
+            old_url: Previous Wikipedia URL (or None)
+            new_url: New Wikipedia URL (or None)
+            status: Status string (unchanged, changed, manual_inspection, skipped, error)
+        """
+        # Format URLs for display
+        old_display = old_url if old_url else "none"
+        new_display = new_url if new_url else "none"
+        
+        # Use different formatting based on status
+        if status == "unchanged":
+            logger.info(f"✓ {name} | ID: {performer_id} | Old: {old_display} | New: {new_display} | Status: {status}")
+        elif status == "changed":
+            logger.info(f"✎ {name} | ID: {performer_id} | Old: {old_display} | New: {new_display} | Status: {status}")
+        elif status == "manual_inspection":
+            logger.info(f"⚠ {name} | ID: {performer_id} | Old: {old_display} | New: {new_display} | Status: {status}")
+        elif status == "skipped":
+            logger.info(f"⊘ {name} | ID: {performer_id} | Old: {old_display} | New: {new_display} | Status: {status}")
+        elif status == "error":
+            logger.info(f"✗ {name} | ID: {performer_id} | Old: {old_display} | New: {new_display} | Status: {status}")
+        else:
+            logger.info(f"  {name} | ID: {performer_id} | Old: {old_display} | New: {new_display} | Status: {status}")
+    
     def search_wikipedia(self, performer_name, context):
         """
         Search Wikipedia for a performer using WikipediaSearcher from wiki_utils
@@ -262,8 +298,8 @@ class PerformerReferenceVerifier:
                     # Verify this is the right artist
                     verification = self.verify_musicbrainz_reference(performer_name, mb_id, context)
                     if verification['valid']:
-                        logger.info(f"  Found MusicBrainz: {mb_id} (confidence: {verification['confidence']})")
-                        logger.info(f"    Reason: {verification['reason']}")
+                        logger.debug(f"  Found MusicBrainz: {mb_id} (confidence: {verification['confidence']})")
+                        logger.debug(f"    Reason: {verification['reason']}")
                         return mb_id
             
             return None
@@ -346,16 +382,17 @@ class PerformerReferenceVerifier:
             Tuple of (success: bool, made_api_calls: bool)
         """
         try:
-            logger.info(f"Processing: {performer['name']}")
-            logger.info("=" * 60)
-            
             # Track whether we made any non-cached API calls (MusicBrainz or forced Wikipedia refresh)
             made_api_calls = False
             
             # Parse existing external links
             external_links = performer['external_links'] or {}
-            wikipedia_url = external_links.get('wikipedia')
+            old_wikipedia_url = external_links.get('wikipedia')
             musicbrainz_id = external_links.get('musicbrainz')
+            
+            # Track the status and new URL for single-line logging
+            new_wikipedia_url = old_wikipedia_url  # Start with the existing URL
+            status = "unchanged"
             
             # Check if we should skip this performer based on --onlynew flag
             if self.only_new:
@@ -365,13 +402,14 @@ class PerformerReferenceVerifier:
                 
                 # Skip if all the refs we're checking already exist
                 skip = True
-                if check_wikipedia and not wikipedia_url:
+                if check_wikipedia and not old_wikipedia_url:
                     skip = False  # Wikipedia is missing, so don't skip
                 if check_musicbrainz and not musicbrainz_id:
                     skip = False  # MusicBrainz is missing, so don't skip
                 
                 if skip:
-                    logger.info(f"  Skipping (already has all requested references)")
+                    # Still log the single-line summary
+                    self._log_performer_status(performer['name'], performer['id'], old_wikipedia_url, new_wikipedia_url, "skipped")
                     return True, made_api_calls
             
             # Build context for verification
@@ -381,7 +419,7 @@ class PerformerReferenceVerifier:
                 'sample_songs': performer['sample_songs'][:5] if performer['sample_songs'] else []
             }
             
-            has_references = bool(wikipedia_url or musicbrainz_id)
+            has_references = bool(old_wikipedia_url or musicbrainz_id)
             new_refs = {}
             needs_update = False
             
@@ -392,68 +430,73 @@ class PerformerReferenceVerifier:
             # If --onlynew is set, only search for missing refs, don't verify existing ones
             if self.only_new:
                 # Skip verification of existing refs
-                if check_wikipedia and wikipedia_url:
+                if check_wikipedia and old_wikipedia_url:
                     check_wikipedia = False  # Don't check it
                 if check_musicbrainz and musicbrainz_id:
                     check_musicbrainz = False  # Don't check it
             
             # 1. Verify existing references (unless --onlynew is set)
             if not self.only_new:
-                if check_wikipedia and wikipedia_url:
-                    logger.debug(f"  Checking existing Wikipedia: {wikipedia_url}")
-                    result = self.wiki_searcher.verify_wikipedia_reference(performer['name'], wikipedia_url, context)
+                if check_wikipedia and old_wikipedia_url:
+                    logger.debug(f"Checking existing Wikipedia: {old_wikipedia_url}")
+                    result = self.wiki_searcher.verify_wikipedia_reference(performer['name'], old_wikipedia_url, context)
                     
                     if result['valid']:
                         logger.debug(f"  ✓ Wikipedia reference is valid (confidence: {result['confidence']}, score: {result.get('score', 0)})")
                         logger.debug(f"    {result['reason']}")
                         self.stats['valid_references'] += 1
+                        # Status remains "unchanged"
                     else:
-                        # MODIFIED: Check if score is 0 or confidence is very_low - if so, remove it
+                        # Check if score is 0 or confidence is very_low - if so, remove it
                         score = result.get('score', 0)
                         confidence = result['confidence']
                         
                         if score == 0 or confidence == 'very_low':
-                            logger.warning(f"  ✗ Wikipedia reference is invalid (confidence: {confidence}, score: {score})")
-                            logger.warning(f"    {result['reason']}")
-                            logger.warning(f"  🗑️  REMOVING invalid Wikipedia reference")
+                            logger.debug(f"  ✗ Wikipedia reference is invalid (confidence: {confidence}, score: {score})")
+                            logger.debug(f"    {result['reason']}")
+                            logger.debug(f"  🗑️  REMOVING invalid Wikipedia reference")
                             
                             success = self.remove_performer_reference(performer['id'], 'wikipedia')
                             if success:
-                                logger.info(f"  ✓ Wikipedia reference removed successfully")
+                                logger.debug(f"  ✓ Wikipedia reference removed successfully")
                                 self.stats['references_removed'] += 1
+                                new_wikipedia_url = None
+                                status = "changed"
                             else:
                                 logger.error(f"  ✗ Failed to remove Wikipedia reference")
                                 self.stats['errors'] += 1
+                                status = "error"
                             
                             self.stats['invalid_references'] += 1
                         else:
-                            logger.warning(f"  ✗ Wikipedia reference may be invalid (confidence: {confidence}, score: {score})")
-                            logger.warning(f"    {result['reason']}")
-                            logger.warning(f"    NOT removing reference - manual review recommended")
+                            logger.debug(f"  ✗ Wikipedia reference may be invalid (confidence: {confidence}, score: {score})")
+                            logger.debug(f"    {result['reason']}")
+                            logger.debug(f"    NOT removing reference - manual review recommended")
                             self.stats['invalid_references'] += 1
+                            status = "manual_inspection"
                 
                 if check_musicbrainz and musicbrainz_id:
-                    logger.info(f"  Checking existing MusicBrainz: {musicbrainz_id}")
+                    logger.debug(f"Checking existing MusicBrainz: {musicbrainz_id}")
                     result = self.verify_musicbrainz_reference(performer['name'], musicbrainz_id, context)
                     made_api_calls = True  # MusicBrainz always makes API calls
                     
                     if result['valid']:
-                        logger.info(f"  ✓ MusicBrainz reference is valid (confidence: {result['confidence']})")
-                        logger.info(f"    {result['reason']}")
+                        logger.debug(f"  ✓ MusicBrainz reference is valid (confidence: {result['confidence']})")
+                        logger.debug(f"    {result['reason']}")
                         self.stats['valid_references'] += 1
                     else:
-                        # MODIFIED: Check if score is 0 or confidence is very_low/certain - if so, remove it
+                        # Check if score is 0 or confidence is very_low/certain - if so, remove it
                         score = result.get('score', 0)
                         confidence = result['confidence']
                         
                         if score == 0 or confidence in ['very_low', 'certain']:
-                            logger.warning(f"  ✗ MusicBrainz reference is invalid (confidence: {confidence}, score: {score})")
-                            logger.warning(f"    {result['reason']}")
-                            logger.warning(f"  🗑️  REMOVING invalid MusicBrainz reference")
+                            logger.debug(f"  ✗ MusicBrainz reference is invalid (confidence: {confidence}, score: {score})")
+                            logger.debug(f"    {result['reason']}")
+                            logger.debug(f"  🗑️  REMOVING invalid MusicBrainz reference")
                             
                             success = self.remove_performer_reference(performer['id'], 'musicbrainz')
                             if success:
-                                logger.info(f"  ✓ MusicBrainz reference removed successfully")
+                                logger.debug(f"  ✓ MusicBrainz reference removed successfully")
                                 self.stats['references_removed'] += 1
                             else:
                                 logger.error(f"  ✗ Failed to remove MusicBrainz reference")
@@ -461,26 +504,28 @@ class PerformerReferenceVerifier:
                             
                             self.stats['invalid_references'] += 1
                         else:
-                            logger.warning(f"  ✗ MusicBrainz reference may be invalid (confidence: {confidence}, score: {score})")
-                            logger.warning(f"    {result['reason']}")
-                            logger.warning(f"    NOT removing reference - manual review recommended")
+                            logger.debug(f"  ✗ MusicBrainz reference may be invalid (confidence: {confidence}, score: {score})")
+                            logger.debug(f"    {result['reason']}")
+                            logger.debug(f"    NOT removing reference - manual review recommended")
                             self.stats['invalid_references'] += 1
             
             # 2. Search for missing references
-            if check_wikipedia and not wikipedia_url:
-                logger.debug("  Searching for Wikipedia reference...")
+            if check_wikipedia and not old_wikipedia_url:
+                logger.debug("Searching for Wikipedia reference...")
                 found_url = self.search_wikipedia(performer['name'], context)
                 if self.force_refresh:
                     made_api_calls = True  # Wikipedia search makes API calls when not cached
                 if found_url:
                     new_refs['wikipedia'] = found_url
+                    new_wikipedia_url = found_url
                     needs_update = True
+                    status = "changed"
                     self.stats['references_added'] += 1
                 else:
                     logger.debug("  No Wikipedia reference found")
             
             if check_musicbrainz and not musicbrainz_id:
-                logger.info("  Searching for MusicBrainz reference...")
+                logger.debug("Searching for MusicBrainz reference...")
                 found_id = self.search_musicbrainz(performer['name'], context)
                 made_api_calls = True  # MusicBrainz always makes API calls
                 if found_id:
@@ -488,21 +533,26 @@ class PerformerReferenceVerifier:
                     needs_update = True
                     self.stats['references_added'] += 1
                 else:
-                    logger.info("  No MusicBrainz reference found")
+                    logger.debug("  No MusicBrainz reference found")
             
             # 3. Update database if we found new references
             if needs_update:
-                logger.info(f"  Updating database with new references...")
+                logger.debug(f"Updating database with new references...")
                 success = self.update_performer_references(performer['id'], new_refs)
                 if success:
-                    logger.info(f"  ✓ Database updated successfully")
+                    logger.debug(f"  ✓ Database updated successfully")
                 else:
                     logger.error(f"  ✗ Failed to update database")
+                    status = "error"
+                    self._log_performer_status(performer['name'], performer['id'], old_wikipedia_url, new_wikipedia_url, status)
                     return False, made_api_calls
             
             # Track missing references
             if not has_references and not needs_update:
                 self.stats['missing_references'] += 1
+            
+            # Log single-line status summary at INFO level
+            self._log_performer_status(performer['name'], performer['id'], old_wikipedia_url, new_wikipedia_url, status)
             
             return True, made_api_calls
             

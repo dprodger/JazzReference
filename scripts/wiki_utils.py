@@ -208,7 +208,7 @@ class WikipediaSearcher:
                 return cached['html']
         
         # Fetch from Wikipedia
-        logger.info(f"  Fetching from Wikipedia...")
+        logger.debug(f"  Fetching from Wikipedia...")
         self.rate_limit()
         
         try:
