@@ -277,7 +277,7 @@ class PerformerReferenceVerifier:
         try:
             url = "https://musicbrainz.org/ws/2/artist/"
             params = {
-                'query': f'artist:"{performer_name}" AND tag:jazz',
+                'query': f'artist:"{performer_name}"',
                 'fmt': 'json',
                 'limit': 5
             }
