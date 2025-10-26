@@ -441,6 +441,10 @@ class PerformerReferenceVerifier:
                     logger.debug(f"Checking existing Wikipedia: {old_wikipedia_url}")
                     result = self.wiki_searcher.verify_wikipedia_reference(performer['name'], old_wikipedia_url, context)
                     
+                    # Track if Wikipedia made an API call
+                    if self.wiki_searcher.last_made_api_call:
+                        made_api_calls = True
+                    
                     if result['valid']:
                         logger.debug(f"  ✓ Wikipedia reference is valid (confidence: {result['confidence']}, score: {result.get('score', 0)})")
                         logger.debug(f"    {result['reason']}")
@@ -513,8 +517,11 @@ class PerformerReferenceVerifier:
             if check_wikipedia and not old_wikipedia_url:
                 logger.debug("Searching for Wikipedia reference...")
                 found_url = self.search_wikipedia(performer['name'], context)
-                if self.force_refresh:
-                    made_api_calls = True  # Wikipedia search makes API calls when not cached
+                
+                # Track if Wikipedia made an API call
+                if self.wiki_searcher.last_made_api_call:
+                    made_api_calls = True
+                    
                 if found_url:
                     new_refs['wikipedia'] = found_url
                     new_wikipedia_url = found_url
