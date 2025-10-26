@@ -232,6 +232,7 @@ class WikipediaSearcher:
         elapsed = time.time() - self.last_request_time
         if elapsed < self.min_request_interval:
             sleep_time = self.min_request_interval - elapsed
+            logger.info("sleeping in rate_limit")
             time.sleep(sleep_time)
         self.last_request_time = time.time()
 
@@ -517,7 +518,7 @@ class WikipediaSearcher:
             if not self.force_refresh:
                 cached_results = self._load_search_from_cache(performer_name)
                 if cached_results:
-                    logger.info(f"  Using cached search results")
+                    logger.debug(f"  Using cached search results")
                     urls = cached_results
                 else:
                     # Perform API search
@@ -570,10 +571,10 @@ class WikipediaSearcher:
             # Verify each URL until we find a good match
             for url in urls[:5]:
                 verification = self.verify_wikipedia_reference(performer_name, url, context)
-                logger.info(f"  Checked {url}: valid={verification['valid']}, confidence={verification['confidence']}, score={verification.get('score', 0)}, reason={verification['reason']}")
+                logger.debug(f"  Checked {url}: valid={verification['valid']}, confidence={verification['confidence']}, score={verification.get('score', 0)}, reason={verification['reason']}")
                 if verification['valid']:
-                    logger.info(f"  Found Wikipedia: {url} (confidence: {verification['confidence']}, score: {verification.get('score', 0)})")
-                    logger.info(f"    Reason: {verification['reason']}")
+                    logger.debug(f"  Found Wikipedia: {url} (confidence: {verification['confidence']}, score: {verification.get('score', 0)})")
+                    logger.debug(f"    Reason: {verification['reason']}")
                     return url
             
             return None

@@ -343,11 +343,14 @@ class PerformerReferenceVerifier:
             performer: Performer record from database
             
         Returns:
-            True if successful, False otherwise
+            Tuple of (success: bool, made_api_calls: bool)
         """
         try:
             logger.info(f"Processing: {performer['name']}")
             logger.info("=" * 60)
+            
+            # Track whether we made any non-cached API calls (MusicBrainz or forced Wikipedia refresh)
+            made_api_calls = False
             
             # Parse existing external links
             external_links = performer['external_links'] or {}
@@ -369,7 +372,7 @@ class PerformerReferenceVerifier:
                 
                 if skip:
                     logger.info(f"  Skipping (already has all requested references)")
-                    return True
+                    return True, made_api_calls
             
             # Build context for verification
             context = {
@@ -432,6 +435,7 @@ class PerformerReferenceVerifier:
                 if check_musicbrainz and musicbrainz_id:
                     logger.info(f"  Checking existing MusicBrainz: {musicbrainz_id}")
                     result = self.verify_musicbrainz_reference(performer['name'], musicbrainz_id, context)
+                    made_api_calls = True  # MusicBrainz always makes API calls
                     
                     if result['valid']:
                         logger.info(f"  ✓ MusicBrainz reference is valid (confidence: {result['confidence']})")
@@ -464,18 +468,21 @@ class PerformerReferenceVerifier:
             
             # 2. Search for missing references
             if check_wikipedia and not wikipedia_url:
-                logger.info("  Searching for Wikipedia reference...")
+                logger.debug("  Searching for Wikipedia reference...")
                 found_url = self.search_wikipedia(performer['name'], context)
+                if self.force_refresh:
+                    made_api_calls = True  # Wikipedia search makes API calls when not cached
                 if found_url:
                     new_refs['wikipedia'] = found_url
                     needs_update = True
                     self.stats['references_added'] += 1
                 else:
-                    logger.info("  No Wikipedia reference found")
+                    logger.debug("  No Wikipedia reference found")
             
             if check_musicbrainz and not musicbrainz_id:
                 logger.info("  Searching for MusicBrainz reference...")
                 found_id = self.search_musicbrainz(performer['name'], context)
+                made_api_calls = True  # MusicBrainz always makes API calls
                 if found_id:
                     new_refs['musicbrainz'] = found_id
                     needs_update = True
@@ -491,18 +498,18 @@ class PerformerReferenceVerifier:
                     logger.info(f"  ✓ Database updated successfully")
                 else:
                     logger.error(f"  ✗ Failed to update database")
-                    return False
+                    return False, made_api_calls
             
             # Track missing references
             if not has_references and not needs_update:
                 self.stats['missing_references'] += 1
             
-            return True
+            return True, made_api_calls
             
         except Exception as e:
             logger.error(f"Error processing {performer['name']}: {e}", exc_info=True)
             self.stats['errors'] += 1
-            return False
+            return False, False  # On error, don't sleep
     
     def run(self):
         """Main processing method"""
@@ -545,10 +552,11 @@ class PerformerReferenceVerifier:
         # Process each performer
         for performer in performers:
             self.stats['performers_processed'] += 1
-            self.process_performer(performer)
+            success, made_api_calls = self.process_performer(performer)
             
-            # Add small delay between performers to be respectful to APIs
-            time.sleep(1.5)
+            # Only sleep if we made actual API calls (not cached data)
+            if made_api_calls:
+                time.sleep(1.5)
         
         # Print summary
         self.print_summary()
