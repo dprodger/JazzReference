@@ -54,6 +54,7 @@ class WikipediaArtistLoader:
         
         # For tracking overwrites in dry-run mode
         self.overwrites = []
+        self.net_new_items = []
         
     def get_artist_by_id(self, artist_id):
         """Get artist by database ID"""
@@ -226,7 +227,7 @@ class WikipediaArtistLoader:
         Returns:
             String with biography text, or None
         """
-        # Find the main content area
+        # Find the main content area - prefer mw-parser-output
         # Wikipedia pages may have multiple divs with 'mw-parser-output' class
         # Find the one that actually has paragraph content
         content_div = None
@@ -234,10 +235,6 @@ class WikipediaArtistLoader:
             if div.find('p'):  # Has at least one paragraph
                 content_div = div
                 break
-        
-        if not content_div:
-            # Fallback
-            content_div = soup.find('div', {'id': 'mw-content-text'})
         
         if not content_div:
             logger.debug("  No content div found")
@@ -320,21 +317,23 @@ class WikipediaArtistLoader:
             artist_name = artist['name']
             artist_id = artist['id']
             
-            logger.info(f"Processing: {artist_name}")
             self.stats['artists_processed'] += 1
             
             # Extract Wikipedia URL
             wiki_url = self.extract_wikipedia_url(artist['external_links'])
             if not wiki_url:
+                logger.info(f"Processing: {artist_name} - skipped (no Wikipedia URL)")
                 logger.debug("  No Wikipedia URL found")
                 self.stats['artists_skipped'] += 1
                 return False
             
+            logger.debug(f"Processing: {artist_name}")
             logger.debug(f"  Wikipedia URL: {wiki_url}")
             
             # Fetch Wikipedia page
             html_content = self.wiki_searcher._fetch_wikipedia_page(wiki_url)
             if not html_content:
+                logger.info(f"Processing: {artist_name} - error (failed to fetch)")
                 logger.warning(f"  Failed to fetch Wikipedia page")
                 self.stats['errors'] += 1
                 return False
@@ -358,12 +357,51 @@ class WikipediaArtistLoader:
             logger.debug(f"  Death date: {death_status} ({artist['death_date']} -> {death_date})")
             logger.debug(f"  Biography: {bio_status}")
             
+            # Determine overall disposition
+            has_net_new = birth_status == 'net-new' or death_status == 'net-new' or bio_status == 'net-new'
+            has_overwrite = birth_status == 'overwrite' or death_status == 'overwrite' or bio_status == 'overwrite'
+            all_match = birth_status == 'match' and death_status == 'match' and bio_status == 'match'
+            
+            if all_match:
+                disposition = "match"
+            elif has_overwrite and has_net_new:
+                disposition = "net-new + overwrite"
+            elif has_overwrite:
+                disposition = "overwrite"
+            elif has_net_new:
+                disposition = "net-new"
+            else:
+                disposition = "match"
+            
+            logger.info(f"Processing: {artist_name} - {disposition}")
+            
             # Track statistics
-            if birth_status == 'net-new' or death_status == 'net-new' or bio_status == 'net-new':
+            if has_net_new:
                 self.stats['net_new'] += 1
-            if birth_status == 'match' and death_status == 'match' and bio_status == 'match':
+                
+                # Log net-new details
+                net_new_info = {
+                    'artist_id': str(artist_id),
+                    'artist_name': artist_name,
+                    'wikipedia_url': wiki_url,
+                    'birth_date': {
+                        'old': str(artist['birth_date']) if artist['birth_date'] else None,
+                        'new': birth_date
+                    } if birth_status == 'net-new' else None,
+                    'death_date': {
+                        'old': str(artist['death_date']) if artist['death_date'] else None,
+                        'new': death_date
+                    } if death_status == 'net-new' else None,
+                    'biography': {
+                        'old': artist['biography'],
+                        'new': biography
+                    } if bio_status == 'net-new' else None
+                }
+                self.net_new_items.append(net_new_info)
+                
+            if all_match:
                 self.stats['exact_matches'] += 1
-            if birth_status == 'overwrite' or death_status == 'overwrite' or bio_status == 'overwrite':
+            if has_overwrite:
                 self.stats['overwrites'] += 1
                 
                 # Log overwrite details
@@ -464,6 +502,29 @@ class WikipediaArtistLoader:
         except Exception as e:
             logger.error(f"Failed to save overwrites log: {e}")
     
+    def save_net_new_log(self):
+        """Save net-new items to JSON log file"""
+        if not self.net_new_items:
+            return
+        
+        log_dir = Path('log')
+        log_dir.mkdir(exist_ok=True)
+        
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        log_file = log_dir / f'wikipedia_net_new_{timestamp}.json'
+        
+        try:
+            with open(log_file, 'w', encoding='utf-8') as f:
+                json.dump({
+                    'timestamp': datetime.now().isoformat(),
+                    'total_net_new': len(self.net_new_items),
+                    'net_new_items': self.net_new_items
+                }, f, indent=2, ensure_ascii=False)
+            
+            logger.info(f"Net-new items logged to: {log_file}")
+        except Exception as e:
+            logger.error(f"Failed to save net-new log: {e}")
+    
     def run(self, artist_name=None, artist_id=None):
         """
         Main processing method
@@ -510,6 +571,10 @@ class WikipediaArtistLoader:
         # Save overwrites log if in dry-run mode
         if self.dry_run and self.overwrites:
             self.save_overwrites_log()
+        
+        # Save net-new log if in dry-run mode
+        if self.dry_run and self.net_new_items:
+            self.save_net_new_log()
         
         # Print summary
         self.print_summary()
