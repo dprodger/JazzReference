@@ -26,6 +26,8 @@ from typing import Optional, Dict, Any, List
 from urllib.parse import quote, urljoin, unquote
 from dataclasses import dataclass
 import time
+from pathlib import Path
+from datetime import datetime
 
 # Third-party imports
 from bs4 import BeautifulSoup
@@ -45,7 +47,11 @@ from wiki_utils import WikipediaSearcher
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(sys.stdout),
+        logging.FileHandler('log/fetch_artist_images.log')
+    ]
 )
 logger = logging.getLogger(__name__)
 
@@ -622,7 +628,7 @@ class ImageDatabaseManager:
 
 
 def process_performer(performer: Dict[str, Any], fetcher: ImageFetcher, 
-                     db_manager: ImageDatabaseManager) -> tuple[int, bool]:
+                     db_manager: ImageDatabaseManager) -> Dict[str, Any]:
     """
     Process a single performer: fetch images and save to database.
     This function clearly separates API calls from database operations.
@@ -633,19 +639,21 @@ def process_performer(performer: Dict[str, Any], fetcher: ImageFetcher,
         db_manager: ImageDatabaseManager for database operations
     
     Returns:
-        Tuple of (number of new images added, whether API calls were made)
+        Dict with processing results including images_added, made_api_calls, sources, etc.
     """
     performer_id = str(performer['id'])
     performer_name = performer['name']
     images_added = 0
     made_api_calls = False
+    sources = []
     
-    logger.info(f"\n{'='*60}")
-    logger.info(f"Fetching images for: {performer_name}")
-    logger.info(f"{'='*60}")
+    logger.debug(f"\n{'='*60}")
+    logger.debug(f"Fetching images for: {performer_name}")
+    logger.debug(f"{'='*60}")
     
     # STEP 1: Get existing images (short DB connection)
     existing_images = db_manager.get_existing_images(performer_id)
+    logger.debug(f"  Found {len(existing_images)} existing image(s)")
     
     # STEP 2: Fetch images from external APIs (NO database connection)
     external_links = performer.get('external_links') or {}
@@ -669,17 +677,44 @@ def process_performer(performer: Dict[str, Any], fetcher: ImageFetcher,
         if db_manager.save_image(performer_id, wiki_image, 
                                 is_primary=not existing_images, display_order=0):
             images_added += 1
+            sources.append('wikipedia')
+            logger.debug(f"  ✓ Added Wikipedia image")
+        else:
+            logger.debug(f"  - Wikipedia image already exists (skipped)")
+    else:
+        logger.debug(f"  - No Wikipedia image found")
     
     if discogs_image:
         if db_manager.save_image(performer_id, discogs_image, 
                                 is_primary=False, display_order=1):
             images_added += 1
+            sources.append('discogs')
+            logger.debug(f"  ✓ Added Discogs image")
+        else:
+            logger.debug(f"  - Discogs image already exists (skipped)")
+    else:
+        logger.debug(f"  - No Discogs image found")
     
-    logger.info(f"\n{'='*60}")
-    logger.info(f"✓ Added {images_added} new image(s) for {performer_name}")
-    logger.info(f"{'='*60}\n")
+    logger.debug(f"\n{'='*60}")
+    logger.debug(f"✓ Added {images_added} new image(s) for {performer_name}")
+    logger.debug(f"{'='*60}\n")
     
-    return images_added, made_api_calls
+    # Determine disposition for single-line logging
+    if images_added > 0:
+        disposition = f"added {images_added} ({', '.join(sources)})"
+    elif wiki_image or discogs_image:
+        disposition = "no new images (already exist)"
+    else:
+        disposition = "no images found"
+    
+    return {
+        'performer_id': performer_id,
+        'performer_name': performer_name,
+        'images_added': images_added,
+        'made_api_calls': made_api_calls,
+        'disposition': disposition,
+        'sources': sources
+    }
 
 
 def get_all_performers() -> List[Dict[str, Any]]:
@@ -700,6 +735,47 @@ def get_all_performers() -> List[Dict[str, Any]]:
             performers = cur.fetchall()
     # Connection is now closed
     return performers
+
+
+def save_images_added_log(images_added_list: List[Dict[str, Any]]):
+    """Save list of performers with newly added images to JSON log file"""
+    if not images_added_list:
+        return
+    
+    log_dir = Path('log')
+    log_dir.mkdir(exist_ok=True)
+    
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    log_file = log_dir / f'images_added_{timestamp}.json'
+    
+    try:
+        with open(log_file, 'w', encoding='utf-8') as f:
+            json.dump({
+                'timestamp': datetime.now().isoformat(),
+                'total_performers': len(images_added_list),
+                'total_images': sum(item['images_added'] for item in images_added_list),
+                'performers': images_added_list
+            }, f, indent=2, ensure_ascii=False)
+        
+        logger.info(f"Images added logged to: {log_file}")
+    except Exception as e:
+        logger.error(f"Failed to save images added log: {e}")
+
+
+def print_summary(stats: Dict[str, int]):
+    """Print processing summary"""
+    logger.info("")
+    logger.info("="*80)
+    logger.info("PROCESSING SUMMARY")
+    logger.info("="*80)
+    logger.info(f"Performers processed:   {stats['performers_processed']}")
+    logger.info(f"Images added:           {stats['images_added']}")
+    logger.info(f"  - Wikipedia:          {stats['wikipedia_images']}")
+    logger.info(f"  - Discogs:            {stats['discogs_images']}")
+    logger.info(f"No new images:          {stats['no_new_images']}")
+    logger.info(f"No images found:        {stats['no_images_found']}")
+    logger.info(f"Errors:                 {stats['errors']}")
+    logger.info("="*80)
 
 
 def main():
@@ -741,60 +817,117 @@ Examples:
     
     args = parser.parse_args()
     
-    # Create fetcher and database manager
-    fetcher = ImageFetcher(dry_run=args.dry_run, debug=args.debug, force_refresh=args.force_refresh)
-    db_manager = ImageDatabaseManager(dry_run=args.dry_run, debug=args.debug)
+    # Set logging level
+    if args.debug:
+        logging.getLogger().setLevel(logging.DEBUG)
+    
+    # Initialize stats tracking
+    stats = {
+        'performers_processed': 0,
+        'images_added': 0,
+        'wikipedia_images': 0,
+        'discogs_images': 0,
+        'no_new_images': 0,
+        'no_images_found': 0,
+        'errors': 0
+    }
+    
+    # Track performers with newly added images
+    images_added_list = []
+    
+    logger.info("="*80)
+    logger.info("FETCH ARTIST IMAGES")
+    logger.info("="*80)
+    
+    if args.dry_run:
+        logger.info("*** DRY RUN MODE - No database changes will be made ***")
     
     if args.force_refresh:
         logger.info("*** FORCE REFRESH MODE - Bypassing Wikipedia cache ***")
+    
+    # Create fetcher and database manager
+    fetcher = ImageFetcher(dry_run=args.dry_run, debug=args.debug, force_refresh=args.force_refresh)
+    db_manager = ImageDatabaseManager(dry_run=args.dry_run, debug=args.debug)
     
     # Determine which performers to process
     performers = []
     
     if args.name:
-        logger.info(f"Searching for performer: {args.name}")
+        logger.debug(f"Searching for performer: {args.name}")
         # Short DB connection to find performer
         performer = find_performer_by_name(args.name)
         if not performer:
             logger.error(f"Performer not found: {args.name}")
             sys.exit(1)
         performers = [performer]
-        logger.info(f"Found performer: {performer['name']} (ID: {performer['id']})")
+        logger.debug(f"Found performer: {performer['name']} (ID: {performer['id']})")
     elif args.id:
-        logger.info(f"Looking up performer ID: {args.id}")
+        logger.debug(f"Looking up performer ID: {args.id}")
         # Short DB connection to find performer
         performer = find_performer_by_id(args.id)
         if not performer:
             logger.error(f"Performer not found with ID: {args.id}")
             sys.exit(1)
         performers = [performer]
-        logger.info(f"Found performer: {performer['name']} (ID: {performer['id']})")
+        logger.debug(f"Found performer: {performer['name']} (ID: {performer['id']})")
     else:
         # Process all performers - short DB connection to get list
-        logger.info("No specific performer specified - processing all performers")
+        logger.debug("No specific performer specified - processing all performers")
         performers = get_all_performers()
-        logger.info(f"Found {len(performers)} performers to process")
+    
+    logger.info(f"Found {len(performers)} performer(s) to process")
+    logger.info("")
     
     # Process each performer
     # Note: Each call to process_performer() uses separate short-lived connections
-    total_images_added = 0
     for i, performer in enumerate(performers, 1):
-        logger.info(f"\nProcessing performer {i}/{len(performers)}")
+        logger.debug(f"Processing performer {i}/{len(performers)}")
         
-        images_added, made_api_calls = process_performer(performer, fetcher, db_manager)
-        total_images_added += images_added
-        
-        # Add delay between performers only if we made API calls
-        if len(performers) > 1 and i < len(performers) and made_api_calls:
-            logger.debug(f"Waiting 2 seconds before next performer (API calls were made)...")
-            time.sleep(2.0)
+        try:
+            result = process_performer(performer, fetcher, db_manager)
+            stats['performers_processed'] += 1
+            
+            # Update stats based on result
+            stats['images_added'] += result['images_added']
+            if 'wikipedia' in result['sources']:
+                stats['wikipedia_images'] += 1
+            if 'discogs' in result['sources']:
+                stats['discogs_images'] += 1
+            
+            if result['images_added'] > 0:
+                images_added_list.append({
+                    'performer_id': result['performer_id'],
+                    'performer_name': result['performer_name'],
+                    'images_added': result['images_added'],
+                    'sources': result['sources']
+                })
+            elif 'already exist' in result['disposition']:
+                stats['no_new_images'] += 1
+            elif 'no images found' in result['disposition']:
+                stats['no_images_found'] += 1
+            
+            # Single-line INFO logging
+            logger.info(f"Processing: {result['performer_name']} - {result['disposition']}")
+            
+            # Add delay between performers only if we made API calls
+            if len(performers) > 1 and i < len(performers) and result['made_api_calls']:
+                logger.debug(f"Waiting 2 seconds before next performer (API calls were made)...")
+                time.sleep(2.0)
+                
+        except Exception as e:
+            stats['errors'] += 1
+            logger.error(f"Error processing {performer['name']}: {e}")
+            if args.debug:
+                logger.exception(e)
     
-    if total_images_added > 0:
-        logger.info(f"\n✓ Success! Added {total_images_added} image(s) across {len(performers)} performer(s)")
-    else:
-        logger.info(f"\n✓ No new images added")
+    # Save log file if we added images
+    if images_added_list:
+        save_images_added_log(images_added_list)
     
-    sys.exit(0)
+    # Print summary
+    print_summary(stats)
+    
+    sys.exit(0 if stats['errors'] == 0 else 1)
 
 
 if __name__ == '__main__':
