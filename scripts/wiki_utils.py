@@ -44,6 +44,9 @@ class WikipediaSearcher:
         self.cache_days = cache_days
         self.force_refresh = force_refresh
         
+        # Track whether last operation made an API call
+        self.last_made_api_call = False
+        
         # Create cache directories if they don't exist
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         self.search_cache_dir = self.cache_dir / 'searches'
@@ -205,10 +208,12 @@ class WikipediaSearcher:
             cached = self._load_from_cache(url)
             if cached:
                 logger.debug(f"  Using cached Wikipedia page (fetched: {cached['fetched_at'][:10]})")
+                self.last_made_api_call = False
                 return cached['html']
         
         # Fetch from Wikipedia
         logger.debug(f"  Fetching from Wikipedia...")
+        self.last_made_api_call = True
         self.rate_limit()
         
         try:
@@ -518,6 +523,7 @@ class WikipediaSearcher:
             if not self.force_refresh:
                 cached_results = self._load_search_from_cache(performer_name)
                 if cached_results is not None:  # Changed from 'if cached_results:' to handle empty lists
+                    self.last_made_api_call = False  # Using cached search results
                     if not cached_results:  # Empty list means no results found previously
                         logger.debug(f"  Using cached empty search results (no Wikipedia page found)")
                         return None
@@ -525,6 +531,7 @@ class WikipediaSearcher:
                     urls = cached_results
                 else:
                     # Perform API search
+                    self.last_made_api_call = True
                     search_url = "https://en.wikipedia.org/w/api.php"
                     params = {
                         'action': 'opensearch',
@@ -552,6 +559,7 @@ class WikipediaSearcher:
                     self._save_search_to_cache(performer_name, urls)
             else:
                 # Force refresh - skip cache
+                self.last_made_api_call = True
                 search_url = "https://en.wikipedia.org/w/api.php"
                 params = {
                     'action': 'opensearch',
@@ -574,6 +582,7 @@ class WikipediaSearcher:
                 urls = data[3]
 
             # Verify each URL until we find a good match
+            # Note: verify_wikipedia_reference will also set last_made_api_call
             for url in urls[:5]:
                 verification = self.verify_wikipedia_reference(performer_name, url, context)
                 logger.debug(f"  Checked {url}: valid={verification['valid']}, confidence={verification['confidence']}, score={verification.get('score', 0)}, reason={verification['reason']}")
