@@ -622,7 +622,7 @@ class ImageDatabaseManager:
 
 
 def process_performer(performer: Dict[str, Any], fetcher: ImageFetcher, 
-                     db_manager: ImageDatabaseManager) -> int:
+                     db_manager: ImageDatabaseManager) -> tuple[int, bool]:
     """
     Process a single performer: fetch images and save to database.
     This function clearly separates API calls from database operations.
@@ -633,11 +633,12 @@ def process_performer(performer: Dict[str, Any], fetcher: ImageFetcher,
         db_manager: ImageDatabaseManager for database operations
     
     Returns:
-        Number of new images added
+        Tuple of (number of new images added, whether API calls were made)
     """
     performer_id = str(performer['id'])
     performer_name = performer['name']
     images_added = 0
+    made_api_calls = False
     
     logger.info(f"\n{'='*60}")
     logger.info(f"Fetching images for: {performer_name}")
@@ -653,21 +654,17 @@ def process_performer(performer: Dict[str, Any], fetcher: ImageFetcher,
     # Fetch Wikipedia image
     wiki_image = fetcher.fetch_wikipedia_image(performer_name, wikipedia_url=wikipedia_url)
     
+    # Check if Wikipedia made an API call (only if we have a wiki_searcher)
+    if hasattr(fetcher, 'wiki_searcher') and fetcher.wiki_searcher.last_made_api_call:
+        made_api_calls = True
+    
     # Fetch Discogs image
     discogs_image = fetcher.fetch_discogs_image(performer_name)
+    if discogs_image:
+        made_api_calls = True  # Discogs always makes API calls
     
     # STEP 3: Save results to database (short DB connections for each operation)
     if wiki_image:
-        # Update external references if we got Wikipedia data
-        external_refs = {}
-        if wiki_image.source_identifier:
-            external_refs['wikipedia_title'] = wiki_image.source_identifier
-        if wiki_image.source_page_url:
-            external_refs['wikipedia_url'] = wiki_image.source_page_url
-        
-        if external_refs:
-            db_manager.update_external_references(performer_id, external_refs)
-        
         # Save the image (will skip if duplicate)
         if db_manager.save_image(performer_id, wiki_image, 
                                 is_primary=not existing_images, display_order=0):
@@ -682,7 +679,7 @@ def process_performer(performer: Dict[str, Any], fetcher: ImageFetcher,
     logger.info(f"✓ Added {images_added} new image(s) for {performer_name}")
     logger.info(f"{'='*60}\n")
     
-    return images_added
+    return images_added, made_api_calls
 
 
 def get_all_performers() -> List[Dict[str, Any]]:
@@ -784,12 +781,12 @@ Examples:
     for i, performer in enumerate(performers, 1):
         logger.info(f"\nProcessing performer {i}/{len(performers)}")
         
-        images_added = process_performer(performer, fetcher, db_manager)
+        images_added, made_api_calls = process_performer(performer, fetcher, db_manager)
         total_images_added += images_added
         
-        # Add delay between performers to be respectful to APIs
-        if len(performers) > 1 and i < len(performers):
-            logger.debug(f"Waiting 2 seconds before next performer...")
+        # Add delay between performers only if we made API calls
+        if len(performers) > 1 and i < len(performers) and made_api_calls:
+            logger.debug(f"Waiting 2 seconds before next performer (API calls were made)...")
             time.sleep(2.0)
     
     if total_images_added > 0:
