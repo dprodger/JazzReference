@@ -204,7 +204,7 @@ class WikipediaSearcher:
         if not self.force_refresh:
             cached = self._load_from_cache(url)
             if cached:
-                logger.info(f"  Using cached Wikipedia page (fetched: {cached['fetched_at'][:10]})")
+                logger.debug(f"  Using cached Wikipedia page (fetched: {cached['fetched_at'][:10]})")
                 return cached['html']
         
         # Fetch from Wikipedia
