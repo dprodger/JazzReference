@@ -37,6 +37,7 @@ class MusicBrainzImporter:
             'releases_found': 0,
             'releases_imported': 0,
             'releases_skipped': 0,
+            'credits_added': 0,
             'errors': 0
         }
    
@@ -183,7 +184,12 @@ class MusicBrainzImporter:
             return None
     
     def check_recording_exists(self, conn, song_id, album_title):
-        """Check if a recording already exists"""
+        """
+        Check if a recording already exists
+        
+        Returns:
+            tuple: (exists: bool, recording_id: str or None)
+        """
         with conn.cursor() as cur:
             cur.execute("""
                 SELECT id FROM recordings
@@ -191,7 +197,74 @@ class MusicBrainzImporter:
             """, (song_id, album_title))
             
             result = cur.fetchone()
-            return result is not None
+            if result:
+                return (True, result['id'])
+            return (False, None)
+    
+    def get_existing_credits(self, conn, recording_id):
+        """
+        Fetch existing performer credits for a recording
+        
+        Returns:
+            List of dicts with keys: performer_name, performer_mbid, instrument_name, role
+        """
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT 
+                    p.name as performer_name,
+                    p.external_links->>'musicbrainz' as performer_mbid,
+                    i.name as instrument_name,
+                    rp.role
+                FROM recording_performers rp
+                JOIN performers p ON rp.performer_id = p.id
+                LEFT JOIN instruments i ON rp.instrument_id = i.id
+                WHERE rp.recording_id = %s
+            """, (recording_id,))
+            
+            return cur.fetchall()
+    
+    def should_update_credits(self, existing_credits, new_performers):
+        """
+        Determine if we should update credits based on comparing existing vs new
+        
+        Args:
+            existing_credits: List of existing credit dicts from database
+            new_performers: List of new performer dicts to potentially import
+            
+        Returns:
+            tuple: (should_update: bool, reason: str)
+        """
+        if not existing_credits:
+            return (True, "no existing credits")
+        
+        # Count instruments in existing vs new
+        existing_with_instruments = sum(1 for c in existing_credits if c['instrument_name'])
+        new_with_instruments = sum(1 for p in new_performers if p.get('instruments'))
+        
+        # If existing credits have no instruments but new ones do, update
+        if existing_with_instruments == 0 and new_with_instruments > 0:
+            return (True, f"existing has no instruments, new has {new_with_instruments}")
+        
+        # If new credits have significantly more detail, update
+        if len(new_performers) > len(existing_credits) * 1.5:
+            return (True, f"new has significantly more performers ({len(new_performers)} vs {len(existing_credits)})")
+        
+        # Check if new credits add performers not in existing
+        existing_names = {c['performer_name'].lower() for c in existing_credits}
+        existing_mbids = {c['performer_mbid'] for c in existing_credits if c['performer_mbid']}
+        
+        new_names = {p['name'].lower() for p in new_performers if p.get('name')}
+        new_mbids = {p['mbid'] for p in new_performers if p.get('mbid')}
+        
+        # Find performers in new that aren't in existing
+        new_unique_names = new_names - existing_names
+        new_unique_mbids = new_mbids - existing_mbids
+        
+        if new_unique_names or new_unique_mbids:
+            return (True, f"new credits add {len(new_unique_names)} new performers")
+        
+        # Otherwise, skip - existing credits are good enough
+        return (False, "existing credits are sufficient")
     
     def import_recording(self, conn, song_id, recording_data):
         """Import a single recording into the database"""
@@ -206,10 +279,93 @@ class MusicBrainzImporter:
         album_title = release.get('title', 'Unknown Album')
         
         # Check if already exists
-        if self.check_recording_exists(conn, song_id, album_title):
+        exists, existing_recording_id = self.check_recording_exists(conn, song_id, album_title)
+        
+        if exists:
             logger.debug(f"Recording already exists: {album_title}")
-            self.stats['releases_skipped'] += 1
-            return False
+            
+            # Get existing credits to compare
+            existing_credits = self.get_existing_credits(conn, existing_recording_id)
+            
+            if existing_credits:
+                logger.debug(f"  Recording has {len(existing_credits)} existing credit(s)")
+                
+                # Parse what we would import to compare
+                # First, parse the relationships to see what performers we'd add
+                relations = recording_data.get('relations', [])
+                new_performers = self.performer_importer.parse_artist_relationships(relations)
+                
+                # If no relationships, try the first release
+                if not new_performers:
+                    releases_list = recording_data.get('releases', [])
+                    if releases_list:
+                        first_release_id = releases_list[0].get('id')
+                        release_data = self.performer_importer.fetch_release_credits(first_release_id)
+                        if release_data:
+                            mb_recording_id = recording_data.get('id')
+                            new_performers = self.performer_importer.parse_release_artist_credits(release_data, mb_recording_id)
+                
+                # If still no performers, fall back to artist credits
+                if not new_performers:
+                    artist_credits = recording_data.get('artist-credit', [])
+                    artists = self.performer_importer.parse_artist_credits(artist_credits)
+                    new_performers = [
+                        {'name': a['name'], 'mbid': a['mbid'], 'instruments': [], 'role': 'performer'}
+                        for a in artists
+                    ]
+                
+                # Decide if we should update
+                should_update, reason = self.should_update_credits(existing_credits, new_performers)
+                
+                if not should_update:
+                    logger.info(f"  Skipping - {reason}")
+                    self.stats['releases_skipped'] += 1
+                    return False
+                else:
+                    logger.info(f"  Updating credits - {reason}")
+                    
+                    if self.dry_run:
+                        logger.info(f"[DRY RUN]   Would update existing recording with new credits")
+                        self.performer_importer.link_performers_to_recording(conn, None, recording_data)
+                        self.stats['credits_added'] += 1
+                        return True
+                    
+                    # Add new performers to existing recording
+                    performers_linked = self.performer_importer.link_performers_to_recording(
+                        conn, existing_recording_id, recording_data
+                    )
+                    
+                    if performers_linked > 0:
+                        conn.commit()
+                        logger.info(f"  ✓ Added {performers_linked} performer credit(s) to existing recording")
+                        self.stats['credits_added'] += 1
+                    else:
+                        logger.debug(f"  No new performer credits to add")
+                    
+                    return True
+            else:
+                # No existing credits, add them
+                logger.info(f"  Recording exists but has no credits, adding them...")
+                
+                if self.dry_run:
+                    logger.info(f"[DRY RUN]   Would add credits to existing recording")
+                    self.performer_importer.link_performers_to_recording(conn, None, recording_data)
+                    self.stats['credits_added'] += 1
+                    return True
+                
+                # Add performers to existing recording
+                performers_linked = self.performer_importer.link_performers_to_recording(
+                    conn, existing_recording_id, recording_data
+                )
+                
+                if performers_linked > 0:
+                    conn.commit()
+                    logger.info(f"  ✓ Added {performers_linked} performer credit(s) to existing recording")
+                    self.stats['credits_added'] += 1
+                else:
+                    logger.debug(f"  No performer credits to add")
+                
+                return True
         
         # Extract date - handle various formats
         release_date = release.get('date', '')
@@ -340,7 +496,8 @@ class MusicBrainzImporter:
         logger.info("="*80)
         logger.info(f"Recordings found:    {self.stats['releases_found'] + self.stats['releases_imported']}")
         logger.info(f"Recordings imported: {self.stats['releases_imported']}")
-        logger.info(f"Recordings skipped:  {self.stats['releases_skipped']} (already exist)")
+        logger.info(f"Recordings skipped:  {self.stats['releases_skipped']} (already exist with credits)")
+        logger.info(f"Credits added:       {self.stats['credits_added']} (to existing recordings)")
         logger.info(f"Performers created:  {self.performer_importer.stats['performers_created']}")
         logger.info(f"Instruments created: {self.performer_importer.stats['instruments_created']}")
         logger.info(f"Errors:              {self.stats['errors']}")
