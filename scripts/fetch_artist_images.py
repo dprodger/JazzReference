@@ -90,12 +90,16 @@ class ImageFetcher:
             force_refresh=force_refresh
         )
         
+        # Track whether the last fetch made API calls
+        self.last_fetch_made_api_call = False
+        
         if debug:
             logger.setLevel(logging.DEBUG)
     
     def fetch_wikipedia_image(self, artist_name: str, wikipedia_url: Optional[str] = None) -> Optional[ImageData]:
         """
         Fetch image from Wikipedia for an artist.
+        Uses WikipediaSearcher for page lookup and rate limiting.
         
         Args:
             artist_name: Name of the artist to search for
@@ -104,7 +108,13 @@ class ImageFetcher:
         Returns:
             ImageData object or None
         """
+        # Reset API call tracking
+        self.last_fetch_made_api_call = False
+        
         try:
+            page_title = None
+            page_url = wikipedia_url
+            
             # If we have a Wikipedia URL from the database, extract the page title
             if wikipedia_url:
                 logger.debug(f"Using Wikipedia URL from database: {wikipedia_url}")
@@ -117,33 +127,45 @@ class ImageFetcher:
                     logger.warning(f"Could not extract page title from URL: {wikipedia_url}")
                     wikipedia_url = None  # Fall back to search
             
-            # If no Wikipedia URL provided, search for the page
+            # If no Wikipedia URL provided, use WikipediaSearcher to find the page
             if not wikipedia_url:
                 logger.debug(f"Searching Wikipedia for {artist_name}...")
                 
-                # Step 1: Search for the Wikipedia page
-                search_url = "https://en.wikipedia.org/w/api.php"
-                search_params = {
-                    'action': 'query',
-                    'format': 'json',
-                    'list': 'search',
-                    'srsearch': artist_name,
-                    'srlimit': 1
+                # Use WikipediaSearcher which handles caching and rate limiting
+                # Provide minimal context for verification
+                context = {
+                    'birth_date': None,
+                    'death_date': None,
+                    'sample_songs': []
                 }
                 
-                response = self.session.get(search_url, params=search_params, timeout=10)
-                response.raise_for_status()
-                search_data = response.json()
+                page_url = self.wiki_searcher.search_wikipedia(artist_name, context)
                 
-                if not search_data.get('query', {}).get('search'):
+                # Track if API call was made (WikipediaSearcher sets this)
+                if self.wiki_searcher.last_made_api_call:
+                    self.last_fetch_made_api_call = True
+                
+                if not page_url:
                     logger.debug(f"No Wikipedia page found for {artist_name}")
                     return None
                 
-                page_title = search_data['query']['search'][0]['title']
-                logger.debug(f"Found Wikipedia page: {page_title}")
+                # Extract page title from the URL we found
+                match = re.search(r'/wiki/(.+)$', page_url)
+                if match:
+                    page_title = unquote(match.group(1))
+                    logger.debug(f"Found Wikipedia page: {page_title}")
+                else:
+                    logger.warning(f"Could not extract page title from found URL: {page_url}")
+                    return None
             
-            # Step 2: Get the main image from the page
-            search_url = "https://en.wikipedia.org/w/api.php"
+            # Step 2: Get the main image from the page using Wikipedia API
+            # Note: This must be an API call - there's no way around it to get the image
+            self.last_fetch_made_api_call = True
+            
+            # Use WikipediaSearcher's rate limiting
+            self.wiki_searcher.rate_limit()
+            
+            api_url = "https://en.wikipedia.org/w/api.php"
             image_params = {
                 'action': 'query',
                 'format': 'json',
@@ -154,7 +176,7 @@ class ImageFetcher:
                 'inprop': 'url'
             }
             
-            response = self.session.get(search_url, params=image_params, timeout=10)
+            response = self.wiki_searcher.session.get(api_url, params=image_params, timeout=10)
             response.raise_for_status()
             page_data = response.json()
             
@@ -169,14 +191,17 @@ class ImageFetcher:
             if 'original' not in page:
                 # API didn't return image - try HTML scraping fallback
                 logger.debug(f"No image from pageimages API, trying HTML scraping fallback...")
-                page_url = page.get('fullurl', f"https://en.wikipedia.org/wiki/{quote(page_title)}")
+                page_url = page.get('fullurl', page_url or f"https://en.wikipedia.org/wiki/{quote(page_title)}")
                 return self._scrape_wikipedia_page_for_image(page_title, page_url, artist_name)
             
             image_url = page['original']['source']
             thumbnail_url = page.get('thumbnail', {}).get('source')
-            page_url = page.get('fullurl', f"https://en.wikipedia.org/wiki/{quote(page_title)}")
+            page_url = page.get('fullurl', page_url or f"https://en.wikipedia.org/wiki/{quote(page_title)}")
             
-            # Get image details for licensing
+            # Step 3: Get image details for licensing (another required API call)
+            # Use WikipediaSearcher's rate limiting
+            self.wiki_searcher.rate_limit()
+            
             image_filename = image_url.split('/')[-1]
             license_params = {
                 'action': 'query',
@@ -186,7 +211,7 @@ class ImageFetcher:
                 'iiprop': 'extmetadata|size'
             }
             
-            response = self.session.get(search_url, params=license_params, timeout=10)
+            response = self.wiki_searcher.session.get(api_url, params=license_params, timeout=10)
             response.raise_for_status()
             license_data = response.json()
             
@@ -475,6 +500,7 @@ class ImageDatabaseManager:
                 logger.exception(e)
             return []
     
+
     def is_duplicate_image(self, performer_id: str, image_url: str) -> bool:
         """
         Check if an image URL is already associated with this performer.
@@ -651,27 +677,52 @@ def process_performer(performer: Dict[str, Any], fetcher: ImageFetcher,
     logger.debug(f"Fetching images for: {performer_name}")
     logger.debug(f"{'='*60}")
     
-    # STEP 1: Get existing images (short DB connection)
+    # STEP 1: Get existing images ONCE (single short DB connection)
     existing_images = db_manager.get_existing_images(performer_id)
     logger.debug(f"  Found {len(existing_images)} existing image(s)")
     
-    # STEP 2: Fetch images from external APIs (NO database connection)
+    # Check in memory if we already have images from each source
+    has_wikipedia_image = any(img['source'] == 'wikipedia' for img in existing_images)
+    has_discogs_image = any(img['source'] == 'discogs' for img in existing_images)
+    
+    if has_wikipedia_image and has_discogs_image:
+        logger.debug(f"  Performer already has images from both sources (skipping all API calls)")
+        return {
+            'performer_id': performer_id,
+            'performer_name': performer_name,
+            'images_added': 0,
+            'made_api_calls': False,
+            'disposition': 'no new images (already exist)',
+            'sources': []
+        }
+    
+    # STEP 2: Fetch images from external APIs (NO database connection, only if needed)
     external_links = performer.get('external_links') or {}
     wikipedia_url = external_links.get('wikipedia')
     
-    # Fetch Wikipedia image
-    wiki_image = fetcher.fetch_wikipedia_image(performer_name, wikipedia_url=wikipedia_url)
+    # Fetch Wikipedia image only if we don't already have one
+    wiki_image = None
+    if not has_wikipedia_image:
+        logger.debug(f"  Fetching Wikipedia image...")
+        wiki_image = fetcher.fetch_wikipedia_image(performer_name, wikipedia_url=wikipedia_url)
+        if fetcher.last_fetch_made_api_call:
+            made_api_calls = True
+            logger.debug(f"  Wikipedia API call was made")
+    else:
+        logger.debug(f"  Skipping Wikipedia fetch (already have Wikipedia image)")
     
-    # Check if Wikipedia made an API call (only if we have a wiki_searcher)
-    if hasattr(fetcher, 'wiki_searcher') and fetcher.wiki_searcher.last_made_api_call:
-        made_api_calls = True
+    # Fetch Discogs image only if we don't already have one
+    discogs_image = None
+    if not has_discogs_image:
+        logger.debug(f"  Fetching Discogs image...")
+        discogs_image = fetcher.fetch_discogs_image(performer_name)
+        if discogs_image:
+            made_api_calls = True
+            logger.debug(f"  Discogs API call was made")
+    else:
+        logger.debug(f"  Skipping Discogs fetch (already have Discogs image)")
     
-    # Fetch Discogs image
-    discogs_image = fetcher.fetch_discogs_image(performer_name)
-    if discogs_image:
-        made_api_calls = True  # Discogs always makes API calls
-    
-    # STEP 3: Save results to database (short DB connections for each operation)
+    # STEP 3: Save results to database (short DB connections for each save operation)
     if wiki_image:
         # Save the image (will skip if duplicate)
         if db_manager.save_image(performer_id, wiki_image, 
@@ -681,7 +732,7 @@ def process_performer(performer: Dict[str, Any], fetcher: ImageFetcher,
             logger.debug(f"  ✓ Added Wikipedia image")
         else:
             logger.debug(f"  - Wikipedia image already exists (skipped)")
-    else:
+    elif not has_wikipedia_image:
         logger.debug(f"  - No Wikipedia image found")
     
     if discogs_image:
@@ -692,7 +743,7 @@ def process_performer(performer: Dict[str, Any], fetcher: ImageFetcher,
             logger.debug(f"  ✓ Added Discogs image")
         else:
             logger.debug(f"  - Discogs image already exists (skipped)")
-    else:
+    elif not has_discogs_image:
         logger.debug(f"  - No Discogs image found")
     
     logger.debug(f"\n{'='*60}")
@@ -702,7 +753,7 @@ def process_performer(performer: Dict[str, Any], fetcher: ImageFetcher,
     # Determine disposition for single-line logging
     if images_added > 0:
         disposition = f"added {images_added} ({', '.join(sources)})"
-    elif wiki_image or discogs_image:
+    elif has_wikipedia_image or has_discogs_image or wiki_image or discogs_image:
         disposition = "no new images (already exist)"
     else:
         disposition = "no images found"
