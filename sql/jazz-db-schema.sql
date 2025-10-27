@@ -145,6 +145,25 @@ CREATE TABLE IF NOT EXISTS artist_images (
 
 
 
+CREATE TABLE IF NOT EXISTS solo_transcriptions (
+    id uuid DEFAULT uuid_generate_v4() PRIMARY KEY,
+    song_id uuid NOT NULL REFERENCES songs(id) ON DELETE CASCADE,
+    recording_id uuid NOT NULL REFERENCES recordings(id) ON DELETE CASCADE,
+    youtube_url character varying(500),
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    created_by character varying(100),
+    updated_by character varying(100)
+);
+
+
+-- Triggers -------------------------------------------------------
+
+
+
+
+
+
 
 -- ============================================================================
 -- ADMIN & VERSIONING TABLES
@@ -221,6 +240,10 @@ CREATE INDEX IF NOT EXISTS idx_artist_images_performer ON artist_images(performe
 CREATE INDEX IF NOT EXISTS idx_artist_images_image ON artist_images(image_id);
 CREATE INDEX IF NOT EXISTS idx_artist_images_primary ON artist_images(is_primary) WHERE is_primary = true;
 
+CREATE UNIQUE INDEX solo_transcriptions_pkey ON solo_transcriptions(id uuid_ops);
+CREATE INDEX idx_solo_transcriptions_song_id ON solo_transcriptions(song_id uuid_ops);
+CREATE INDEX idx_solo_transcriptions_recording_id ON solo_transcriptions(recording_id uuid_ops);
+
 
 -- ============================================================================
 -- FUNCTIONS & TRIGGERS
@@ -264,6 +287,11 @@ CREATE TRIGGER trigger_update_images_updated_at
     BEFORE UPDATE ON images
     FOR EACH ROW
     EXECUTE FUNCTION update_images_updated_at();
+
+CREATE TRIGGER update_solo_transcriptions_updated_at
+  BEFORE UPDATE ON public.solo_transcriptions
+  FOR EACH ROW
+  EXECUTE FUNCTION public.update_updated_at_column();
 
 
 -- ============================================================================
@@ -354,5 +382,6 @@ COMMENT ON COLUMN images.source IS 'Source of the image: wikipedia, discogs, mus
 COMMENT ON COLUMN images.source_identifier IS 'External ID from the source system (e.g., Discogs artist ID)';
 COMMENT ON COLUMN artist_images.is_primary IS 'Marks the primary/profile image for an artist';
 COMMENT ON COLUMN artist_images.display_order IS 'Order for displaying images in carousel (lower numbers first)';
+COMMENT ON TABLE solo_transcriptions IS 'Specific solo transcriptions for a song and recording';
 
 
