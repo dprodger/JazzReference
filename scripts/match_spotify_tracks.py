@@ -16,6 +16,7 @@ import requests
 
 # Import shared database utilities
 from db_utils import get_db_connection
+from db_utils import normalize_apostrophes
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -490,7 +491,7 @@ Examples:
     matcher = SpotifyMatcher(dry_run=args.dry_run, artist_filter=args.artist)
     
     # Determine song identifier
-    song_identifier = args.name if args.name else args.id
+    song_identifier = normalize_apostrophes(args.name) if args.name else args.id
     
     try:
         success = matcher.match_recordings_for_song(song_identifier)

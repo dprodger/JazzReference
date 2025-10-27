@@ -14,6 +14,8 @@ import requests
 
 # Import shared database and MusicBrainz utilities
 from db_utils import get_db_connection
+from db_utils import normalize_apostrophes
+
 from mb_utils import MusicBrainzSearcher
 
 # Configure logging
@@ -222,7 +224,7 @@ Notes:
     # Create gatherer and run
     gatherer = MusicBrainzGatherer(
         dry_run=args.dry_run,
-        song_name=args.name if hasattr(args, 'name') and args.name else None,
+        song_name=normalize_apostrophes(args.name) if hasattr(args, 'name') and args.name else None,
         song_id=args.id if hasattr(args, 'id') and args.id else None
     )
     

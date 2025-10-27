@@ -15,6 +15,7 @@ import requests
 
 # Local imports
 from db_utils import get_db_connection
+from db_utils import normalize_apostrophes
 from wiki_utils import WikipediaSearcher
 from mb_utils import MusicBrainzSearcher
 
@@ -505,7 +506,7 @@ instead of searching for them.
     
     try:
         success = creator.create_with_research(
-            args.name,
+            normalize_apostrophes(args.name),
             wikipedia_url=args.wiki,
             musicbrainz_id=args.mb
         )

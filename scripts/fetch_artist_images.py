@@ -38,6 +38,7 @@ from db_utils import (
     find_performer_by_name,
     find_performer_by_id,
     update_performer_external_references,
+    normalize_apostrophes,
     get_performer_images
 )
 
@@ -904,11 +905,12 @@ Examples:
     performers = []
     
     if args.name:
-        logger.debug(f"Searching for performer: {args.name}")
+        artist_name = normalize_apostrophes(args.name)
+        logger.debug(f"Searching for performer: {artist_name}")
         # Short DB connection to find performer
-        performer = find_performer_by_name(args.name)
+        performer = find_performer_by_name(artist_name)
         if not performer:
-            logger.error(f"Performer not found: {args.name}")
+            logger.error(f"Performer not found: {artist_name}")
             sys.exit(1)
         performers = [performer]
         logger.debug(f"Found performer: {performer['name']} (ID: {performer['id']})")

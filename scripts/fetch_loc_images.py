@@ -29,6 +29,7 @@ from db_utils import (
     find_performer_by_name,
     find_performer_by_id,
     update_performer_external_references,
+    normalize_apostrophes,
     get_performer_images
 )
 
@@ -654,10 +655,11 @@ Notes:
     
     # Find the performer
     if args.name:
-        logger.info(f"Searching for performer: {args.name}")
-        performer = find_performer_by_name(args.name)
+        artist_name = normalize_apostrophes(args.name)
+        logger.info(f"Searching for performer: {artist_name}")
+        performer = find_performer_by_name(artist_name)
         if not performer:
-            logger.error(f"Performer not found: {args.name}")
+            logger.error(f"Performer not found: {artist_name}")
             sys.exit(1)
     else:
         logger.info(f"Looking up performer ID: {args.id}")

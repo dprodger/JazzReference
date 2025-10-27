@@ -344,13 +344,16 @@ def normalize_apostrophes(text):
     if not text:
         return text
     
+    # The correct apostrophe to normalize to (U+2019 RIGHT SINGLE QUOTATION MARK)
+    correct_apostrophe = '\u2019'  # This is: '
+    
     # Map of apostrophe variants to the correct Unicode apostrophe
     apostrophe_variants = {
-        "'": "'",  # U+0027 (straight apostrophe) -> U+2019
-        "`": "'",  # U+0060 (backtick/grave accent) -> U+2019
-        "´": "'",  # U+00B4 (acute accent) -> U+2019
-        "'": "'",  # U+2018 (left single quotation mark) -> U+2019
-        "‛": "'",  # U+201B (single high-reversed-9 quotation mark) -> U+2019
+        "'": correct_apostrophe,  # U+0027 (straight apostrophe) -> U+2019
+        "`": correct_apostrophe,  # U+0060 (backtick/grave accent) -> U+2019
+        "´": correct_apostrophe,  # U+00B4 (acute accent) -> U+2019
+        "'": correct_apostrophe,  # U+2018 (left single quotation mark) -> U+2019
+        "‛": correct_apostrophe,  # U+201B (single high-reversed-9 quotation mark) -> U+2019
     }
     
     result = text
@@ -358,5 +361,3 @@ def normalize_apostrophes(text):
         result = result.replace(variant, correct)
     
     return result
-
-
