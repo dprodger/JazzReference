@@ -33,8 +33,9 @@ logger = logging.getLogger(__name__)
 
 
 class SpotifyMatcher:
-    def __init__(self, dry_run=False):
+    def __init__(self, dry_run=False, artist_filter=None):
         self.dry_run = dry_run
+        self.artist_filter = artist_filter
         self.access_token = None
         self.token_expires = 0
         self.stats = {
@@ -153,7 +154,8 @@ class SpotifyMatcher:
         """Get all recordings for a song with performer information"""
         with get_db_connection() as conn:
             with conn.cursor() as cur:
-                cur.execute("""
+                # Build query with optional artist filter
+                query = """
                     SELECT 
                         r.id,
                         r.album_title,
@@ -177,10 +179,29 @@ class SpotifyMatcher:
                     LEFT JOIN recording_performers rp ON r.id = rp.recording_id
                     LEFT JOIN performers p ON rp.performer_id = p.id
                     WHERE r.song_id = %s
+                """
+                
+                params = [song_id]
+                
+                # Add artist filter if specified
+                if self.artist_filter:
+                    query += """
+                    AND EXISTS (
+                        SELECT 1 
+                        FROM recording_performers rp2
+                        JOIN performers p2 ON rp2.performer_id = p2.id
+                        WHERE rp2.recording_id = r.id
+                        AND p2.name ILIKE %s
+                    )
+                    """
+                    params.append(f'%{self.artist_filter}%')
+                
+                query += """
                     GROUP BY r.id, r.album_title, r.recording_year, r.spotify_url
                     ORDER BY r.recording_year DESC NULLS LAST, r.album_title
-                """, (song_id,))
+                """
                 
+                cur.execute(query, params)
                 return cur.fetchall()
     
     def search_spotify_track(self, song_title, album_title, artist_name, year=None):
@@ -302,6 +323,8 @@ class SpotifyMatcher:
         logger.info(f"Song: {song['title']}")
         logger.info(f"Composer: {song['composer']}")
         logger.info(f"Database ID: {song['id']}")
+        if self.artist_filter:
+            logger.info(f"Filtering to recordings by: {self.artist_filter}")
         logger.info("")
         
         # Get recordings
@@ -393,6 +416,9 @@ Examples:
   # Match by song ID
   python match_spotify_tracks.py --id a1b2c3d4-e5f6-7890-abcd-ef1234567890
   
+  # Filter to only recordings by a specific artist
+  python match_spotify_tracks.py --name "Autumn Leaves" --artist "Bill Evans"
+  
   # Dry run to see what would be matched
   python match_spotify_tracks.py --name "Blue in Green" --dry-run
   
@@ -410,6 +436,11 @@ Examples:
     group.add_argument(
         '--id',
         help='Song database ID'
+    )
+    
+    parser.add_argument(
+        '--artist',
+        help='Filter to recordings by this artist'
     )
     
     parser.add_argument(
@@ -431,7 +462,7 @@ Examples:
         logging.getLogger().setLevel(logging.DEBUG)
     
     # Create matcher and run
-    matcher = SpotifyMatcher(dry_run=args.dry_run)
+    matcher = SpotifyMatcher(dry_run=args.dry_run, artist_filter=args.artist)
     
     # Determine song identifier
     song_identifier = args.name if args.name else args.id
