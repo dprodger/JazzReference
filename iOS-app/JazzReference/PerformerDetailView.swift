@@ -80,20 +80,33 @@ struct PerformerDetailView: View {
                                 HStack {
                                     Image(systemName: "calendar")
                                         .foregroundColor(JazzTheme.brass)
-                                    Text("Born: \(birthDate)")
+                                    Text("Born: \(birthDate.formatAsDate())")  // ← Added .formatAsDate()
                                         .font(.subheadline)
                                         .foregroundColor(JazzTheme.smokeGray)
                                 }
                             }
-                            
+
                             if let deathDate = performer.deathDate {
                                 HStack {
                                     Image(systemName: "calendar")
                                         .foregroundColor(JazzTheme.brass)
-                                    Text("Died: \(deathDate)")
+                                    Text("Died: \(deathDate.formatAsDate())")  // ← Added .formatAsDate()
                                         .font(.subheadline)
                                         .foregroundColor(JazzTheme.smokeGray)
                                 }
+                            }
+                            if let biography = performer.biography {
+                                VStack(alignment: .leading, spacing: 8) {
+                                    Text("Biography")
+                                        .font(.headline)
+                                        .foregroundColor(JazzTheme.charcoal)
+                                    Text(biography)
+                                        .font(.body)
+                                        .foregroundColor(JazzTheme.smokeGray)
+                                }
+                                .padding()
+                                .background(JazzTheme.cardBackground)
+                                .cornerRadius(10)
                             }
                             
                             if let instruments = performer.instruments, !instruments.isEmpty {
@@ -116,20 +129,6 @@ struct PerformerDetailView: View {
                                             }
                                         }
                                     }
-                                }
-                                .padding()
-                                .background(JazzTheme.cardBackground)
-                                .cornerRadius(10)
-                            }
-                            
-                            if let biography = performer.biography {
-                                VStack(alignment: .leading, spacing: 8) {
-                                    Text("Biography")
-                                        .font(.headline)
-                                        .foregroundColor(JazzTheme.charcoal)
-                                    Text(biography)
-                                        .font(.body)
-                                        .foregroundColor(JazzTheme.smokeGray)
                                 }
                                 .padding()
                                 .background(JazzTheme.cardBackground)

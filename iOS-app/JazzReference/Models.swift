@@ -6,6 +6,8 @@
 //
 // MARK: - Models
 
+import Foundation
+
 struct Song: Codable, Identifiable {
     let id: String
     let title: String
@@ -147,5 +149,23 @@ struct ArtistImage: Codable, Identifiable {
         case sourcePageUrl = "source_page_url"
         case isPrimary = "is_primary"
         case displayOrder = "display_order"
+    }
+}
+
+// Date formatting helper
+extension String {
+    func formatAsDate() -> String {
+        let isoFormatter = ISO8601DateFormatter()
+        isoFormatter.formatOptions = [.withFullDate, .withTime, .withColonSeparatorInTime]
+        
+        guard let date = isoFormatter.date(from: self) else {
+            return self // Return original if parsing fails
+        }
+        
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateStyle = .long
+        dateFormatter.timeStyle = .none
+        
+        return dateFormatter.string(from: date)
     }
 }
