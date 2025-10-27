@@ -41,6 +41,7 @@ Data
 * running Jazz_song_research in dry-run mode, doesn't show me the musicbrainz search
 * running jazz_song_research, not sure I'm getting wikipedia on finding a new song
 * when gathering_mb_releases, store the MB id in the table
+* when running fetch_artist_images.py, it looks like it's slow either sleeping, or with db connection
 
 	
 Done:

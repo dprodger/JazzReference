@@ -97,7 +97,7 @@ class ArtistCreator:
             UUID of created artist, or None on failure
         """
         if self.dry_run:
-            logger.info(f"[DRY RUN] Would create artist: {name}")
+            logger.debug(f"[DRY RUN] Would create artist: {name}")
             return "dry-run-uuid"
         
         try:
@@ -128,7 +128,7 @@ class ArtistCreator:
             references: Dict with keys like 'wikipedia', 'musicbrainz'
         """
         if self.dry_run:
-            logger.info(f"[DRY RUN] Would update references: {json.dumps(references)}")
+            logger.debug(f"[DRY RUN] Would update references: {json.dumps(references)}")
             return True
         
         try:
@@ -159,7 +159,7 @@ class ArtistCreator:
             Wikipedia URL if found with reasonable confidence, None otherwise
         """
         try:
-            logger.info(f"  Searching Wikipedia for: {artist_name}")
+            logger.debug(f"  Searching Wikipedia for: {artist_name}")
             
             # Build minimal context (we don't have sample songs yet)
             context = {
@@ -182,12 +182,12 @@ class ArtistCreator:
             time.sleep(1.0)  # Rate limiting
             
             if response.status_code != 200:
-                logger.info(f"  ✗ Wikipedia search failed (status {response.status_code})")
+                logger.warning(f"  ✗ Wikipedia search failed (status {response.status_code})")
                 return None
             
             data = response.json()
             if len(data) < 4 or not data[3]:
-                logger.info(f"  ✗ No Wikipedia results found")
+                logger.debug(f"  ✗ No Wikipedia results found")
                 return None
             
             # Get the URLs from the response
@@ -200,12 +200,12 @@ class ArtistCreator:
                 
                 # Accept any valid result (low, medium, or high - not very_low)
                 if verification['valid']:
-                    logger.info(f"  ✓ Found Wikipedia: {url} (confidence: {verification['confidence']}, score: {verification.get('score', 0)})")
-                    logger.info(f"    Reason: {verification['reason']}")
+                    logger.debug(f"  ✓ Found Wikipedia: {url} (confidence: {verification['confidence']}, score: {verification.get('score', 0)})")
+                    logger.debug(f"    Reason: {verification['reason']}")
                     self.stats['wikipedia_found'] += 1
                     return url
             
-            logger.info(f"  ✗ No valid Wikipedia match found")
+            logger.debug(f"  ✗ No valid Wikipedia match found")
             return None
             
         except Exception as e:
@@ -224,32 +224,18 @@ class ArtistCreator:
             MusicBrainz artist ID if found with reasonable confidence, None otherwise
         """
         try:
-            logger.info(f"  Searching MusicBrainz for: {artist_name}")
+            logger.debug(f"  Searching MusicBrainz for: {artist_name}")
             
             # Build minimal context
             context = {
                 'sample_songs': []
             }
             
-            url = "https://musicbrainz.org/ws/2/artist/"
-            params = {
-                'query': f'artist:"{artist_name}" AND tag:jazz',
-                'fmt': 'json',
-                'limit': 5
-            }
-            
-            response = self.session.get(url, params=params, timeout=10)
-            time.sleep(1.0)  # MusicBrainz rate limiting
-            
-            if response.status_code != 200:
-                logger.info(f"  ✗ MusicBrainz search failed (status {response.status_code})")
-                return None
-            
-            data = response.json()
-            artists = data.get('artists', [])
+            # Use the cached search method
+            artists = self.mb_searcher.search_musicbrainz_artist(artist_name)
             
             if not artists:
-                logger.info(f"  ✗ No MusicBrainz results found")
+                logger.debug(f"  ✗ No MusicBrainz results found")
                 return None
             
             # Look for exact or close name match
@@ -260,12 +246,12 @@ class ArtistCreator:
                     # Verify this is the right artist
                     verification = self.verify_musicbrainz_reference(artist_name, mb_id, context)
                     if verification['valid']:
-                        logger.info(f"  ✓ Found MusicBrainz: {mb_id} (confidence: {verification['confidence']})")
-                        logger.info(f"    Reason: {verification['reason']}")
+                        logger.debug(f"  ✓ Found MusicBrainz: {mb_id} (confidence: {verification['confidence']})")
+                        logger.debug(f"    Reason: {verification['reason']}")
                         self.stats['musicbrainz_found'] += 1
                         return mb_id
             
-            logger.info(f"  ✗ No valid MusicBrainz match found")
+            logger.debug(f"  ✗ No valid MusicBrainz match found")
             return None
             
         except Exception as e:
@@ -286,31 +272,17 @@ class ArtistCreator:
             Dict with 'valid' (bool), 'confidence' (str), 'reason' (str)
         """
         try:
-            url = f"https://musicbrainz.org/ws/2/artist/{mb_id}"
-            params = {
-                'fmt': 'json',
-                'inc': 'recordings+tags'
-            }
-            
             logger.debug(f"Verifying MusicBrainz ID: {mb_id}")
             
-            response = self.session.get(url, params=params, timeout=10)
-            time.sleep(1.0)  # MusicBrainz rate limiting
+            # Use the cached detail lookup
+            data = self.mb_searcher.get_artist_details(mb_id)
             
-            if response.status_code == 404:
+            if data is None:
                 return {
                     'valid': False,
                     'confidence': 'certain',
                     'reason': 'MusicBrainz ID not found (404)'
                 }
-            elif response.status_code != 200:
-                return {
-                    'valid': False,
-                    'confidence': 'uncertain',
-                    'reason': f'API returned status code {response.status_code}'
-                }
-            
-            data = response.json()
             
             # Check name similarity
             mb_name = data.get('name', '').lower()
@@ -369,10 +341,9 @@ class ArtistCreator:
             # Check if artist already exists
             existing = self.check_artist_exists(name)
             if existing:
-                logger.info(f"✗ Artist already exists: {name}")
-                logger.info(f"  ID: {existing['id']}")
+                logger.info(f"✗ Artist already exists: {name}, ID: {existing['id']}")
                 if existing['external_links']:
-                    logger.info(f"  External links: {json.dumps(existing['external_links'], indent=2)}")
+                    logger.debug(f"  External links: {json.dumps(existing['external_links'], indent=2)}")
                 self.stats['artists_skipped'] += 1
                 return False
             
@@ -384,7 +355,7 @@ class ArtistCreator:
                 logger.error(f"✗ Failed to create artist")
                 return False
             
-            logger.info(f"✓ Artist created with ID: {artist_id}")
+            logger.debug(f"✓ Artist created with ID: {artist_id}")
             self.stats['artists_created'] += 1
             logger.info("")
             
@@ -393,7 +364,7 @@ class ArtistCreator:
             
             # Handle Wikipedia reference
             if wikipedia_url:
-                logger.info(f"Using provided Wikipedia URL: {wikipedia_url}")
+                logger.debug(f"Using provided Wikipedia URL: {wikipedia_url}")
                 external_refs['wikipedia'] = wikipedia_url
                 self.stats['wikipedia_found'] += 1
             else:
@@ -404,7 +375,7 @@ class ArtistCreator:
             
             # Handle MusicBrainz reference
             if musicbrainz_id:
-                logger.info(f"Using provided MusicBrainz ID: {musicbrainz_id}")
+                logger.debug(f"Using provided MusicBrainz ID: {musicbrainz_id}")
                 external_refs['musicbrainz'] = musicbrainz_id
                 self.stats['musicbrainz_found'] += 1
             else:
@@ -415,17 +386,17 @@ class ArtistCreator:
             
             # Update artist with references if any were found
             if external_refs:
-                logger.info("")
-                logger.info(f"Updating artist with external references...")
+                logger.debug("")
+                logger.debug(f"Updating artist with external references...")
                 success = self.update_artist_references(artist_id, external_refs)
                 if success:
-                    logger.info(f"✓ External references updated")
-                    logger.info(f"  {json.dumps(external_refs, indent=2)}")
+                    logger.debug(f"✓ External references updated")
+                    logger.debug(f"  {json.dumps(external_refs, indent=2)}")
                 else:
                     logger.error(f"✗ Failed to update external references")
             else:
-                logger.info("")
-                logger.info("⚠️  No external references found")
+                logger.debug("")
+                logger.debug("⚠️  No external references found")
             
             logger.info("")
             logger.info("="*80)
