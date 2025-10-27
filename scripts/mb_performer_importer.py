@@ -5,9 +5,8 @@ Shared utilities for importing performer and instrument data from MusicBrainz
 
 import json
 import logging
-import time
-import requests
 from db_utils import get_db_connection
+from mb_utils import MusicBrainzSearcher
 
 logger = logging.getLogger(__name__)
 
@@ -16,11 +15,7 @@ class PerformerImporter:
     
     def __init__(self, dry_run=False):
         self.dry_run = dry_run
-        self.session = requests.Session()
-        self.session.headers.update({
-            'User-Agent': 'JazzReference/1.0 (https://github.com/yourusername/jazzreference)',
-            'Accept': 'application/json'
-        })
+        self.mb_searcher = MusicBrainzSearcher()
         self.stats = {
             'performers_created': 0,
             'instruments_created': 0,
@@ -37,18 +32,9 @@ class PerformerImporter:
         Returns:
             Release data dict or None if error
         """
-        url = f"https://musicbrainz.org/ws/2/release/{release_id}"
-        params = {
-            'inc': 'artist-credits+recordings+artist-rels',
-            'fmt': 'json'
-        }
-        
         try:
-            time.sleep(1.0)  # Rate limiting
-            logger.debug(f"      Fetching release credits: {release_id}")
-            response = self.session.get(url, params=params)
-            response.raise_for_status()
-            return response.json()
+            # Use cached method from mb_utils
+            return self.mb_searcher.get_release_details(release_id)
         except Exception as e:
             logger.warning(f"      Error fetching release credits: {e}")
             return None

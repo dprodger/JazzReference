@@ -56,6 +56,8 @@ class MusicBrainzSearcher:
         self.work_cache_dir.mkdir(parents=True, exist_ok=True)
         self.recording_cache_dir = self.cache_dir / 'recordings'
         self.recording_cache_dir.mkdir(parents=True, exist_ok=True)
+        self.release_cache_dir = self.cache_dir / 'releases'
+        self.release_cache_dir.mkdir(parents=True, exist_ok=True)
         
         logger.debug(f"MusicBrainz cache: {self.cache_dir} (expires after {cache_days} days, force_refresh={force_refresh})")
     
@@ -130,6 +132,19 @@ class MusicBrainzSearcher:
         filename = f"recording_{recording_id}.json"
         return self.recording_cache_dir / filename
     
+    def _get_release_detail_cache_path(self, release_id):
+        """
+        Get the cache file path for a release detail lookup
+        
+        Args:
+            release_id: MusicBrainz release ID
+            
+        Returns:
+            Path object for the cache file
+        """
+        filename = f"release_{release_id}.json"
+        return self.release_cache_dir / filename
+    
     def _is_cache_valid(self, cache_path):
         """
         Check if cache file exists and is not expired
@@ -203,6 +218,7 @@ class MusicBrainzSearcher:
         elapsed = time.time() - self.last_request_time
         if elapsed < self.min_request_interval:
             sleep_time = self.min_request_interval - elapsed
+            logger.debug("rate_limit: sleep")
             time.sleep(sleep_time)
         self.last_request_time = time.time()
     
@@ -565,6 +581,58 @@ class MusicBrainzSearcher:
             logger.error(f"Error fetching recording details from MusicBrainz: {e}")
             return None
     
+    def get_release_details(self, release_id):
+        """
+        Get detailed information about a MusicBrainz release
+        
+        Args:
+            release_id: MusicBrainz release ID
+            
+        Returns:
+            Dict with release details, or None if not found
+        """
+        # Check cache first (unless force_refresh is enabled)
+        cache_path = self._get_release_detail_cache_path(release_id)
+        if not self.force_refresh:
+            cached = self._load_from_cache(cache_path)
+            if cached:
+                logger.debug(f"  Using cached release details (cached: {cached['cached_at'][:10]})")
+                self.last_made_api_call = False
+                return cached.get('data')
+        
+        # Fetch from API
+        self.last_made_api_call = True
+        self.rate_limit()
+        
+        try:
+            url = f"https://musicbrainz.org/ws/2/release/{release_id}"
+            params = {
+                'inc': 'artist-credits+recordings+artist-rels',
+                'fmt': 'json'
+            }
+            
+            logger.debug(f"Fetching MusicBrainz release details: {release_id}")
+            
+            response = self.session.get(url, params=params, timeout=10)
+            
+            if response.status_code == 404:
+                # Cache the negative result
+                self._save_to_cache(cache_path, None)
+                return None
+            elif response.status_code != 200:
+                return None
+            
+            data = response.json()
+            
+            # Cache the result
+            self._save_to_cache(cache_path, data)
+            
+            return data
+            
+        except Exception as e:
+            logger.error(f"Error fetching release details from MusicBrainz: {e}")
+            return None
+    
     def clear_cache(self, search_only=False):
         """
         Clear the MusicBrainz cache
@@ -587,4 +655,5 @@ class MusicBrainzSearcher:
                 self.artist_cache_dir.mkdir(parents=True, exist_ok=True)
                 self.work_cache_dir.mkdir(parents=True, exist_ok=True)
                 self.recording_cache_dir.mkdir(parents=True, exist_ok=True)
+                self.release_cache_dir.mkdir(parents=True, exist_ok=True)
                 logger.info("Cleared all MusicBrainz cache")
