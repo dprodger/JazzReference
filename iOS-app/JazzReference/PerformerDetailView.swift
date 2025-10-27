@@ -135,13 +135,13 @@ struct PerformerDetailView: View {
                                 .cornerRadius(10)
                             }
                             
-                            // External References Panel
                             ExternalReferencesPanel(
+                                wikipediaUrl: performer.wikipediaUrl,
+                                musicbrainzId: performer.musicbrainzId,
                                 externalLinks: performer.externalLinks,
                                 entityId: performer.id,
                                 entityName: performer.name
-                            )
-                        }
+                            )                        }
                         .padding()
                         
                         Divider()

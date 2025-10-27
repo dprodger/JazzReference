@@ -30,6 +30,8 @@ CREATE TABLE performers (
     birth_date DATE,
     death_date DATE,
     external_links JSONB, -- Store social media, official websites, etc.
+    wikipedia_url VARCHAR(500),
+    musicbrainz_id VARCHAR(255),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     created_by VARCHAR(100),
@@ -208,6 +210,8 @@ CREATE INDEX idx_songs_musicbrainz_id ON songs(musicbrainz_id);
 -- Performer indexes
 CREATE INDEX idx_performers_name ON performers(name);
 -- CREATE INDEX idx_performers_name_trgm ON performers USING gin(name gin_trgm_ops);
+CREATE INDEX idx_performers_wikipedia_url ON performers(wikipedia_url) WHERE wikipedia_url IS NOT NULL;
+CREATE INDEX idx_performers_musicbrainz_id ON performers(musicbrainz_id) WHERE musicbrainz_id IS NOT NULL;
 
 -- Recording indexes
 CREATE INDEX idx_recordings_song_id ON recordings(song_id);
@@ -369,6 +373,8 @@ COMMENT ON TABLE songs IS 'Core table storing jazz standard songs and compositio
 COMMENT ON COLUMN songs.musicbrainz_id IS 'MusicBrainz Work ID for this song/composition';
 COMMENT ON TABLE recordings IS 'Specific recordings of songs with album and streaming information';
 COMMENT ON TABLE performers IS 'Jazz musicians and vocalists';
+COMMENT ON COLUMN performers.wikipedia_url IS 'Direct link to Wikipedia article for this performer';
+COMMENT ON COLUMN performers.musicbrainz_id IS 'MusicBrainz artist ID (UUID format)';
 COMMENT ON TABLE instruments IS 'Reference table for musical instruments';
 COMMENT ON TABLE recording_performers IS 'Junction table linking performers to recordings with their instrument roles';
 COMMENT ON TABLE videos IS 'YouTube videos linked to songs or recordings';

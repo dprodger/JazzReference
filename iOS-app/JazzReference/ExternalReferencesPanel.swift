@@ -30,6 +30,26 @@ struct ExternalReferencesPanel: View {
         case artist // For performers
     }
     
+    // NEW: Initializer for artists with dedicated wikipedia and musicbrainz fields
+    init(wikipediaUrl: String?, musicbrainzId: String?, externalLinks: [String: String]?,
+         entityId: String, entityName: String) {
+        // Use dedicated fields first, fall back to external_links if needed
+        var references = externalLinks ?? [:]
+        if let wikipedia = wikipediaUrl {
+            references["wikipedia"] = wikipedia
+        }
+        if let musicbrainz = musicbrainzId {
+            references["musicbrainz"] = musicbrainz
+        }
+        
+        self.externalReferences = references
+        self.musicbrainzId = musicbrainzId
+        self.musicbrainzType = .artist
+        self.entityType = "Artist"
+        self.entityId = entityId
+        self.entityName = entityName
+    }
+
     // Convenience initializer for songs (with separate musicbrainzId field)
     init(externalReferences: [String: String]?, musicbrainzId: String?, entityId: String, entityName: String) {
         self.externalReferences = externalReferences

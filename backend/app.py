@@ -425,7 +425,8 @@ def get_performers():
     try:
         if search_query:
             query = """
-                SELECT id, name, biography, birth_date, death_date, external_links
+                SELECT id, name, biography, birth_date, death_date, 
+                    external_links, wikipedia_url, musicbrainz_id
                 FROM performers
                 WHERE name ILIKE %s
                 ORDER BY name
@@ -433,7 +434,7 @@ def get_performers():
             params = (f'%{search_query}%',)
         else:
             query = """
-                SELECT id, name, biography, birth_date, death_date, external_links
+                SELECT id, name, biography, birth_date, death_date, external_links, wikipedia_url, musicbrainz_id
                 FROM performers
                 ORDER BY name
             """
@@ -533,7 +534,7 @@ def get_performer_detail(performer_id):
     try:
         # Get performer information
         performer_query = """
-            SELECT id, name, biography, birth_date, death_date, external_links 
+            SELECT id, name, biography, birth_date, death_date, external_links, wikipedia_url, musicbrainz_id 
             FROM performers
             WHERE id = %s
         """

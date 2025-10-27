@@ -81,6 +81,8 @@ struct PerformerDetail: Codable, Identifiable {
     let birthDate: String?
     let deathDate: String?
     let externalLinks: [String: String]?
+    let wikipediaUrl: String?          // NEW: Dedicated field
+    let musicbrainzId: String?         // NEW: Dedicated field
     let instruments: [PerformerInstrument]?
     let recordings: [PerformerRecording]?
     let images: [ArtistImage]?  // <-- ADD THIS LINE
@@ -90,6 +92,8 @@ struct PerformerDetail: Codable, Identifiable {
         case birthDate = "birth_date"
         case deathDate = "death_date"
         case externalLinks = "external_links"
+        case wikipediaUrl = "wikipedia_url"     // NEW
+        case musicbrainzId = "musicbrainz_id"   // NEW
     }
 }
 
