@@ -205,79 +205,104 @@ class SpotifyMatcher:
                 return cur.fetchall()
     
     def search_spotify_track(self, song_title, album_title, artist_name, year=None):
-        """Search Spotify for a track"""
+        """Search Spotify for a track using progressive search strategy"""
         token = self.get_spotify_token()
         
         headers = {
             'Authorization': f'Bearer {token}'
         }
         
-        # Build search query
-        query_parts = [f'track:"{song_title}"']
-        
-        if artist_name:
-            query_parts.append(f'artist:"{artist_name}"')
-        
-        if album_title:
-            query_parts.append(f'album:"{album_title}"')
-        
-        if year:
-            query_parts.append(f'year:{year}')
-        
-        query = ' '.join(query_parts)
-        
         url = 'https://api.spotify.com/v1/search'
-        params = {
-            'q': query,
-            'type': 'track',
-            'limit': 5
-        }
         
-        try:
-            time.sleep(0.1)  # Rate limiting - be nice to Spotify
-            logger.debug(f"    Searching Spotify: {query}")
-            
-            response = requests.get(url, headers=headers, params=params)
-            response.raise_for_status()
-            
-            data = response.json()
-            tracks = data.get('tracks', {}).get('items', [])
-            
-            if not tracks:
-                logger.debug(f"    ✗ No Spotify matches found")
-                return None
-            
-            # Return the best match (first result)
-            best_match = tracks[0]
-            track_id = best_match['id']
-            track_name = best_match['name']
-            track_artists = ', '.join([a['name'] for a in best_match['artists']])
-            track_album = best_match['album']['name']
-            track_url = best_match['external_urls']['spotify']
-            
-            logger.debug(f"    ✓ Found: '{track_name}' by {track_artists}")
-            logger.debug(f"       Album: '{track_album}'")
-            logger.debug(f"       URL: {track_url}")
-            
-            return {
-                'id': track_id,
-                'url': track_url,
-                'name': track_name,
-                'artists': track_artists,
-                'album': track_album
+        # Define search strategies in order of specificity
+        search_strategies = []
+        
+        # Strategy 1: All fields with exact track name
+        if artist_name and album_title and year:
+            search_strategies.append({
+                'query': f'track:"{song_title}" artist:"{artist_name}" album:"{album_title}" year:{year}',
+                'description': 'exact track + artist + album + year'
+            })
+        
+        # Strategy 2: Track, artist, and album (no year)
+        if artist_name and album_title:
+            search_strategies.append({
+                'query': f'track:"{song_title}" artist:"{artist_name}" album:"{album_title}"',
+                'description': 'exact track + artist + album'
+            })
+        
+        # Strategy 3: Track and artist with looser track matching
+        if artist_name:
+            search_strategies.append({
+                'query': f'track:{song_title} artist:"{artist_name}"',
+                'description': 'track + artist (loose match)'
+            })
+        
+        # Strategy 4: Just track and artist, both loose
+        if artist_name:
+            search_strategies.append({
+                'query': f'{song_title} {artist_name}',
+                'description': 'track + artist (very loose)'
+            })
+        
+        # Try each strategy until we get results
+        for strategy in search_strategies:
+            params = {
+                'q': strategy['query'],
+                'type': 'track',
+                'limit': 10
             }
             
-        except requests.exceptions.HTTPError as e:
-            if e.response.status_code == 401:
-                # Token expired, clear it
-                self.access_token = None
-                logger.warning("Spotify token expired, will refresh on next request")
+            try:
+                time.sleep(0.1)  # Rate limiting
+                logger.debug(f"    Trying: {strategy['description']}")
+                logger.debug(f"    Query: {strategy['query']}")
+                
+                response = requests.get(url, headers=headers, params=params)
+                response.raise_for_status()
+                
+                data = response.json()
+                tracks = data.get('tracks', {}).get('items', [])
+                
+                if tracks:
+                    # Found results - return best match
+                    best_match = tracks[0]
+                    track_id = best_match['id']
+                    track_name = best_match['name']
+                    track_artists = ', '.join([a['name'] for a in best_match['artists']])
+                    track_album = best_match['album']['name']
+                    track_url = best_match['external_urls']['spotify']
+                    
+                    logger.debug(f"    ✓ Found with {strategy['description']}")
+                    logger.debug(f"       Track: '{track_name}' by {track_artists}")
+                    logger.debug(f"       Album: '{track_album}'")
+                    logger.debug(f"       URL: {track_url}")
+                    
+                    return {
+                        'id': track_id,
+                        'url': track_url,
+                        'name': track_name,
+                        'artists': track_artists,
+                        'album': track_album
+                    }
+                else:
+                    logger.debug(f"    ✗ No results with {strategy['description']}")
+                    
+            except requests.exceptions.HTTPError as e:
+                if e.response.status_code == 401:
+                    # Token expired, clear it
+                    self.access_token = None
+                    logger.warning("Spotify token expired, will refresh on next request")
+                    return None
+                logger.error(f"Spotify search failed: {e}")
                 return None
-            logger.error(f"Spotify search failed: {e}")
-            return None
-        except Exception as e:
-            logger.error(f"Error searching Spotify: {e}")
-            return None
+            except Exception as e:
+                logger.error(f"Error searching Spotify: {e}")
+                return None
+        
+        # No strategies worked
+        logger.debug(f"    ✗ No Spotify matches found after trying all strategies")
+        return None
     
     def update_recording_spotify_url(self, conn, recording_id, spotify_url):
         """Update recording with Spotify URL"""
