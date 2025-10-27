@@ -52,6 +52,10 @@ class MusicBrainzSearcher:
         self.search_cache_dir.mkdir(parents=True, exist_ok=True)
         self.artist_cache_dir = self.cache_dir / 'artists'
         self.artist_cache_dir.mkdir(parents=True, exist_ok=True)
+        self.work_cache_dir = self.cache_dir / 'works'
+        self.work_cache_dir.mkdir(parents=True, exist_ok=True)
+        self.recording_cache_dir = self.cache_dir / 'recordings'
+        self.recording_cache_dir.mkdir(parents=True, exist_ok=True)
         
         logger.debug(f"MusicBrainz cache: {self.cache_dir} (expires after {cache_days} days, force_refresh={force_refresh})")
     
@@ -99,6 +103,32 @@ class MusicBrainzSearcher:
         """
         filename = f"artist_{mb_id}.json"
         return self.artist_cache_dir / filename
+    
+    def _get_work_detail_cache_path(self, work_id):
+        """
+        Get the cache file path for a work detail lookup
+        
+        Args:
+            work_id: MusicBrainz work ID
+            
+        Returns:
+            Path object for the cache file
+        """
+        filename = f"work_{work_id}.json"
+        return self.work_cache_dir / filename
+    
+    def _get_recording_detail_cache_path(self, recording_id):
+        """
+        Get the cache file path for a recording detail lookup
+        
+        Args:
+            recording_id: MusicBrainz recording ID
+            
+        Returns:
+            Path object for the cache file
+        """
+        filename = f"recording_{recording_id}.json"
+        return self.recording_cache_dir / filename
     
     def _is_cache_valid(self, cache_path):
         """
@@ -431,6 +461,110 @@ class MusicBrainzSearcher:
             logger.error(f"Error fetching artist details from MusicBrainz: {e}")
             return None
     
+    def get_work_recordings(self, work_id):
+        """
+        Get recordings for a MusicBrainz work
+        
+        Args:
+            work_id: MusicBrainz work ID
+            
+        Returns:
+            Dict with work data including recording relations, or None if not found
+        """
+        # Check cache first (unless force_refresh is enabled)
+        cache_path = self._get_work_detail_cache_path(work_id)
+        if not self.force_refresh:
+            cached = self._load_from_cache(cache_path)
+            if cached:
+                logger.debug(f"  Using cached work recordings (cached: {cached['cached_at'][:10]})")
+                self.last_made_api_call = False
+                return cached.get('data')
+        
+        # Fetch from API
+        self.last_made_api_call = True
+        self.rate_limit()
+        
+        try:
+            url = f"https://musicbrainz.org/ws/2/work/{work_id}"
+            params = {
+                'inc': 'recording-rels',
+                'fmt': 'json'
+            }
+            
+            logger.debug(f"Fetching MusicBrainz work recordings: {work_id}")
+            
+            response = self.session.get(url, params=params, timeout=10)
+            
+            if response.status_code == 404:
+                # Cache the negative result
+                self._save_to_cache(cache_path, None)
+                return None
+            elif response.status_code != 200:
+                return None
+            
+            data = response.json()
+            
+            # Cache the result
+            self._save_to_cache(cache_path, data)
+            
+            return data
+            
+        except Exception as e:
+            logger.error(f"Error fetching work recordings from MusicBrainz: {e}")
+            return None
+    
+    def get_recording_details(self, recording_id):
+        """
+        Get detailed information about a MusicBrainz recording
+        
+        Args:
+            recording_id: MusicBrainz recording ID
+            
+        Returns:
+            Dict with recording details, or None if not found
+        """
+        # Check cache first (unless force_refresh is enabled)
+        cache_path = self._get_recording_detail_cache_path(recording_id)
+        if not self.force_refresh:
+            cached = self._load_from_cache(cache_path)
+            if cached:
+                logger.debug(f"  Using cached recording details (cached: {cached['cached_at'][:10]})")
+                self.last_made_api_call = False
+                return cached.get('data')
+        
+        # Fetch from API
+        self.last_made_api_call = True
+        self.rate_limit()
+        
+        try:
+            url = f"https://musicbrainz.org/ws/2/recording/{recording_id}"
+            params = {
+                'inc': 'releases+artist-credits+artist-rels',
+                'fmt': 'json'
+            }
+            
+            logger.debug(f"Fetching MusicBrainz recording details: {recording_id}")
+            
+            response = self.session.get(url, params=params, timeout=10)
+            
+            if response.status_code == 404:
+                # Cache the negative result
+                self._save_to_cache(cache_path, None)
+                return None
+            elif response.status_code != 200:
+                return None
+            
+            data = response.json()
+            
+            # Cache the result
+            self._save_to_cache(cache_path, data)
+            
+            return data
+            
+        except Exception as e:
+            logger.error(f"Error fetching recording details from MusicBrainz: {e}")
+            return None
+    
     def clear_cache(self, search_only=False):
         """
         Clear the MusicBrainz cache
@@ -451,4 +585,6 @@ class MusicBrainzSearcher:
                 self.cache_dir.mkdir(parents=True, exist_ok=True)
                 self.search_cache_dir.mkdir(parents=True, exist_ok=True)
                 self.artist_cache_dir.mkdir(parents=True, exist_ok=True)
+                self.work_cache_dir.mkdir(parents=True, exist_ok=True)
+                self.recording_cache_dir.mkdir(parents=True, exist_ok=True)
                 logger.info("Cleared all MusicBrainz cache")

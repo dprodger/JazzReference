@@ -6,17 +6,16 @@ Fetches releases for songs with MusicBrainz IDs and imports them into the databa
 
 import sys
 import json
-import time
 import argparse
 import logging
 import os
 from datetime import datetime
-import requests
 
 # Import shared database utilities
 sys.path.insert(0, '/mnt/project/scripts')
 from db_utils import get_db_connection
 from mb_performer_importer import PerformerImporter
+from mb_utils import MusicBrainzSearcher
 
 # Configure logging
 logging.basicConfig(
@@ -32,11 +31,7 @@ logger = logging.getLogger(__name__)
 class MusicBrainzImporter:
     def __init__(self, dry_run=False):
         self.dry_run = dry_run
-        self.session = requests.Session()
-        self.session.headers.update({
-            'User-Agent': 'JazzReference/1.0 (https://github.com/yourusername/jazzreference)',
-            'Accept': 'application/json'
-        })
+        self.mb_searcher = MusicBrainzSearcher()
         self.performer_importer = PerformerImporter(dry_run=dry_run)
         self.stats = {
             'releases_found': 0,
@@ -107,24 +102,14 @@ class MusicBrainzImporter:
         """Fetch recordings for a MusicBrainz work ID"""
         logger.info(f"Fetching recordings for MusicBrainz work: {work_id}")
         
-        # Use the work endpoint to get recordings, not the recording endpoint
-        url = f"https://musicbrainz.org/ws/2/work/{work_id}"
-        params = {
-            'inc': 'recording-rels',
-            'fmt': 'json'
-        }
-        
         try:
-            time.sleep(1.0)  # Rate limiting - MusicBrainz requires 1 req/sec
-            logger.debug(f"Requesting: {url} with params: {params}")
-            response = self.session.get(url, params=params)
+            # Use cached method from mb_utils
+            data = self.mb_searcher.get_work_recordings(work_id)
             
-            # Log response for debugging
-            logger.debug(f"Response status: {response.status_code}")
-            
-            response.raise_for_status()
-            
-            data = response.json()
+            if not data:
+                logger.error(f"Could not fetch work from MusicBrainz")
+                self.stats['errors'] += 1
+                return []
             
             # Extract recordings from relations
             recordings = []
@@ -153,36 +138,20 @@ class MusicBrainzImporter:
             
             return recordings
             
-        except requests.exceptions.HTTPError as e:
-            logger.error(f"HTTP Error fetching MusicBrainz work: {e}")
-            if hasattr(e, 'response') and e.response is not None:
-                try:
-                    error_text = e.response.text
-                    logger.error(f"Response content: {error_text}")
-                except:
-                    logger.error("Could not decode response content")
-            self.stats['errors'] += 1
-            return []
-        except requests.exceptions.RequestException as e:
+        except Exception as e:
             logger.error(f"Error fetching MusicBrainz work: {e}")
             self.stats['errors'] += 1
             return []
     
     def fetch_recording_detail(self, recording_id):
         """Fetch detailed information about a specific recording including artist relationships"""
-        url = f"https://musicbrainz.org/ws/2/recording/{recording_id}"
-        params = {
-            'inc': 'releases+artist-credits+artist-rels',
-            'fmt': 'json'
-        }
-        
         try:
-            time.sleep(1.0)  # Rate limiting
-            logger.debug(f"    Fetching full details for recording: {recording_id}")
-            response = self.session.get(url, params=params)
-            response.raise_for_status()
+            # Use cached method from mb_utils
+            data = self.mb_searcher.get_recording_details(recording_id)
             
-            data = response.json()
+            if not data:
+                logger.debug(f"    Could not fetch recording details")
+                return None
             
             # Log key information about the recording
             title = data.get('title', 'Unknown')
