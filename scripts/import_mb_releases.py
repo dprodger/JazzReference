@@ -14,6 +14,7 @@ from datetime import datetime
 # Import shared database utilities
 sys.path.insert(0, '/mnt/project/scripts')
 from db_utils import get_db_connection
+from db_utils import normalize_apostrophes
 from mb_performer_importer import PerformerImporter
 from mb_utils import MusicBrainzSearcher
 
@@ -565,7 +566,9 @@ Examples:
     importer = MusicBrainzImporter(dry_run=args.dry_run)
 
     # Determine song identifier
-    song_identifier = args.name if args.name else args.id
+    song_name = normalize_apostrophes(args.name)
+    
+    song_identifier = normalize_apostrophes(args.name) if args.name else args.id
     
     try:
         success = importer.import_releases_for_song(song_identifier)

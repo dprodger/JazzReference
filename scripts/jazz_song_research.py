@@ -32,6 +32,37 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+def normalize_apostrophes(text):
+    """
+    Normalize various apostrophe characters to the correct Unicode apostrophe (').
+    
+    This function can be extracted to a utilities module for reuse across scripts.
+    
+    Args:
+        text: String that may contain various apostrophe characters
+        
+    Returns:
+        String with all apostrophes normalized to U+2019 (')
+    """
+    if not text:
+        return text
+    
+    # Map of apostrophe variants to the correct Unicode apostrophe
+    apostrophe_variants = {
+        "'": "'",  # U+0027 (straight apostrophe) -> U+2019
+        "`": "'",  # U+0060 (backtick/grave accent) -> U+2019
+        "´": "'",  # U+00B4 (acute accent) -> U+2019
+        "'": "'",  # U+2018 (left single quotation mark) -> U+2019
+        "‛": "'",  # U+201B (single high-reversed-9 quotation mark) -> U+2019
+    }
+    
+    result = text
+    for variant, correct in apostrophe_variants.items():
+        result = result.replace(variant, correct)
+    
+    return result
+
+
 class JazzSongResearcher:
     def __init__(self, dry_run=False):
         self.dry_run = dry_run
@@ -414,10 +445,13 @@ Examples:
     if args.debug:
         logging.getLogger().setLevel(logging.DEBUG)
     
+    # Normalize apostrophes in song name
+    song_name = normalize_apostrophes(args.name)
+    
     researcher = JazzSongResearcher(dry_run=args.dry_run)
     
     try:
-        success = researcher.import_to_database(args.name)
+        success = researcher.import_to_database(song_name)
         sys.exit(0 if success else 1)
     except KeyboardInterrupt:
         logger.info("\nCancelled by user")
