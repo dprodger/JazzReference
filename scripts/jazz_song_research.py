@@ -22,6 +22,7 @@ from pathlib import Path
 # Import db_utils and mb_utils from same directory
 sys.path.insert(0, str(Path(__file__).parent))
 from db_utils import get_db_connection
+from db_utils import normalize_apostrophes
 from mb_utils import MusicBrainzSearcher
 
 # Configure logging
@@ -30,37 +31,6 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
-
-
-def normalize_apostrophes(text):
-    """
-    Normalize various apostrophe characters to the correct Unicode apostrophe (').
-    
-    This function can be extracted to a utilities module for reuse across scripts.
-    
-    Args:
-        text: String that may contain various apostrophe characters
-        
-    Returns:
-        String with all apostrophes normalized to U+2019 (')
-    """
-    if not text:
-        return text
-    
-    # Map of apostrophe variants to the correct Unicode apostrophe
-    apostrophe_variants = {
-        "'": "'",  # U+0027 (straight apostrophe) -> U+2019
-        "`": "'",  # U+0060 (backtick/grave accent) -> U+2019
-        "´": "'",  # U+00B4 (acute accent) -> U+2019
-        "'": "'",  # U+2018 (left single quotation mark) -> U+2019
-        "‛": "'",  # U+201B (single high-reversed-9 quotation mark) -> U+2019
-    }
-    
-    result = text
-    for variant, correct in apostrophe_variants.items():
-        result = result.replace(variant, correct)
-    
-    return result
 
 
 class JazzSongResearcher:
