@@ -42,6 +42,8 @@ Data
 * running jazz_song_research, not sure I'm getting wikipedia on finding a new song
 * when gathering_mb_releases, store the MB id in the table
 * when running fetch_artist_images.py, it looks like it's slow either sleeping, or with db connection
+* we'll meet again, peggy lee, why dont you do right -- when importing the release it said credits were fine -- but no one else is listed on that track. Problem or not?
+* On Recordign Detail View, show a Learn More box with links
 
 	
 Done:
