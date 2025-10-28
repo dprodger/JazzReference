@@ -145,6 +145,8 @@ extension PerformerDetail {
         externalLinks: [
             "wikipedia": "https://en.wikipedia.org/wiki/Miles_Davis"
         ],
+        wikipediaUrl: "https://en.wikipedia.org/wiki/Miles_Davis",
+        musicbrainzId: "mb-id",
         instruments: [
             PerformerInstrument(name: "Trumpet", isPrimary: true),
             PerformerInstrument(name: "Flugelhorn", isPrimary: false)
@@ -188,6 +190,8 @@ extension PerformerDetail {
         birthDate: nil,
         deathDate: nil,
         externalLinks: nil,
+        wikipediaUrl: "wikipedia.org/john_coltrane",
+        musicbrainzId: "mb-id",
         instruments: [
             PerformerInstrument(name: "Tenor Saxophone", isPrimary: true)
         ],
