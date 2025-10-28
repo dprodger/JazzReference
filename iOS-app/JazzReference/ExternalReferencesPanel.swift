@@ -26,8 +26,9 @@ struct ExternalReferencesPanel: View {
     }
     
     enum MusicBrainzType {
-        case work   // For songs
-        case artist // For performers
+        case work      // For songs
+        case artist    // For performers
+        case recording // For recordings
     }
     
     // NEW: Initializer for artists with dedicated wikipedia and musicbrainz fields
@@ -70,6 +71,16 @@ struct ExternalReferencesPanel: View {
         self.entityName = entityName
     }
     
+    // Convenience initializer for recordings (musicbrainz only)
+    init(musicbrainzId: String?, recordingId: String, albumTitle: String) {
+        self.externalReferences = nil
+        self.musicbrainzId = musicbrainzId
+        self.musicbrainzType = .recording
+        self.entityType = "Recording"
+        self.entityId = recordingId
+        self.entityName = albumTitle
+    }
+    
     var wikipediaURL: String? {
         externalReferences?["wikipedia"]
     }
@@ -85,6 +96,8 @@ struct ExternalReferencesPanel: View {
             return "https://musicbrainz.org/work/\(mbId)"
         case .artist:
             return "https://musicbrainz.org/artist/\(mbId)"
+        case .recording:
+            return "https://musicbrainz.org/recording/\(mbId)"
         }
     }
     
@@ -220,4 +233,3 @@ struct ExternalReferencesPanel: View {
         print("  Explanation: \(explanation)")
     }
 }
-

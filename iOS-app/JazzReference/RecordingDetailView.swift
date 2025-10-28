@@ -158,6 +158,15 @@ struct RecordingDetailView: View {
                             .padding(.horizontal)
                         }
                         
+                        // External References Panel
+                        if recording.musicbrainzId != nil {
+                            ExternalReferencesPanel(
+                                musicbrainzId: recording.musicbrainzId,
+                                recordingId: recordingId,
+                                albumTitle: recording.albumTitle ?? "Unknown Album"
+                            )
+                        }
+                        
                         Divider()
                             .padding(.horizontal)
                         

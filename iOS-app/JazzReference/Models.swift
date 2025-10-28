@@ -39,6 +39,7 @@ struct Recording: Codable, Identifiable {
     let spotifyUrl: String?
     let youtubeUrl: String?
     let appleMusicUrl: String?
+    let musicbrainzId: String?
     let isCanonical: Bool?
     let notes: String?
     let performers: [Performer]?
@@ -55,6 +56,7 @@ struct Recording: Codable, Identifiable {
         case youtubeUrl = "youtube_url"
         case appleMusicUrl = "apple_music_url"
         case isCanonical = "is_canonical"
+        case musicbrainzId = "musicbrainz_id"
     }
 }
 
