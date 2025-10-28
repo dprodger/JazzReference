@@ -397,6 +397,9 @@ class MusicBrainzImporter:
                 logger.debug(f"Could not parse date: {release_date}")
                 pass
         
+        # Extract MusicBrainz recording ID
+        mb_recording_id = recording_data.get('id')
+        
         if self.dry_run:
             logger.info(f"[DRY RUN] Would import: {album_title} ({release_year or 'unknown year'})")
             logger.info(f"[DRY RUN]   Date: {formatted_date or 'None'}")
@@ -410,9 +413,9 @@ class MusicBrainzImporter:
             cur.execute("""
                 INSERT INTO recordings (
                     song_id, album_title, recording_year, recording_date,
-                    is_canonical, notes
+                    is_canonical, musicbrainz_id, notes
                 )
-                VALUES (%s, %s, %s, %s, %s, %s)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
                 RETURNING id
             """, (
                 song_id,
@@ -420,7 +423,8 @@ class MusicBrainzImporter:
                 release_year,
                 formatted_date,
                 False,  # Not canonical by default
-                f"Imported from MusicBrainz - Recording ID: {recording_data.get('id')}"
+                mb_recording_id,
+                f"Imported from MusicBrainz"
             ))
             
             recording_id = cur.fetchone()['id']
