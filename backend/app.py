@@ -50,6 +50,35 @@ pool: Optional[ConnectionPool] = None
 keepalive_thread: Optional[threading.Thread] = None
 keepalive_stop = threading.Event()
 
+
+def reset_connection_pool():
+    """Reset the connection pool by closing and reinitializing it"""
+    global pool
+    
+    logger.warning("Resetting connection pool...")
+    
+    # Close existing pool
+    if pool is not None:
+        try:
+            pool.close()
+            logger.info("Old pool closed")
+        except Exception as e:
+            logger.error(f"Error closing old pool: {e}")
+    
+    pool = None
+    
+    # Reinitialize
+    time.sleep(2)  # Brief pause
+    success = init_connection_pool()
+    
+    if success:
+        logger.info("✓ Connection pool reset successfully")
+    else:
+        logger.error("✗ Failed to reset connection pool")
+    
+    return success
+    
+    
 def connection_keepalive():
     """Background thread to keep connections alive during idle periods"""
     logger.info("Starting connection keepalive thread...")
@@ -91,6 +120,8 @@ def init_connection_pool(max_retries=3, retry_delay=2):
                 open=True,
                 timeout=10,  # Reduce timeout
                 max_waiting=2,  # Fewer waiting requests
+                max_lifetime=3600,  # recycle connections after one hour
+                max_idle=300,       # close idle connections after 5 min
                 kwargs={
                     'row_factory': dict_row,
                     'connect_timeout': 5,
