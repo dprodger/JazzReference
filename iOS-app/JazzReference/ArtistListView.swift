@@ -78,7 +78,7 @@ struct ArtistsListView: View {
                     }
                 }
                 .task {
-                    await networkManager.fetchPerformers()
+                    await networkManager.fetchPerformers(searchQuery: searchText)
                 }
         }
         .tint(JazzTheme.amber)

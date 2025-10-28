@@ -53,7 +53,7 @@ struct SongsListView: View {
                     }
                 }
                 .task {
-                    await networkManager.fetchSongs()
+                    await networkManager.fetchSongs(searchQuery: searchText)
                 }
         }
         .tint(JazzTheme.burgundy)
