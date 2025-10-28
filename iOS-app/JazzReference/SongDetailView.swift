@@ -14,6 +14,42 @@ enum SongRecordingFilter: String, CaseIterable {
     case all = "All"
 }
 
+// MARK: - Instrument Family Enum
+enum InstrumentFamily: String, CaseIterable, Hashable {
+    case guitar = "Guitar"
+    case saxophone = "Saxophone"
+    case trumpet = "Trumpet"
+    case trombone = "Trombone"
+    case piano = "Piano"
+    case organ = "Organ"
+    case bass = "Bass"
+    case drums = "Drums"
+    case clarinet = "Clarinet"
+    case flute = "Flute"
+    case vibraphone = "Vibraphone"
+    case vocals = "Vocals"
+    
+    // Map specific instruments to their family
+    static func family(for instrument: String) -> InstrumentFamily? {
+        let normalized = instrument.lowercased()
+        
+        if normalized.contains("guitar") { return .guitar }
+        if normalized.contains("sax") { return .saxophone }
+        if normalized.contains("trumpet") || normalized.contains("flugelhorn") { return .trumpet }
+        if normalized.contains("trombone") { return .trombone }
+        if normalized.contains("piano") && !normalized.contains("organ") { return .piano }
+        if normalized.contains("organ") { return .organ }
+        if normalized.contains("bass") && !normalized.contains("brass") { return .bass }
+        if normalized.contains("drum") || normalized == "percussion" { return .drums }
+        if normalized.contains("clarinet") { return .clarinet }
+        if normalized.contains("flute") { return .flute }
+        if normalized.contains("vibraphone") || normalized.contains("vibes") { return .vibraphone }
+        if normalized.contains("vocal") || normalized.contains("voice") || normalized.contains("singer") { return .vocals }
+        
+        return nil
+    }
+}
+
 // MARK: - Song Detail View
 struct SongDetailView: View {
     let songId: String
@@ -22,38 +58,40 @@ struct SongDetailView: View {
     @State private var selectedFilter: SongRecordingFilter = .withSpotify
     
     // Instrument filter states
-    @State private var selectedInstrument: String? = nil
+    @State private var selectedInstrument: InstrumentFamily? = nil
     @State private var isInstrumentFilterExpanded: Bool = false
     
-    // Extract unique instruments from recordings
-    var availableInstruments: [String] {
+    // Extract unique instrument families from recordings
+    var availableInstruments: [InstrumentFamily] {
         guard let recordings = song?.recordings else { return [] }
         
-        var instruments = Set<String>()
+        var families = Set<InstrumentFamily>()
         for recording in recordings {
             if let performers = recording.performers {
                 for performer in performers {
-                    if let instrument = performer.instrument {
-                        instruments.insert(instrument)
+                    if let instrument = performer.instrument,
+                       let family = InstrumentFamily.family(for: instrument) {
+                        families.insert(family)
                     }
                 }
             }
         }
         
-        return instruments.sorted()
+        return families.sorted { $0.rawValue < $1.rawValue }
     }
     
-    // Apply filters in order: first instrument, then Spotify
+    // Apply filters in order: first instrument family, then Spotify
     var filteredRecordings: [Recording] {
         guard let recordings = song?.recordings else { return [] }
         
-        // First, apply instrument filter if selected
+        // First, apply instrument family filter if selected
         var result = recordings
-        if let instrument = selectedInstrument {
+        if let family = selectedInstrument {
             result = result.filter { recording in
                 guard let performers = recording.performers else { return false }
                 return performers.contains { performer in
-                    performer.instrument == instrument
+                    guard let instrument = performer.instrument else { return false }
+                    return InstrumentFamily.family(for: instrument) == family
                 }
             }
         }
@@ -164,25 +202,25 @@ struct SongDetailView: View {
                                         }
                                         
                                         // Instrument buttons
-                                        ForEach(availableInstruments, id: \.self) { instrument in
+                                        ForEach(availableInstruments, id: \.self) { family in
                                             Button(action: {
-                                                if selectedInstrument == instrument {
+                                                if selectedInstrument == family {
                                                     selectedInstrument = nil
                                                 } else {
-                                                    selectedInstrument = instrument
+                                                    selectedInstrument = family
                                                 }
                                             }) {
                                                 HStack {
-                                                    Image(systemName: selectedInstrument == instrument ? "checkmark.circle.fill" : "circle")
-                                                        .foregroundColor(selectedInstrument == instrument ? JazzTheme.brass : JazzTheme.smokeGray)
-                                                    Text(instrument)
+                                                    Image(systemName: selectedInstrument == family ? "checkmark.circle.fill" : "circle")
+                                                        .foregroundColor(selectedInstrument == family ? JazzTheme.brass : JazzTheme.smokeGray)
+                                                    Text(family.rawValue)
                                                         .foregroundColor(JazzTheme.charcoal)
                                                     Spacer()
                                                 }
                                                 .padding(.vertical, 8)
                                                 .padding(.horizontal, 12)
                                                 .background(
-                                                    selectedInstrument == instrument
+                                                    selectedInstrument == family
                                                         ? JazzTheme.brass.opacity(0.1)
                                                         : Color.clear
                                                 )
@@ -200,9 +238,9 @@ struct SongDetailView: View {
                                             .font(.headline)
                                             .foregroundColor(JazzTheme.charcoal)
                                         
-                                        if let instrument = selectedInstrument {
+                                        if let family = selectedInstrument {
                                             Spacer()
-                                            Text(instrument)
+                                            Text(family.rawValue)
                                                 .font(.subheadline)
                                                 .foregroundColor(JazzTheme.brass)
                                                 .padding(.horizontal, 8)
