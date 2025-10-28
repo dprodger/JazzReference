@@ -107,6 +107,26 @@ struct SongDetailView: View {
         return result
     }
     
+    // Group recordings by leader, sorted by leader's last name
+    var groupedRecordings: [(leader: String, recordings: [Recording])] {
+        let recordings = filteredRecordings
+        
+        // Group by leader name
+        var groups: [String: [Recording]] = [:]
+        for recording in recordings {
+            let leaderName = recording.performers?.first { $0.role == "leader" }?.name ?? "Unknown"
+            groups[leaderName, default: []].append(recording)
+        }
+        
+        // Sort by last name
+        return groups.map { (leader: $0.key, recordings: $0.value) }
+            .sorted { (group1, group2) in
+                let lastName1 = group1.leader.components(separatedBy: " ").last ?? group1.leader
+                let lastName2 = group2.leader.components(separatedBy: " ").last ?? group2.leader
+                return lastName1.localizedCaseInsensitiveCompare(lastName2) == .orderedAscending
+            }
+    }
+    
     var body: some View {
         ScrollView {
             if isLoading {
@@ -289,11 +309,21 @@ struct SongDetailView: View {
                     // Recordings List
                     VStack(alignment: .leading, spacing: 12) {
                         if !filteredRecordings.isEmpty {
-                            ForEach(filteredRecordings) { recording in
-                                NavigationLink(destination: RecordingDetailView(recordingId: recording.id)) {
-                                    RecordingRowView(recording: recording)
+                            ForEach(groupedRecordings, id: \.leader) { group in
+                                VStack(alignment: .leading, spacing: 8) {
+                                    Text(group.leader)
+                                        .font(.headline)
+                                        .foregroundColor(JazzTheme.burgundy)
+                                        .padding(.horizontal)
+                                        .padding(.top, 8)
+                                    
+                                    ForEach(group.recordings) { recording in
+                                        NavigationLink(destination: RecordingDetailView(recordingId: recording.id)) {
+                                            RecordingRowView(recording: recording)
+                                        }
+                                        .buttonStyle(.plain)
+                                    }
                                 }
-                                .buttonStyle(.plain)
                             }
                         } else {
                             VStack(spacing: 12) {
