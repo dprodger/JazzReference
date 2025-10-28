@@ -12,6 +12,15 @@ struct RecordingDetailView: View {
     let recordingId: String
     @State private var recording: Recording?
     @State private var isLoading = true
+    @State private var reportingInfo: ReportingInfo?
+    @State private var longPressOccurred = false
+    @Environment(\.openURL) var openURL
+    
+    struct ReportingInfo: Identifiable {
+        let id = UUID()
+        let source: String
+        let url: String
+    }
     
     var body: some View {
         ScrollView {
@@ -109,24 +118,50 @@ struct RecordingDetailView: View {
                                     .padding(.horizontal)
                                 
                                 HStack(spacing: 16) {
-                                    if let spotifyUrl = recording.spotifyUrl {
-                                        Link(destination: URL(string: spotifyUrl)!) {
+                                    if let spotifyUrl = recording.spotifyUrl, let url = URL(string: spotifyUrl) {
+                                        let urlString = spotifyUrl
+                                        Button {
+                                            if !longPressOccurred {
+                                                openURL(url)
+                                            }
+                                            longPressOccurred = false
+                                        } label: {
                                             StreamingButton(
                                                 icon: "music.note",
                                                 color: JazzTheme.teal,
                                                 label: "Spotify"
                                             )
                                         }
+                                        .simultaneousGesture(
+                                            LongPressGesture(minimumDuration: 0.5)
+                                                .onEnded { _ in
+                                                    longPressOccurred = true
+                                                    reportingInfo = ReportingInfo(source: "Spotify", url: urlString)
+                                                }
+                                        )
                                     }
                                     
-                                    if let youtubeUrl = recording.youtubeUrl {
-                                        Link(destination: URL(string: youtubeUrl)!) {
+                                    if let youtubeUrl = recording.youtubeUrl, let url = URL(string: youtubeUrl) {
+                                        let urlString = youtubeUrl
+                                        Button {
+                                            if !longPressOccurred {
+                                                openURL(url)
+                                            }
+                                            longPressOccurred = false
+                                        } label: {
                                             StreamingButton(
                                                 icon: "play.rectangle.fill",
                                                 color: JazzTheme.burgundy,
                                                 label: "YouTube"
                                             )
                                         }
+                                        .simultaneousGesture(
+                                            LongPressGesture(minimumDuration: 0.5)
+                                                .onEnded { _ in
+                                                    longPressOccurred = true
+                                                    reportingInfo = ReportingInfo(source: "YouTube", url: urlString)
+                                                }
+                                        )
                                     }
                                     
                                     if let appleMusicUrl = recording.appleMusicUrl {
@@ -207,6 +242,29 @@ struct RecordingDetailView: View {
         }
         .background(JazzTheme.backgroundLight)
         .navigationBarTitleDisplayMode(.inline)
+        .sheet(item: $reportingInfo) { info in
+            ReportLinkIssueView(
+                entityType: "Recording",
+                entityId: recordingId,
+                entityName: recording?.albumTitle ?? "Unknown Album",
+                externalSource: info.source,
+                externalUrl: info.url,
+                onSubmit: { explanation in
+                    submitLinkReport(
+                        entityType: "Recording",
+                        entityId: recordingId,
+                        entityName: recording?.albumTitle ?? "Unknown Album",
+                        externalSource: info.source,
+                        externalUrl: info.url,
+                        explanation: explanation
+                    )
+                    reportingInfo = nil
+                },
+                onCancel: {
+                    reportingInfo = nil
+                }
+            )
+        }
         .task {
             #if DEBUG
             if ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1" {
@@ -221,6 +279,19 @@ struct RecordingDetailView: View {
             recording = await networkManager.fetchRecordingDetail(id: recordingId)
             isLoading = false
         }
+    }
+    
+    // MARK: - Stub submission method
+    private func submitLinkReport(entityType: String, entityId: String, entityName: String, externalSource: String, externalUrl: String, explanation: String) {
+        // TODO: Implement actual submission logic
+        // For now, this is just a stub
+        print("Link report submitted:")
+        print("  Entity Type: \(entityType)")
+        print("  Entity ID: \(entityId)")
+        print("  Entity Name: \(entityName)")
+        print("  External Source: \(externalSource)")
+        print("  External URL: \(externalUrl)")
+        print("  Explanation: \(explanation)")
     }
 }
 
