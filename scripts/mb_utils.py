@@ -524,7 +524,7 @@ class MusicBrainzSearcher:
         try:
             url = f"https://musicbrainz.org/ws/2/work/{work_id}"
             params = {
-                'inc': 'recording-rels',
+                'inc': 'artist-rels+recording-rels',
                 'fmt': 'json'
             }
             
