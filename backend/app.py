@@ -364,6 +364,7 @@ def get_song_detail(song_id):
                 r.spotify_url,
                 r.youtube_url,
                 r.apple_music_url,
+                r.musicbrainz_id,
                 r.is_canonical,
                 r.notes,
                 COALESCE(
@@ -413,7 +414,7 @@ def get_recording_detail(recording_id):
         recording_query = """
             SELECT r.id, r.song_id, r.album_title, r.recording_date, 
                    r.recording_year, r.label, r.spotify_url, r.youtube_url,
-                   r.apple_music_url, r.is_canonical, r.notes,
+                   r.apple_music_url, r.musicbrainz_id, r.is_canonical, r.notes,
                    s.title as song_title, s.composer
             FROM recordings r
             JOIN songs s ON r.song_id = s.id
