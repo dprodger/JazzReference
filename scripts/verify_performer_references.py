@@ -92,6 +92,8 @@ class PerformerReferenceVerifier:
                         p.id,
                         p.name,
                         p.external_links,
+                        p.wikipedia_url,
+                        p.musicbrainz_id,
                         p.birth_date,
                         p.death_date,
                         p.biography,
@@ -121,7 +123,7 @@ class PerformerReferenceVerifier:
                     query += " WHERE " + " AND ".join(where_clauses)
                 
                 query += """
-                    GROUP BY p.id, p.name, p.external_links, p.birth_date, p.death_date, p.biography
+                    GROUP BY p.id, p.name, p.external_links, p.wikipedia_url, p.musicbrainz_id, p.birth_date, p.death_date, p.biography
                     ORDER BY p.name
                 """
                 
@@ -310,7 +312,7 @@ class PerformerReferenceVerifier:
     
     def update_performer_references(self, performer_id, new_refs):
         """
-        Update external_links for a performer
+        Update wikipedia_url and musicbrainz_id for a performer
         
         Args:
             performer_id: UUID of the performer
@@ -327,14 +329,38 @@ class PerformerReferenceVerifier:
         try:
             with get_db_connection() as conn:
                 with conn.cursor() as cur:
-                    # Merge new references with existing ones
-                    cur.execute("""
-                        UPDATE performers
-                        SET external_links = COALESCE(external_links, '{}'::jsonb) || %s::jsonb,
-                            updated_at = CURRENT_TIMESTAMP
-                        WHERE id = %s
-                    """, (json.dumps(new_refs), performer_id))
+                    # Update dedicated columns for wikipedia and musicbrainz
+                    # Keep other references in external_links
+                    update_parts = []
+                    params = []
                     
+                    if 'wikipedia' in new_refs:
+                        update_parts.append("wikipedia_url = %s")
+                        params.append(new_refs['wikipedia'])
+                    
+                    if 'musicbrainz' in new_refs:
+                        update_parts.append("musicbrainz_id = %s")
+                        params.append(new_refs['musicbrainz'])
+                    
+                    # Handle any other references that should stay in external_links
+                    other_refs = {k: v for k, v in new_refs.items() if k not in ['wikipedia', 'musicbrainz']}
+                    if other_refs:
+                        update_parts.append("external_links = COALESCE(external_links, '{}'::jsonb) || %s::jsonb")
+                        params.append(json.dumps(other_refs))
+                    
+                    if not update_parts:
+                        return True
+                    
+                    update_parts.append("updated_at = CURRENT_TIMESTAMP")
+                    params.append(performer_id)
+                    
+                    query = f"""
+                        UPDATE performers
+                        SET {', '.join(update_parts)}
+                        WHERE id = %s
+                    """
+                    
+                    cur.execute(query, params)
                     conn.commit()
                     return True
         except Exception as e:
@@ -344,7 +370,7 @@ class PerformerReferenceVerifier:
     # ADDED: New method to remove a reference
     def remove_performer_reference(self, performer_id, ref_type):
         """
-        Remove a specific reference from external_links
+        Remove a specific reference from dedicated columns
         
         Args:
             performer_id: UUID of the performer
@@ -357,13 +383,29 @@ class PerformerReferenceVerifier:
         try:
             with get_db_connection() as conn:
                 with conn.cursor() as cur:
-                    # Remove the specified key from the JSONB object
-                    cur.execute("""
-                        UPDATE performers
-                        SET external_links = external_links - %s,
-                            updated_at = CURRENT_TIMESTAMP
-                        WHERE id = %s
-                    """, (ref_type, performer_id))
+                    # Clear the dedicated column
+                    if ref_type == 'wikipedia':
+                        cur.execute("""
+                            UPDATE performers
+                            SET wikipedia_url = NULL,
+                                updated_at = CURRENT_TIMESTAMP
+                            WHERE id = %s
+                        """, (performer_id,))
+                    elif ref_type == 'musicbrainz':
+                        cur.execute("""
+                            UPDATE performers
+                            SET musicbrainz_id = NULL,
+                                updated_at = CURRENT_TIMESTAMP
+                            WHERE id = %s
+                        """, (performer_id,))
+                    else:
+                        # For other reference types, remove from external_links
+                        cur.execute("""
+                            UPDATE performers
+                            SET external_links = external_links - %s,
+                                updated_at = CURRENT_TIMESTAMP
+                            WHERE id = %s
+                        """, (ref_type, performer_id))
                     
                     conn.commit()
                     return True
@@ -385,10 +427,10 @@ class PerformerReferenceVerifier:
             # Track whether we made any non-cached API calls (MusicBrainz or forced Wikipedia refresh)
             made_api_calls = False
             
-            # Parse existing external links
+            # Read from dedicated columns first, fall back to external_links
             external_links = performer['external_links'] or {}
-            old_wikipedia_url = external_links.get('wikipedia')
-            musicbrainz_id = external_links.get('musicbrainz')
+            old_wikipedia_url = performer.get('wikipedia_url') or external_links.get('wikipedia')
+            musicbrainz_id = performer.get('musicbrainz_id') or external_links.get('musicbrainz')
             
             # Track the status and new URL for single-line logging
             new_wikipedia_url = old_wikipedia_url  # Start with the existing URL

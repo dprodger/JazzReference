@@ -374,6 +374,25 @@ class MusicBrainzSearcher:
             logger.error(f"    ✗ Error searching MusicBrainz: {e}")
             return None
     
+    def _escape_lucene_query(self, text):
+        """
+        Escape special characters for Lucene query syntax
+        
+        Args:
+            text: Text to escape
+            
+        Returns:
+            Escaped text safe for Lucene queries
+        """
+        # Lucene special characters that need escaping
+        special_chars = ['\\', '+', '-', '&', '|', '!', '(', ')', '{', '}', '[', ']', '^', '"', '~', '*', '?', ':']
+        
+        escaped = text
+        for char in special_chars:
+            escaped = escaped.replace(char, f'\\{char}')
+        
+        return escaped
+    
     def search_musicbrainz_artist(self, artist_name):
         """
         Search MusicBrainz for an artist
@@ -399,8 +418,10 @@ class MusicBrainzSearcher:
         
         try:
             url = "https://musicbrainz.org/ws/2/artist/"
+            # Escape special Lucene characters in the artist name
+            escaped_name = self._escape_lucene_query(artist_name)
             params = {
-                'query': f'artist:"{artist_name}" AND tag:jazz',
+                'query': f'artist:"{escaped_name}"',
                 'fmt': 'json',
                 'limit': 5
             }

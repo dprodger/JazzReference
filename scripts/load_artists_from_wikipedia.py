@@ -61,7 +61,7 @@ class WikipediaArtistLoader:
         with get_db_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute("""
-                    SELECT id, name, birth_date, death_date, biography, external_links
+                    SELECT id, name, birth_date, death_date, biography, wikipedia_url
                     FROM performers
                     WHERE id = %s
                 """, (artist_id,))
@@ -73,7 +73,7 @@ class WikipediaArtistLoader:
         with get_db_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute("""
-                    SELECT id, name, birth_date, death_date, biography, external_links
+                    SELECT id, name, birth_date, death_date, biography, wikipedia_url
                     FROM performers
                     WHERE LOWER(name) = LOWER(%s)
                 """, (artist_name,))
@@ -85,25 +85,14 @@ class WikipediaArtistLoader:
         with get_db_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute("""
-                    SELECT id, name, birth_date, death_date, biography, external_links
+                    SELECT id, name, birth_date, death_date, biography, wikipedia_url
                     FROM performers
-                    WHERE external_links->>'wikipedia' IS NOT NULL
-                    AND external_links->>'wikipedia' != ''
+                    WHERE wikipedia_url IS NOT NULL
+                    AND wikipedia_url != ''
                     ORDER BY name
                 """)
                 
                 return cur.fetchall()
-    
-    def extract_wikipedia_url(self, external_links):
-        """Extract Wikipedia URL from external_links JSON"""
-        if not external_links:
-            return None
-        
-        # external_links is already a dict if using dict_row
-        if isinstance(external_links, dict):
-            return external_links.get('wikipedia')
-        
-        return None
     
     def extract_birth_death_dates(self, soup):
         """
@@ -308,7 +297,7 @@ class WikipediaArtistLoader:
         Process a single artist
         
         Args:
-            artist: Artist dict with id, name, birth_date, death_date, biography, external_links
+            artist: Artist dict with id, name, birth_date, death_date, biography, wikipedia_url
             
         Returns:
             True if successful, False otherwise
@@ -319,8 +308,8 @@ class WikipediaArtistLoader:
             
             self.stats['artists_processed'] += 1
             
-            # Extract Wikipedia URL
-            wiki_url = self.extract_wikipedia_url(artist['external_links'])
+            # Get Wikipedia URL
+            wiki_url = artist['wikipedia_url']
             if not wiki_url:
                 logger.info(f"Processing: {artist_name} - skipped (no Wikipedia URL)")
                 logger.debug("  No Wikipedia URL found")

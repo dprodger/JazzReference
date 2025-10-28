@@ -75,7 +75,7 @@ class ArtistCreator:
             with get_db_connection() as conn:
                 with conn.cursor() as cur:
                     cur.execute("""
-                        SELECT id, name, external_links
+                        SELECT id, name, external_links, wikipedia_url, musicbrainz_id
                         FROM performers
                         WHERE LOWER(name) = LOWER(%s)
                     """, (name,))
@@ -122,7 +122,7 @@ class ArtistCreator:
     
     def update_artist_references(self, artist_id, references):
         """
-        Update external_links for an artist
+        Update wikipedia_url and musicbrainz_id for an artist
         
         Args:
             artist_id: UUID of the artist
@@ -135,13 +135,38 @@ class ArtistCreator:
         try:
             with get_db_connection() as conn:
                 with conn.cursor() as cur:
-                    cur.execute("""
-                        UPDATE performers
-                        SET external_links = COALESCE(external_links, '{}'::jsonb) || %s::jsonb,
-                            updated_at = CURRENT_TIMESTAMP
-                        WHERE id = %s
-                    """, (json.dumps(references), artist_id))
+                    # Update dedicated columns for wikipedia and musicbrainz
+                    # Keep other references in external_links
+                    update_parts = []
+                    params = []
                     
+                    if 'wikipedia' in references:
+                        update_parts.append("wikipedia_url = %s")
+                        params.append(references['wikipedia'])
+                    
+                    if 'musicbrainz' in references:
+                        update_parts.append("musicbrainz_id = %s")
+                        params.append(references['musicbrainz'])
+                    
+                    # Handle any other references that should stay in external_links
+                    other_refs = {k: v for k, v in references.items() if k not in ['wikipedia', 'musicbrainz']}
+                    if other_refs:
+                        update_parts.append("external_links = COALESCE(external_links, '{}'::jsonb) || %s::jsonb")
+                        params.append(json.dumps(other_refs))
+                    
+                    if not update_parts:
+                        return True
+                    
+                    update_parts.append("updated_at = CURRENT_TIMESTAMP")
+                    params.append(artist_id)
+                    
+                    query = f"""
+                        UPDATE performers
+                        SET {', '.join(update_parts)}
+                        WHERE id = %s
+                    """
+                    
+                    cur.execute(query, params)
                     conn.commit()
                     return True
         except Exception as e:
@@ -343,8 +368,10 @@ class ArtistCreator:
             existing = self.check_artist_exists(name)
             if existing:
                 logger.info(f"✗ Artist already exists: {name}, ID: {existing['id']}")
+                logger.debug(f"  Wikipedia: {existing.get('wikipedia_url', 'none')}")
+                logger.debug(f"  MusicBrainz: {existing.get('musicbrainz_id', 'none')}")
                 if existing['external_links']:
-                    logger.debug(f"  External links: {json.dumps(existing['external_links'], indent=2)}")
+                    logger.debug(f"  Other links: {json.dumps(existing['external_links'], indent=2)}")
                 self.stats['artists_skipped'] += 1
                 return False
             

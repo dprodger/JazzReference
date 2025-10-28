@@ -698,8 +698,7 @@ def process_performer(performer: Dict[str, Any], fetcher: ImageFetcher,
         }
     
     # STEP 2: Fetch images from external APIs (NO database connection, only if needed)
-    external_links = performer.get('external_links') or {}
-    wikipedia_url = external_links.get('wikipedia')
+    wikipedia_url = performer.get('wikipedia_url')
     
     # Fetch Wikipedia image only if we don't already have one
     wiki_image = None
@@ -780,7 +779,7 @@ def get_all_performers() -> List[Dict[str, Any]]:
     with get_db_connection() as conn:
         with conn.cursor() as cur:
             cur.execute("""
-                SELECT id, name, biography, birth_date, death_date, external_links
+                SELECT id, name, biography, birth_date, death_date, wikipedia_url
                 FROM performers
                 ORDER BY name
             """)

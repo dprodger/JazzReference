@@ -213,7 +213,7 @@ class MusicBrainzImporter:
             cur.execute("""
                 SELECT 
                     p.name as performer_name,
-                    p.external_links->>'musicbrainz' as performer_mbid,
+                    p.musicbrainz_id as performer_mbid,
                     i.name as instrument_name,
                     rp.role
                 FROM recording_performers rp
@@ -566,8 +566,6 @@ Examples:
     importer = MusicBrainzImporter(dry_run=args.dry_run)
 
     # Determine song identifier
-    song_name = normalize_apostrophes(args.name)
-    
     song_identifier = normalize_apostrophes(args.name) if args.name else args.id
     
     try:

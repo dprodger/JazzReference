@@ -3,7 +3,6 @@
 Shared utilities for importing performer and instrument data from MusicBrainz
 """
 
-import json
 import logging
 from db_utils import get_db_connection
 from mb_utils import MusicBrainzSearcher
@@ -233,7 +232,7 @@ class PerformerImporter:
             if artist_mbid:
                 cur.execute("""
                     SELECT id FROM performers
-                    WHERE external_links->>'musicbrainz' = %s
+                    WHERE musicbrainz_id = %s
                 """, (artist_mbid,))
                 result = cur.fetchone()
                 
@@ -257,15 +256,11 @@ class PerformerImporter:
                 logger.info(f"[DRY RUN] Would create performer: {artist_name}")
                 return None
             
-            external_links = {}
-            if artist_mbid:
-                external_links['musicbrainz'] = artist_mbid
-            
             cur.execute("""
-                INSERT INTO performers (name, external_links)
+                INSERT INTO performers (name, musicbrainz_id)
                 VALUES (%s, %s)
                 RETURNING id
-            """, (artist_name, json.dumps(external_links)))
+            """, (artist_name, artist_mbid))
             
             performer_id = cur.fetchone()['id']
             logger.info(f"Created new performer: {artist_name} (ID: {performer_id})")
