@@ -14,6 +14,8 @@ struct RecordingDetailView: View {
     @State private var isLoading = true
     @State private var reportingInfo: ReportingInfo?
     @State private var longPressOccurred = false
+    @State private var showingSubmissionAlert = false
+    @State private var submissionAlertMessage = ""
     @Environment(\.openURL) var openURL
     
     struct ReportingInfo: Identifiable {
@@ -244,14 +246,14 @@ struct RecordingDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .sheet(item: $reportingInfo) { info in
             ReportLinkIssueView(
-                entityType: "Recording",
+                entityType: "recording",
                 entityId: recordingId,
                 entityName: recording?.albumTitle ?? "Unknown Album",
                 externalSource: info.source,
                 externalUrl: info.url,
                 onSubmit: { explanation in
                     submitLinkReport(
-                        entityType: "Recording",
+                        entityType: "recording",
                         entityId: recordingId,
                         entityName: recording?.albumTitle ?? "Unknown Album",
                         externalSource: info.source,
@@ -264,6 +266,11 @@ struct RecordingDetailView: View {
                     reportingInfo = nil
                 }
             )
+        }
+        .alert("Report Submitted", isPresented: $showingSubmissionAlert) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(submissionAlertMessage)
         }
         .task {
             #if DEBUG
@@ -281,17 +288,80 @@ struct RecordingDetailView: View {
         }
     }
     
-    // MARK: - Stub submission method
+    // MARK: - Submit link report to API
     private func submitLinkReport(entityType: String, entityId: String, entityName: String, externalSource: String, externalUrl: String, explanation: String) {
-        // TODO: Implement actual submission logic
-        // For now, this is just a stub
-        print("Link report submitted:")
-        print("  Entity Type: \(entityType)")
-        print("  Entity ID: \(entityId)")
-        print("  Entity Name: \(entityName)")
-        print("  External Source: \(externalSource)")
-        print("  External URL: \(externalUrl)")
-        print("  Explanation: \(explanation)")
+        Task {
+            do {
+                let success = try await sendReportToAPI(
+                    entityType: entityType,
+                    entityId: entityId,
+                    entityName: entityName,
+                    externalSource: externalSource,
+                    externalUrl: externalUrl,
+                    explanation: explanation
+                )
+                
+                if success {
+                    submissionAlertMessage = "Thank you for your report. We will review it shortly."
+                } else {
+                    submissionAlertMessage = "Failed to submit report. Please try again later."
+                }
+                showingSubmissionAlert = true
+                
+            } catch {
+                submissionAlertMessage = "Failed to submit report: \(error.localizedDescription)"
+                showingSubmissionAlert = true
+            }
+        }
+    }
+    
+    // MARK: - API call
+    private func sendReportToAPI(entityType: String, entityId: String, entityName: String, externalSource: String, externalUrl: String, explanation: String) async throws -> Bool {
+        
+        // Get API base URL from environment or use default
+        let baseURL = ProcessInfo.processInfo.environment["API_BASE_URL"] ?? "https://linernotesjazz.com"
+        
+        guard let url = URL(string: "\(baseURL)/api/content-reports") else {
+            throw URLError(.badURL)
+        }
+        
+        // Build request body
+        let requestBody: [String: Any] = [
+            "entity_type": entityType,
+            "entity_id": entityId,
+            "entity_name": entityName,
+            "external_source": externalSource,
+            "external_url": externalUrl,
+            "explanation": explanation,
+            "reporter_platform": "ios",
+            "reporter_app_version": Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
+        ]
+        
+        // Create request
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
+        
+        // Send request
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        // Check response
+        guard let httpResponse = response as? HTTPURLResponse else {
+            return false
+        }
+        
+        if httpResponse.statusCode == 201 {
+            // Success
+            return true
+        } else {
+            // Log error for debugging
+            if let errorDict = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let errorMessage = errorDict["error"] as? String {
+                print("API Error: \(errorMessage)")
+            }
+            return false
+        }
     }
 }
 
