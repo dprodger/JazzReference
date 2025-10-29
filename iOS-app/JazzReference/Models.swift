@@ -2,9 +2,8 @@
 //  Models.swift
 //  JazzReference
 //
-//  Created by Dave Rodger on 10/24/25.
+//  Updated with album artwork support
 //
-// MARK: - Models
 
 import Foundation
 
@@ -37,6 +36,10 @@ struct Recording: Codable, Identifiable {
     let recordingYear: Int?
     let label: String?
     let spotifyUrl: String?
+    let spotifyTrackId: String?
+    let albumArtSmall: String?
+    let albumArtMedium: String?
+    let albumArtLarge: String?
     let youtubeUrl: String?
     let appleMusicUrl: String?
     let musicbrainzId: String?
@@ -53,6 +56,10 @@ struct Recording: Codable, Identifiable {
         case recordingDate = "recording_date"
         case recordingYear = "recording_year"
         case spotifyUrl = "spotify_url"
+        case spotifyTrackId = "spotify_track_id"
+        case albumArtSmall = "album_art_small"
+        case albumArtMedium = "album_art_medium"
+        case albumArtLarge = "album_art_large"
         case youtubeUrl = "youtube_url"
         case appleMusicUrl = "apple_music_url"
         case isCanonical = "is_canonical"
@@ -83,19 +90,19 @@ struct PerformerDetail: Codable, Identifiable {
     let birthDate: String?
     let deathDate: String?
     let externalLinks: [String: String]?
-    let wikipediaUrl: String?          // NEW: Dedicated field
-    let musicbrainzId: String?         // NEW: Dedicated field
+    let wikipediaUrl: String?
+    let musicbrainzId: String?
     let instruments: [PerformerInstrument]?
     let recordings: [PerformerRecording]?
-    let images: [ArtistImage]?  // <-- ADD THIS LINE
+    let images: [ArtistImage]?
 
     enum CodingKeys: String, CodingKey {
         case id, name, biography, instruments, recordings, images
         case birthDate = "birth_date"
         case deathDate = "death_date"
         case externalLinks = "external_links"
-        case wikipediaUrl = "wikipedia_url"     // NEW
-        case musicbrainzId = "musicbrainz_id"   // NEW
+        case wikipediaUrl = "wikipedia_url"
+        case musicbrainzId = "musicbrainz_id"
     }
 }
 
@@ -143,8 +150,6 @@ struct ArtistImage: Codable, Identifiable {
     let height: Int?
     let thumbnailUrl: String?
     let sourcePageUrl: String?
-    let isPrimary: Bool
-    let displayOrder: Int
     
     enum CodingKeys: String, CodingKey {
         case id, url, source, width, height, attribution
@@ -153,25 +158,5 @@ struct ArtistImage: Codable, Identifiable {
         case licenseUrl = "license_url"
         case thumbnailUrl = "thumbnail_url"
         case sourcePageUrl = "source_page_url"
-        case isPrimary = "is_primary"
-        case displayOrder = "display_order"
-    }
-}
-
-// Date formatting helper
-extension String {
-    func formatAsDate() -> String {
-        let isoFormatter = ISO8601DateFormatter()
-        isoFormatter.formatOptions = [.withFullDate, .withTime, .withColonSeparatorInTime]
-        
-        guard let date = isoFormatter.date(from: self) else {
-            return self // Return original if parsing fails
-        }
-        
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateStyle = .long
-        dateFormatter.timeStyle = .none
-        
-        return dateFormatter.string(from: date)
     }
 }

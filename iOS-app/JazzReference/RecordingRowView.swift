@@ -2,73 +2,82 @@
 //  RecordingRowView.swift
 //  JazzReference
 //
-//  Updated with Spotify icon indicator
+//  Updated with album artwork support
 //
 
 import SwiftUI
-import Combine
 
 struct RecordingRowView: View {
     let recording: Recording
     
-    private var leadArtists: String {
-        guard let performers = recording.performers else { return "Unknown Artist" }
-        let leaders = performers.filter { $0.role == "leader" }
-        if leaders.isEmpty {
-            return performers.first?.name ?? "Unknown Artist"
-        }
-        return leaders.map { $0.name }.joined(separator: ", ")
-    }
-    
     var body: some View {
         HStack(spacing: 12) {
-            // Canonical indicator
-            if recording.isCanonical == true {
-                Image(systemName: "star.fill")
-                    .foregroundColor(JazzTheme.gold)
-                    .font(.subheadline)
-                    .frame(width: 20)
+            // Album artwork thumbnail
+            if let albumArtUrl = recording.albumArtMedium ?? recording.albumArtSmall {
+                AsyncImage(url: URL(string: albumArtUrl)) { phase in
+                    switch phase {
+                    case .empty:
+                        ProgressView()
+                            .frame(width: 60, height: 60)
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .frame(width: 60, height: 60)
+                            .cornerRadius(6)
+                    case .failure:
+                        Image(systemName: "music.note")
+                            .font(.title2)
+                            .foregroundColor(.secondary)
+                            .frame(width: 60, height: 60)
+                            .background(Color(.systemGray5))
+                            .cornerRadius(6)
+                    @unknown default:
+                        EmptyView()
+                    }
+                }
+                .frame(width: 60, height: 60)
             } else {
-                Spacer()
-                    .frame(width: 20)
+                // Placeholder when no artwork available
+                Image(systemName: "opticaldisc")
+                    .font(.title2)
+                    .foregroundColor(.secondary)
+                    .frame(width: 60, height: 60)
+                    .background(Color(.systemGray5))
+                    .cornerRadius(6)
             }
             
             // Recording info
-            VStack(alignment: .leading, spacing: 4) {
-                // Album name with Spotify indicator inline
-                HStack(spacing: 6) {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    if recording.isCanonical == true {
+                        Image(systemName: "star.fill")
+                            .foregroundColor(.yellow)
+                            .font(.caption)
+                    }
+                    
                     Text(recording.albumTitle ?? "Unknown Album")
                         .font(.headline)
-                        .foregroundColor(JazzTheme.charcoal)
-                        .lineLimit(1)
-                    
-                    // Spotify indicator (if available)
-                    if recording.spotifyUrl != nil {
-                        Image(systemName: "play.circle.fill")
-                            .foregroundColor(.green)
-                            .font(.subheadline)
-                    }
                 }
                 
-                // Lead artists
-                Text(leadArtists)
-                    .font(.subheadline)
-                    .foregroundColor(JazzTheme.smokeGray)
-                    .lineLimit(1)
+                if let year = recording.recordingYear {
+                    Text("\(year)")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+                
+                if let label = recording.label {
+                    Text(label)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
             }
             
             Spacer()
-            
-            // Year - always reserve space for consistent alignment
-            Text(recording.recordingYear != nil ? String(recording.recordingYear!) : "")
-                .font(.subheadline)
-                .foregroundColor(JazzTheme.smokeGray)
-                .frame(minWidth: 45, alignment: .trailing)
         }
-        .padding(.vertical, 12)
-        .padding(.horizontal, 16)
-        .background(JazzTheme.cardBackground)
-        .cornerRadius(8)
+        .padding()
+        .background(Color(.systemGray6))
+        .cornerRadius(10)
         .padding(.horizontal)
     }
 }

@@ -80,7 +80,7 @@ struct PerformerDetailView: View {
                                 HStack {
                                     Image(systemName: "calendar")
                                         .foregroundColor(JazzTheme.brass)
-                                    Text("Born: \(birthDate.formatAsDate())")  // ← Added .formatAsDate()
+                                    Text("Born: \(birthDate)")  // ← Added .formatAsDate()
                                         .font(.subheadline)
                                         .foregroundColor(JazzTheme.smokeGray)
                                 }
@@ -90,7 +90,7 @@ struct PerformerDetailView: View {
                                 HStack {
                                     Image(systemName: "calendar")
                                         .foregroundColor(JazzTheme.brass)
-                                    Text("Died: \(deathDate.formatAsDate())")  // ← Added .formatAsDate()
+                                    Text("Died: \(deathDate)")  // ← Added .formatAsDate()
                                         .font(.subheadline)
                                         .foregroundColor(JazzTheme.smokeGray)
                                 }
