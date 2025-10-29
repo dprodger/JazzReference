@@ -196,6 +196,81 @@ CREATE TABLE audit_log (
     changed_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+
+
+
+
+-- ============================================================================
+-- Migration: Add Content Error Reporting
+-- Run this on your Supabase database
+-- ============================================================================
+
+-- Create content_reports table
+CREATE TABLE content_reports (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    
+    -- Entity identification (polymorphic relationship)
+    entity_type VARCHAR(50) NOT NULL CHECK (entity_type IN ('song', 'performer', 'recording')),
+    entity_id UUID NOT NULL,
+    entity_name VARCHAR(255) NOT NULL,
+    
+    -- Report classification
+    report_category VARCHAR(50) NOT NULL DEFAULT 'link_issue', 
+    -- Categories: 'link_issue', 'wrong_entity_linked', 'incorrect_info', 'missing_info', 'duplicate', 'other'
+    
+    -- External reference details
+    external_source VARCHAR(100) NOT NULL, 
+    external_url VARCHAR(1000) NOT NULL,
+    
+    -- User's explanation
+    explanation TEXT NOT NULL,
+    
+    -- Status tracking
+    status VARCHAR(50) DEFAULT 'pending' NOT NULL 
+        CHECK (status IN ('pending', 'reviewing', 'resolved', 'dismissed', 'duplicate')),
+    priority VARCHAR(20) DEFAULT 'normal' 
+        CHECK (priority IN ('low', 'normal', 'high', 'critical')),
+    
+    -- Resolution details
+    resolution_notes TEXT,
+    resolution_action VARCHAR(100),
+    
+    -- Reporter metadata (anonymous)
+    reporter_ip VARCHAR(45),
+    reporter_user_agent TEXT,
+    reporter_platform VARCHAR(50),
+    reporter_app_version VARCHAR(50),
+    
+    -- Admin handling
+    reviewed_by UUID REFERENCES admin_users(id) ON DELETE SET NULL,
+    reviewed_at TIMESTAMP WITH TIME ZONE,
+    resolved_by UUID REFERENCES admin_users(id) ON DELETE SET NULL,
+    resolved_at TIMESTAMP WITH TIME ZONE,
+    
+    -- Timestamps
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+-- Create indexes
+CREATE INDEX idx_content_reports_entity ON content_reports(entity_type, entity_id);
+CREATE INDEX idx_content_reports_entity_id ON content_reports(entity_id);
+CREATE INDEX idx_content_reports_status ON content_reports(status) WHERE status IN ('pending', 'reviewing');
+CREATE INDEX idx_content_reports_created_at ON content_reports(created_at DESC);
+CREATE INDEX idx_content_reports_external_source ON content_reports(external_source);
+
+-- Add trigger for updated_at
+CREATE TRIGGER update_content_reports_updated_at 
+    BEFORE UPDATE ON content_reports
+    FOR EACH ROW 
+    EXECUTE FUNCTION update_updated_at_column();
+
+-- Add comments
+COMMENT ON TABLE content_reports IS 'User-submitted reports of issues with external links and content';
+COMMENT ON COLUMN content_reports.entity_type IS 'Type of entity: song, performer, or recording';
+COMMENT ON COLUMN content_reports.report_category IS 'Type of issue: link_issue (broken/404), wrong_entity_linked (link points to different entity or entity does not exist on this source), incorrect_info, missing_info, duplicate, other';
+COMMENT ON COLUMN content_reports.external_source IS 'External service: wikipedia, musicbrainz, spotify, youtube, apple_music, jazzstandards';
+COMMENT ON COLUMN content_reports.status IS 'Current status: pending, reviewing, resolved, dismissed, duplicate';
 -- ============================================================================
 -- INDEXES FOR PERFORMANCE
 -- ============================================================================
