@@ -54,6 +54,35 @@ struct RecordingDetailView: View {
                     VStack(alignment: .leading, spacing: 20) {
                         // Album Information
                         VStack(alignment: .leading, spacing: 12) {
+                            // Album artwork
+                            if let albumArtUrl = recording.albumArtLarge ?? recording.albumArtMedium {
+                                AsyncImage(url: URL(string: albumArtUrl)) { phase in
+                                    switch phase {
+                                    case .empty:
+                                        ProgressView()
+                                            .frame(maxWidth: .infinity)
+                                            .frame(height: 300)
+                                    case .success(let image):
+                                        image
+                                            .resizable()
+                                            .aspectRatio(contentMode: .fit)
+                                            .frame(maxWidth: .infinity)
+                                            .cornerRadius(12)
+                                    case .failure:
+                                        Image(systemName: "music.note")
+                                            .font(.system(size: 80))
+                                            .foregroundColor(.secondary)
+                                            .frame(maxWidth: .infinity)
+                                            .frame(height: 300)
+                                            .background(Color(.systemGray5))
+                                            .cornerRadius(12)
+                                    @unknown default:
+                                        EmptyView()
+                                    }
+                                }
+                                .shadow(radius: 8)
+                            }
+                            
                             HStack {
                                 if recording.isCanonical == true {
                                     Image(systemName: "star.fill")

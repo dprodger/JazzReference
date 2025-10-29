@@ -11,73 +11,67 @@ struct RecordingRowView: View {
     let recording: Recording
     
     var body: some View {
-        HStack(spacing: 12) {
-            // Album artwork thumbnail
-            if let albumArtUrl = recording.albumArtMedium ?? recording.albumArtSmall {
-                AsyncImage(url: URL(string: albumArtUrl)) { phase in
-                    switch phase {
-                    case .empty:
-                        ProgressView()
-                            .frame(width: 60, height: 60)
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                            .frame(width: 60, height: 60)
-                            .cornerRadius(6)
-                    case .failure:
-                        Image(systemName: "music.note")
-                            .font(.title2)
-                            .foregroundColor(.secondary)
-                            .frame(width: 60, height: 60)
-                            .background(Color(.systemGray5))
-                            .cornerRadius(6)
-                    @unknown default:
-                        EmptyView()
+        VStack(alignment: .leading, spacing: 8) {
+            // Album artwork
+            ZStack(alignment: .topTrailing) {
+                if let albumArtUrl = recording.albumArtMedium ?? recording.albumArtSmall {
+                    AsyncImage(url: URL(string: albumArtUrl)) { phase in
+                        switch phase {
+                        case .empty:
+                            ProgressView()
+                                .frame(width: 150, height: 150)
+                        case .success(let image):
+                            image
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                                .frame(width: 150, height: 150)
+                                .clipped()
+                        case .failure:
+                            Image(systemName: "music.note")
+                                .font(.largeTitle)
+                                .foregroundColor(.secondary)
+                                .frame(width: 150, height: 150)
+                                .background(Color(.systemGray5))
+                        @unknown default:
+                            EmptyView()
+                        }
                     }
-                }
-                .frame(width: 60, height: 60)
-            } else {
-                // Placeholder when no artwork available
-                Image(systemName: "opticaldisc")
-                    .font(.title2)
-                    .foregroundColor(.secondary)
-                    .frame(width: 60, height: 60)
-                    .background(Color(.systemGray5))
-                    .cornerRadius(6)
-            }
-            
-            // Recording info
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    if recording.isCanonical == true {
-                        Image(systemName: "star.fill")
-                            .foregroundColor(.yellow)
-                            .font(.caption)
-                    }
-                    
-                    Text(recording.albumTitle ?? "Unknown Album")
-                        .font(.headline)
-                }
-                
-                if let year = recording.recordingYear {
-                    Text("\(year)")
-                        .font(.subheadline)
+                } else {
+                    Image(systemName: "opticaldisc")
+                        .font(.largeTitle)
                         .foregroundColor(.secondary)
+                        .frame(width: 150, height: 150)
+                        .background(Color(.systemGray5))
                 }
                 
-                if let label = recording.label {
-                    Text(label)
+                if recording.isCanonical == true {
+                    Image(systemName: "star.fill")
+                        .foregroundColor(.yellow)
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .padding(6)
+                        .background(Color.black.opacity(0.6))
+                        .clipShape(Circle())
+                        .padding(6)
                 }
             }
+            .cornerRadius(8)
+            .frame(width: 150)
             
-            Spacer()
+            // Album title
+            Text(recording.albumTitle ?? "Unknown Album")
+                .font(.subheadline)
+                .fontWeight(.medium)
+                .lineLimit(2)
+                .frame(width: 150, alignment: .leading)
+            
+            // Year
+            if let year = recording.recordingYear {
+                Text("\(year)")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .frame(width: 150, alignment: .leading)
+            }
         }
-        .padding()
-        .background(Color(.systemGray6))
-        .cornerRadius(10)
-        .padding(.horizontal)
+        .frame(width: 150)
     }
 }
