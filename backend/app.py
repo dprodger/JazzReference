@@ -145,6 +145,10 @@ def get_song_detail(song_id):
                 r.recording_year,
                 r.label,
                 r.spotify_url,
+                r.spotify_track_id,
+                r.album_art_small,
+                r.album_art_medium,
+                r.album_art_large,
                 r.youtube_url,
                 r.apple_music_url,
                 r.musicbrainz_id,
@@ -173,7 +177,9 @@ def get_song_detail(song_id):
             LEFT JOIN instruments i ON rp.instrument_id = i.id
             WHERE r.song_id = %s
             GROUP BY r.id, r.album_title, r.recording_date, r.recording_year,
-                     r.label, r.spotify_url, r.youtube_url, r.apple_music_url,
+                     r.label, r.spotify_url, r.spotify_track_id,
+                     r.album_art_small, r.album_art_medium, r.album_art_large,
+                     r.youtube_url, r.apple_music_url,
                      r.is_canonical, r.notes
             ORDER BY r.is_canonical DESC, r.recording_year DESC
         """
@@ -196,8 +202,10 @@ def get_recording_detail(recording_id):
         # Get recording information
         recording_query = """
             SELECT r.id, r.song_id, r.album_title, r.recording_date, 
-                   r.recording_year, r.label, r.spotify_url, r.youtube_url,
-                   r.apple_music_url, r.musicbrainz_id, r.is_canonical, r.notes,
+                   r.recording_year, r.label, r.spotify_url, r.spotify_track_id,
+                   r.album_art_small, r.album_art_medium, r.album_art_large,
+                   r.youtube_url, r.apple_music_url, r.musicbrainz_id, 
+                   r.is_canonical, r.notes,
                    s.title as song_title, s.composer
             FROM recordings r
             JOIN songs s ON r.song_id = s.id

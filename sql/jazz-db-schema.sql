@@ -73,7 +73,11 @@ CREATE TABLE recordings (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     created_by VARCHAR(100),
     updated_by VARCHAR(100),
-    musicbrainz_id VARCHAR(255) UNIQUE
+    musicbrainz_id VARCHAR(255) UNIQUE,
+    spotify_track_id VARCHAR(100),
+    album_art_small VARCHAR(500),
+    album_art_medium VARCHAR(500),
+    album_art_large VARCHAR(500)
 );
 
 -- Recording performers (junction table with instrument role)
@@ -159,6 +163,13 @@ CREATE TABLE IF NOT EXISTS solo_transcriptions (
 );
 
 
+
+
+-- Add comments for documentation
+COMMENT ON COLUMN recordings.spotify_track_id IS 'Spotify track ID extracted from spotify_url';
+COMMENT ON COLUMN recordings.album_art_small IS 'Small album artwork (64x64) from Spotify';
+COMMENT ON COLUMN recordings.album_art_medium IS 'Medium album artwork (300x300) from Spotify';
+COMMENT ON COLUMN recordings.album_art_large IS 'Large album artwork (640x640) from Spotify';
 -- Triggers -------------------------------------------------------
 
 
@@ -293,6 +304,7 @@ CREATE INDEX idx_recordings_song_id ON recordings(song_id);
 CREATE INDEX idx_recordings_year ON recordings(recording_year);
 CREATE INDEX idx_recordings_is_canonical ON recordings(is_canonical);
 CREATE INDEX idx_recordings_album_title ON recordings(album_title);
+CREATE INDEX idx_recordings_spotify_track_id ON recordings(spotify_track_id);
 
 -- Recording performer indexes
 CREATE INDEX idx_recording_performers_recording_id ON recording_performers(recording_id);
