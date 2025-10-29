@@ -311,7 +311,7 @@ struct SongDetailView: View {
                         if !filteredRecordings.isEmpty {
                             ForEach(groupedRecordings, id: \.leader) { group in
                                 VStack(alignment: .leading, spacing: 8) {
-                                    Text(group.leader)
+                                    Text("\(group.leader) (\(group.recordings.count))")
                                         .font(.headline)
                                         .foregroundColor(JazzTheme.burgundy)
                                         .padding(.horizontal)
