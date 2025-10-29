@@ -274,17 +274,36 @@ class SpotifyMatcher:
                     track_album = best_match['album']['name']
                     track_url = best_match['external_urls']['spotify']
                     
+                    # Extract album artwork URLs (Spotify provides 3 sizes)
+                    images = best_match['album'].get('images', [])
+                    album_art = {
+                        'large': None,
+                        'medium': None,
+                        'small': None
+                    }
+                    
+                    # Spotify returns images in descending size order: large, medium, small
+                    if len(images) >= 1:
+                        album_art['large'] = images[0].get('url')
+                    if len(images) >= 2:
+                        album_art['medium'] = images[1].get('url')
+                    if len(images) >= 3:
+                        album_art['small'] = images[2].get('url')
+                    
                     logger.debug(f"    ✓ Found with {strategy['description']}")
                     logger.debug(f"       Track: '{track_name}' by {track_artists}")
                     logger.debug(f"       Album: '{track_album}'")
                     logger.debug(f"       URL: {track_url}")
+                    if album_art['medium']:
+                        logger.debug(f"       Album Art: ✓")
                     
                     return {
                         'id': track_id,
                         'url': track_url,
                         'name': track_name,
                         'artists': track_artists,
-                        'album': track_album
+                        'album': track_album,
+                        'album_art': album_art
                     }
                 else:
                     logger.debug(f"    ✗ No results with {strategy['description']}")
@@ -305,22 +324,39 @@ class SpotifyMatcher:
         logger.debug(f"    ✗ No Spotify matches found after trying all strategies")
         return None
     
-    def update_recording_spotify_url(self, conn, recording_id, spotify_url):
-        """Update recording with Spotify URL"""
+    def update_recording_spotify_url(self, conn, recording_id, spotify_data):
+        """Update recording with Spotify URL, track ID, and album artwork"""
         if self.dry_run:
-            logger.info(f"    [DRY RUN] Would update recording with: {spotify_url}")
+            logger.info(f"    [DRY RUN] Would update recording with: {spotify_data['url']}")
+            if spotify_data.get('album_art', {}).get('medium'):
+                logger.info(f"    [DRY RUN] Would add album artwork")
             return
         
         with conn.cursor() as cur:
+            # Extract track ID from spotify_data
+            track_id = spotify_data.get('id')
+            album_art = spotify_data.get('album_art', {})
+            
             cur.execute("""
                 UPDATE recordings
                 SET spotify_url = %s,
+                    spotify_track_id = %s,
+                    album_art_small = %s,
+                    album_art_medium = %s,
+                    album_art_large = %s,
                     updated_at = CURRENT_TIMESTAMP
                 WHERE id = %s
-            """, (spotify_url, recording_id), prepare=False)
+            """, (
+                spotify_data['url'],
+                track_id,
+                album_art.get('small'),
+                album_art.get('medium'),
+                album_art.get('large'),
+                recording_id
+            ), prepare=False)
             
             conn.commit()
-            logger.info(f"    ✓ Updated with Spotify URL")
+            logger.info(f"    ✓ Updated with Spotify URL and album artwork")
             self.stats['recordings_updated'] += 1
     
     def match_recordings_for_song(self, song_identifier):
@@ -401,7 +437,7 @@ class SpotifyMatcher:
                     self.update_recording_spotify_url(
                         conn,
                         recording['id'],
-                        spotify_match['url']
+                        spotify_match
                     )
                 else:
                     logger.info(f"    ✗ No Spotify match found")
