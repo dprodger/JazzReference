@@ -5,16 +5,12 @@ A Flask API with robust database connection handling
 
 from flask import Flask, jsonify, request
 from flask_cors import CORS
-import psycopg
-from psycopg.rows import dict_row
-from psycopg_pool import ConnectionPool
-import os
 import logging
-from contextlib import contextmanager
 import time
-from typing import Optional
-import threading
 from api_doc import api_docs
+
+# Import database tools
+import db_tools
 
 
 # Configure logging
@@ -29,242 +25,6 @@ CORS(app)
 app.register_blueprint(api_docs)
 
 
-# Database configuration
-DB_CONFIG = {
-    'host': os.environ.get('DB_HOST', 'db.wxinjyotnrqxrwqrtvkp.supabase.co'),
-    'database': os.environ.get('DB_NAME', 'postgres'),
-    'user': os.environ.get('DB_USER', 'postgres'),
-    'password': os.environ.get('DB_PASSWORD', 'jovpeW-pukgu0-nifron'),
-    'port': os.environ.get('DB_PORT', '5432')
-}
-
-# Connection string for pooling
-CONNECTION_STRING = (
-    f"postgresql://{DB_CONFIG['user']}:{DB_CONFIG['password']}"
-    f"@{DB_CONFIG['host']}:{DB_CONFIG['port']}/{DB_CONFIG['database']}"
-    f"?sslmode=require"
-)
-
-# Global connection pool
-pool: Optional[ConnectionPool] = None
-keepalive_thread: Optional[threading.Thread] = None
-keepalive_stop = threading.Event()
-
-
-def reset_connection_pool():
-    """Reset the connection pool by closing and reinitializing it"""
-    global pool
-    
-    logger.warning("Resetting connection pool...")
-    
-    # Close existing pool
-    if pool is not None:
-        try:
-            pool.close()
-            logger.info("Old pool closed")
-        except Exception as e:
-            logger.error(f"Error closing old pool: {e}")
-    
-    pool = None
-    
-    # Reinitialize
-    time.sleep(2)  # Brief pause
-    success = init_connection_pool()
-    
-    if success:
-        logger.info("✓ Connection pool reset successfully")
-    else:
-        logger.error("✗ Failed to reset connection pool")
-    
-    return success
-    
-    
-def connection_keepalive():
-    """Background thread to keep connections alive during idle periods"""
-    logger.info("Starting connection keepalive thread...")
-    
-    while not keepalive_stop.is_set():
-        try:
-            # Wait 5 minutes between keepalive pings
-            if keepalive_stop.wait(300):  # 300 seconds = 5 minutes
-                break
-            
-            if pool is not None:
-                logger.debug("Sending keepalive ping to database...")
-                try:
-                    with pool.connection() as conn:
-                        with conn.cursor() as cur:
-                            cur.execute("SELECT 1")
-                    logger.debug("Keepalive ping successful")
-                except Exception as e:
-                    logger.warning(f"Keepalive ping failed: {e}")
-                    
-        except Exception as e:
-            logger.error(f"Error in keepalive thread: {e}")
-    
-    logger.info("Connection keepalive thread stopped")
-
-def init_connection_pool(max_retries=3, retry_delay=2):
-    """Initialize the connection pool with retry logic optimized for port 6543"""
-    global pool
-    
-    for attempt in range(max_retries):
-        try:
-            logger.info(f"Initializing connection pool (attempt {attempt + 1}/{max_retries})...")
-            
-            # Use VERY conservative settings for Supabase free tier
-            pool = ConnectionPool(
-                CONNECTION_STRING,
-                min_size=1,  # Only 1 connection
-                max_size=2,  # Max 2 connections per worker
-                open=True,
-                timeout=10,  # Reduce timeout
-                max_waiting=2,  # Fewer waiting requests
-                max_lifetime=3600,  # recycle connections after one hour
-                max_idle=300,       # close idle connections after 5 min
-                kwargs={
-                    'row_factory': dict_row,
-                    'connect_timeout': 5,
-                    'keepalives': 1,
-                    'keepalives_idle': 30,
-                    'keepalives_interval': 10,
-                    'keepalives_count': 3,
-                    'options': '-c statement_timeout=30000'
-                }
-            )
-            
-            # Test the connection
-            logger.info("Testing connection pool...")
-            with pool.connection() as conn:
-                with conn.cursor() as cur:
-                    cur.execute("SELECT 1 as test")
-                    result = cur.fetchone()
-                    logger.info(f"✓ Connection pool initialized successfully (test: {result})")
-            
-            return True
-            
-        except Exception as e:
-            logger.error(f"✗ Connection pool initialization failed (attempt {attempt + 1}/{max_retries}): {e}")
-            
-            # Clean up failed pool
-            if pool is not None:
-                try:
-                    pool.close()
-                except:
-                    pass
-                pool = None
-            
-            if attempt < max_retries - 1:
-                logger.info(f"Retrying in {retry_delay} seconds...")
-                time.sleep(retry_delay)
-                retry_delay *= 1.5  # Exponential backoff
-            else:
-                logger.error("Failed to initialize connection pool after all retries")
-                return False
-    
-    return False
-
-@contextmanager
-def get_db_connection():
-    """Get a database connection from the pool with explicit transaction management"""
-    global pool
-    
-    # Lazy initialization - create pool on first request if not exists
-    if pool is None:
-        logger.info("Connection pool not initialized, initializing now...")
-        if not init_connection_pool():
-            raise RuntimeError("Failed to initialize connection pool")
-    
-    conn = None
-    max_retries = 2
-    retry_delay = 0.5
-    
-    for attempt in range(max_retries):
-        try:
-            conn = pool.getconn(timeout=10)  # 10 second timeout to get connection from pool
-            
-            # Yield the connection for use
-            yield conn
-            
-            # If we get here, the code block succeeded
-            # Explicitly commit the transaction
-            conn.commit()
-            return  # Success, exit the function
-            
-        except psycopg.OperationalError as e:
-            logger.error(f"Database operational error (attempt {attempt + 1}/{max_retries}): {e}")
-            
-            # Rollback on error
-            if conn:
-                try:
-                    conn.rollback()
-                except Exception as rollback_error:
-                    logger.error(f"Error rolling back transaction: {rollback_error}")
-            
-            # If this was a connection error and we have retries left, try again
-            if attempt < max_retries - 1:
-                logger.info(f"Retrying connection in {retry_delay}s...")
-                time.sleep(retry_delay)
-                retry_delay *= 2
-                
-                # Return the bad connection if we got one
-                if conn:
-                    try:
-                        pool.putconn(conn)
-                    except:
-                        pass
-                conn = None
-            else:
-                raise
-                
-        except Exception as e:
-            # Rollback on any error
-            if conn:
-                try:
-                    conn.rollback()
-                    logger.debug("Transaction rolled back due to error")
-                except Exception as rollback_error:
-                    logger.error(f"Error rolling back transaction: {rollback_error}")
-            
-            logger.error(f"Unexpected database error: {e}")
-            raise
-            
-        finally:
-            # Always return connection to pool
-            if conn:
-                try:
-                    pool.putconn(conn)
-                except Exception as e:
-                    logger.error(f"Error returning connection to pool: {e}")
-
-def execute_query(query, params=None, fetch_one=False, fetch_all=True):
-    """Execute a query with proper error handling and logging"""
-    start_time = time.time()
-    
-    try:
-        with get_db_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute(query, params)
-                
-                if fetch_one:
-                    result = cur.fetchone()
-                elif fetch_all:
-                    result = cur.fetchall()
-                else:
-                    result = None
-                
-                duration = time.time() - start_time
-                logger.debug(f"Query executed in {duration:.3f}s")
-                
-                return result
-                
-    except psycopg.OperationalError as e:
-        logger.error(f"Database operational error after {time.time() - start_time:.3f}s: {e}")
-        raise
-    except Exception as e:
-        logger.error(f"Query error after {time.time() - start_time:.3f}s: {e}")
-        raise
-
 @app.route('/api/health', methods=['GET'])
 def health_check():
     """Enhanced health check endpoint with detailed diagnostics"""
@@ -276,14 +36,14 @@ def health_check():
     }
     
     try:
-        # Check if pool exists
-        if pool is None:
+        # Check if db_tools.pool exists
+        if db_tools.pool is None:
             health_status['status'] = 'unhealthy'
-            health_status['database'] = 'pool not initialized'
+            health_status['database'] = 'db_tools.pool not initialized'
             return jsonify(health_status), 503
         
-        # Get pool statistics
-        pool_stats = pool.get_stats()
+        # Get db_tools.pool statistics
+        pool_stats = db_tools.pool.get_stats()
         health_status['pool_stats'] = {
             'pool_size': pool_stats.get('pool_size', 0),
             'pool_available': pool_stats.get('pool_available', 0),
@@ -291,7 +51,7 @@ def health_check():
         }
         
         # Test database connection
-        result = execute_query("SELECT version(), current_timestamp", fetch_one=True)
+        result = db_tools.execute_query("SELECT version(), current_timestamp", fetch_one=True)
         
         health_status['status'] = 'healthy'
         health_status['database'] = 'connected'
@@ -353,7 +113,7 @@ def get_songs():
             """
             params = None
         
-        songs = execute_query(query, params)
+        songs = db_tools.execute_query(query, params)
         return jsonify(songs)
         
     except Exception as e:
@@ -371,7 +131,7 @@ def get_song_detail(song_id):
             FROM songs
             WHERE id = %s
         """
-        song = execute_query(song_query, (song_id,), fetch_one=True)
+        song = db_tools.execute_query(song_query, (song_id,), fetch_one=True)
         
         if not song:
             return jsonify({'error': 'Song not found'}), 404
@@ -417,7 +177,7 @@ def get_song_detail(song_id):
                      r.is_canonical, r.notes
             ORDER BY r.is_canonical DESC, r.recording_year DESC
         """
-        recordings = execute_query(recordings_query, (song_id,))
+        recordings = db_tools.execute_query(recordings_query, (song_id,))
         
         # Add recording info to song
         song['recordings'] = recordings
@@ -443,7 +203,7 @@ def get_recording_detail(recording_id):
             JOIN songs s ON r.song_id = s.id
             WHERE r.id = %s
         """
-        recording = execute_query(recording_query, (recording_id,), fetch_one=True)
+        recording = db_tools.execute_query(recording_query, (recording_id,), fetch_one=True)
         
         if not recording:
             return jsonify({'error': 'Recording not found'}), 404
@@ -464,7 +224,7 @@ def get_recording_detail(recording_id):
                 END,
                 p.name
         """
-        recording['performers'] = execute_query(performers_query, (recording_id,))
+        recording['performers'] = db_tools.execute_query(performers_query, (recording_id,))
         
         return jsonify(recording)
         
@@ -495,7 +255,7 @@ def get_performers():
             """
             params = None
         
-        performers = execute_query(query, params)
+        performers = db_tools.execute_query(query, params)
         return jsonify(performers)
         
     except Exception as e:
@@ -531,7 +291,7 @@ def get_performer_images(performer_id):
             ORDER BY ai.is_primary DESC, ai.display_order, i.created_at
         """
         
-        images = execute_query(query, (performer_id,), fetch_all=True)
+        images = db_tools.execute_query(query, (performer_id,), fetch_all=True)
         
         if not images:
             return jsonify([])
@@ -568,7 +328,7 @@ def get_image_detail(image_id):
             GROUP BY i.id
         """
         
-        image = execute_query(query, (image_id,), fetch_one=True)
+        image = db_tools.execute_query(query, (image_id,), fetch_one=True)
         
         if not image:
             return jsonify({'error': 'Image not found'}), 404
@@ -593,7 +353,7 @@ def get_performer_detail(performer_id):
             FROM performers
             WHERE id = %s
         """
-        performer = execute_query(performer_query, (performer_id,), fetch_one=True)
+        performer = db_tools.execute_query(performer_query, (performer_id,), fetch_one=True)
         
         if not performer:
             return jsonify({'error': 'Performer not found'}), 404
@@ -606,7 +366,7 @@ def get_performer_detail(performer_id):
             WHERE pi.performer_id = %s
             ORDER BY pi.is_primary DESC, i.name
         """
-        performer['instruments'] = execute_query(instruments_query, (performer_id,))
+        performer['instruments'] = db_tools.execute_query(instruments_query, (performer_id,))
         
         # Get recordings
         recordings_query = """
@@ -619,7 +379,7 @@ def get_performer_detail(performer_id):
             WHERE rp.performer_id = %s
             ORDER BY r.recording_year DESC NULLS LAST, s.title
         """
-        performer['recordings'] = execute_query(recordings_query, (performer_id,))
+        performer['recordings'] = db_tools.execute_query(recordings_query, (performer_id,))
         
         # Get images
         images_query = """
@@ -642,7 +402,7 @@ def get_performer_detail(performer_id):
             WHERE ai.performer_id = %s
             ORDER BY ai.is_primary DESC, ai.display_order, i.created_at
         """
-        performer['images'] = execute_query(images_query, (performer_id,))
+        performer['images'] = db_tools.execute_query(images_query, (performer_id,))
         
         return jsonify(performer)
         
@@ -704,7 +464,7 @@ def submit_content_report():
         reporter_user_agent = request.headers.get('User-Agent')
         
         # Insert into database
-        with get_db_connection() as conn:
+        with db_tools.get_db_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute("""
                     INSERT INTO content_reports (
@@ -822,7 +582,7 @@ def get_content_reports():
         params.append(limit)
         
         # Execute query
-        with get_db_connection() as conn:
+        with db_tools.get_db_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(query, params)
                 reports = cur.fetchall()
@@ -858,22 +618,11 @@ if __name__ == '__main__':
     logger.info("Database connection pool will initialize on first request")
     
     # Start keepalive thread
-    keepalive_thread = threading.Thread(target=connection_keepalive, daemon=True)
-    keepalive_thread.start()
+    db_tools.start_keepalive_thread()
     
     try:
         app.run(debug=True, host='0.0.0.0', port=5001)
     finally:
-        # Stop keepalive thread
-        logger.info("Stopping keepalive thread...")
-        keepalive_stop.set()
-        if keepalive_thread:
-            keepalive_thread.join(timeout=5)
-        
-        # Close the connection pool on shutdown
-        if pool:
-            logger.info("Closing connection pool...")
-            pool.close()
-            logger.info("Connection pool closed")
-
-
+        # Stop keepalive thread and close pool
+        db_tools.stop_keepalive_thread()
+        db_tools.close_connection_pool()
