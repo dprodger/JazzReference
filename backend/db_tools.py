@@ -18,14 +18,24 @@ from psycopg_pool import ConnectionPool
 logger = logging.getLogger(__name__)
 
 
-# Database configuration
-DB_CONFIG = {
-    'host': os.environ.get('DB_HOST', 'db.wxinjyotnrqxrwqrtvkp.supabase.co'),
+# Database configuration - Using Transaction Pooler
+DB_DIRECT_CONFIG = {
+    'host': os.environ.get('DB_HOST', 'aws-1-us-east-2.pooler.supabase.com'),
     'database': os.environ.get('DB_NAME', 'postgres'),
     'user': os.environ.get('DB_USER', 'postgres'),
     'password': os.environ.get('DB_PASSWORD', 'jovpeW-pukgu0-nifron'),
     'port': os.environ.get('DB_PORT', '5432')
 }
+
+DB_TRANSACTION_POOLER_CONFIG = {
+    'host': os.environ.get('DB_HOST', 'aws-1-us-east-2.pooler.supabase.com'),
+    'database': os.environ.get('DB_NAME', 'postgres'),
+    'user': os.environ.get('DB_USER', 'postgres.wxinjyotnrqxrwqrtvkp'),
+    'password': os.environ.get('DB_PASSWORD', 'jovpeW-pukgu0-nifron'),
+    'port': os.environ.get('DB_PORT', '6543')
+}
+
+DB_CONFIG = DB_TRANSACTION_POOLER_CONFIG
 
 # Connection string for pooling
 CONNECTION_STRING = (
@@ -95,31 +105,33 @@ def connection_keepalive():
 
 
 def init_connection_pool(max_retries=3, retry_delay=2):
-    """Initialize the connection pool with retry logic optimized for port 6543"""
+    """Initialize the connection pool with settings optimized for transaction pooler"""
     global pool
     
     for attempt in range(max_retries):
         try:
             logger.info(f"Initializing connection pool (attempt {attempt + 1}/{max_retries})...")
             
-            # Use VERY conservative settings for Supabase free tier
+            # Optimized settings for Supabase transaction pooler
             pool = ConnectionPool(
                 CONNECTION_STRING,
-                min_size=1,  # Only 1 connection
-                max_size=2,  # Max 2 connections per worker
+                min_size=1,          # Minimum 1 connection ready
+                max_size=3,          # Increased from 2 to 3
                 open=True,
-                timeout=10,  # Reduce timeout
-                max_waiting=2,  # Fewer waiting requests
-                max_lifetime=3600,  # recycle connections after one hour
-                max_idle=300,       # close idle connections after 5 min
+                timeout=10,
+                max_waiting=10,      # Increased from 2 to 10 - allows more requests to queue
+                max_lifetime=1800,   # Recycle after 30 minutes (was 60)
+                max_idle=600,        # Keep idle for 10 minutes (was 5)
                 kwargs={
                     'row_factory': dict_row,
-                    'connect_timeout': 5,
+                    'connect_timeout': 10,
                     'keepalives': 1,
                     'keepalives_idle': 30,
                     'keepalives_interval': 10,
                     'keepalives_count': 3,
-                    'options': '-c statement_timeout=30000'
+                    'options': '-c statement_timeout=30000',
+                    'autocommit': False,
+                    'prepare_threshold': None  # CRITICAL: Disable prepared statements for pooler
                 }
             )
             
@@ -157,7 +169,10 @@ def init_connection_pool(max_retries=3, retry_delay=2):
 
 @contextmanager
 def get_db_connection():
-    """Get a database connection from the pool with explicit transaction management"""
+    """
+    Get a database connection from the pool using context manager pattern.
+    Transaction pooler will automatically return connection after transaction completes.
+    """
     global pool
     
     # Lazy initialization - create pool on first request if not exists
@@ -166,67 +181,14 @@ def get_db_connection():
         if not init_connection_pool():
             raise RuntimeError("Failed to initialize connection pool")
     
-    conn = None
-    max_retries = 2
-    retry_delay = 0.5
-    
-    for attempt in range(max_retries):
-        try:
-            conn = pool.getconn(timeout=10)  # 10 second timeout to get connection from pool
-            
-            # Yield the connection for use
+    # Use pool.connection() context manager - much simpler and safer!
+    try:
+        with pool.connection() as conn:
             yield conn
-            
-            # If we get here, the code block succeeded
-            # Explicitly commit the transaction
-            conn.commit()
-            return  # Success, exit the function
-            
-        except psycopg.OperationalError as e:
-            logger.error(f"Database operational error (attempt {attempt + 1}/{max_retries}): {e}")
-            
-            # Rollback on error
-            if conn:
-                try:
-                    conn.rollback()
-                except Exception as rollback_error:
-                    logger.error(f"Error rolling back transaction: {rollback_error}")
-            
-            # If this was a connection error and we have retries left, try again
-            if attempt < max_retries - 1:
-                logger.info(f"Retrying connection in {retry_delay}s...")
-                time.sleep(retry_delay)
-                retry_delay *= 2
-                
-                # Return the bad connection if we got one
-                if conn:
-                    try:
-                        pool.putconn(conn)
-                    except:
-                        pass
-                conn = None
-            else:
-                raise
-                
-        except Exception as e:
-            # Rollback on any error
-            if conn:
-                try:
-                    conn.rollback()
-                    logger.debug("Transaction rolled back due to error")
-                except Exception as rollback_error:
-                    logger.error(f"Error rolling back transaction: {rollback_error}")
-            
-            logger.error(f"Unexpected database error: {e}")
-            raise
-            
-        finally:
-            # Always return connection to pool
-            if conn:
-                try:
-                    pool.putconn(conn)
-                except Exception as e:
-                    logger.error(f"Error returning connection to pool: {e}")
+            # Transaction will be committed automatically if no exception
+    except Exception as e:
+        logger.error(f"Database error: {e}")
+        raise
 
 
 def execute_query(query, params=None, fetch_one=False, fetch_all=True):
