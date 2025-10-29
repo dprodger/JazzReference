@@ -415,7 +415,7 @@ class MusicBrainzImporter:
                     song_id, album_title, recording_year, recording_date,
                     is_canonical, musicbrainz_id, notes
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                VALUES (%s, %s, %s, %s, %s, %s)
                 RETURNING id
             """, (
                 song_id,
@@ -423,8 +423,7 @@ class MusicBrainzImporter:
                 release_year,
                 formatted_date,
                 False,  # Not canonical by default
-                mb_recording_id,
-                f"Imported from MusicBrainz"
+                mb_recording_id
             ))
             
             recording_id = cur.fetchone()['id']

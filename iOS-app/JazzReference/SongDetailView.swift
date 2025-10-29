@@ -317,11 +317,16 @@ struct SongDetailView: View {
                                         .padding(.horizontal)
                                         .padding(.top, 8)
                                     
-                                    ForEach(group.recordings) { recording in
-                                        NavigationLink(destination: RecordingDetailView(recordingId: recording.id)) {
-                                            RecordingRowView(recording: recording)
+                                    ScrollView(.horizontal, showsIndicators: false) {
+                                        HStack(spacing: 16) {
+                                            ForEach(group.recordings) { recording in
+                                                NavigationLink(destination: RecordingDetailView(recordingId: recording.id)) {
+                                                    RecordingRowView(recording: recording)
+                                                }
+                                                .buttonStyle(.plain)
+                                            }
                                         }
-                                        .buttonStyle(.plain)
+                                        .padding(.horizontal)
                                     }
                                 }
                             }

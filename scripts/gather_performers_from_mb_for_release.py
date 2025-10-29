@@ -210,17 +210,16 @@ class SingleRecordingImporter:
             cur.execute("""
                 INSERT INTO recordings (
                     song_id, album_title, recording_year, recording_date,
-                    is_canonical, notes
+                    is_canonical
                 )
-                VALUES (%s, %s, %s, %s, %s, %s)
+                VALUES (%s, %s, %s, %s, %s)
                 RETURNING id
             """, (
                 song_id,
                 album_title,
                 release_year,
                 formatted_date,
-                False,
-                f"Imported from MusicBrainz - Recording ID: {recording_data.get('id')}"
+                False
             ))
             
             recording_id = cur.fetchone()['id']
