@@ -413,7 +413,7 @@ class MusicBrainzImporter:
             cur.execute("""
                 INSERT INTO recordings (
                     song_id, album_title, recording_year, recording_date,
-                    is_canonical, musicbrainz_id, notes
+                    is_canonical, musicbrainz_id
                 )
                 VALUES (%s, %s, %s, %s, %s, %s)
                 RETURNING id
