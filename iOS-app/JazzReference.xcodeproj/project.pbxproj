@@ -7,17 +7,10 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		B4911D342EB316F700326CA7 /* MusicBrainzImporter.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = B4911D2A2EB316F600326CA7 /* MusicBrainzImporter.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		B4EE328C2EB3ED5E00C643D1 /* MusicBrainzImporter.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = B4911D2A2EB316F600326CA7 /* MusicBrainzImporter.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
-		B4911D322EB316F700326CA7 /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = B4C160382E91B03600EB8D2C /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = B4911D292EB316F600326CA7;
-			remoteInfo = MusicBrainzImporter;
-		};
 		B4C1604E2E91B03700EB8D2C /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = B4C160382E91B03600EB8D2C /* Project object */;
@@ -32,18 +25,25 @@
 			remoteGlobalIDString = B4C1603F2E91B03600EB8D2C;
 			remoteInfo = JazzReference;
 		};
+		B4EE328D2EB3F95000C643D1 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = B4C160382E91B03600EB8D2C /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = B4911D292EB316F600326CA7;
+			remoteInfo = MusicBrainzImporter;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
-		B4911D352EB316F700326CA7 /* Embed Foundation Extensions */ = {
+		B4EE328B2EB3ED3700C643D1 /* Embed App Extensions */ = {
 			isa = PBXCopyFilesBuildPhase;
-			buildActionMask = 2147483647;
+			buildActionMask = 12;
 			dstPath = "";
 			dstSubfolderSpec = 13;
 			files = (
-				B4911D342EB316F700326CA7 /* MusicBrainzImporter.appex in Embed Foundation Extensions */,
+				B4EE328C2EB3ED5E00C643D1 /* MusicBrainzImporter.appex in Embed App Extensions */,
 			);
-			name = "Embed Foundation Extensions";
+			name = "Embed App Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXCopyFilesBuildPhase section */
@@ -176,13 +176,13 @@
 			buildPhases = (
 				B4C1603C2E91B03600EB8D2C /* Sources */,
 				B4C1603D2E91B03600EB8D2C /* Frameworks */,
+				B4EE328B2EB3ED3700C643D1 /* Embed App Extensions */,
 				B4C1603E2E91B03600EB8D2C /* Resources */,
-				B4911D352EB316F700326CA7 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
-				B4911D332EB316F700326CA7 /* PBXTargetDependency */,
+				B4EE328E2EB3F95000C643D1 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				B4C160422E91B03600EB8D2C /* JazzReference */,
@@ -351,11 +351,6 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
-		B4911D332EB316F700326CA7 /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			target = B4911D292EB316F600326CA7 /* MusicBrainzImporter */;
-			targetProxy = B4911D322EB316F700326CA7 /* PBXContainerItemProxy */;
-		};
 		B4C1604F2E91B03700EB8D2C /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = B4C1603F2E91B03600EB8D2C /* JazzReference */;
@@ -365,6 +360,11 @@
 			isa = PBXTargetDependency;
 			target = B4C1603F2E91B03600EB8D2C /* JazzReference */;
 			targetProxy = B4C160582E91B03700EB8D2C /* PBXContainerItemProxy */;
+		};
+		B4EE328E2EB3F95000C643D1 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = B4911D292EB316F600326CA7 /* MusicBrainzImporter */;
+			targetProxy = B4EE328D2EB3F95000C643D1 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
