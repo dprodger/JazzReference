@@ -642,50 +642,47 @@ def search_performers():
         return jsonify({'error': 'Name parameter is required'}), 400
     
     try:
-        conn = get_db_connection()
-        cur = conn.cursor()
-        
-        # Search for performers with names containing the search term (case-insensitive)
-        # Use ILIKE for case-insensitive matching
-        cur.execute("""
-            SELECT 
-                id,
-                name,
-                biography,
-                birth_date,
-                death_date,
-                musicbrainz_id
-            FROM performers
-            WHERE LOWER(name) LIKE LOWER(%s)
-            ORDER BY 
-                -- Exact matches first
-                CASE WHEN LOWER(name) = LOWER(%s) THEN 0 ELSE 1 END,
-                -- Then by name
-                name
-            LIMIT 10
-        """, (f'%{name}%', name))
-        
-        performers = cur.fetchall()
-        
-        cur.close()
-        conn.close()
-        
-        if not performers:
-            return jsonify([]), 404
-        
-        # Format the results
-        results = []
-        for performer in performers:
-            results.append({
-                'id': str(performer['id']),
-                'name': performer['name'],
-                'biography': performer['biography'],
-                'birth_date': performer['birth_date'].isoformat() if performer['birth_date'] else None,
-                'death_date': performer['death_date'].isoformat() if performer['death_date'] else None,
-                'musicbrainz_id': performer['musicbrainz_id']
-            })
-        
-        return jsonify(results)
+        with db_tools.get_db_connection() as conn:
+            with conn.cursor() as cur:
+            
+                # Search for performers with names containing the search term (case-insensitive)
+                # Use ILIKE for case-insensitive matching
+                cur.execute("""
+                    SELECT 
+                        id,
+                        name,
+                        biography,
+                        birth_date,
+                        death_date,
+                        musicbrainz_id
+                    FROM performers
+                    WHERE LOWER(name) LIKE LOWER(%s)
+                    ORDER BY 
+                        -- Exact matches first
+                        CASE WHEN LOWER(name) = LOWER(%s) THEN 0 ELSE 1 END,
+                        -- Then by name
+                        name
+                    LIMIT 10
+                """, (f'%{name}%', name))
+                
+                performers = cur.fetchall()
+                
+                if not performers:
+                    return jsonify([]), 404
+                
+                # Format the results
+                results = []
+                for performer in performers:
+                    results.append({
+                        'id': str(performer['id']),
+                        'name': performer['name'],
+                        'biography': performer['biography'],
+                        'birth_date': performer['birth_date'].isoformat() if performer['birth_date'] else None,
+                        'death_date': performer['death_date'].isoformat() if performer['death_date'] else None,
+                        'musicbrainz_id': performer['musicbrainz_id']
+                    })
+                
+                return jsonify(results)
         
     except Exception as e:
         logger.error(f"Error searching performers: {e}", exc_info=True)
