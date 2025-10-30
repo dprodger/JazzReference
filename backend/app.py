@@ -8,6 +8,8 @@ from flask_cors import CORS
 import logging
 import time
 from api_doc import api_docs
+import sys
+import os
 
 # Import database tools
 import db_tools
@@ -618,6 +620,79 @@ def get_content_reports():
             'success': False,
             'error': 'An error occurred while fetching reports.'
         }), 500
+
+
+
+
+#!/usr/bin/env python3
+@app.route('/api/performers/search', methods=['GET'])
+def search_performers():
+    """
+    Search for performers by name
+    
+    Query Parameters:
+        name: Performer name to search for (case-insensitive partial match)
+        
+    Returns:
+        List of matching performers with their details
+    """
+    name = request.args.get('name', '').strip()
+    
+    if not name:
+        return jsonify({'error': 'Name parameter is required'}), 400
+    
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        
+        # Search for performers with names containing the search term (case-insensitive)
+        # Use ILIKE for case-insensitive matching
+        cur.execute("""
+            SELECT 
+                id,
+                name,
+                biography,
+                birth_date,
+                death_date,
+                musicbrainz_id
+            FROM performers
+            WHERE LOWER(name) LIKE LOWER(%s)
+            ORDER BY 
+                -- Exact matches first
+                CASE WHEN LOWER(name) = LOWER(%s) THEN 0 ELSE 1 END,
+                -- Then by name
+                name
+            LIMIT 10
+        """, (f'%{name}%', name))
+        
+        performers = cur.fetchall()
+        
+        cur.close()
+        conn.close()
+        
+        if not performers:
+            return jsonify([]), 404
+        
+        # Format the results
+        results = []
+        for performer in performers:
+            results.append({
+                'id': str(performer['id']),
+                'name': performer['name'],
+                'biography': performer['biography'],
+                'birth_date': performer['birth_date'].isoformat() if performer['birth_date'] else None,
+                'death_date': performer['death_date'].isoformat() if performer['death_date'] else None,
+                'musicbrainz_id': performer['musicbrainz_id']
+            })
+        
+        return jsonify(results)
+        
+    except Exception as e:
+        logger.error(f"Error searching performers: {e}", exc_info=True)
+        return jsonify({'error': 'Internal server error'}), 500
+
+
+
 
 if __name__ == '__main__':
     # Don't initialize pool at startup - let it initialize on first request
