@@ -24,6 +24,8 @@
                 <dict>
                     <key>NSExtensionActivationSupportsWebPageWithMaxCount</key>
                     <integer>1</integer>
+                    <key>NSExtensionActivationSupportsWebURLWithMaxCount</key>
+                    <integer>1</integer>
                 </dict>
                 <key>NSExtensionJavaScriptPreprocessingFile</key>
                 <string>ExtractArtistData</string>
