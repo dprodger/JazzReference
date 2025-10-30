@@ -30,18 +30,41 @@ struct ContentView: View {
 }
 
 
-// MARK: - App Entry Point
+import SwiftUI
 
 @main
 struct JazzReferenceApp: App {
+    // State for showing artist creation sheet
+    @State private var showingArtistCreation = false
+    // State for holding imported artist data
+    @State private var importedArtistData: ImportedArtistData?
+    
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .onAppear {
+                    // Check for imported artist data when app launches
+                    checkForImportedArtist()
+                }
+                .sheet(isPresented: $showingArtistCreation) {
+                    // Show artist creation view with imported data
+                    if let data = importedArtistData {
+                        ArtistCreationView(importedData: data)
+                    }
+                }
                 .ignoresSafeArea()
         }
     }
+    
+    private func checkForImportedArtist() {
+        // Use SharedArtistDataManager to retrieve data from extension
+        if let data = SharedArtistDataManager.retrieveSharedData() {
+            print("📥 Imported artist data detected: \(data.name)")
+            importedArtistData = data
+            showingArtistCreation = true
+        }
+    }
 }
-
 // MARK: - Preview
 
 #Preview {
