@@ -32,28 +32,76 @@ struct ContentView: View {
 
 import SwiftUI
 
+// Add this to JazzReferenceApp.swift in the App struct
+// This will verify the URL scheme is properly registered
+
 @main
 struct JazzReferenceApp: App {
-    // State for showing artist creation sheet
     @State private var showingArtistCreation = false
-    // State for holding imported artist data
     @State private var importedArtistData: ImportedArtistData?
+    @Environment(\.scenePhase) var scenePhase
+
+
+    // ADD THIS INITIALIZER
+    init() {
+        // Diagnostic: Check URL scheme registration
+        NSLog("========================================")
+        NSLog("🔧 MAIN APP URL SCHEME DIAGNOSTICS")
+        NSLog("========================================")
+        
+        // Check if CFBundleURLTypes is in Info.plist
+        if let urlTypes = Bundle.main.object(forInfoDictionaryKey: "CFBundleURLTypes") as? [[String: Any]] {
+            NSLog("✅ CFBundleURLTypes found in Info.plist")
+            NSLog("   Number of URL types: %d", urlTypes.count)
+            
+            for (index, urlType) in urlTypes.enumerated() {
+                NSLog("\n   URL Type %d:", index)
+                
+                if let name = urlType["CFBundleURLName"] as? String {
+                    NSLog("   - Name: %@", name)
+                }
+                
+                if let schemes = urlType["CFBundleURLSchemes"] as? [String] {
+                    NSLog("   - Schemes: %@", schemes.joined(separator: ", "))
+                    
+                    if schemes.contains("jazzreference") {
+                        NSLog("   ✅ Contains 'jazzreference'")
+                    }
+                }
+                
+                if let role = urlType["CFBundleTypeRole"] as? String {
+                    NSLog("   - Role: %@", role)
+                }
+            }
+        } else {
+            NSLog("❌ CFBundleURLTypes NOT FOUND in Info.plist")
+            NSLog("   URL scheme may be in build settings only")
+            NSLog("   Extensions require it in Info.plist!")
+        }
+        
+        NSLog("\nBundle ID: %@", Bundle.main.bundleIdentifier ?? "nil")
+        NSLog("========================================\n")
+    }
     
     var body: some Scene {
         WindowGroup {
             ContentView()
                 .onOpenURL { url in
-                         if url.scheme == "jazzreference" && url.host == "import-artist" {
-                             checkForImportedArtist()
-                         }
-                     }
+                    if url.scheme == "jazzreference" && url.host == "import-artist" {
+                        checkForImportedArtist()
+                    }
+                }
                 .onAppear {
-                    // Check for imported artist data when app launches
                     checkForImportedArtist()
                 }
-                .sheet(isPresented: $showingArtistCreation) {
-                    // Show artist creation view with imported data
-                    if let data = importedArtistData {
+                .onChange(of: scenePhase) { oldPhase, newPhase in
+                    if newPhase == .active {
+                        checkForImportedArtist()
+                    }
+                }
+                .sheet(item: $importedArtistData) { data in
+                    // CHANGED: Use .sheet(item:) instead of isPresented
+                    NavigationStack {
                         ArtistCreationView(importedData: data)
                     }
                 }
@@ -62,14 +110,16 @@ struct JazzReferenceApp: App {
     }
     
     private func checkForImportedArtist() {
-        // Use SharedArtistDataManager to retrieve data from extension
         if let data = SharedArtistDataManager.retrieveSharedData() {
-            print("📥 Imported artist data detected: \(data.name)")
+            NSLog("🔥 Imported artist data detected: %@", data.name)
             importedArtistData = data
             showingArtistCreation = true
+        } else {
+            NSLog("ℹ️ No imported artist data found")
         }
     }
 }
+
 // MARK: - Preview
 
 #Preview {

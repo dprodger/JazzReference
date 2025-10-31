@@ -18,6 +18,7 @@
     <string>$(MARKETING_VERSION)</string>
     <key>CFBundleVersion</key>
     <string>$(CURRENT_PROJECT_VERSION)</string>
+    <!-- Register Custom URL Scheme -->
     <key>CFBundleURLTypes</key>
     <array>
         <dict>

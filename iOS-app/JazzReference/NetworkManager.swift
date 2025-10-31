@@ -3,7 +3,7 @@ import SwiftUI
 import Combine
 
 class NetworkManager: ObservableObject {
-    static let baseURL = "https://jazzreference.onrender.com/api"
+    static let baseURL = "https://linernotesjazz.com/api"
     
     @Published var songs: [Song] = []
     @Published var performers: [Performer] = []

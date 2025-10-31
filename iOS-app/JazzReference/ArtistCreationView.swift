@@ -26,6 +26,9 @@ struct ArtistCreationView: View {
     
     // Initialize with imported data (or empty if creating manually)
     init(importedData: ImportedArtistData? = nil) {
+        NSLog("🎨 ArtistCreationView.init()")
+        NSLog("   Received name: '%@'", importedData?.name ?? "NIL")
+        
         _name = State(initialValue: importedData?.name ?? "")
         _musicbrainzId = State(initialValue: importedData?.musicbrainzId ?? "")
         _biography = State(initialValue: importedData?.biography ?? "")
@@ -33,6 +36,8 @@ struct ArtistCreationView: View {
         _deathDate = State(initialValue: importedData?.formattedDeathDate ?? "")
         _instruments = State(initialValue: importedData?.instruments?.joined(separator: ", ") ?? "")
         _wikipediaUrl = State(initialValue: importedData?.wikipediaUrl ?? "")
+        
+        NSLog("✅ Init complete, name state: '%@'", importedData?.name ?? "EMPTY")
     }
     
     var body: some View {
@@ -91,6 +96,12 @@ struct ArtistCreationView: View {
                         dismiss()
                     }
                 }
+            }
+            .onAppear {
+                NSLog("📱 ArtistCreationView.onAppear()")
+                NSLog("   name = '%@'", name)
+                NSLog("   biography length = %d", biography.count)
+                NSLog("   musicbrainzId = '%@'", musicbrainzId)
             }
             .alert("Error", isPresented: $showingError) {
                 Button("OK", role: .cancel) { }
