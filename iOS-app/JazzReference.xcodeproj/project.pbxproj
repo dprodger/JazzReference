@@ -66,17 +66,30 @@
 		B4911D382EB316F700326CA7 /* Exceptions for "MusicBrainzImporter" folder in "MusicBrainzImporter" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
+				ExtractArtistData.js,
+				ExtractSongData.js,
 				Info.plist,
 			);
 			target = B4911D292EB316F600326CA7 /* MusicBrainzImporter */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
+/* Begin PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet section */
+		B49E75372EB547640053A338 /* Exceptions for "MusicBrainzImporter" folder in "Compile Sources" phase from "MusicBrainzImporter" target */ = {
+			isa = PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet;
+			buildPhase = B4911D262EB316F600326CA7 /* Sources */;
+			membershipExceptions = (
+				ExtractMusicBrainzData.js,
+			);
+		};
+/* End PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		B4911D2B2EB316F600326CA7 /* MusicBrainzImporter */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
 				B4911D382EB316F700326CA7 /* Exceptions for "MusicBrainzImporter" folder in "MusicBrainzImporter" target */,
+				B49E75372EB547640053A338 /* Exceptions for "MusicBrainzImporter" folder in "Compile Sources" phase from "MusicBrainzImporter" target */,
 			);
 			path = MusicBrainzImporter;
 			sourceTree = "<group>";

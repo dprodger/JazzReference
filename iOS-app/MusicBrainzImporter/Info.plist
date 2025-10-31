@@ -34,7 +34,7 @@
 				<integer>1</integer>
 			</dict>
 			<key>NSExtensionJavaScriptPreprocessingFile</key>
-			<string>ExtractArtistData</string>
+			<string>ExtractMusicBrainzData</string>
 		</dict>
 		<key>NSExtensionPointIdentifier</key>
 		<string>com.apple.share-services</string>

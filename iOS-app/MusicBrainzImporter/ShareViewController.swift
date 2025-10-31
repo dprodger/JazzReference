@@ -57,6 +57,53 @@ struct ExistingArtist: Codable {
     }
 }
 
+// MARK: - Song Data Models
+
+struct SongData: Codable {
+    let title: String
+    let musicbrainzId: String
+    let composers: [String]?
+    let workType: String?
+    let key: String?
+    let annotation: String?
+    let wikipediaUrl: String?
+    let sourceUrl: String?
+    
+    var composerString: String? {
+        guard let composers = composers, !composers.isEmpty else {
+            return nil
+        }
+        return composers.joined(separator: ", ")
+    }
+}
+
+enum SongMatchResult {
+    case notFound
+    case exactMatch(existingSong: ExistingSong)
+    case titleMatchNoMbid(existingSong: ExistingSong)
+    case titleMatchDifferentMbid(existingSong: ExistingSong)
+}
+
+struct ExistingSong: Codable {
+    let id: String
+    let title: String
+    let composer: String?
+    let structure: String?
+    var musicbrainzId: String?
+    
+    var shortInfo: String {
+        if let composer = composer, !composer.isEmpty {
+            return "by \(composer)"
+        }
+        return "No composer information"
+    }
+    
+    enum CodingKeys: String, CodingKey {
+        case id, title, composer, structure
+        case musicbrainzId = "musicbrainz_id"
+    }
+}
+
 // MARK: - Database Service
 
 class ArtistDatabaseService {
@@ -125,6 +172,66 @@ class ArtistDatabaseService {
     }
 }
 
+class SongDatabaseService {
+    static let shared = SongDatabaseService()
+    
+    private  let baseURL = "https://linernotesjazz.com/api"
+
+    private init() {}
+    
+    /// Check if a song exists in the database by title and/or MusicBrainz ID
+    func checkSongExists(title: String, musicbrainzId: String) async throws -> SongMatchResult {
+        // Search by title first
+        guard let encodedTitle = title.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) else {
+            throw URLError(.badURL)
+        }
+        
+        let urlString = "\(baseURL)/songs/search?title=\(encodedTitle)"
+        guard let url = URL(string: urlString) else {
+            throw URLError(.badURL)
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.timeoutInterval = 10.0
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw URLError(.badServerResponse)
+        }
+        
+        if httpResponse.statusCode == 404 {
+            return .notFound
+        }
+        
+        guard httpResponse.statusCode == 200 else {
+            throw URLError(.badServerResponse)
+        }
+        
+        // Parse the response
+        let decoder = JSONDecoder()
+        let results = try decoder.decode([ExistingSong].self, from: data)
+        
+        // Check for exact title match (case-insensitive)
+        guard let matchingSong = results.first(where: { $0.title.lowercased() == title.lowercased() }) else {
+            return .notFound
+        }
+        
+        // Check the MusicBrainz ID
+        if let existingMbid = matchingSong.musicbrainzId {
+            if existingMbid == musicbrainzId {
+                return .exactMatch(existingSong: matchingSong)
+            } else {
+                return .titleMatchDifferentMbid(existingSong: matchingSong)
+            }
+        } else {
+            return .titleMatchNoMbid(existingSong: matchingSong)
+        }
+    }
+}
+
 // MARK: - Shared Data Manager
 
 class SharedArtistData {
@@ -145,6 +252,25 @@ class SharedArtistData {
     }
 }
 
+class SharedSongData {
+    static func saveSharedData(_ songData: SongData, appGroup: String) {
+        guard let sharedDefaults = UserDefaults(suiteName: appGroup) else {
+            print("❌ Failed to get shared UserDefaults")
+            return
+        }
+        
+        let encoder = JSONEncoder()
+        if let encoded = try? encoder.encode(songData) {
+            sharedDefaults.set(encoded, forKey: "pendingSongImport")
+            sharedDefaults.removeObject(forKey: "pendingArtistImport") // Clear any pending artist import
+            sharedDefaults.synchronize()
+            print("✅ Song data saved to shared container")
+        } else {
+            print("❌ Failed to encode song data")
+        }
+    }
+}
+
 // MARK: - Share View Controller
 
 class ShareViewController: UIViewController {
@@ -152,6 +278,9 @@ class ShareViewController: UIViewController {
     // MARK: - Properties
     private var artistData: ArtistData?
     private var existingArtist: ExistingArtist?
+    private var songData: SongData?
+    private var existingSong: ExistingSong?
+    private var isSongImport: Bool = false
     private let appGroupIdentifier = "group.me.rodger.david.JazzReference"
     
     // MARK: - Lifecycle
@@ -159,10 +288,50 @@ class ShareViewController: UIViewController {
         super.viewDidLoad()
         view.backgroundColor = .systemBackground
         
-        extractArtistData()
+        // First, detect if this is an artist or song page
+        detectPageType()
     }
 
     // MARK: - Data Extraction
+    
+    private func detectPageType() {
+        print("🔍 Detecting page type...")
+        
+        guard let extensionItem = extensionContext?.inputItems.first as? NSExtensionItem,
+              let itemProvider = extensionItem.attachments?.first else {
+            print("❌ No extension item found")
+            showError("No data available")
+            return
+        }
+        
+        // Check if we have a URL to determine the type
+        if itemProvider.hasItemConformingToTypeIdentifier(UTType.url.identifier) {
+            itemProvider.loadItem(forTypeIdentifier: UTType.url.identifier, options: nil) { [weak self] (item, error) in
+                if let url = item as? URL {
+                    let urlString = url.absoluteString
+                    if urlString.contains("musicbrainz.org/work/") {
+                        self?.isSongImport = true
+                        print("📍 Detected: Song/Work page")
+                    } else if urlString.contains("musicbrainz.org/artist/") {
+                        self?.isSongImport = false
+                        print("📍 Detected: Artist page")
+                    }
+                }
+                
+                // Now proceed with extraction
+                DispatchQueue.main.async {
+                    if self?.isSongImport == true {
+                        self?.extractSongData()
+                    } else {
+                        self?.extractArtistData()
+                    }
+                }
+            }
+        } else {
+            // If we can't get URL, default to artist
+            extractArtistData()
+        }
+    }
     
     private func extractArtistData() {
         print("🔍 Starting data extraction...")
@@ -246,7 +415,7 @@ class ShareViewController: UIViewController {
             }
         } else {
             print("❌ No property list type found")
-            showError("This extension only works with web pages")
+            showError("This extension only works with web pages(!)")
         }
     }
     
@@ -352,6 +521,206 @@ class ShareViewController: UIViewController {
         }
     }
     
+    // MARK: - Song Extraction and Processing
+    
+    private func extractSongData() {
+        NSLog("🔍 Starting song data extraction...")
+        
+        guard let extensionItem = extensionContext?.inputItems.first as? NSExtensionItem else {
+            print("❌ No extension item found")
+            showError("No data available")
+            return
+        }
+        
+        guard let itemProvider = extensionItem.attachments?.first else {
+            print("❌ No item provider found")
+            showError("No data available")
+            return
+        }
+        
+        NSLog("✓ Extension item and provider found")
+        
+        let propertyListType = "com.apple.property-list"
+        
+        showError("extension item adn provider found")
+        if itemProvider.hasItemConformingToTypeIdentifier(propertyListType) {
+            NSLog("✓ Property list type found, loading item...")
+            
+            itemProvider.loadItem(forTypeIdentifier: propertyListType, options: nil) { [weak self] (item, error) in
+                guard let self = self else { return }
+                
+                if let error = error {
+                    NSLog("❌ Error loading item: \(error.localizedDescription)")
+                    DispatchQueue.main.async {
+                        self.showError("Failed to load page data")
+                    }
+                    return
+                }
+                
+                NSLog("✓ Item loaded successfully")
+                
+                if let dictionary = item as? [String: Any] {
+                    NSLog("✓ Got dictionary from item")
+                    
+                    if let results = dictionary[NSExtensionJavaScriptPreprocessingResultsKey] as? [String: Any] {
+                        NSLog("✓ Got JavaScript preprocessing results")
+                        
+                        DispatchQueue.main.async {
+                            self.processSongData(results)
+                        }
+                    } else {
+                        NSLog("❌ No JavaScript preprocessing results found")
+                        DispatchQueue.main.async {
+                            self.showError("Could not extract data from page")
+                        }
+                    }
+                } else if let data = item as? Data {
+                    NSLog("✓ Got Data, attempting to deserialize...")
+                    do {
+                        if let dict = try PropertyListSerialization.propertyList(from: data, options: [], format: nil) as? [String: Any] {
+                            NSLog("✓ Successfully deserialized property list")
+                            
+                            if let results = dict[NSExtensionJavaScriptPreprocessingResultsKey] as? [String: Any] {
+                                NSLog("✓ Got JavaScript preprocessing results from deserialized data")
+                                
+                                DispatchQueue.main.async {
+                                    self.processSongData(results)
+                                }
+                            } else {
+                                NSLog("❌ No JavaScript preprocessing results in deserialized data")
+                                DispatchQueue.main.async {
+                                    self.showError("Could not extract song data from page")
+                                }
+                            }
+                        }
+                    } catch {
+                        NSLog("❌ Error deserializing property list: \(error)")
+                        DispatchQueue.main.async {
+                            self.showError("Failed to process page data")
+                        }
+                    }
+                } else {
+                    NSLog("❌ Item is not a dictionary or Data")
+                    DispatchQueue.main.async {
+                        self.showError("Unexpected data format")
+                    }
+                }
+            }
+        } else {
+            self.showError("Property list type not available")
+            NSLog("❌ Property list type not available")
+            showError("Cannot extract data from this page")
+        }
+    }
+    
+    private func processSongData(_ data: [String: Any]) {
+        print("📋 Processing song data...")
+        print("Data keys: \(data.keys)")
+        
+        // Check if there's an error from JavaScript
+        if let error = data["error"] as? String {
+            print("❌ JavaScript error: \(error)")
+            showError(error)
+            return
+        }
+        
+        // Extract required fields
+        guard let title = data["title"] as? String,
+              !title.isEmpty else {
+            print("❌ Missing or empty title")
+            showError("Could not extract song title from page")
+            return
+        }
+        
+        guard let musicbrainzId = data["musicbrainzId"] as? String,
+              !musicbrainzId.isEmpty else {
+            print("❌ Missing or empty MusicBrainz ID")
+            showError("Could not extract MusicBrainz ID from page")
+            return
+        }
+        
+        print("✓ Got title: \(title)")
+        print("✓ Got MusicBrainz ID: \(musicbrainzId)")
+        
+        // Extract optional fields
+        let composers = data["composers"] as? [String]
+        let workType = data["workType"] as? String
+        let key = data["key"] as? String
+        let annotation = data["annotation"] as? String
+        let wikipediaUrl = data["wikipediaUrl"] as? String
+        let sourceUrl = data["url"] as? String
+        
+        // Create SongData
+        let songData = SongData(
+            title: title,
+            musicbrainzId: musicbrainzId,
+            composers: composers,
+            workType: workType,
+            key: key,
+            annotation: annotation,
+            wikipediaUrl: wikipediaUrl,
+            sourceUrl: sourceUrl
+        )
+        
+        self.songData = songData
+        
+        print("✓ SongData created successfully")
+        print("  Title: \(title)")
+        if let composers = composers {
+            print("  Composers: \(composers.joined(separator: ", "))")
+        }
+        
+        // Check if song already exists in database
+        showLoadingView()
+        checkSongMatch(songData: songData)
+    }
+    
+    private func checkSongMatch(songData: SongData) {
+        Task {
+            do {
+                print("🔍 Checking if song exists in database...")
+                let result = try await SongDatabaseService.shared.checkSongExists(
+                    title: songData.title,
+                    musicbrainzId: songData.musicbrainzId
+                )
+                
+                DispatchQueue.main.async {
+                    self.processSongMatch(result: result, songData: songData)
+                }
+            } catch {
+                print("❌ Error checking song: \(error)")
+                DispatchQueue.main.async {
+                    // If database check fails, just proceed with import
+                    print("⚠️ Database check failed, proceeding with import anyway...")
+                    self.showSongConfirmationView(with: songData)
+                }
+            }
+        }
+    }
+    
+    private func processSongMatch(result: SongMatchResult, songData: SongData) {
+        switch result {
+        case .notFound:
+            print("✓ Song not found in database - showing import view")
+            showSongConfirmationView(with: songData)
+            
+        case .exactMatch(let existingSong):
+            print("⚠️ Exact match found - song already exists")
+            self.existingSong = existingSong
+            showSongExactMatchView(songData: songData, existingSong: existingSong)
+            
+        case .titleMatchNoMbid(let existingSong):
+            print("⚠️ Title match with no MusicBrainz ID")
+            self.existingSong = existingSong
+            showSongTitleMatchNoMbidView(songData: songData, existingSong: existingSong)
+            
+        case .titleMatchDifferentMbid(let existingSong):
+            print("⚠️ Title match with different MusicBrainz ID")
+            self.existingSong = existingSong
+            showSongTitleMatchDifferentMbidView(songData: songData, existingSong: existingSong)
+        }
+    }
+    
     // MARK: - UI Views
     
     private func showLoadingView() {
@@ -418,6 +787,73 @@ class ShareViewController: UIViewController {
             existingArtist: existingArtist,
             onOverwrite: { [weak self] in
                 // TODO: Implement overwrite logic
+                self?.showNotImplementedAlert("Overwrite MusicBrainz ID")
+            },
+            onCancel: { [weak self] in
+                self?.cancelImport()
+            }
+        )
+        
+        replaceCurrentView(with: view)
+    }
+    
+    private func showSongConfirmationView(with songData: SongData) {
+        print("🎨 Showing song confirmation view")
+        
+        let confirmationView = SongImportConfirmationView(
+            songData: songData,
+            onImport: { [weak self] in
+                self?.importSong()
+            },
+            onCancel: { [weak self] in
+                self?.cancelImport()
+            }
+        )
+        
+        replaceCurrentView(with: confirmationView)
+    }
+    
+    private func showSongExactMatchView(songData: SongData, existingSong: ExistingSong) {
+        print("🎨 Showing song exact match view")
+        
+        let view = SongExactMatchView(
+            songData: songData,
+            existingSong: existingSong,
+            onOpenInApp: { [weak self] in
+                self?.openSongInApp(songId: existingSong.id)
+            },
+            onCancel: { [weak self] in
+                self?.cancelImport()
+            }
+        )
+        
+        replaceCurrentView(with: view)
+    }
+    
+    private func showSongTitleMatchNoMbidView(songData: SongData, existingSong: ExistingSong) {
+        print("🎨 Showing song title match (no MBID) view")
+        
+        let view = SongTitleMatchNoMbidView(
+            songData: songData,
+            existingSong: existingSong,
+            onAssociate: { [weak self] in
+                self?.showNotImplementedAlert("Associate MusicBrainz ID to song")
+            },
+            onCancel: { [weak self] in
+                self?.cancelImport()
+            }
+        )
+        
+        replaceCurrentView(with: view)
+    }
+    
+    private func showSongTitleMatchDifferentMbidView(songData: SongData, existingSong: ExistingSong) {
+        print("🎨 Showing song title match (different MBID) view")
+        
+        let view = SongTitleMatchDifferentMbidView(
+            songData: songData,
+            existingSong: existingSong,
+            onOverwrite: { [weak self] in
                 self?.showNotImplementedAlert("Overwrite MusicBrainz ID")
             },
             onCancel: { [weak self] in
@@ -528,6 +964,43 @@ class ShareViewController: UIViewController {
         print("🔗 Opening artist in app: \(artistId)")
         
         // TODO: Implement deep link to open the main app at the artist detail page
+        // For now, just show a placeholder
+        showNotImplementedAlert("Open in App")
+    }
+    
+    private func importSong() {
+        print("💾 Importing song...")
+        
+        guard let songData = songData else {
+            showError("No song data to import")
+            return
+        }
+        
+        NSLog("💾 Saving song data to shared container")
+        SharedSongData.saveSharedData(songData, appGroup: appGroupIdentifier)
+        NSLog("✅ Data saved successfully")
+        
+        // Show success message with clear next step
+        DispatchQueue.main.async { [weak self] in
+            let alert = UIAlertController(
+                title: "✅ Song Data Imported",
+                message: "Open the Jazz Reference app to complete adding \(songData.title) to your collection.",
+                preferredStyle: .alert
+            )
+            
+            alert.addAction(UIAlertAction(title: "Got It", style: .default) { [weak self] _ in
+                NSLog("👋 User acknowledged, closing extension")
+                self?.extensionContext?.completeRequest(returningItems: nil, completionHandler: nil)
+            })
+            
+            self?.present(alert, animated: true)
+        }
+    }
+    
+    private func openSongInApp(songId: String) {
+        print("🔗 Opening song in app: \(songId)")
+        
+        // TODO: Implement deep link to open the main app at the song detail page
         // For now, just show a placeholder
         showNotImplementedAlert("Open in App")
     }
@@ -1082,6 +1555,376 @@ struct NotImplementedView: View {
         }
         .padding(.top, 60)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(.systemBackground))
+    }
+}
+
+// MARK: - Song Import Views
+
+struct SongImportConfirmationView: View {
+    let songData: SongData
+    let onImport: () -> Void
+    let onCancel: () -> Void
+    
+    var body: some View {
+        VStack(spacing: 20) {
+            VStack(spacing: 12) {
+                Image(systemName: "music.note")
+                    .font(.system(size: 50))
+                    .foregroundColor(.blue)
+                
+                Text("Import Song")
+                    .font(.title2)
+                    .bold()
+                
+                Text("Review the song information below")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+            }
+            .padding(.top, 40)
+            
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    InfoRow(label: "Title", value: songData.title)
+                    
+                    if let composerString = songData.composerString {
+                        InfoRow(label: "Composer(s)", value: composerString)
+                    }
+                    
+                    if let workType = songData.workType {
+                        InfoRow(label: "Type", value: workType)
+                    }
+                    
+                    if let key = songData.key {
+                        InfoRow(label: "Key", value: key)
+                    }
+                    
+                    InfoRow(label: "MusicBrainz ID", value: songData.musicbrainzId)
+                }
+                .padding()
+            }
+            .background(Color(.systemGray6))
+            .cornerRadius(12)
+            .padding(.horizontal)
+            
+            Spacer()
+            
+            VStack(spacing: 12) {
+                Button(action: onImport) {
+                    Text("Import to Jazz Reference")
+                        .font(.headline)
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color.blue)
+                        .cornerRadius(12)
+                }
+                
+                Button(action: onCancel) {
+                    Text("Cancel")
+                        .font(.headline)
+                        .foregroundColor(.blue)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color(.systemGray6))
+                        .cornerRadius(12)
+                }
+            }
+            .padding(.horizontal)
+            .padding(.bottom, 20)
+        }
+        .background(Color(.systemBackground))
+    }
+}
+
+struct SongExactMatchView: View {
+    let songData: SongData
+    let existingSong: ExistingSong
+    let onOpenInApp: () -> Void
+    let onCancel: () -> Void
+    
+    var body: some View {
+        VStack(spacing: 20) {
+            VStack(spacing: 12) {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 50))
+                    .foregroundColor(.green)
+                
+                Text("Song Already Exists")
+                    .font(.title2)
+                    .bold()
+                
+                Text("\(songData.title) is already in the database")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+            }
+            .padding(.top, 40)
+            .padding(.horizontal)
+            
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    Text("Database Record")
+                        .font(.headline)
+                        .foregroundColor(.secondary)
+                    
+                    InfoRow(label: "Title", value: existingSong.title)
+                    
+                    if let composer = existingSong.composer {
+                        InfoRow(label: "Composer", value: composer)
+                    }
+                    
+                    InfoRow(label: "MusicBrainz ID", value: existingSong.musicbrainzId ?? "None")
+                }
+                .padding()
+            }
+            .background(Color(.systemGray6))
+            .cornerRadius(12)
+            .padding(.horizontal)
+            
+            Spacer()
+            
+            VStack(spacing: 12) {
+                Button(action: onOpenInApp) {
+                    Text("Open in Jazz Reference")
+                        .font(.headline)
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color.blue)
+                        .cornerRadius(12)
+                }
+                
+                Button(action: onCancel) {
+                    Text("Done")
+                        .font(.headline)
+                        .foregroundColor(.blue)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color(.systemGray6))
+                        .cornerRadius(12)
+                }
+            }
+            .padding(.horizontal)
+            .padding(.bottom, 20)
+        }
+        .background(Color(.systemBackground))
+    }
+}
+
+struct SongTitleMatchNoMbidView: View {
+    let songData: SongData
+    let existingSong: ExistingSong
+    let onAssociate: () -> Void
+    let onCancel: () -> Void
+    
+    var body: some View {
+        VStack(spacing: 20) {
+            VStack(spacing: 12) {
+                Image(systemName: "link.circle.fill")
+                    .font(.system(size: 50))
+                    .foregroundColor(.orange)
+                
+                Text("Song Found Without ID")
+                    .font(.title2)
+                    .bold()
+                
+                Text("A song named \(songData.title) exists but has no MusicBrainz ID")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+            }
+            .padding(.top, 40)
+            .padding(.horizontal)
+            
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Current Database Record")
+                            .font(.headline)
+                            .foregroundColor(.secondary)
+                        
+                        InfoRow(label: "Title", value: existingSong.title)
+                        
+                        if let composer = existingSong.composer {
+                            InfoRow(label: "Composer", value: composer)
+                        } else {
+                            InfoRow(label: "Composer", value: "Not set")
+                        }
+                        
+                        InfoRow(label: "MusicBrainz ID", value: "Not set")
+                    }
+                    .padding()
+                    .background(Color(.systemGray5))
+                    .cornerRadius(8)
+                    
+                    HStack {
+                        Spacer()
+                        Image(systemName: "arrow.down")
+                            .foregroundColor(.secondary)
+                        Spacer()
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("MusicBrainz Data")
+                            .font(.headline)
+                            .foregroundColor(.secondary)
+                        
+                        InfoRow(label: "Title", value: songData.title)
+                        
+                        if let composerString = songData.composerString {
+                            InfoRow(label: "Composer(s)", value: composerString)
+                        }
+                        
+                        InfoRow(label: "MusicBrainz ID", value: songData.musicbrainzId)
+                    }
+                    .padding()
+                    .background(Color.blue.opacity(0.1))
+                    .cornerRadius(8)
+                }
+                .padding(.horizontal)
+            }
+            
+            Spacer()
+            
+            VStack(spacing: 12) {
+                Button(action: onAssociate) {
+                    Text("Associate MusicBrainz ID")
+                        .font(.headline)
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color.blue)
+                        .cornerRadius(12)
+                }
+                
+                Button(action: onCancel) {
+                    Text("Cancel")
+                        .font(.headline)
+                        .foregroundColor(.blue)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color(.systemGray6))
+                        .cornerRadius(12)
+                }
+            }
+            .padding(.horizontal)
+            .padding(.bottom, 20)
+        }
+        .background(Color(.systemBackground))
+    }
+}
+
+struct SongTitleMatchDifferentMbidView: View {
+    let songData: SongData
+    let existingSong: ExistingSong
+    let onOverwrite: () -> Void
+    let onCancel: () -> Void
+    
+    var body: some View {
+        VStack(spacing: 20) {
+            VStack(spacing: 12) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.system(size: 50))
+                    .foregroundColor(.red)
+                
+                Text("Different Song Found")
+                    .font(.title2)
+                    .bold()
+                
+                Text("A song named \(songData.title) exists with a different MusicBrainz ID")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+            }
+            .padding(.top, 40)
+            .padding(.horizontal)
+            
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Current Database Record")
+                            .font(.headline)
+                            .foregroundColor(.secondary)
+                        
+                        InfoRow(label: "Title", value: existingSong.title)
+                        
+                        if let composer = existingSong.composer {
+                            InfoRow(label: "Composer", value: composer)
+                        }
+                        
+                        InfoRow(label: "MusicBrainz ID", value: existingSong.musicbrainzId ?? "None")
+                    }
+                    .padding()
+                    .background(Color(.systemGray5))
+                    .cornerRadius(8)
+                    
+                    HStack {
+                        Spacer()
+                        Text("VS")
+                            .font(.headline)
+                            .foregroundColor(.red)
+                        Spacer()
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("MusicBrainz Data")
+                            .font(.headline)
+                            .foregroundColor(.secondary)
+                        
+                        InfoRow(label: "Title", value: songData.title)
+                        
+                        if let composerString = songData.composerString {
+                            InfoRow(label: "Composer(s)", value: composerString)
+                        }
+                        
+                        InfoRow(label: "MusicBrainz ID", value: songData.musicbrainzId)
+                    }
+                    .padding()
+                    .background(Color.red.opacity(0.1))
+                    .cornerRadius(8)
+                }
+                .padding(.horizontal)
+            }
+            
+            VStack(spacing: 8) {
+                Text("⚠️ Warning")
+                    .font(.headline)
+                    .foregroundColor(.red)
+                
+                Text("These may be different songs with the same title. Overwriting will replace the existing MusicBrainz ID.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+            }
+            .padding(.horizontal)
+            
+            Spacer()
+            
+            VStack(spacing: 12) {
+                Button(action: onOverwrite) {
+                    Text("Overwrite MusicBrainz ID")
+                        .font(.headline)
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color.red)
+                        .cornerRadius(12)
+                }
+                
+                Button(action: onCancel) {
+                    Text("Cancel")
+                        .font(.headline)
+                        .foregroundColor(.blue)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color(.systemGray6))
+                        .cornerRadius(12)
+                }
+            }
+            .padding(.horizontal)
+            .padding(.bottom, 20)
+        }
         .background(Color(.systemBackground))
     }
 }
