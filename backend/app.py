@@ -272,6 +272,174 @@ def get_performers():
         logger.error(f"Error fetching performers: {e}")
         return jsonify({'error': 'Failed to fetch performers', 'detail': str(e)}), 500
 
+"""
+ADD THIS CODE TO app.py
+
+Location: Add after the existing GET /api/performers endpoint (around line 273-274)
+
+This implements the POST /api/performers endpoint for creating new performers
+from the iOS app, typically from MusicBrainz import data.
+"""
+
+@app.route('/api/performers', methods=['POST'])
+def create_performer():
+    """Create a new performer from iOS app (typically from MusicBrainz import)"""
+    try:
+        data = request.get_json()
+        
+        # Validate required fields
+        if not data or 'name' not in data or not data['name'].strip():
+            return jsonify({'error': 'Performer name is required'}), 400
+        
+        name = data['name'].strip()
+        
+        # Optional fields
+        musicbrainz_id = data.get('musicbrainz_id', '').strip() or None
+        biography = data.get('biography', '').strip() or None
+        birth_date = data.get('birth_date', '').strip() or None
+        death_date = data.get('death_date', '').strip() or None
+        wikipedia_url = data.get('wikipedia_url', '').strip() or None
+        instruments = data.get('instruments', [])  # List of instrument names
+        
+        # Start transaction
+        with db_tools.get_db_connection() as conn:
+            with conn.cursor() as cur:
+                # Check if performer already exists by name
+                cur.execute("""
+                    SELECT id, name FROM performers 
+                    WHERE LOWER(name) = LOWER(%s)
+                """, (name,))
+                
+                existing = cur.fetchone()
+                if existing:
+                    return jsonify({
+                        'error': 'Performer already exists',
+                        'existing_performer': existing
+                    }), 409
+                
+                # Check if performer exists by MusicBrainz ID
+                if musicbrainz_id:
+                    cur.execute("""
+                        SELECT id, name FROM performers 
+                        WHERE musicbrainz_id = %s
+                    """, (musicbrainz_id,))
+                    
+                    existing = cur.fetchone()
+                    if existing:
+                        return jsonify({
+                            'error': 'Performer with this MusicBrainz ID already exists',
+                            'existing_performer': existing
+                        }), 409
+                
+                # Parse dates (handle YYYY, YYYY-MM, YYYY-MM-DD formats)
+                birth_date_sql = None
+                death_date_sql = None
+                
+                if birth_date:
+                    try:
+                        # Validate date format
+                        if len(birth_date) >= 4:  # At least year
+                            birth_date_sql = birth_date
+                    except:
+                        logger.warning(f"Invalid birth_date format: {birth_date}")
+                
+                if death_date:
+                    try:
+                        if len(death_date) >= 4:
+                            death_date_sql = death_date
+                    except:
+                        logger.warning(f"Invalid death_date format: {death_date}")
+                
+                # Insert performer
+                cur.execute("""
+                    INSERT INTO performers (
+                        name, 
+                        musicbrainz_id, 
+                        biography, 
+                        birth_date, 
+                        death_date, 
+                        wikipedia_url,
+                        external_links,
+                        created_at,
+                        updated_at
+                    )
+                    VALUES (%s, %s, %s, %s, %s, %s, '{}'::jsonb, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                    RETURNING id, name, musicbrainz_id, biography, birth_date, death_date, wikipedia_url
+                """, (
+                    name,
+                    musicbrainz_id,
+                    biography,
+                    birth_date_sql,
+                    death_date_sql,
+                    wikipedia_url
+                ))
+                
+                new_performer = cur.fetchone()
+                performer_id = new_performer['id']
+                
+                # Handle instruments if provided
+                if instruments and len(instruments) > 0:
+                    for idx, instrument_name in enumerate(instruments):
+                        if not instrument_name or not instrument_name.strip():
+                            continue
+                        
+                        instrument_name = instrument_name.strip()
+                        
+                        # Find or create instrument
+                        cur.execute("""
+                            SELECT id FROM instruments 
+                            WHERE LOWER(name) = LOWER(%s)
+                        """, (instrument_name,))
+                        
+                        instrument = cur.fetchone()
+                        
+                        if instrument:
+                            instrument_id = instrument['id']
+                        else:
+                            # Create new instrument
+                            cur.execute("""
+                                INSERT INTO instruments (name)
+                                VALUES (%s)
+                                RETURNING id
+                            """, (instrument_name,))
+                            
+                            result = cur.fetchone()
+                            instrument_id = result['id']
+                            logger.info(f"Created new instrument: {instrument_name}")
+                        
+                        # Link performer to instrument (first one is primary)
+                        is_primary = (idx == 0)
+                        
+                        cur.execute("""
+                            INSERT INTO performer_instruments (
+                                performer_id, 
+                                instrument_id, 
+                                is_primary
+                            )
+                            VALUES (%s, %s, %s)
+                            ON CONFLICT (performer_id, instrument_id) DO NOTHING
+                        """, (performer_id, instrument_id, is_primary))
+                
+                # Commit transaction
+                conn.commit()
+                
+                logger.info(f"✅ Created performer: {name} (ID: {performer_id})")
+                
+                # Return the created performer
+                return jsonify({
+                    'success': True,
+                    'performer': new_performer,
+                    'message': f'Successfully created performer: {name}'
+                }), 201
+                
+    except Exception as e:
+        logger.error(f"Error creating performer: {e}", exc_info=True)
+        return jsonify({
+            'error': 'Failed to create performer',
+            'detail': str(e)
+        }), 500
+        
+        
 # Add these new routes to your existing backend/app.py file
 # Add them before the if __name__ == '__main__' block
 
