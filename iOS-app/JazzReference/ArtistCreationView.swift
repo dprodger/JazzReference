@@ -136,7 +136,7 @@ struct ArtistCreationView: View {
         // TODO: Update this URL to match your backend server
         // For local development: "http://localhost:5001/api/performers"
         // For production: "https://your-server.com/api/performers"
-        guard let url = URL(string: "http://linernotesjazz.com/api/performers") else {
+        guard let url = URL(string: "\(NetworkManager.baseURL)/performers") else {
             throw URLError(.badURL)
         }
         
