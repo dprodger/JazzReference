@@ -157,17 +157,13 @@ class ShareViewController: UIViewController {
     // MARK: - Lifecycle
     override func viewDidLoad() {
         super.viewDidLoad()
-        
-        // Set up the view appearance
         view.backgroundColor = .systemBackground
         
-        print("📱 Share extension launched")
-        
-        // Start extracting data
         extractArtistData()
     }
-    
+
     // MARK: - Data Extraction
+    
     private func extractArtistData() {
         print("🔍 Starting data extraction...")
         
@@ -462,21 +458,37 @@ class ShareViewController: UIViewController {
     }
     
     // MARK: - Actions
+    // UPDATED importArtist() using NSLog instead of print()
+    // NSLog is more reliable for extension debugging
+
     private func importArtist() {
+        NSLog("🎯 importArtist() called")
+        
         guard let artistData = artistData else {
-            print("❌ No artist data to import")
-            showError("No artist data available")
+            showError("No artist data to import")
             return
         }
         
-        print("💾 Saving artist data: \(artistData.name)")
-        
-        // Save to shared container
+        NSLog("💾 Saving artist data to shared container")
         SharedArtistData.saveSharedData(artistData, appGroup: appGroupIdentifier)
+        NSLog("✅ Data saved successfully")
         
-        // Show success and close
-        // showSuccessAndClose()
-        openMainAppForImport()
+        // Show success message with clear next step
+        DispatchQueue.main.async { [weak self] in
+            let alert = UIAlertController(
+                title: "✅ Artist Data Imported",
+                message: "Open the Jazz Reference app to complete adding \(artistData.name) to your collection.",
+                preferredStyle: .alert
+            )
+            
+            alert.addAction(UIAlertAction(title: "Got It", style: .default) { [weak self] _ in
+                NSLog("👋 User acknowledged, closing extension")
+                // Extension will close, user manually opens main app
+                self?.extensionContext?.completeRequest(returningItems: nil, completionHandler: nil)
+            })
+            
+            self?.present(alert, animated: true)
+        }
     }
     
     private func openMainAppForImport() {
