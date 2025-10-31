@@ -3,7 +3,7 @@
 //  JazzReference
 //
 //  Simple artist creation view that works with imported MusicBrainz data
-//  THIS IS A MINIMAL WORKING VERSION - Customize for your needs
+//  UPDATED WITH WORKING API INTEGRATION
 //
 
 import SwiftUI
@@ -110,22 +110,10 @@ struct ArtistCreationView: View {
         
         isSaving = true
         
-        // TODO: Replace this with your actual API call
-        // For now, this is a placeholder that simulates saving
-        
-        print("💾 Saving artist:")
-        print("   Name: \(name)")
-        print("   MusicBrainz ID: \(musicbrainzId)")
-        print("   Biography: \(biography.prefix(50))...")
-        
-        // Simulate API call
+        // Save artist to API
         Task {
             do {
-                // TODO: Uncomment and implement your API call
-                // try await saveArtistToAPI()
-                
-                // Simulate network delay
-                try await Task.sleep(nanoseconds: 1_000_000_000)
+                try await saveArtistToAPI()
                 
                 await MainActor.run {
                     isSaving = false
@@ -142,37 +130,109 @@ struct ArtistCreationView: View {
         }
     }
     
-    // TODO: Implement your actual API call here
+    // MARK: - API Integration
+    
     private func saveArtistToAPI() async throws {
-        // Example API implementation:
-        /*
-        guard let url = URL(string: "\(NetworkManager.baseURL)/artists") else {
-            throw NSError(domain: "Invalid URL", code: 0)
+        // TODO: Update this URL to match your backend server
+        // For local development: "http://localhost:5001/api/performers"
+        // For production: "https://your-server.com/api/performers"
+        guard let url = URL(string: "http://linernotesjazz.com/api/performers") else {
+            throw URLError(.badURL)
         }
         
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         
+        // Parse instruments from comma-separated string
+        let instrumentArray = instruments
+            .split(separator: ",")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+        
+        // Build request body
         let artistData: [String: Any] = [
             "name": name,
             "musicbrainz_id": musicbrainzId.isEmpty ? NSNull() : musicbrainzId,
             "biography": biography.isEmpty ? NSNull() : biography,
             "birth_date": birthDate.isEmpty ? NSNull() : birthDate,
             "death_date": deathDate.isEmpty ? NSNull() : deathDate,
-            "instruments": instruments.isEmpty ? [] : instruments.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) },
+            "instruments": instrumentArray,
             "wikipedia_url": wikipediaUrl.isEmpty ? NSNull() : wikipediaUrl
         ]
         
+        // Convert to JSON
         request.httpBody = try JSONSerialization.data(withJSONObject: artistData)
         
-        let (_, response) = try await URLSession.shared.data(for: request)
-        
-        guard let httpResponse = response as? HTTPURLResponse,
-              (200...299).contains(httpResponse.statusCode) else {
-            throw NSError(domain: "API Error", code: 0)
+        // Log the request (for debugging)
+        print("📤 Sending artist creation request:")
+        print("   URL: \(url)")
+        print("   Name: \(name)")
+        if !musicbrainzId.isEmpty {
+            print("   MusicBrainz ID: \(musicbrainzId)")
         }
-        */
+        
+        // Perform request
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        // Check response
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw URLError(.badServerResponse)
+        }
+        
+        print("📥 Response status: \(httpResponse.statusCode)")
+        
+        // Handle different status codes
+        switch httpResponse.statusCode {
+        case 200...299:
+            // Success
+            if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                print("✅ Success response: \(json)")
+            }
+            
+        case 409:
+            // Conflict - artist already exists
+            if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let error = json["error"] as? String {
+                throw ArtistCreationError.alreadyExists(error)
+            }
+            throw ArtistCreationError.alreadyExists("Artist already exists")
+            
+        case 400:
+            // Bad request - validation error
+            if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let error = json["error"] as? String {
+                throw ArtistCreationError.validationError(error)
+            }
+            throw ArtistCreationError.validationError("Invalid data")
+            
+        default:
+            // Other error
+            if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let error = json["error"] as? String {
+                throw ArtistCreationError.serverError(error)
+            }
+            throw ArtistCreationError.serverError("Server returned status \(httpResponse.statusCode)")
+        }
+    }
+}
+
+// MARK: - Error Types
+
+enum ArtistCreationError: LocalizedError {
+    case alreadyExists(String)
+    case validationError(String)
+    case serverError(String)
+    
+    var errorDescription: String? {
+        switch self {
+        case .alreadyExists(let message):
+            return "Artist Already Exists: \(message)"
+        case .validationError(let message):
+            return "Validation Error: \(message)"
+        case .serverError(let message):
+            return "Server Error: \(message)"
+        }
     }
 }
 

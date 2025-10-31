@@ -42,6 +42,11 @@ struct JazzReferenceApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .onOpenURL { url in
+                         if url.scheme == "jazzreference" && url.host == "import-artist" {
+                             checkForImportedArtist()
+                         }
+                     }
                 .onAppear {
                     // Check for imported artist data when app launches
                     checkForImportedArtist()

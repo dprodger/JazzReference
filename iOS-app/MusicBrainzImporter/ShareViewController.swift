@@ -62,10 +62,9 @@ struct ExistingArtist: Codable {
 class ArtistDatabaseService {
     static let shared = ArtistDatabaseService()
     
-    // TODO: Update with your actual backend URL
     // For development, you might use: http://localhost:5001
     // For production, use your deployed backend URL
-    private  let baseURL = "https://jazzreference.onrender.com/api"
+    private  let baseURL = "https://linernotesjazz.com/api"
 
     private init() {}
     
@@ -476,7 +475,41 @@ class ShareViewController: UIViewController {
         SharedArtistData.saveSharedData(artistData, appGroup: appGroupIdentifier)
         
         // Show success and close
-        showSuccessAndClose()
+        // showSuccessAndClose()
+        openMainAppForImport()
+    }
+    
+    private func openMainAppForImport() {
+        print("🔗 Opening main app for import...")
+        
+        guard let url = URL(string: "jazzreference://import-artist") else {
+            print("❌ Invalid URL scheme")
+            showError("Could not open main app")
+            return
+        }
+        
+        var responder = self as UIResponder?
+        let selector = #selector(openURL(_:))
+        
+        while responder != nil {
+            if responder!.responds(to: selector) && responder != self {
+                responder!.perform(selector, with: url)
+                
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+                    print("✅ Main app opened, closing extension")
+                    self?.extensionContext?.completeRequest(returningItems: nil, completionHandler: nil)
+                }
+                return
+            }
+            responder = responder?.next
+        }
+        
+        print("❌ Could not open URL")
+        showError("Could not open main app")
+    }
+
+    @objc private func openURL(_ url: URL) {
+        // Called via perform selector
     }
     
     private func openArtistInApp(artistId: String) {
