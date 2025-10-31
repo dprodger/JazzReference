@@ -26,6 +26,14 @@ app = Flask(__name__)
 CORS(app)
 app.register_blueprint(api_docs)
 
+def safe_strip(value):
+    """Safely strip a string value, handling None"""
+    if value is None:
+        return None
+    if isinstance(value, str):
+        stripped = value.strip()
+        return stripped if stripped else None
+    return value
 
 @app.route('/api/health', methods=['GET'])
 def health_check():
@@ -288,18 +296,19 @@ def create_performer():
         data = request.get_json()
         
         # Validate required fields
-        if not data or 'name' not in data or not data['name'].strip():
+        name = data.get('name')
+        if not name or not name.strip():
             return jsonify({'error': 'Performer name is required'}), 400
         
-        name = data['name'].strip()
+        name = name.strip()
         
-        # Optional fields
-        musicbrainz_id = data.get('musicbrainz_id', '').strip() or None
-        biography = data.get('biography', '').strip() or None
-        birth_date = data.get('birth_date', '').strip() or None
-        death_date = data.get('death_date', '').strip() or None
-        wikipedia_url = data.get('wikipedia_url', '').strip() or None
-        instruments = data.get('instruments', [])  # List of instrument names
+        # Optional fields - safely handle None values
+        musicbrainz_id = safe_strip(data.get('musicbrainz_id'))
+        biography = safe_strip(data.get('biography'))
+        birth_date = safe_strip(data.get('birth_date'))
+        death_date = safe_strip(data.get('death_date'))
+        wikipedia_url = safe_strip(data.get('wikipedia_url'))
+        instruments = data.get('instruments', [])
         
         # Start transaction
         with db_tools.get_db_connection() as conn:
@@ -331,99 +340,55 @@ def create_performer():
                             'existing_performer': existing
                         }), 409
                 
-                # Parse dates (handle YYYY, YYYY-MM, YYYY-MM-DD formats)
-                birth_date_sql = None
-                death_date_sql = None
-                
-                if birth_date:
-                    try:
-                        # Validate date format
-                        if len(birth_date) >= 4:  # At least year
-                            birth_date_sql = birth_date
-                    except:
-                        logger.warning(f"Invalid birth_date format: {birth_date}")
-                
-                if death_date:
-                    try:
-                        if len(death_date) >= 4:
-                            death_date_sql = death_date
-                    except:
-                        logger.warning(f"Invalid death_date format: {death_date}")
-                
-                # Insert performer
+                # Insert the new performer
                 cur.execute("""
-                    INSERT INTO performers (
-                        name, 
-                        musicbrainz_id, 
-                        biography, 
-                        birth_date, 
-                        death_date, 
-                        wikipedia_url,
-                        external_links,
-                        created_at,
-                        updated_at
-                    )
-                    VALUES (%s, %s, %s, %s, %s, %s, '{}'::jsonb, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                    RETURNING id, name, musicbrainz_id, biography, birth_date, death_date, wikipedia_url
-                """, (
-                    name,
-                    musicbrainz_id,
-                    biography,
-                    birth_date_sql,
-                    death_date_sql,
-                    wikipedia_url
-                ))
+                    INSERT INTO performers 
+                    (name, biography, birth_date, death_date, wikipedia_url, musicbrainz_id)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                    RETURNING id, name, biography, birth_date, death_date, 
+                              wikipedia_url, musicbrainz_id
+                """, (name, biography, birth_date, death_date, wikipedia_url, musicbrainz_id))
                 
                 new_performer = cur.fetchone()
                 performer_id = new_performer['id']
                 
                 # Handle instruments if provided
                 if instruments and len(instruments) > 0:
-                    for idx, instrument_name in enumerate(instruments):
+                    for instrument_name in instruments:
                         if not instrument_name or not instrument_name.strip():
                             continue
                         
                         instrument_name = instrument_name.strip()
                         
-                        # Find or create instrument
+                        # Get or create instrument
                         cur.execute("""
-                            SELECT id FROM instruments 
-                            WHERE LOWER(name) = LOWER(%s)
+                            SELECT id FROM instruments WHERE LOWER(name) = LOWER(%s)
                         """, (instrument_name,))
                         
                         instrument = cur.fetchone()
                         
-                        if instrument:
-                            instrument_id = instrument['id']
-                        else:
+                        if not instrument:
                             # Create new instrument
                             cur.execute("""
                                 INSERT INTO instruments (name)
                                 VALUES (%s)
                                 RETURNING id
                             """, (instrument_name,))
-                            
-                            result = cur.fetchone()
-                            instrument_id = result['id']
-                            logger.info(f"Created new instrument: {instrument_name}")
+                            instrument = cur.fetchone()
                         
-                        # Link performer to instrument (first one is primary)
-                        is_primary = (idx == 0)
+                        instrument_id = instrument['id']
                         
+                        # Link performer to instrument
                         cur.execute("""
-                            INSERT INTO performer_instruments (
-                                performer_id, 
-                                instrument_id, 
-                                is_primary
-                            )
+                            INSERT INTO performer_instruments 
+                            (performer_id, instrument_id, is_primary)
                             VALUES (%s, %s, %s)
-                            ON CONFLICT (performer_id, instrument_id) DO NOTHING
-                        """, (performer_id, instrument_id, is_primary))
+                            ON CONFLICT DO NOTHING
+                        """, (performer_id, instrument_id, True))
                 
-                # Commit transaction
                 conn.commit()
                 
-                logger.info(f"✅ Created performer: {name} (ID: {performer_id})")
+                logger.info(f"Created performer: {name} (ID: {performer_id})")
                 
                 # Return the created performer
                 return jsonify({
@@ -437,8 +402,7 @@ def create_performer():
         return jsonify({
             'error': 'Failed to create performer',
             'detail': str(e)
-        }), 500
-        
+        }), 500        
         
 # Add these new routes to your existing backend/app.py file
 # Add them before the if __name__ == '__main__' block
