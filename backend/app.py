@@ -76,29 +76,6 @@ def health_check():
         health_status['database'] = f'error: {str(e)}'
         return jsonify(health_status), 503
 
-"""
-MINIMAL TEST ENDPOINT
-Add this to app.py first to verify routing works, then add the full endpoints.
-Paste this right after the /api/health endpoint.
-"""
-
-@app.route('/api/test-content-reports', methods=['POST', 'GET'])
-def test_content_reports():
-    """Test endpoint to verify routing works"""
-    if request.method == 'POST':
-        return jsonify({
-            'success': True,
-            'message': 'POST endpoint works!',
-            'received_data': request.get_json()
-        }), 201
-    else:
-        return jsonify({
-            'success': True,
-            'message': 'GET endpoint works!'
-        })
-
-
-# After this works, replace with the full endpoints from app_py_additions.py
 @app.route('/api/songs', methods=['GET'])
 def get_songs():
     """Get all songs or search songs by title"""
