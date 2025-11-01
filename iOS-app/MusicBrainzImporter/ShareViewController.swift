@@ -15,10 +15,6 @@ import UniformTypeIdentifiers
 struct ArtistData: Codable {
     let name: String
     let musicbrainzId: String
-    let biography: String?
-    let birthDate: String?
-    let deathDate: String?
-    let instruments: [String]?
     let wikipediaUrl: String?
     let sourceUrl: String?
 }
@@ -430,24 +426,15 @@ class ShareViewController: UIViewController {
             return
         }
         
-        // Extract artist information from the JavaScript results
-        // Handle optional fields that might not be present
+        // Extract ONLY minimal artist information from the JavaScript results
         let name = data["name"] as? String ?? ""
         let musicbrainzId = data["musicbrainzId"] as? String ?? ""
-        let biography = data["biography"] as? String
-        let birthDate = data["birthDate"] as? String
-        let deathDate = data["deathDate"] as? String
-        let instruments = data["instruments"] as? [String]
         let wikipediaUrl = data["wikipediaUrl"] as? String
         let sourceUrl = data["url"] as? String
         
         let artistData = ArtistData(
             name: name,
             musicbrainzId: musicbrainzId,
-            biography: biography,
-            birthDate: birthDate,
-            deathDate: deathDate,
-            instruments: instruments,
             wikipediaUrl: wikipediaUrl,
             sourceUrl: sourceUrl
         )
@@ -1078,35 +1065,6 @@ struct ArtistImportConfirmationView: View {
                     
                     InfoRow(label: "MusicBrainz ID", value: artistData.musicbrainzId)
                     
-                    if let birthDate = artistData.birthDate {
-                        InfoRow(label: "Born", value: birthDate)
-                    }
-                    
-                    if let deathDate = artistData.deathDate {
-                        InfoRow(label: "Died", value: deathDate)
-                    }
-                    
-                    if let instruments = artistData.instruments, !instruments.isEmpty {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Instruments")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                            Text(instruments.joined(separator: ", "))
-                                .font(.body)
-                        }
-                    }
-                    
-                    if let bio = artistData.biography, !bio.isEmpty {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Biography Preview")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                            Text(bio.prefix(150) + (bio.count > 150 ? "..." : ""))
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                                .lineLimit(3)
-                        }
-                    }
                 }
                 .padding()
             }
@@ -1397,17 +1355,6 @@ struct ArtistNameMatchDifferentMbidView: View {
                         InfoRow(label: "Name", value: artistData.name)
                         InfoRow(label: "MusicBrainz ID", value: artistData.musicbrainzId)
                             .foregroundColor(.red)
-                        
-                        if let bio = artistData.biography, !bio.isEmpty {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Biography")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                                Text(String(bio.prefix(150)) + (bio.count > 150 ? "..." : ""))
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                        }
                     }
                     .padding()
                     .background(Color(.systemGray6))

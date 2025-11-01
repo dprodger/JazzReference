@@ -66,7 +66,6 @@
 		B4911D382EB316F700326CA7 /* Exceptions for "MusicBrainzImporter" folder in "MusicBrainzImporter" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
-				ExtractArtistData.js,
 				Info.plist,
 			);
 			target = B4911D292EB316F600326CA7 /* MusicBrainzImporter */;

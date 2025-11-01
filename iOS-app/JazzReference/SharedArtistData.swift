@@ -13,40 +13,9 @@ struct ImportedArtistData: Codable, Identifiable {
     let id = UUID()
     let name: String
     let musicbrainzId: String
-    let biography: String?
-    let birthDate: String?
-    let deathDate: String?
-    let instruments: [String]?
-    let wikipediaUrl: String?
     let sourceUrl: String?
     let importedAt: Date
     
-    var formattedBirthDate: String? {
-        guard let birthDate = birthDate else { return nil }
-        return formatDate(birthDate)
-    }
-    
-    var formattedDeathDate: String? {
-        guard let deathDate = deathDate else { return nil }
-        return formatDate(deathDate)
-    }
-    
-    private func formatDate(_ dateString: String) -> String {
-        // Handle various date formats from MusicBrainz
-        // e.g., "1926-05-26", "1926-05", "1926"
-        let components = dateString.split(separator: "-")
-        
-        switch components.count {
-        case 3: // Full date: YYYY-MM-DD
-            return dateString
-        case 2: // Year and month: YYYY-MM
-            return dateString
-        case 1: // Just year: YYYY
-            return String(components[0])
-        default:
-            return dateString
-        }
-    }
 }
 
 /// Manager for handling shared artist data between extension and main app
@@ -84,11 +53,6 @@ class SharedArtistDataManager {
             let result = ImportedArtistData(
                 name: artistData.name,
                 musicbrainzId: artistData.musicbrainzId,
-                biography: artistData.biography,
-                birthDate: artistData.birthDate,
-                deathDate: artistData.deathDate,
-                instruments: artistData.instruments,
-                wikipediaUrl: artistData.wikipediaUrl,
                 sourceUrl: artistData.sourceUrl,
                 importedAt: Date() // Current time
             )
@@ -107,11 +71,6 @@ class SharedArtistDataManager {
                 let result = ImportedArtistData(
                     name: basicData.name,
                     musicbrainzId: basicData.musicbrainzId,
-                    biography: basicData.biography,
-                    birthDate: basicData.birthDate,
-                    deathDate: basicData.deathDate,
-                    instruments: basicData.instruments,
-                    wikipediaUrl: basicData.wikipediaUrl,
                     sourceUrl: basicData.sourceUrl,
                     importedAt: Date()
                 )
@@ -153,11 +112,6 @@ class SharedArtistDataManager {
 private struct ImportedArtistDataWithTimestamp: Codable {
     let name: String
     let musicbrainzId: String
-    let biography: String?
-    let birthDate: String?
-    let deathDate: String?
-    let instruments: [String]?
-    let wikipediaUrl: String?
     let sourceUrl: String?
     let importedAt: Date
 }
@@ -165,10 +119,5 @@ private struct ImportedArtistDataWithTimestamp: Codable {
 private struct BasicArtistData: Codable {
     let name: String
     let musicbrainzId: String
-    let biography: String?
-    let birthDate: String?
-    let deathDate: String?
-    let instruments: [String]?
-    let wikipediaUrl: String?
     let sourceUrl: String?
 }

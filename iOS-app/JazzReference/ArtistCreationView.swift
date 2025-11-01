@@ -3,7 +3,7 @@
 //  JazzReference
 //
 //  Simple artist creation view that works with imported MusicBrainz data
-//  UPDATED WITH WORKING API INTEGRATION
+//  SIMPLIFIED VERSION - Only name, MusicBrainz ID, and Wikipedia URL
 //
 
 import SwiftUI
@@ -11,14 +11,9 @@ import SwiftUI
 struct ArtistCreationView: View {
     @Environment(\.dismiss) var dismiss
     
-    // Form fields - pre-populated with imported data
+    // Form fields - pre-populated with imported data (minimal set only)
     @State private var name: String
     @State private var musicbrainzId: String
-    @State private var biography: String
-    @State private var birthDate: String
-    @State private var deathDate: String
-    @State private var instruments: String
-    @State private var wikipediaUrl: String
     
     @State private var isSaving = false
     @State private var showingError = false
@@ -31,11 +26,6 @@ struct ArtistCreationView: View {
         
         _name = State(initialValue: importedData?.name ?? "")
         _musicbrainzId = State(initialValue: importedData?.musicbrainzId ?? "")
-        _biography = State(initialValue: importedData?.biography ?? "")
-        _birthDate = State(initialValue: importedData?.formattedBirthDate ?? "")
-        _deathDate = State(initialValue: importedData?.formattedDeathDate ?? "")
-        _instruments = State(initialValue: importedData?.instruments?.joined(separator: ", ") ?? "")
-        _wikipediaUrl = State(initialValue: importedData?.wikipediaUrl ?? "")
         
         NSLog("✅ Init complete, name state: '%@'", importedData?.name ?? "EMPTY")
     }
@@ -51,23 +41,10 @@ struct ArtistCreationView: View {
                         .font(.system(.body, design: .monospaced))
                 }
                 
-                Section(header: Text("Biography")) {
-                    TextEditor(text: $biography)
-                        .frame(minHeight: 100)
-                }
-                
-                Section(header: Text("Dates")) {
-                    TextField("Birth Date (YYYY-MM-DD or YYYY)", text: $birthDate)
-                        .textInputAutocapitalization(.never)
-                    TextField("Death Date (YYYY-MM-DD or YYYY)", text: $deathDate)
-                        .textInputAutocapitalization(.never)
-                }
-                
-                Section(header: Text("Additional Information")) {
-                    TextField("Instruments (comma-separated)", text: $instruments)
-                    TextField("Wikipedia URL", text: $wikipediaUrl)
-                        .textInputAutocapitalization(.never)
-                        .keyboardType(.URL)
+                Section {
+                    Text("Additional details (bio, dates, instruments) will be automatically fetched by the backend.")
+                        .font(.caption)
+                        .foregroundColor(.gray)
                 }
                 
                 Section {
@@ -100,7 +77,6 @@ struct ArtistCreationView: View {
             .onAppear {
                 NSLog("📱 ArtistCreationView.onAppear()")
                 NSLog("   name = '%@'", name)
-                NSLog("   biography length = %d", biography.count)
                 NSLog("   musicbrainzId = '%@'", musicbrainzId)
             }
             .alert("Error", isPresented: $showingError) {
@@ -144,9 +120,6 @@ struct ArtistCreationView: View {
     // MARK: - API Integration
     
     private func saveArtistToAPI() async throws {
-        // TODO: Update this URL to match your backend server
-        // For local development: "http://localhost:5001/api/performers"
-        // For production: "https://your-server.com/api/performers"
         guard let url = URL(string: "\(NetworkManager.baseURL)/performers") else {
             throw URLError(.badURL)
         }
@@ -155,21 +128,11 @@ struct ArtistCreationView: View {
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         
-        // Parse instruments from comma-separated string
-        let instrumentArray = instruments
-            .split(separator: ",")
-            .map { $0.trimmingCharacters(in: .whitespaces) }
-            .filter { !$0.isEmpty }
-        
-        // Build request body
+        // Build request body with only the minimal fields
+        // Backend will handle fetching additional details based on MusicBrainz ID
         let artistData: [String: Any] = [
             "name": name,
             "musicbrainz_id": musicbrainzId.isEmpty ? NSNull() : musicbrainzId,
-            "biography": biography.isEmpty ? NSNull() : biography,
-            "birth_date": birthDate.isEmpty ? NSNull() : birthDate,
-            "death_date": deathDate.isEmpty ? NSNull() : deathDate,
-            "instruments": instrumentArray,
-            "wikipedia_url": wikipediaUrl.isEmpty ? NSNull() : wikipediaUrl
         ]
         
         // Convert to JSON
@@ -252,11 +215,6 @@ enum ArtistCreationError: LocalizedError {
     ArtistCreationView(importedData: ImportedArtistData(
         name: "Miles Davis",
         musicbrainzId: "561d854a-6a28-4aa7-8c99-323e6ce46c2a",
-        biography: "Miles Dewey Davis III was an American jazz trumpeter, bandleader, and composer. He is among the most influential and acclaimed figures in the history of jazz and 20th-century music.",
-        birthDate: "1926-05-26",
-        deathDate: "1991-09-28",
-        instruments: ["trumpet", "flugelhorn"],
-        wikipediaUrl: "https://en.wikipedia.org/wiki/Miles_Davis",
         sourceUrl: "https://musicbrainz.org/artist/561d854a-6a28-4aa7-8c99-323e6ce46c2a",
         importedAt: Date()
     ))
