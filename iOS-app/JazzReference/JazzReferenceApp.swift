@@ -40,6 +40,8 @@ struct JazzReferenceApp: App {
     @State private var showingArtistCreation = false
     @State private var importedArtistData: ImportedArtistData?
     @Environment(\.scenePhase) var scenePhase
+    @State private var showingSongCreation = false
+    @State private var importedSongData: ImportedSongData?
 
 
     // ADD THIS INITIALIZER
@@ -93,10 +95,12 @@ struct JazzReferenceApp: App {
                 }
                 .onAppear {
                     checkForImportedArtist()
+                    checkForImportedSong()
                 }
                 .onChange(of: scenePhase) { oldPhase, newPhase in
                     if newPhase == .active {
                         checkForImportedArtist()
+                        checkForImportedSong()
                     }
                 }
                 .sheet(item: $importedArtistData) { data in
@@ -105,6 +109,11 @@ struct JazzReferenceApp: App {
                         ArtistCreationView(importedData: data)
                     }
                 }
+                .sheet(item: $importedSongData) { data in           // ← ADD THIS
+                    NavigationStack {                                 // ← ADD THIS
+                        SongCreationView(importedData: data)         // ← ADD THIS
+                    }                                                 // ← ADD THIS
+                }                                                     // ← ADD THIS
                 .ignoresSafeArea()
         }
     }
@@ -116,6 +125,16 @@ struct JazzReferenceApp: App {
             showingArtistCreation = true
         } else {
             NSLog("ℹ️ No imported artist data found")
+        }
+    }
+    
+    private func checkForImportedSong() {
+        if let data = SharedSongDataManager.retrieveSharedData() {
+            NSLog("🔥 Imported song data detected: %@", data.title)
+            importedSongData = data
+            showingSongCreation = true
+        } else {
+            NSLog("ℹ️ No imported song data found")
         }
     }
 }
