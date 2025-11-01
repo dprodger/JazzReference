@@ -34,11 +34,11 @@ class ShareViewController: UIViewController {
     // MARK: - Data Extraction
     
     private func detectPageType() {
-        print("🔍 Detecting page type...")
+        NSLog("🔍 Detecting page type...")
         
         guard let extensionItem = extensionContext?.inputItems.first as? NSExtensionItem,
               let itemProvider = extensionItem.attachments?.first else {
-            print("❌ No extension item found")
+            NSLog("❌ No extension item found")
             showError("No data available")
             return
         }
@@ -50,10 +50,10 @@ class ShareViewController: UIViewController {
                     let urlString = url.absoluteString
                     if urlString.contains("musicbrainz.org/work/") {
                         self?.isSongImport = true
-                        print("📍 Detected: Song/Work page")
+                        NSLog("📍 Detected: Song/Work page")
                     } else if urlString.contains("musicbrainz.org/artist/") {
                         self?.isSongImport = false
-                        print("📍 Detected: Artist page")
+                        NSLog("📍 Detected: Artist page")
                     }
                 }
                 
@@ -73,66 +73,66 @@ class ShareViewController: UIViewController {
     }
     
     private func extractArtistData() {
-        print("🔍 Starting data extraction...")
+        NSLog("🔍 Starting data extraction...")
         
         // Get the extension context
         guard let extensionItem = extensionContext?.inputItems.first as? NSExtensionItem else {
-            print("❌ No extension item found")
+            NSLog("❌ No extension item found")
             showError("No data available")
             return
         }
         
         guard let itemProvider = extensionItem.attachments?.first else {
-            print("❌ No item provider found")
+            NSLog("❌ No item provider found")
             showError("No data available")
             return
         }
         
-        print("✓ Extension item and provider found")
+        NSLog("✓ Extension item and provider found")
         
         // Check for property list (JavaScript preprocessing results)
         let propertyListType = "com.apple.property-list"
         
         if itemProvider.hasItemConformingToTypeIdentifier(propertyListType) {
-            print("✓ Property list type found, loading item...")
+            NSLog("✓ Property list type found, loading item...")
             
             itemProvider.loadItem(forTypeIdentifier: propertyListType, options: nil) { [weak self] (item, error) in
                 guard let self = self else { return }
                 
                 if let error = error {
-                    print("❌ Error loading item: \(error.localizedDescription)")
+                    NSLog("❌ Error loading item: \(error.localizedDescription)")
                     DispatchQueue.main.async {
                         self.showError("Failed to load page data")
                     }
                     return
                 }
                 
-                print("✓ Item loaded successfully")
+                NSLog("✓ Item loaded successfully")
                 
                 // The item should be a Dictionary containing the JavaScript preprocessing results
                 if let dictionary = item as? [String: Any] {
-                    print("✓ Got dictionary from item")
+                    NSLog("✓ Got dictionary from item")
                     
                     // Check for the JavaScript preprocessing results key
                     if let results = dictionary[NSExtensionJavaScriptPreprocessingResultsKey] as? [String: Any] {
-                        print("✓ Got JavaScript preprocessing results")
+                        NSLog("✓ Got JavaScript preprocessing results")
                         
                         DispatchQueue.main.async {
                             self.processExtractedData(results)
                         }
                     } else {
-                        print("❌ No JavaScript preprocessing results found")
+                        NSLog("❌ No JavaScript preprocessing results found")
                         DispatchQueue.main.async {
                             self.showError("Could not extract data from page")
                         }
                     }
                 } else if let data = item as? Data {
-                    print("✓ Got Data, attempting to deserialize...")
+                    NSLog("✓ Got Data, attempting to deserialize...")
                     do {
                         if let dict = try PropertyListSerialization.propertyList(from: data, options: [], format: nil) as? [String: Any] {
-                            print("✓ Successfully deserialized property list")
+                            NSLog("✓ Successfully deserialized property list")
                             if let results = dict[NSExtensionJavaScriptPreprocessingResultsKey] as? [String: Any] {
-                                print("✓ Got JavaScript preprocessing results from deserialized data")
+                                NSLog("✓ Got JavaScript preprocessing results from deserialized data")
                                 DispatchQueue.main.async {
                                     self.processExtractedData(results)
                                 }
@@ -140,31 +140,31 @@ class ShareViewController: UIViewController {
                             }
                         }
                     } catch {
-                        print("❌ Failed to deserialize property list: \(error)")
+                        NSLog("❌ Failed to deserialize property list: \(error)")
                     }
                     DispatchQueue.main.async {
                         self.showError("Invalid data format")
                     }
                 } else {
-                    print("❌ Item is not Dictionary or Data: \(type(of: item))")
+                    NSLog("❌ Item is not Dictionary or Data: \(type(of: item))")
                     DispatchQueue.main.async {
                         self.showError("Invalid data format")
                     }
                 }
             }
         } else {
-            print("❌ No property list type found")
+            NSLog("❌ No property list type found")
             showError("This extension only works with web pages(!)")
         }
     }
     
     // MARK: - Data Processing
     private func processExtractedData(_ data: [String: Any]) {
-        print("📄 Processing extracted data...")
+        NSLog("📄 Processing extracted data...")
         
         // Check for error from JavaScript
         if let error = data["error"] as? String {
-            print("❌ JavaScript error: \(error)")
+            NSLog("❌ JavaScript error: \(error)")
             showError(error)
             return
         }
@@ -182,18 +182,18 @@ class ShareViewController: UIViewController {
             sourceUrl: sourceUrl
         )
         
-        print("🎵 Extracted artist: \(artistData.name)")
-        print("🆔 MusicBrainz ID: \(artistData.musicbrainzId)")
+        NSLog("🎵 Extracted artist: \(artistData.name)")
+        NSLog("🆔 MusicBrainz ID: \(artistData.musicbrainzId)")
         
         // Validate that we got at least a name and ID
         guard !artistData.name.isEmpty, !artistData.musicbrainzId.isEmpty else {
-            print("❌ Missing required fields - name: '\(artistData.name)', id: '\(artistData.musicbrainzId)'")
+            NSLog("❌ Missing required fields - name: '\(artistData.name)', id: '\(artistData.musicbrainzId)'")
             showError("Could not extract artist information from this page")
             return
         }
         
         self.artistData = artistData
-        print("✅ Data validation passed")
+        NSLog("✅ Data validation passed")
         
         // Check if artist already exists in database
         checkArtistExistence(artistData)
@@ -201,7 +201,7 @@ class ShareViewController: UIViewController {
     
     // MARK: - Database Checking
     private func checkArtistExistence(_ artistData: ArtistData) {
-        print("🔍 Checking if artist exists in database...")
+        NSLog("🔍 Checking if artist exists in database...")
         
         // Show loading indicator
         showLoadingView()
@@ -214,13 +214,13 @@ class ShareViewController: UIViewController {
                 )
                 
                 await MainActor.run {
-                    print("✅ Database check complete")
+                    NSLog("✅ Database check complete")
                     self.handleArtistMatchResult(result, artistData: artistData)
                 }
             } catch {
                 await MainActor.run {
-                    print("⚠️ Database check failed: \(error.localizedDescription)")
-                    print("   Proceeding with import anyway...")
+                    NSLog("⚠️ Database check failed: \(error.localizedDescription)")
+                    NSLog("   Proceeding with import anyway...")
                     // If database check fails, just proceed with normal import
                     self.showConfirmationView(with: artistData)
                 }
@@ -231,21 +231,21 @@ class ShareViewController: UIViewController {
     private func handleArtistMatchResult(_ result: ArtistMatchResult, artistData: ArtistData) {
         switch result {
         case .notFound:
-            print("ℹ️ Artist not found - showing normal import")
+            NSLog("ℹ️ Artist not found - showing normal import")
             showConfirmationView(with: artistData)
             
         case .exactMatch(let existingArtist):
-            print("ℹ️ Exact match found - artist already exists")
+            NSLog("ℹ️ Exact match found - artist already exists")
             self.existingArtist = existingArtist
             showExactMatchView(artistData: artistData, existingArtist: existingArtist)
             
         case .nameMatchNoMbid(let existingArtist):
-            print("ℹ️ Name match with blank MusicBrainz ID")
+            NSLog("ℹ️ Name match with blank MusicBrainz ID")
             self.existingArtist = existingArtist
             showNameMatchNoMbidView(artistData: artistData, existingArtist: existingArtist)
             
         case .nameMatchDifferentMbid(let existingArtist):
-            print("ℹ️ Name match with different MusicBrainz ID")
+            NSLog("ℹ️ Name match with different MusicBrainz ID")
             self.existingArtist = existingArtist
             showNameMatchDifferentMbidView(artistData: artistData, existingArtist: existingArtist)
         }
@@ -257,13 +257,13 @@ class ShareViewController: UIViewController {
         NSLog("🔍 Starting song data extraction...")
         
         guard let extensionItem = extensionContext?.inputItems.first as? NSExtensionItem else {
-            print("❌ No extension item found")
+            NSLog("❌ No extension item found")
             showError("No data available")
             return
         }
         
         guard let itemProvider = extensionItem.attachments?.first else {
-            print("❌ No item provider found")
+            NSLog("❌ No item provider found")
             showError("No data available")
             return
         }
@@ -344,12 +344,12 @@ class ShareViewController: UIViewController {
     }
     
     private func processSongData(_ data: [String: Any]) {
-        print("📋 Processing song data...")
-        print("Data keys: \(data.keys)")
+        NSLog("📋 Processing song data...")
+        NSLog("Data keys: \(data.keys)")
         
         // Check if there's an error from JavaScript
         if let error = data["error"] as? String {
-            print("❌ JavaScript error: \(error)")
+            NSLog("❌ JavaScript error: \(error)")
             showError(error)
             return
         }
@@ -357,20 +357,20 @@ class ShareViewController: UIViewController {
         // Extract required fields
         guard let title = data["title"] as? String,
               !title.isEmpty else {
-            print("❌ Missing or empty title")
+            NSLog("❌ Missing or empty title")
             showError("Could not extract song title from page")
             return
         }
         
         guard let musicbrainzId = data["musicbrainzId"] as? String,
               !musicbrainzId.isEmpty else {
-            print("❌ Missing or empty MusicBrainz ID")
+            NSLog("❌ Missing or empty MusicBrainz ID")
             showError("Could not extract MusicBrainz ID from page")
             return
         }
         
-        print("✓ Got title: \(title)")
-        print("✓ Got MusicBrainz ID: \(musicbrainzId)")
+        NSLog("✓ Got title: \(title)")
+        NSLog("✓ Got MusicBrainz ID: \(musicbrainzId)")
         
         // Extract optional fields
         let composers = data["composers"] as? [String]
@@ -394,10 +394,10 @@ class ShareViewController: UIViewController {
         
         self.songData = songData
         
-        print("✓ SongData created successfully")
-        print("  Title: \(title)")
+        NSLog("✓ SongData created successfully")
+        NSLog("  Title: \(title)")
         if let composers = composers {
-            print("  Composers: \(composers.joined(separator: ", "))")
+            NSLog("  Composers: \(composers.joined(separator: ", "))")
         }
         
         // Check if song already exists in database
@@ -408,7 +408,7 @@ class ShareViewController: UIViewController {
     private func checkSongMatch(songData: SongData) {
         Task {
             do {
-                print("🔍 Checking if song exists in database...")
+                NSLog("🔍 Checking if song exists in database...")
                 let result = try await SongDatabaseService.shared.checkSongExists(
                     title: songData.title,
                     musicbrainzId: songData.musicbrainzId
@@ -418,10 +418,10 @@ class ShareViewController: UIViewController {
                     self.processSongMatch(result: result, songData: songData)
                 }
             } catch {
-                print("❌ Error checking song: \(error)")
+                NSLog("❌ Error checking song: \(error)")
                 DispatchQueue.main.async {
                     // If database check fails, just proceed with import
-                    print("⚠️ Database check failed, proceeding with import anyway...")
+                    NSLog("⚠️ Database check failed, proceeding with import anyway...")
                     self.showSongConfirmationView(with: songData)
                 }
             }
@@ -431,21 +431,21 @@ class ShareViewController: UIViewController {
     private func processSongMatch(result: SongMatchResult, songData: SongData) {
         switch result {
         case .notFound:
-            print("✓ Song not found in database - showing import view")
+            NSLog("✓ Song not found in database - showing import view")
             showSongConfirmationView(with: songData)
             
         case .exactMatch(let existingSong):
-            print("⚠️ Exact match found - song already exists")
+            NSLog("⚠️ Exact match found - song already exists")
             self.existingSong = existingSong
             showSongExactMatchView(songData: songData, existingSong: existingSong)
             
         case .titleMatchNoMbid(let existingSong):
-            print("⚠️ Title match with no MusicBrainz ID")
+            NSLog("⚠️ Title match with no MusicBrainz ID")
             self.existingSong = existingSong
             showSongTitleMatchNoMbidView(songData: songData, existingSong: existingSong)
             
         case .titleMatchDifferentMbid(let existingSong):
-            print("⚠️ Title match with different MusicBrainz ID")
+            NSLog("⚠️ Title match with different MusicBrainz ID")
             self.existingSong = existingSong
             showSongTitleMatchDifferentMbidView(songData: songData, existingSong: existingSong)
         }
@@ -459,7 +459,7 @@ class ShareViewController: UIViewController {
     }
     
     private func showConfirmationView(with artistData: ArtistData) {
-        print("🎨 Showing confirmation view")
+        NSLog("🎨 Showing confirmation view")
         
         let confirmationView = ArtistImportConfirmationView(
             artistData: artistData,
@@ -475,7 +475,7 @@ class ShareViewController: UIViewController {
     }
     
     private func showExactMatchView(artistData: ArtistData, existingArtist: ExistingArtist) {
-        print("🎨 Showing exact match view")
+        NSLog("🎨 Showing exact match view")
         
         let view = ArtistExactMatchView(
             artistData: artistData,
@@ -492,7 +492,7 @@ class ShareViewController: UIViewController {
     }
     
     private func showNameMatchNoMbidView(artistData: ArtistData, existingArtist: ExistingArtist) {
-        print("🎨 Showing name match (no MBID) view")
+        NSLog("🎨 Showing name match (no MBID) view")
         
         let view = ArtistNameMatchNoMbidView(
             artistData: artistData,
@@ -510,7 +510,7 @@ class ShareViewController: UIViewController {
     }
     
     private func showNameMatchDifferentMbidView(artistData: ArtistData, existingArtist: ExistingArtist) {
-        print("🎨 Showing name match (different MBID) view")
+        NSLog("🎨 Showing name match (different MBID) view")
         
         let view = ArtistNameMatchDifferentMbidView(
             artistData: artistData,
@@ -528,7 +528,7 @@ class ShareViewController: UIViewController {
     }
     
     private func showSongConfirmationView(with songData: SongData) {
-        print("🎨 Showing song confirmation view")
+        NSLog("🎨 Showing song confirmation view")
         
         let confirmationView = SongImportConfirmationView(
             songData: songData,
@@ -544,7 +544,7 @@ class ShareViewController: UIViewController {
     }
     
     private func showSongExactMatchView(songData: SongData, existingSong: ExistingSong) {
-        print("🎨 Showing song exact match view")
+        NSLog("🎨 Showing song exact match view")
         
         let view = SongExactMatchView(
             songData: songData,
@@ -561,7 +561,7 @@ class ShareViewController: UIViewController {
     }
     
     private func showSongTitleMatchNoMbidView(songData: SongData, existingSong: ExistingSong) {
-        print("🎨 Showing song title match (no MBID) view")
+        NSLog("🎨 Showing song title match (no MBID) view")
         
         let view = SongTitleMatchNoMbidView(
             songData: songData,
@@ -578,7 +578,7 @@ class ShareViewController: UIViewController {
     }
     
     private func showSongTitleMatchDifferentMbidView(songData: SongData, existingSong: ExistingSong) {
-        print("🎨 Showing song title match (different MBID) view")
+        NSLog("🎨 Showing song title match (different MBID) view")
         
         let view = SongTitleMatchDifferentMbidView(
             songData: songData,
@@ -595,7 +595,7 @@ class ShareViewController: UIViewController {
     }
     
     private func showError(_ message: String) {
-        print("⚠️ Showing error: \(message)")
+        NSLog("⚠️ Showing error: \(message)")
         
         let errorView = ErrorView(
             message: message,
@@ -624,7 +624,7 @@ class ShareViewController: UIViewController {
     }
     
     // MARK: - Actions
-    // UPDATED importArtist() using NSLog instead of print()
+    // UPDATED importArtist() using NSLog instead of NSLog()
     // NSLog is more reliable for extension debugging
 
     private func importArtist() {
@@ -658,10 +658,10 @@ class ShareViewController: UIViewController {
     }
     
     private func openMainAppForImport() {
-        print("🔗 Opening main app for import...")
+        NSLog("🔗 Opening main app for import...")
         
         guard let url = URL(string: "jazzreference://import-artist") else {
-            print("❌ Invalid URL scheme")
+            NSLog("❌ Invalid URL scheme")
             showError("Could not open main app")
             return
         }
@@ -674,7 +674,7 @@ class ShareViewController: UIViewController {
                 responder!.perform(selector, with: url)
                 
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
-                    print("✅ Main app opened, closing extension")
+                    NSLog("✅ Main app opened, closing extension")
                     self?.extensionContext?.completeRequest(returningItems: nil, completionHandler: nil)
                 }
                 return
@@ -682,7 +682,7 @@ class ShareViewController: UIViewController {
             responder = responder?.next
         }
         
-        print("❌ Could not open URL")
+        NSLog("❌ Could not open URL")
         showError("Could not open main app")
     }
 
@@ -691,7 +691,7 @@ class ShareViewController: UIViewController {
     }
     
     private func openArtistInApp(artistId: String) {
-        print("🔗 Opening artist in app: \(artistId)")
+        NSLog("🔗 Opening artist in app: \(artistId)")
         
         // TODO: Implement deep link to open the main app at the artist detail page
         // For now, just show a placeholder
@@ -699,7 +699,7 @@ class ShareViewController: UIViewController {
     }
     
     private func importSong() {
-        print("💾 Importing song...")
+        NSLog("💾 Importing song...")
         
         guard let songData = songData else {
             showError("No song data to import")
@@ -728,7 +728,7 @@ class ShareViewController: UIViewController {
     }
     
     private func openSongInApp(songId: String) {
-        print("🔗 Opening song in app: \(songId)")
+        NSLog("🔗 Opening song in app: \(songId)")
         
         // TODO: Implement deep link to open the main app at the song detail page
         // For now, just show a placeholder
@@ -746,12 +746,12 @@ class ShareViewController: UIViewController {
     }
     
     private func cancelImport() {
-        print("❌ User cancelled import")
+        NSLog("❌ User cancelled import")
         extensionContext?.completeRequest(returningItems: nil, completionHandler: nil)
     }
     
     private func showSuccessAndClose() {
-        print("✅ Showing success message")
+        NSLog("✅ Showing success message")
         
         // Show brief success message
         let successView = SuccessView()
@@ -759,7 +759,7 @@ class ShareViewController: UIViewController {
         
         // Close after a brief delay
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
-            print("👋 Closing extension")
+            NSLog("👋 Closing extension")
             self?.extensionContext?.completeRequest(returningItems: nil, completionHandler: nil)
         }
     }
