@@ -89,7 +89,7 @@ class SongDatabaseService {
             throw URLError(.badURL)
         }
         
-        let urlString = "\(baseURL)/songs/search?title=\(encodedTitle)"
+        let urlString = "\(baseURL)/songs?search=\(encodedTitle)"
         guard let url = URL(string: urlString) else {
             throw URLError(.badURL)
         }
