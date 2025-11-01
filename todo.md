@@ -1,7 +1,6 @@
 things to do:
 App
 * hook up bad-link logging on images
-* fix the default (I type in a song name; get to that song; then go back -- the text box has my song name, but the page has no search restriction)
 
 Backend Server
 
@@ -27,6 +26,7 @@ Data
 
 	
 Done:
+* fix the default (I type in a song name; get to that song; then go back -- the text box has my song name, but the page has no search restriction)
 * amend fetch_artist_images to gather for all artists?
 * Ensure multiple images perform ok
 * given a Wikipedia image page (like this), correctly import it https://en.wikipedia.org/wiki/Miles_Davis#/media/File:Charlie_Parker,_Tommy_Potter,_Miles_Davis,_Duke_Jordan,_Max_Roach_(Gottlieb_06851).jpg
