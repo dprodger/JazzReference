@@ -6,10 +6,6 @@ var ExtractMusicBrainzData = function() {};
 
 ExtractMusicBrainzData.prototype = {
     run: function(arguments) {
-        // DEBUG: Log that JavaScript is running
-        console.log("🟢 JavaScript preprocessing started!");
-        console.log("URL: " + document.location.href);
-        
         // Extract the URL to determine page type
         var url = document.location.href;
         
@@ -61,14 +57,24 @@ ExtractMusicBrainzData.prototype = {
         var birthDate = "";
         var birthElement = document.querySelector('dd.begin-date');
         if (birthElement) {
-            birthDate = birthElement.textContent.trim();
+            var dateText = birthElement.textContent.trim();
+            // Extract just the date in YYYY-MM-DD format
+            var dateMatch = dateText.match(/(\d{4}-\d{2}-\d{2})/);
+            if (dateMatch) {
+                birthDate = dateMatch[1];
+            }
         }
         
         // Extract death date
         var deathDate = "";
         var deathElement = document.querySelector('dd.end-date');
         if (deathElement) {
-            deathDate = deathElement.textContent.trim();
+            var dateText = deathElement.textContent.trim();
+            // Extract just the date in YYYY-MM-DD format
+            var dateMatch = dateText.match(/(\d{4}-\d{2}-\d{2})/);
+            if (dateMatch) {
+                deathDate = dateMatch[1];
+            }
         }
         
         // Extract instruments
@@ -125,29 +131,35 @@ ExtractMusicBrainzData.prototype = {
         var mbidMatch = url.match(/\/work\/([a-f0-9\-]+)/);
         var musicbrainzId = mbidMatch ? mbidMatch[1] : "";
         
-        // Extract work title
+        // Extract work title - try multiple selectors
         var title = "";
-        // Try multiple selectors for robustness
+        
+        // Try 1: Link inside h1 (some pages may have this)
         var titleElement = document.querySelector('h1 a[href*="/work/"]');
         if (titleElement) {
             title = titleElement.textContent.trim();
         }
-
+        
         // Try 2: Just the h1 text content (most common)
         if (!title) {
             var h1Element = document.querySelector('h1');
             if (h1Element) {
+                // Get only the direct text content, not nested elements
                 title = h1Element.textContent.trim();
             }
         }
-
+        
         // Try 3: Get from page title as fallback
         if (!title) {
             var pageTitle = document.title;
+            // Remove " - MusicBrainz" from the end if present
             title = pageTitle.replace(/\s*-\s*MusicBrainz\s*$/, '').trim();
         }
-        // Extract composer(s)
+        
+        // Extract composer(s) - try multiple selectors
         var composers = [];
+        
+        // Look for composer or writer in the details list
         var composerElements = document.querySelectorAll('dd.writer a[href*="/artist/"], dd.composer a[href*="/artist/"]');
         composerElements.forEach(function(element) {
             var composerName = element.textContent.trim();
@@ -248,4 +260,5 @@ ExtractMusicBrainzData.prototype = {
 };
 
 // Create the instance
+var ExtensionPreprocessingJS = new ExtractMusicBrainzData;
 var ExtensionPreprocessingJS = new ExtractMusicBrainzData;
