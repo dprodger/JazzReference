@@ -181,6 +181,229 @@ def get_song_detail(song_id):
     except Exception as e:
         logger.error(f"Error fetching song detail: {e}")
         return jsonify({'error': 'Failed to fetch song detail', 'detail': str(e)}), 500
+   
+   
+   
+   
+   
+   
+   
+   
+   
+@app.route('/api/songs/search', methods=['GET'])
+def search_songs():
+    """
+    Search for songs by title
+    
+    Query Parameters:
+        title: Song title to search for (case-insensitive partial match)
+        
+    Returns:
+        List of matching songs with their details
+    """
+    title = request.args.get('title', '').strip()
+    
+    if not title:
+        return jsonify({'error': 'Title parameter is required'}), 400
+    
+    try:
+        with db_tools.get_db_connection() as conn:
+            with conn.cursor() as cur:
+            
+                # Search for songs with titles containing the search term (case-insensitive)
+                # Use ILIKE for case-insensitive matching
+                cur.execute("""
+                    SELECT 
+                        id,
+                        title,
+                        composer,
+                        structure,
+                        musicbrainz_id,
+                        external_references
+                    FROM songs
+                    WHERE LOWER(title) LIKE LOWER(%s)
+                    ORDER BY 
+                        -- Exact matches first
+                        CASE WHEN LOWER(title) = LOWER(%s) THEN 0 ELSE 1 END,
+                        -- Then by title length (shorter = more likely to be what we want)
+                        LENGTH(title),
+                        title
+                    LIMIT 10
+                """, (f'%{title}%', title))
+                
+                songs = cur.fetchall()
+                
+                return jsonify(songs)
+                
+    except Exception as e:
+        logger.error(f"Error searching songs: {e}")
+        return jsonify({'error': 'Failed to search songs', 'detail': str(e)}), 500
+
+
+@app.route('/api/songs', methods=['POST'])
+def create_song():
+    """Create a new song from iOS app (typically from MusicBrainz import)"""
+    try:
+        data = request.get_json()
+        
+        # Validate required fields
+        title = data.get('title')
+        if not title or not title.strip():
+            return jsonify({'error': 'Song title is required'}), 400
+        
+        title = title.strip()
+        
+        # Optional fields - safely handle None values
+        composer = safe_strip(data.get('composer'))
+        musicbrainz_id = safe_strip(data.get('musicbrainz_id'))
+        structure = safe_strip(data.get('structure'))
+        
+        # Handle external references (JSON field)
+        external_refs = data.get('external_references', {})
+        if not isinstance(external_refs, dict):
+            external_refs = {}
+        
+        # Add Wikipedia URL if provided separately
+        wikipedia_url = safe_strip(data.get('wikipedia_url'))
+        if wikipedia_url and 'wikipedia' not in external_refs:
+            external_refs['wikipedia'] = wikipedia_url
+        
+        # Start transaction
+        with db_tools.get_db_connection() as conn:
+            with conn.cursor() as cur:
+                # Check if song already exists by title (case-insensitive)
+                cur.execute("""
+                    SELECT id, title, musicbrainz_id FROM songs 
+                    WHERE LOWER(title) = LOWER(%s)
+                """, (title,))
+                
+                existing = cur.fetchone()
+                if existing:
+                    return jsonify({
+                        'error': 'Song already exists',
+                        'existing_song': existing
+                    }), 409
+                
+                # Check if song exists by MusicBrainz ID
+                if musicbrainz_id:
+                    cur.execute("""
+                        SELECT id, title FROM songs 
+                        WHERE musicbrainz_id = %s
+                    """, (musicbrainz_id,))
+                    
+                    existing_by_mbid = cur.fetchone()
+                    if existing_by_mbid:
+                        return jsonify({
+                            'error': 'Song with this MusicBrainz ID already exists',
+                            'existing_song': existing_by_mbid
+                        }), 409
+                
+                # Insert new song
+                cur.execute("""
+                    INSERT INTO songs (
+                        title, 
+                        composer, 
+                        musicbrainz_id, 
+                        structure,
+                        external_references,
+                        created_at,
+                        updated_at
+                    ) VALUES (%s, %s, %s, %s, %s::jsonb, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                    RETURNING id, title, composer, musicbrainz_id
+                """, (
+                    title,
+                    composer,
+                    musicbrainz_id,
+                    structure,
+                    json.dumps(external_refs) if external_refs else None
+                ))
+                
+                new_song = cur.fetchone()
+                
+        logger.info(f"Created new song: {new_song['title']} (ID: {new_song['id']})")
+        
+        return jsonify({
+            'success': True,
+            'message': 'Song created successfully',
+            'song': new_song
+        }), 201
+        
+    except KeyError as e:
+        logger.error(f"Missing data field: {e}")
+        return jsonify({
+            'success': False,
+            'error': f'Invalid request data: {str(e)}'
+        }), 400
+        
+    except Exception as e:
+        logger.error(f"Error creating song: {e}")
+        return jsonify({
+            'success': False,
+            'error': 'An error occurred while creating the song. Please try again later.'
+        }), 500
+
+
+@app.route('/api/songs/<song_id>', methods=['PATCH'])
+def update_song_musicbrainz_id(song_id):
+    """
+    Update a song's MusicBrainz ID
+    Used when associating an existing song with a MusicBrainz work
+    """
+    try:
+        data = request.get_json()
+        musicbrainz_id = data.get('musicbrainz_id', '').strip()
+        
+        if not musicbrainz_id:
+            return jsonify({'error': 'MusicBrainz ID is required'}), 400
+        
+        with db_tools.get_db_connection() as conn:
+            with conn.cursor() as cur:
+                # Check if song exists
+                cur.execute("SELECT id, title FROM songs WHERE id = %s", (song_id,))
+                song = cur.fetchone()
+                
+                if not song:
+                    return jsonify({'error': 'Song not found'}), 404
+                
+                # Check if another song already has this MusicBrainz ID
+                cur.execute("""
+                    SELECT id, title FROM songs 
+                    WHERE musicbrainz_id = %s AND id != %s
+                """, (musicbrainz_id, song_id))
+                
+                conflict = cur.fetchone()
+                if conflict:
+                    return jsonify({
+                        'error': 'Another song already has this MusicBrainz ID',
+                        'conflicting_song': conflict
+                    }), 409
+                
+                # Update the MusicBrainz ID
+                cur.execute("""
+                    UPDATE songs
+                    SET musicbrainz_id = %s,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE id = %s
+                    RETURNING id, title, composer, musicbrainz_id
+                """, (musicbrainz_id, song_id))
+                
+                updated_song = cur.fetchone()
+                
+        logger.info(f"Updated song {song_id} with MusicBrainz ID: {musicbrainz_id}")
+        
+        return jsonify({
+            'success': True,
+            'message': 'Song updated successfully',
+            'song': updated_song
+        })
+        
+    except Exception as e:
+        logger.error(f"Error updating song: {e}")
+        return jsonify({
+            'success': False,
+            'error': 'An error occurred while updating the song'
+        }), 500
+
         
 @app.route('/api/recordings/<recording_id>', methods=['GET'])
 def get_recording_detail(recording_id):
@@ -256,15 +479,6 @@ def get_performers():
     except Exception as e:
         logger.error(f"Error fetching performers: {e}")
         return jsonify({'error': 'Failed to fetch performers', 'detail': str(e)}), 500
-
-"""
-ADD THIS CODE TO app.py
-
-Location: Add after the existing GET /api/performers endpoint (around line 273-274)
-
-This implements the POST /api/performers endpoint for creating new performers
-from the iOS app, typically from MusicBrainz import data.
-"""
 
 @app.route('/api/performers', methods=['POST'])
 def create_performer():
