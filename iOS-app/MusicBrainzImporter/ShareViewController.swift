@@ -34,46 +34,17 @@ class ShareViewController: UIViewController {
     // MARK: - Data Extraction
     
     private func detectPageType() {
-        NSLog("🔍 Detecting page type...")
+        NSLog("🔍 Starting data extraction...")
         
-        guard let extensionItem = extensionContext?.inputItems.first as? NSExtensionItem,
-              let itemProvider = extensionItem.attachments?.first else {
-            NSLog("❌ No extension item found")
-            showError("No data available")
-            return
-        }
-        
-        // Check if we have a URL to determine the type
-        if itemProvider.hasItemConformingToTypeIdentifier(UTType.url.identifier) {
-            itemProvider.loadItem(forTypeIdentifier: UTType.url.identifier, options: nil) { [weak self] (item, error) in
-                if let url = item as? URL {
-                    let urlString = url.absoluteString
-                    if urlString.contains("musicbrainz.org/work/") {
-                        self?.isSongImport = true
-                        NSLog("📍 Detected: Song/Work page")
-                    } else if urlString.contains("musicbrainz.org/artist/") {
-                        self?.isSongImport = false
-                        NSLog("📍 Detected: Artist page")
-                    }
-                }
-                
-                // Now proceed with extraction
-                DispatchQueue.main.async {
-                    if self?.isSongImport == true {
-                        self?.extractSongData()
-                    } else {
-                        self?.extractArtistData()
-                    }
-                }
-            }
-        } else {
-            // If we can't get URL, default to artist
-            extractArtistData()
-        }
+        // We can't reliably detect the page type before JavaScript preprocessing
+        // because the URL might not be available in the share extension context.
+        // Instead, we'll extract the data and let the JavaScript tell us what type it is
+        // based on the URL and fields it returns.
+        extractData()
     }
     
-    private func extractArtistData() {
-        NSLog("🔍 Starting data extraction...")
+    private func extractData() {
+        NSLog("🔍 Extracting page data...")
         
         // Get the extension context
         guard let extensionItem = extensionContext?.inputItems.first as? NSExtensionItem else {
@@ -169,6 +140,24 @@ class ShareViewController: UIViewController {
             return
         }
         
+        // Detect page type based on the fields present in the JavaScript results
+        // Song/work pages have "title", artist pages have "name"
+        if let _ = data["title"] as? String {
+            NSLog("📍 Detected: Song/Work page (has 'title' field)")
+            processSongData(data)
+        } else if let _ = data["name"] as? String {
+            NSLog("📍 Detected: Artist page (has 'name' field)")
+            processArtistData(data)
+        } else {
+            NSLog("❌ Could not determine page type from JavaScript results")
+            NSLog("   Available keys: \(data.keys.joined(separator: ", "))")
+            showError("Could not extract data from this page")
+        }
+    }
+    
+    private func processArtistData(_ data: [String: Any]) {
+        NSLog("🎵 Processing artist data...")
+        
         // Extract ONLY minimal artist information from the JavaScript results
         let name = data["name"] as? String ?? ""
         let musicbrainzId = data["musicbrainzId"] as? String ?? ""
@@ -182,8 +171,8 @@ class ShareViewController: UIViewController {
             sourceUrl: sourceUrl
         )
         
-        NSLog("🎵 Extracted artist: \(artistData.name)")
-        NSLog("🆔 MusicBrainz ID: \(artistData.musicbrainzId)")
+        NSLog("   Artist: \(artistData.name)")
+        NSLog("   MusicBrainz ID: \(artistData.musicbrainzId)")
         
         // Validate that we got at least a name and ID
         guard !artistData.name.isEmpty, !artistData.musicbrainzId.isEmpty else {
@@ -193,7 +182,7 @@ class ShareViewController: UIViewController {
         }
         
         self.artistData = artistData
-        NSLog("✅ Data validation passed")
+        NSLog("✅ Artist data validation passed")
         
         // Check if artist already exists in database
         checkArtistExistence(artistData)
@@ -251,101 +240,11 @@ class ShareViewController: UIViewController {
         }
     }
     
-    // MARK: - Song Extraction and Processing
-    
-    private func extractSongData() {
-        NSLog("🔍 Starting song data extraction...")
-        
-        guard let extensionItem = extensionContext?.inputItems.first as? NSExtensionItem else {
-            NSLog("❌ No extension item found")
-            showError("No data available")
-            return
-        }
-        
-        guard let itemProvider = extensionItem.attachments?.first else {
-            NSLog("❌ No item provider found")
-            showError("No data available")
-            return
-        }
-        
-        NSLog("✓ Extension item and provider found")
-        
-        let propertyListType = "com.apple.property-list"
-        
-        showError("extension item adn provider found")
-        if itemProvider.hasItemConformingToTypeIdentifier(propertyListType) {
-            NSLog("✓ Property list type found, loading item...")
-            
-            itemProvider.loadItem(forTypeIdentifier: propertyListType, options: nil) { [weak self] (item, error) in
-                guard let self = self else { return }
-                
-                if let error = error {
-                    NSLog("❌ Error loading item: \(error.localizedDescription)")
-                    DispatchQueue.main.async {
-                        self.showError("Failed to load page data")
-                    }
-                    return
-                }
-                
-                NSLog("✓ Item loaded successfully")
-                
-                if let dictionary = item as? [String: Any] {
-                    NSLog("✓ Got dictionary from item")
-                    
-                    if let results = dictionary[NSExtensionJavaScriptPreprocessingResultsKey] as? [String: Any] {
-                        NSLog("✓ Got JavaScript preprocessing results")
-                        
-                        DispatchQueue.main.async {
-                            self.processSongData(results)
-                        }
-                    } else {
-                        NSLog("❌ No JavaScript preprocessing results found")
-                        DispatchQueue.main.async {
-                            self.showError("Could not extract data from page")
-                        }
-                    }
-                } else if let data = item as? Data {
-                    NSLog("✓ Got Data, attempting to deserialize...")
-                    do {
-                        if let dict = try PropertyListSerialization.propertyList(from: data, options: [], format: nil) as? [String: Any] {
-                            NSLog("✓ Successfully deserialized property list")
-                            
-                            if let results = dict[NSExtensionJavaScriptPreprocessingResultsKey] as? [String: Any] {
-                                NSLog("✓ Got JavaScript preprocessing results from deserialized data")
-                                
-                                DispatchQueue.main.async {
-                                    self.processSongData(results)
-                                }
-                            } else {
-                                NSLog("❌ No JavaScript preprocessing results in deserialized data")
-                                DispatchQueue.main.async {
-                                    self.showError("Could not extract song data from page")
-                                }
-                            }
-                        }
-                    } catch {
-                        NSLog("❌ Error deserializing property list: \(error)")
-                        DispatchQueue.main.async {
-                            self.showError("Failed to process page data")
-                        }
-                    }
-                } else {
-                    NSLog("❌ Item is not a dictionary or Data")
-                    DispatchQueue.main.async {
-                        self.showError("Unexpected data format")
-                    }
-                }
-            }
-        } else {
-            self.showError("Property list type not available")
-            NSLog("❌ Property list type not available")
-            showError("Cannot extract data from this page")
-        }
-    }
+    // MARK: - Song Processing
     
     private func processSongData(_ data: [String: Any]) {
-        NSLog("📋 Processing song data...")
-        NSLog("Data keys: \(data.keys)")
+        NSLog("🎵 Processing song data...")
+        NSLog("   Data keys: \(data.keys.joined(separator: ", "))")
         
         // Check if there's an error from JavaScript
         if let error = data["error"] as? String {
@@ -369,8 +268,8 @@ class ShareViewController: UIViewController {
             return
         }
         
-        NSLog("✓ Got title: \(title)")
-        NSLog("✓ Got MusicBrainz ID: \(musicbrainzId)")
+        NSLog("   Title: \(title)")
+        NSLog("   MusicBrainz ID: \(musicbrainzId)")
         
         // Extract optional fields
         let composers = data["composers"] as? [String]
@@ -379,6 +278,14 @@ class ShareViewController: UIViewController {
         let annotation = data["annotation"] as? String
         let wikipediaUrl = data["wikipediaUrl"] as? String
         let sourceUrl = data["url"] as? String
+        
+        // Log optional fields if present
+        if let composers = composers, !composers.isEmpty {
+            NSLog("   Composers: \(composers.joined(separator: ", "))")
+        }
+        if let workType = workType {
+            NSLog("   Work Type: \(workType)")
+        }
         
         // Create SongData
         let songData = SongData(
@@ -394,11 +301,7 @@ class ShareViewController: UIViewController {
         
         self.songData = songData
         
-        NSLog("✓ SongData created successfully")
-        NSLog("  Title: \(title)")
-        if let composers = composers {
-            NSLog("  Composers: \(composers.joined(separator: ", "))")
-        }
+        NSLog("✅ Song data validation passed")
         
         // Check if song already exists in database
         showLoadingView()
@@ -764,4 +667,3 @@ class ShareViewController: UIViewController {
         }
     }
 }
-
