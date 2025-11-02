@@ -138,7 +138,22 @@ struct SongDetailView: View {
                 }
                 .frame(maxWidth: .infinity, minHeight: 300)
             } else if let song = song {
-                VStack(alignment: .leading, spacing: 20) {
+                VStack(alignment: .leading, spacing: 0) {
+                    // Styled Header with Jazz Theme
+                    HStack {
+                        Image(systemName: "music.note")
+                            .font(.title2)
+                            .foregroundColor(JazzTheme.cream)
+                        Text("SONG")
+                            .font(.headline)
+                            .fontWeight(.semibold)
+                            .foregroundColor(JazzTheme.cream)
+                        Spacer()
+                    }
+                    .padding()
+                    .background(JazzTheme.burgundyGradient)
+                    
+                    VStack(alignment: .leading, spacing: 20) {
                     // Song Information Header
                     VStack(alignment: .leading, spacing: 12) {
                         Text(song.title)
@@ -347,6 +362,7 @@ struct SongDetailView: View {
                     .padding(.top)
                 }
                 .padding(.bottom)
+                }
             } else {
                 VStack {
                     Spacer()
@@ -361,6 +377,9 @@ struct SongDetailView: View {
         }
         .background(JazzTheme.backgroundLight)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(JazzTheme.burgundy, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
+        .toolbarColorScheme(.dark, for: .navigationBar)
         .task {
             #if DEBUG
             if ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1" {
