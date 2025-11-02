@@ -5,6 +5,7 @@ A Flask API with robust database connection handling
 
 from flask import Flask, jsonify, request
 from flask_cors import CORS
+from datetime import date
 import logging
 import time
 from api_doc import api_docs
@@ -16,6 +17,17 @@ import json
 import db_tools
 
 
+
+# Custom JSON encoder to format dates without timestamps
+from flask.json.provider import DefaultJSONProvider
+
+class CustomJSONProvider(DefaultJSONProvider):
+    """Custom JSON provider that formats dates as YYYY-MM-DD"""
+    def default(self, obj):
+        if isinstance(obj, date):
+            return obj.strftime('%Y-%m-%d')
+        return super().default(obj)
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -25,6 +37,7 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 CORS(app)
+app.json = CustomJSONProvider(app)
 app.register_blueprint(api_docs)
 
 def safe_strip(value):
