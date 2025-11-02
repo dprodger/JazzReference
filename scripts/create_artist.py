@@ -372,6 +372,52 @@ class ArtistCreator:
                 logger.debug(f"  MusicBrainz: {existing.get('musicbrainz_id', 'none')}")
                 if existing['external_links']:
                     logger.debug(f"  Other links: {json.dumps(existing['external_links'], indent=2)}")
+                
+                # Check if we need to look up missing IDs
+                missing_wiki = not existing.get('wikipedia_url')
+                missing_mb = not existing.get('musicbrainz_id')
+                
+                if missing_wiki or missing_mb:
+                    logger.info("")
+                    logger.info("Looking up missing external IDs...")
+                    external_refs = {}
+                    
+                    # Look up Wikipedia if missing
+                    if missing_wiki:
+                        if wikipedia_url:
+                            logger.debug(f"Using provided Wikipedia URL: {wikipedia_url}")
+                            external_refs['wikipedia'] = wikipedia_url
+                            self.stats['wikipedia_found'] += 1
+                        else:
+                            wiki_url = self.search_wikipedia(name)
+                            if wiki_url:
+                                external_refs['wikipedia'] = wiki_url
+                    
+                    # Look up MusicBrainz if missing
+                    if missing_mb:
+                        if musicbrainz_id:
+                            logger.debug(f"Using provided MusicBrainz ID: {musicbrainz_id}")
+                            external_refs['musicbrainz'] = musicbrainz_id
+                            self.stats['musicbrainz_found'] += 1
+                        else:
+                            mb_id = self.search_musicbrainz(name)
+                            if mb_id:
+                                external_refs['musicbrainz'] = mb_id
+                    
+                    # Update if we found any missing IDs
+                    if external_refs:
+                        logger.info("")
+                        logger.info(f"Updating artist with found external IDs...")
+                        success = self.update_artist_references(existing['id'], external_refs)
+                        if success:
+                            logger.info(f"✓ External IDs updated")
+                            for key, value in external_refs.items():
+                                logger.debug(f"  {key}: {value}")
+                        else:
+                            logger.error(f"✗ Failed to update external IDs")
+                    else:
+                        logger.info("No additional external IDs found")
+                
                 self.stats['artists_skipped'] += 1
                 return False
             
