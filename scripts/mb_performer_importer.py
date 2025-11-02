@@ -6,6 +6,65 @@ Shared utilities for importing performer and instrument data from MusicBrainz
 import logging
 from db_utils import get_db_connection
 from mb_utils import MusicBrainzSearcher
+import re
+
+def normalize_group_name(group_name):
+    """
+    Remove common group suffixes to get the core artist name
+    
+    Examples:
+        "Ahmad Jamal Quintet" → "ahmad jamal"
+        "Gene Krupa and His Orchestra" → "gene krupa"
+    """
+    if not group_name:
+        return ""
+    
+    name = group_name.lower().strip()
+    
+    # Patterns to remove (order matters - try longest first)
+    patterns = [
+        r'\s+and\s+his\s+orchestra\b.*$',
+        r'\s+and\s+his\s+band\b.*$',
+        r'\s+and\s+his\s+quintet\b.*$',
+        r'\s+and\s+his\s+quartet\b.*$',
+        r'\s+and\s+his\s+trio\b.*$',
+        r'\s+orchestra\b.*$',
+        r'\s+big\s+band\b.*$',
+        r'\s+band\b.*$',
+        r'\s+ensemble\b.*$',
+        r'\s+trio\b.*$',
+        r'\s+quartet\b.*$',
+        r'\s+quintet\b.*$',
+        r'\s+sextet\b.*$',
+        r'\s+septet\b.*$',
+        r'\s+octet\b.*$',
+    ]
+    
+    for pattern in patterns:
+        name = re.sub(pattern, '', name)
+    
+    return name.strip()
+
+
+def is_performer_leader_of_group(performer_name, group_name):
+    """
+    Check if a performer is likely the leader of a group
+    
+    Args:
+        performer_name: Individual performer name (e.g., "Ahmad Jamal")
+        group_name: Group/ensemble name (e.g., "Ahmad Jamal Quintet")
+        
+    Returns:
+        bool: True if the performer is likely the group leader
+    """
+    if not performer_name or not group_name:
+        return False
+    
+    performer_normalized = performer_name.lower().strip()
+    group_normalized = normalize_group_name(group_name)
+    
+    return performer_normalized == group_normalized
+
 
 logger = logging.getLogger(__name__)
 
@@ -387,11 +446,27 @@ class PerformerImporter:
             for p in performers_to_import:
                 role_str = p.get('role', 'performer')
                 
-                # Determine if this is a leader based on artist-credit
-                is_leader = (
-                    (p.get('mbid') and p['mbid'] in leader_mbids) or
-                    (p.get('name') and p['name'].lower() in leader_names)
-                )
+                # Check if this performer is in the artist-credit (they're a leader)
+                # This now handles both direct matches and group/ensemble names
+                is_leader = False
+                match_reason = None
+                
+                # Check 1: MBID match (most reliable)
+                if performer_mbid and performer_mbid in leader_mbids:
+                    is_leader = True
+                    match_reason = "MBID match"
+                # Check 2: Exact name match
+                elif performer_name and performer_name.lower() in leader_names:
+                    is_leader = True
+                    match_reason = "Exact name match"
+                # Check 3: Group name match (NEW!)
+                else:
+                    for leader_name in leader_names:
+                        if is_performer_leader_of_group(performer_name, leader_name):
+                            is_leader = True
+                            match_reason = f"Group leader ('{performer_name}' leads '{leader_name}')"
+                            logger.debug(f"      Identified group leader: {match_reason}")
+                            break
                 
                 if is_leader:
                     role_display = 'leader'
@@ -435,11 +510,21 @@ class PerformerImporter:
                     performer_name = performer_data.get('name', '')
                     
                     # Check if this performer is in the artist-credit (they're a leader)
-                    is_leader = (
-                        (performer_mbid and performer_mbid in leader_mbids) or
-                        (performer_name and performer_name.lower() in leader_names)
-                    )
+                    # Check if this performer is a leader (handles group names)
+                    is_leader = False
+                    p_mbid = performer_data.get('mbid')
+                    p_name = performer_data.get('name')
                     
+                    if p_mbid and p_mbid in leader_mbids:
+                        is_leader = True
+                    elif p_name and p_name.lower() in leader_names:
+                        is_leader = True
+                    else:
+                        for leader_name in leader_names:
+                            if is_performer_leader_of_group(p_name, leader_name):
+                                is_leader = True
+                                break                    
+                                
                     if performer_role in ['engineer', 'producer', 'vocal', 'mix', 'mastering']:
                         # These are technical/production roles, not performance roles
                         db_role = 'other'
