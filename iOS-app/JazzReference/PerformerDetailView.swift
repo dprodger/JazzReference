@@ -99,12 +99,17 @@ struct PerformerDetailView: View {
                             VStack(alignment: .leading, spacing: 12) {
                                 // Always show biography preview
                                 if let biography = performer.biography {
-                                    Text(biography)
-                                        .font(.body)
-                                        .foregroundColor(JazzTheme.smokeGray)
-                                        .lineLimit(isBiographicalInfoExpanded ? nil : 3)
-                                        .padding(.horizontal)
-                                        .padding(.top, 8)
+                                    let paragraphs = biography.components(separatedBy: "\n\n").filter { !$0.isEmpty }
+                                    VStack(alignment: .leading, spacing: 12) {
+                                        ForEach(Array(paragraphs.enumerated()), id: \.offset) { _, paragraph in
+                                            Text(paragraph)
+                                                .font(.body)
+                                                .foregroundColor(JazzTheme.smokeGray)
+                                        }
+                                    }
+                                    .lineLimit(isBiographicalInfoExpanded ? nil : 3)
+                                    .padding(.horizontal)
+                                    .padding(.top, 8)
                                 }
                                 
                                 // Show details when expanded
@@ -309,3 +314,4 @@ struct PerformerRecordingRowView: View {
         PerformerDetailView(performerId: "preview-performer-detail-2")
     }
 }
+
