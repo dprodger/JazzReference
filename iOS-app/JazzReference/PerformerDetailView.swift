@@ -18,6 +18,7 @@ struct PerformerDetailView: View {
     @State private var performer: PerformerDetail?
     @State private var isLoading = true
     @State private var selectedFilter: RecordingFilter = .all
+    @State private var isBiographicalInfoExpanded = false
     
     private var filteredRecordings: [PerformerRecording] {
         guard let recordings = performer?.recordings else { return [] }
@@ -74,75 +75,103 @@ struct PerformerDetailView: View {
                                 .padding(.top, 8)
                         }
                         
-                        // Performer Information - REST OF THE INFO
-                        VStack(alignment: .leading, spacing: 12) {
-                            if let birthDate = performer.birthDate {
-                                HStack {
-                                    Image(systemName: "calendar")
-                                        .foregroundColor(JazzTheme.brass)
-                                    Text("Born: \(birthDate)")  // ← Added .formatAsDate()
-                                        .font(.subheadline)
-                                        .foregroundColor(JazzTheme.smokeGray)
+                        // Biographical Information Section - Expandable
+                        VStack(alignment: .leading, spacing: 0) {
+                            Button(action: {
+                                withAnimation {
+                                    isBiographicalInfoExpanded.toggle()
                                 }
-                            }
-
-                            if let deathDate = performer.deathDate {
+                            }) {
                                 HStack {
-                                    Image(systemName: "calendar")
-                                        .foregroundColor(JazzTheme.brass)
-                                    Text("Died: \(deathDate)")  // ← Added .formatAsDate()
-                                        .font(.subheadline)
-                                        .foregroundColor(JazzTheme.smokeGray)
-                                }
-                            }
-                            if let biography = performer.biography {
-                                VStack(alignment: .leading, spacing: 8) {
-                                    Text("Biography")
-                                        .font(.headline)
+                                    Text("Biographical Information")
+                                        .font(.title2)
+                                        .bold()
                                         .foregroundColor(JazzTheme.charcoal)
+                                    Spacer()
+                                    Image(systemName: isBiographicalInfoExpanded ? "chevron.up" : "chevron.down")
+                                        .foregroundColor(JazzTheme.brass)
+                                }
+                                .padding()
+                                .background(JazzTheme.cardBackground)
+                            }
+                            .buttonStyle(.plain)
+                            
+                            VStack(alignment: .leading, spacing: 12) {
+                                // Always show biography preview
+                                if let biography = performer.biography {
                                     Text(biography)
                                         .font(.body)
                                         .foregroundColor(JazzTheme.smokeGray)
+                                        .lineLimit(isBiographicalInfoExpanded ? nil : 3)
+                                        .padding(.horizontal)
+                                        .padding(.top, 8)
                                 }
-                                .padding()
-                                .background(JazzTheme.cardBackground)
-                                .cornerRadius(10)
-                            }
-                            
-                            if let instruments = performer.instruments, !instruments.isEmpty {
-                                VStack(alignment: .leading, spacing: 8) {
-                                    Text("Instruments")
-                                        .font(.headline)
-                                        .foregroundColor(JazzTheme.charcoal)
-                                    
-                                    ForEach(instruments, id: \.name) { instrument in
-                                        HStack {
-                                            Image(systemName: "music.note")
-                                                .foregroundColor(JazzTheme.brass)
-                                            Text(instrument.name)
-                                                .font(.subheadline)
-                                                .foregroundColor(JazzTheme.charcoal)
-                                            if instrument.isPrimary == true {
-                                                Text("(Primary)")
-                                                    .font(.caption)
+                                
+                                // Show details when expanded
+                                if isBiographicalInfoExpanded {
+                                    VStack(alignment: .leading, spacing: 12) {
+                                        if let birthDate = performer.birthDate {
+                                            HStack {
+                                                Image(systemName: "calendar")
+                                                    .foregroundColor(JazzTheme.brass)
+                                                Text("Born: \(birthDate)")
+                                                    .font(.subheadline)
                                                     .foregroundColor(JazzTheme.smokeGray)
                                             }
                                         }
+
+                                        if let deathDate = performer.deathDate {
+                                            HStack {
+                                                Image(systemName: "calendar")
+                                                    .foregroundColor(JazzTheme.brass)
+                                                Text("Died: \(deathDate)")
+                                                    .font(.subheadline)
+                                                    .foregroundColor(JazzTheme.smokeGray)
+                                            }
+                                        }
+                                        
+                                        if let instruments = performer.instruments, !instruments.isEmpty {
+                                            VStack(alignment: .leading, spacing: 8) {
+                                                Text("Instruments")
+                                                    .font(.headline)
+                                                    .foregroundColor(JazzTheme.charcoal)
+                                                
+                                                ForEach(instruments, id: \.name) { instrument in
+                                                    HStack {
+                                                        Image(systemName: "music.note")
+                                                            .foregroundColor(JazzTheme.brass)
+                                                        Text(instrument.name)
+                                                            .font(.subheadline)
+                                                            .foregroundColor(JazzTheme.charcoal)
+                                                        if instrument.isPrimary == true {
+                                                            Text("(Primary)")
+                                                                .font(.caption)
+                                                                .foregroundColor(JazzTheme.smokeGray)
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                            .padding(.top, 8)
+                                        }
+                                        
+                                        ExternalReferencesPanel(
+                                            wikipediaUrl: performer.wikipediaUrl,
+                                            musicbrainzId: performer.musicbrainzId,
+                                            externalLinks: performer.externalLinks,
+                                            entityId: performer.id,
+                                            entityName: performer.name
+                                        )
+                                        .padding(.top, 8)
                                     }
+                                    .padding(.horizontal)
+                                    .padding(.bottom, 12)
                                 }
-                                .padding()
-                                .background(JazzTheme.cardBackground)
-                                .cornerRadius(10)
                             }
-                            
-                            ExternalReferencesPanel(
-                                wikipediaUrl: performer.wikipediaUrl,
-                                musicbrainzId: performer.musicbrainzId,
-                                externalLinks: performer.externalLinks,
-                                entityId: performer.id,
-                                entityName: performer.name
-                            )                        }
-                        .padding()
+                        }
+                        .background(JazzTheme.cardBackground)
+                        .cornerRadius(10)
+                        .padding(.horizontal)
+                        .padding(.top, 8)
                         
                         Divider()
                         
