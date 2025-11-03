@@ -42,7 +42,7 @@ struct JazzReferenceApp: App {
     @Environment(\.scenePhase) var scenePhase
     @State private var showingSongCreation = false
     @State private var importedSongData: ImportedSongData?
-
+    @StateObject private var repertoireManager = RepertoireManager()
 
     // ADD THIS INITIALIZER
     init() {
@@ -115,6 +115,7 @@ struct JazzReferenceApp: App {
                     }                                                 // ← ADD THIS
                 }                                                     // ← ADD THIS
                 .ignoresSafeArea()
+                .environmentObject(repertoireManager)
         }
     }
     

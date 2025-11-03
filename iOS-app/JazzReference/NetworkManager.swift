@@ -184,7 +184,7 @@ class NetworkManager: ObservableObject {
         }
     }
     
-    // MARK: - NEW: Repertoire API Methods
+    // MARK: - Repertoire API Methods
     
     /// Fetch all available repertoires
     func fetchRepertoires() async -> [Repertoire] {
@@ -263,6 +263,68 @@ class NetworkManager: ObservableObject {
                 self.isLoading = false
             }
             print("Error fetching repertoire songs: \(error)")
+        }
+    }
+    
+    // MARK: - NEW: Add Song to Repertoire
+    
+    /// Add a song to a repertoire
+    /// - Parameters:
+    ///   - songId: The song ID to add
+    ///   - repertoireId: The repertoire ID to add it to
+    /// - Returns: Result with success message or error
+    func addSongToRepertoire(songId: String, repertoireId: String) async -> Result<String, Error> {
+        let startTime = Date()
+        guard let url = URL(string: "\(NetworkManager.baseURL)/repertoires/\(repertoireId)/songs") else {
+            print("Error: Invalid add song URL")
+            return .failure(NSError(domain: "NetworkManager", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid URL"]))
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        // Create request body
+        let body = ["song_id": songId ]
+        
+        do {
+            request.httpBody = try JSONSerialization.data(withJSONObject: body)
+            
+            let (data, response) = try await URLSession.shared.data(for: request)
+            
+            guard let httpResponse = response as? HTTPURLResponse else {
+                return .failure(NSError(domain: "NetworkManager", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid response"]))
+            }
+            
+            NetworkManager.logRequest("POST /repertoires/\(repertoireId)/songs", startTime: startTime)
+            
+            if httpResponse.statusCode == 201 {
+                // Success
+                if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                   let message = json["message"] as? String {
+                    print("   ↳ \(message)")
+                    return .success(message)
+                }
+                return .success("Song added to repertoire")
+            } else if httpResponse.statusCode == 409 {
+                // Conflict - already in repertoire
+                if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                   let error = json["error"] as? String {
+                    print("   ↳ \(error)")
+                    return .failure(NSError(domain: "NetworkManager", code: 409, userInfo: [NSLocalizedDescriptionKey: error]))
+                }
+                return .failure(NSError(domain: "NetworkManager", code: 409, userInfo: [NSLocalizedDescriptionKey: "Song already in repertoire"]))
+            } else {
+                // Other error
+                if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                   let error = json["error"] as? String {
+                    return .failure(NSError(domain: "NetworkManager", code: httpResponse.statusCode, userInfo: [NSLocalizedDescriptionKey: error]))
+                }
+                return .failure(NSError(domain: "NetworkManager", code: httpResponse.statusCode, userInfo: [NSLocalizedDescriptionKey: "Failed to add song"]))
+            }
+        } catch {
+            print("Error adding song to repertoire: \(error)")
+            return .failure(error)
         }
     }
 }
