@@ -174,7 +174,39 @@ COMMENT ON COLUMN recordings.album_art_large IS 'Large album artwork (640x640) f
 
 
 
+CREATE TABLE IF NOT EXISTS repertoires (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    name VARCHAR(255) NOT NULL,
+                    description TEXT,
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+                )
+                
+CREATE INDEX IF NOT EXISTS idx_repertoires_name 
+	ON repertoires(name)
+	
+CREATE TABLE IF NOT EXISTS repertoire_songs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    repertoire_id UUID NOT NULL,
+    song_id UUID NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_repertoire
+        FOREIGN KEY (repertoire_id)
+        REFERENCES repertoires(id)
+        ON DELETE CASCADE,
+    CONSTRAINT fk_song
+        FOREIGN KEY (song_id)
+        REFERENCES songs(id)
+        ON DELETE CASCADE,
+    CONSTRAINT unique_repertoire_song
+        UNIQUE (repertoire_id, song_id)
+)
 
+CREATE INDEX IF NOT EXISTS idx_repertoire_songs_repertoire_id 
+ON repertoire_songs(repertoire_id)
+
+CREATE INDEX IF NOT EXISTS idx_repertoire_songs_song_id 
+ON repertoire_songs(song_id)
 
 
 

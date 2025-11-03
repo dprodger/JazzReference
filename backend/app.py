@@ -1028,6 +1028,212 @@ def search_performers():
 
 
 
+
+
+"""
+Repertoire API Endpoints
+Add these endpoints to backend/app.py
+
+These endpoints support viewing and managing repertoires (collections of songs).
+In Phase 1, we implement GET endpoints for listing and viewing repertoires.
+"""
+
+# =============================================================================
+# REPERTOIRE ENDPOINTS
+# =============================================================================
+
+@app.route('/api/repertoires', methods=['GET'])
+def get_repertoires():
+    """
+    Get all repertoires with song counts
+    
+    Returns:
+        List of all repertoires with metadata and song counts
+        
+    Example response:
+        [
+            {
+                "id": "uuid",
+                "name": "Gig Standards",
+                "description": "Essential standards for typical jazz gigs",
+                "song_count": 42,
+                "created_at": "2025-01-15T10:30:00Z",
+                "updated_at": "2025-01-20T14:22:00Z"
+            },
+            ...
+        ]
+    """
+    try:
+        query = """
+            SELECT 
+                r.id,
+                r.name,
+                r.description,
+                r.created_at,
+                r.updated_at,
+                COUNT(rs.song_id) as song_count
+            FROM repertoires r
+            LEFT JOIN repertoire_songs rs ON r.id = rs.repertoire_id
+            GROUP BY r.id, r.name, r.description, r.created_at, r.updated_at
+            ORDER BY r.name
+        """
+        
+        repertoires = db_tools.execute_query(query)
+        return jsonify(repertoires)
+        
+    except Exception as e:
+        logger.error(f"Error fetching repertoires: {e}")
+        return jsonify({'error': 'Failed to fetch repertoires', 'detail': str(e)}), 500
+
+
+@app.route('/api/repertoires/<repertoire_id>', methods=['GET'])
+def get_repertoire_detail(repertoire_id):
+    """
+    Get detailed information about a specific repertoire
+    
+    Args:
+        repertoire_id: UUID of the repertoire
+        
+    Returns:
+        Repertoire with full song details
+        
+    Example response:
+        {
+            "id": "uuid",
+            "name": "Gig Standards",
+            "description": "Essential standards for typical jazz gigs",
+            "created_at": "2025-01-15T10:30:00Z",
+            "updated_at": "2025-01-20T14:22:00Z",
+            "songs": [
+                {
+                    "id": 1,
+                    "title": "Autumn Leaves",
+                    "composer": "Joseph Kosma",
+                    "structure": "AABA",
+                    "added_to_repertoire_at": "2025-01-15T10:35:00Z"
+                },
+                ...
+            ],
+            "song_count": 42
+        }
+    """
+    try:
+        # Get repertoire information
+        repertoire_query = """
+            SELECT id, name, description, created_at, updated_at
+            FROM repertoires
+            WHERE id = %s
+        """
+        repertoire = db_tools.execute_query(repertoire_query, (repertoire_id,), fetch_one=True)
+        
+        if not repertoire:
+            return jsonify({'error': 'Repertoire not found'}), 404
+        
+        # Get songs in this repertoire
+        songs_query = """
+            SELECT 
+                s.id,
+                s.title,
+                s.composer,
+                s.structure,
+                s.musicbrainz_id,
+                s.external_references,
+                rs.created_at as added_to_repertoire_at
+            FROM songs s
+            INNER JOIN repertoire_songs rs ON s.id = rs.song_id
+            WHERE rs.repertoire_id = %s
+            ORDER BY s.title
+        """
+        songs = db_tools.execute_query(songs_query, (repertoire_id,))
+        
+        # Add songs to repertoire
+        repertoire['songs'] = songs
+        repertoire['song_count'] = len(songs)
+        
+        return jsonify(repertoire)
+        
+    except Exception as e:
+        logger.error(f"Error fetching repertoire detail: {e}")
+        return jsonify({'error': 'Failed to fetch repertoire detail', 'detail': str(e)}), 500
+
+
+@app.route('/api/repertoires/<repertoire_id>/songs', methods=['GET'])
+def get_repertoire_songs(repertoire_id):
+    """
+    Get just the songs in a specific repertoire (without full repertoire metadata)
+    
+    This is useful for the iOS app when it wants to filter the song list
+    to just show songs in the current repertoire.
+    
+    Args:
+        repertoire_id: UUID of the repertoire, or "all" for all songs
+        
+    Returns:
+        List of songs in the repertoire
+        
+    Example response:
+        [
+            {
+                "id": 1,
+                "title": "Autumn Leaves",
+                "composer": "Joseph Kosma",
+                "structure": "AABA",
+                "musicbrainz_id": "...",
+                "external_references": {...},
+                "added_to_repertoire_at": "2025-01-15T10:35:00Z"
+            },
+            ...
+        ]
+    """
+    try:
+        # Special case: "all" means return all songs (no filtering)
+        if repertoire_id.lower() == 'all':
+            query = """
+                SELECT id, title, composer, structure, musicbrainz_id, 
+                       song_reference, external_references, created_at, updated_at
+                FROM songs
+                ORDER BY title
+            """
+            songs = db_tools.execute_query(query)
+            return jsonify(songs)
+        
+        # Verify repertoire exists
+        repertoire_check = """
+            SELECT id FROM repertoires WHERE id = %s
+        """
+        repertoire = db_tools.execute_query(repertoire_check, (repertoire_id,), fetch_one=True)
+        
+        if not repertoire:
+            return jsonify({'error': 'Repertoire not found'}), 404
+        
+        # Get songs in this repertoire
+        query = """
+            SELECT 
+                s.id,
+                s.title,
+                s.composer,
+                s.structure,
+                s.musicbrainz_id,
+                s.song_reference,
+                s.external_references,
+                s.created_at,
+                s.updated_at,
+                rs.created_at as added_to_repertoire_at
+            FROM songs s
+            INNER JOIN repertoire_songs rs ON s.id = rs.song_id
+            WHERE rs.repertoire_id = %s
+            ORDER BY s.title
+        """
+        songs = db_tools.execute_query(query, (repertoire_id,))
+        
+        return jsonify(songs)
+        
+    except Exception as e:
+        logger.error(f"Error fetching repertoire songs: {e}")
+        return jsonify({'error': 'Failed to fetch repertoire songs', 'detail': str(e)}), 500
+
+
+
 if __name__ == '__main__':
     # Don't initialize pool at startup - let it initialize on first request
     # This prevents deployment failures if DB is temporarily unavailable
