@@ -402,6 +402,17 @@ class PerformerImporter:
         artists_from_credits = self.parse_artist_credits(recording_data.get('artist-credit', []))
         logger.debug(f"      Parsed {len(artists_from_credits)} artists from recording credits")
         
+        # Fallback: If no recording artist-credit, try first release artist-credit
+        if not artists_from_credits:
+            releases = recording_data.get('releases', [])
+            if releases:
+                first_release = releases[0]
+                release_artist_credits = first_release.get('artist-credit', [])
+                if release_artist_credits:
+                    artists_from_credits = self.parse_artist_credits(release_artist_credits)
+                    if artists_from_credits:
+                        logger.debug(f"      Using release artist-credit as fallback: {', '.join([a['name'] for a in artists_from_credits])}")
+        
         # Create a set of leader MBIDs and names for quick lookup
         leader_mbids = {a['mbid'] for a in artists_from_credits if a['mbid']}
         leader_names = {a['name'].lower() for a in artists_from_credits if a['name']}
@@ -570,5 +581,29 @@ class PerformerImporter:
                         role_display = performer_role if performer_role != 'performer' else db_role
                         logger.debug(f"  Linked performer: {performer_data['name']} ({role_display}) - no instrument")
                         performers_linked += 1
+            
+            # Ensure at least one leader exists
+            if performers_linked > 0:
+                cur.execute("""
+                    SELECT COUNT(*) as leader_count
+                    FROM recording_performers
+                    WHERE recording_id = %s AND role = 'leader'
+                """, (recording_id,))
+                
+                leader_count = cur.fetchone()['leader_count']
+                
+                if leader_count == 0:
+                    logger.warning(f"      No leaders assigned - marking first performer as leader")
+                    cur.execute("""
+                        UPDATE recording_performers
+                        SET role = 'leader'
+                        WHERE id = (
+                            SELECT id FROM recording_performers
+                            WHERE recording_id = %s
+                            AND role != 'other'
+                            ORDER BY id
+                            LIMIT 1
+                        )
+                    """, (recording_id,))
         
         return performers_linked
