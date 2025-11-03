@@ -53,6 +53,10 @@ enum InstrumentFamily: String, CaseIterable, Hashable {
 // MARK: - Song Detail View
 struct SongDetailView: View {
     let songId: String
+    let allSongs: [Song]
+    let repertoireId: String
+    
+    @State private var currentSongId: String
     @State private var song: Song?
     @State private var isLoading = true
     @State private var selectedFilter: SongRecordingFilter = .withSpotify
@@ -68,6 +72,14 @@ struct SongDetailView: View {
     @State private var showErrorAlert = false
     @State private var alertMessage = ""
     @State private var isAddingToRepertoire = false
+    
+    // MARK: - Initializer
+    init(songId: String, allSongs: [Song] = [], repertoireId: String = "all") {
+        self.songId = songId
+        self.allSongs = allSongs
+        self.repertoireId = repertoireId
+        self._currentSongId = State(initialValue: songId)
+    }
     
     // Extract unique instrument families from recordings
     var availableInstruments: [InstrumentFamily] {
@@ -133,6 +145,48 @@ struct SongDetailView: View {
                 let lastName2 = group2.leader.components(separatedBy: " ").last ?? group2.leader
                 return lastName1.localizedCaseInsensitiveCompare(lastName2) == .orderedAscending
             }
+    }
+    
+    // MARK: - Navigation Helpers
+    
+    private var currentIndex: Int? {
+        allSongs.firstIndex { $0.id == currentSongId }
+    }
+    
+    private var canNavigatePrevious: Bool {
+        guard let index = currentIndex else { return false }
+        return index > 0
+    }
+    
+    private var canNavigateNext: Bool {
+        guard let index = currentIndex else { return false }
+        return index < allSongs.count - 1
+    }
+    
+    private func navigateToPrevious() {
+        guard let index = currentIndex, canNavigatePrevious else { return }
+        let previousSong = allSongs[index - 1]
+        currentSongId = previousSong.id
+        loadCurrentSong()
+    }
+    
+    private func navigateToNext() {
+        guard let index = currentIndex, canNavigateNext else { return }
+        let nextSong = allSongs[index + 1]
+        currentSongId = nextSong.id
+        loadCurrentSong()
+    }
+    
+    private func loadCurrentSong() {
+        isLoading = true
+        Task {
+            let networkManager = NetworkManager()
+            let fetchedSong = await networkManager.fetchSongDetail(id: currentSongId)
+            await MainActor.run {
+                song = fetchedSong
+                isLoading = false
+            }
+        }
     }
     
     var body: some View {
@@ -406,16 +460,34 @@ struct SongDetailView: View {
             #if DEBUG
             if ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1" {
                 let networkManager = NetworkManager()
-                song = networkManager.fetchSongDetailSync(id: songId)
+                song = networkManager.fetchSongDetailSync(id: currentSongId)
                 isLoading = false
                 return
             }
             #endif
             
             let networkManager = NetworkManager()
-            song = await networkManager.fetchSongDetail(id: songId)
+            song = await networkManager.fetchSongDetail(id: currentSongId)
             isLoading = false
         }
+        .gesture(
+            DragGesture(minimumDistance: 50)
+                .onEnded { value in
+                    if abs(value.translation.width) > abs(value.translation.height) {
+                        if value.translation.width < -50 && canNavigateNext {
+                            // Swipe left - next song
+                            withAnimation(.easeInOut(duration: 0.3)) {
+                                navigateToNext()
+                            }
+                        } else if value.translation.width > 50 && canNavigatePrevious {
+                            // Swipe right - previous song
+                            withAnimation(.easeInOut(duration: 0.3)) {
+                                navigateToPrevious()
+                            }
+                        }
+                    }
+                }
+        )
         .sheet(isPresented: $showAddToRepertoireSheet) {
             AddToRepertoireSheet(
                 songId: songId,
@@ -441,6 +513,46 @@ struct SongDetailView: View {
             Button("OK", role: .cancel) { }
         } message: {
             Text(alertMessage)
+        }
+        .overlay(alignment: .bottom) {
+            // Navigation indicators
+            if !allSongs.isEmpty && !isLoading {
+                HStack(spacing: 20) {
+                    Button(action: {
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            navigateToPrevious()
+                        }
+                    }) {
+                        Image(systemName: "chevron.left.circle.fill")
+                            .font(.system(size: 36))
+                            .foregroundColor(canNavigatePrevious ? JazzTheme.burgundy : JazzTheme.smokeGray.opacity(0.3))
+                    }
+                    .disabled(!canNavigatePrevious)
+                    
+                    if let index = currentIndex {
+                        Text("\(index + 1) of \(allSongs.count)")
+                            .font(.caption)
+                            .fontWeight(.medium)
+                            .foregroundColor(JazzTheme.charcoal)
+                    }
+                    
+                    Button(action: {
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            navigateToNext()
+                        }
+                    }) {
+                        Image(systemName: "chevron.right.circle.fill")
+                            .font(.system(size: 36))
+                            .foregroundColor(canNavigateNext ? JazzTheme.burgundy : JazzTheme.smokeGray.opacity(0.3))
+                    }
+                    .disabled(!canNavigateNext)
+                }
+                .padding(.horizontal, 24)
+                .padding(.vertical, 12)
+                .background(.ultraThinMaterial)
+                .cornerRadius(20)
+                .padding(.bottom, 20)
+            }
         }
     }
 }

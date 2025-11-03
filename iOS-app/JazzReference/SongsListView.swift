@@ -201,7 +201,12 @@ struct SongsListView: View {
                 ForEach(groupedSongs, id: \.0) { letter, songs in
                     Section(header: SectionHeaderView(letter: letter)) {
                         ForEach(songs) { song in
-                            NavigationLink(destination: SongDetailView(songId: song.id)) {
+                            NavigationLink(destination: SongDetailView(
+                                                songId: song.id,
+                                                allSongs: networkManager.songs,
+                                                repertoireId: repertoireManager.selectedRepertoire.id
+                                            )
+                                                .environmentObject(repertoireManager)) {
                                 songRowView(song: song)
                             }
                             .listRowBackground(JazzTheme.cardBackground)
