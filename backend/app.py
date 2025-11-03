@@ -1459,7 +1459,7 @@ def add_song_to_repertoire(repertoire_id):
         if not data or 'song_id' not in data:
             return jsonify({'error': 'Missing required field: song_id'}), 400
         
-        song_id = data.get('song_id')
+        song_id = str(data.get('song_id'))
         
         # Verify repertoire exists
         rep_query = "SELECT id, name FROM repertoires WHERE id = %s"
@@ -1520,7 +1520,7 @@ def add_song_to_repertoire(repertoire_id):
         return jsonify({'error': 'Failed to add song to repertoire', 'detail': str(e)}), 500
 
 
-@app.route('/api/repertoires/<repertoire_id>/songs/<int:song_id>', methods=['DELETE'])
+@app.route('/api/repertoires/<repertoire_id>/songs/<song_id>', methods=['DELETE'])
 def remove_song_from_repertoire(repertoire_id, song_id):
     """
     Remove a song from a repertoire
