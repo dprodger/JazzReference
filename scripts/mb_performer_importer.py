@@ -110,16 +110,18 @@ class PerformerImporter:
         """
         performers = []
         
-        # Check release-level relationships first
-        relations = release_data.get('relations', [])
-        if relations:
-            logger.debug(f"      Checking {len(relations)} release-level relations")
-            release_performers = self.parse_artist_relationships(relations)
-            if release_performers:
-                logger.debug(f"      Found {len(release_performers)} performers from release relationships")
-                return release_performers
+        # ONLY check release-level relationships if we're NOT looking for a specific recording
+        # (Release-level credits on compilations are typically producers/engineers, not performers)
+        if not target_recording_id:
+            relations = release_data.get('relations', [])
+            if relations:
+                logger.debug(f"      Checking {len(relations)} release-level relations")
+                release_performers = self.parse_artist_relationships(relations)
+                if release_performers:
+                    logger.debug(f"      Found {len(release_performers)} performers from release relationships")
+                    return release_performers
         
-        # Check track-level credits
+        # Check track-level credits (always do this when target_recording_id is specified)
         media = release_data.get('media', [])
         for medium in media:
             tracks = medium.get('tracks', [])
