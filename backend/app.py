@@ -1232,7 +1232,304 @@ def get_repertoire_songs(repertoire_id):
         logger.error(f"Error fetching repertoire songs: {e}")
         return jsonify({'error': 'Failed to fetch repertoire songs', 'detail': str(e)}), 500
 
+# =============================================================================
+# REPERTOIRE CRUD ENDPOINTS - Add these to app.py after the existing GET endpoints
+# =============================================================================
 
+@app.route('/api/repertoires', methods=['POST'])
+def create_repertoire():
+    """
+    Create a new repertoire
+    
+    Request body:
+        {
+            "name": "My Gig List",
+            "description": "Songs for Friday night gig"  # optional
+        }
+    
+    Returns:
+        Created repertoire with id
+    """
+    try:
+        data = request.get_json()
+        
+        # Validate required fields
+        if not data or 'name' not in data:
+            return jsonify({'error': 'Missing required field: name'}), 400
+        
+        name = safe_strip(data.get('name'))
+        description = safe_strip(data.get('description'))
+        
+        if not name:
+            return jsonify({'error': 'Name cannot be empty'}), 400
+        
+        # Insert new repertoire
+        query = """
+            INSERT INTO repertoires (name, description)
+            VALUES (%s, %s)
+            RETURNING id, name, description, created_at, updated_at
+        """
+        
+        result = db_tools.execute_query(query, (name, description), fetch_one=True)
+        
+        if not result:
+            return jsonify({'error': 'Failed to create repertoire'}), 500
+        
+        # Add song_count of 0 for new repertoire
+        repertoire = dict(result)
+        repertoire['song_count'] = 0
+        
+        logger.info(f"Created repertoire: {name} (ID: {result['id']})")
+        return jsonify(repertoire), 201
+        
+    except Exception as e:
+        logger.error(f"Error creating repertoire: {e}")
+        return jsonify({'error': 'Failed to create repertoire', 'detail': str(e)}), 500
+
+
+@app.route('/api/repertoires/<repertoire_id>', methods=['PUT'])
+def update_repertoire(repertoire_id):
+    """
+    Update a repertoire's name and/or description
+    
+    Request body:
+        {
+            "name": "Updated Name",           # optional
+            "description": "Updated desc"      # optional
+        }
+    
+    Returns:
+        Updated repertoire
+    """
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+        
+        # Check if repertoire exists
+        check_query = "SELECT id FROM repertoires WHERE id = %s"
+        exists = db_tools.execute_query(check_query, (repertoire_id,), fetch_one=True)
+        
+        if not exists:
+            return jsonify({'error': 'Repertoire not found'}), 404
+        
+        # Build update query dynamically based on provided fields
+        updates = []
+        params = []
+        
+        if 'name' in data:
+            name = safe_strip(data.get('name'))
+            if not name:
+                return jsonify({'error': 'Name cannot be empty'}), 400
+            updates.append("name = %s")
+            params.append(name)
+        
+        if 'description' in data:
+            description = safe_strip(data.get('description'))
+            updates.append("description = %s")
+            params.append(description)
+        
+        if not updates:
+            return jsonify({'error': 'No fields to update'}), 400
+        
+        # Always update the updated_at timestamp
+        updates.append("updated_at = CURRENT_TIMESTAMP")
+        params.append(repertoire_id)
+        
+        query = f"""
+            UPDATE repertoires
+            SET {', '.join(updates)}
+            WHERE id = %s
+            RETURNING id, name, description, created_at, updated_at
+        """
+        
+        result = db_tools.execute_query(query, params, fetch_one=True)
+        
+        if not result:
+            return jsonify({'error': 'Failed to update repertoire'}), 500
+        
+        # Get song count
+        count_query = """
+            SELECT COUNT(*) as count 
+            FROM repertoire_songs 
+            WHERE repertoire_id = %s
+        """
+        count_result = db_tools.execute_query(count_query, (repertoire_id,), fetch_one=True)
+        
+        repertoire = dict(result)
+        repertoire['song_count'] = count_result['count'] if count_result else 0
+        
+        logger.info(f"Updated repertoire: {repertoire_id}")
+        return jsonify(repertoire), 200
+        
+    except Exception as e:
+        logger.error(f"Error updating repertoire: {e}")
+        return jsonify({'error': 'Failed to update repertoire', 'detail': str(e)}), 500
+
+
+@app.route('/api/repertoires/<repertoire_id>', methods=['DELETE'])
+def delete_repertoire(repertoire_id):
+    """
+    Delete a repertoire
+    
+    Note: This will cascade delete all repertoire_songs entries
+    
+    Returns:
+        Success message
+    """
+    try:
+        # Check if repertoire exists
+        check_query = "SELECT id, name FROM repertoires WHERE id = %s"
+        exists = db_tools.execute_query(check_query, (repertoire_id,), fetch_one=True)
+        
+        if not exists:
+            return jsonify({'error': 'Repertoire not found'}), 404
+        
+        # Delete the repertoire (cascade will delete repertoire_songs)
+        delete_query = "DELETE FROM repertoires WHERE id = %s"
+        db_tools.execute_query(delete_query, (repertoire_id,))
+        
+        logger.info(f"Deleted repertoire: {exists['name']} (ID: {repertoire_id})")
+        return jsonify({
+            'success': True,
+            'message': 'Repertoire deleted successfully'
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error deleting repertoire: {e}")
+        return jsonify({'error': 'Failed to delete repertoire', 'detail': str(e)}), 500
+
+
+@app.route('/api/repertoires/<repertoire_id>/songs', methods=['POST'])
+def add_song_to_repertoire(repertoire_id):
+    """
+    Add a song to a repertoire
+    
+    Request body:
+        {
+            "song_id": 123
+        }
+    
+    Returns:
+        Success message with song details
+    """
+    try:
+        data = request.get_json()
+        
+        if not data or 'song_id' not in data:
+            return jsonify({'error': 'Missing required field: song_id'}), 400
+        
+        song_id = data.get('song_id')
+        
+        # Verify repertoire exists
+        rep_query = "SELECT id, name FROM repertoires WHERE id = %s"
+        repertoire = db_tools.execute_query(rep_query, (repertoire_id,), fetch_one=True)
+        
+        if not repertoire:
+            return jsonify({'error': 'Repertoire not found'}), 404
+        
+        # Verify song exists
+        song_query = "SELECT id, title, composer FROM songs WHERE id = %s"
+        song = db_tools.execute_query(song_query, (song_id,), fetch_one=True)
+        
+        if not song:
+            return jsonify({'error': 'Song not found'}), 404
+        
+        # Check if song is already in repertoire
+        check_query = """
+            SELECT id FROM repertoire_songs 
+            WHERE repertoire_id = %s AND song_id = %s
+        """
+        exists = db_tools.execute_query(
+            check_query, 
+            (repertoire_id, song_id), 
+            fetch_one=True
+        )
+        
+        if exists:
+            return jsonify({
+                'error': 'Song already in repertoire',
+                'song': dict(song),
+                'repertoire': dict(repertoire)
+            }), 409
+        
+        # Add song to repertoire
+        insert_query = """
+            INSERT INTO repertoire_songs (repertoire_id, song_id)
+            VALUES (%s, %s)
+            RETURNING id, created_at
+        """
+        result = db_tools.execute_query(
+            insert_query, 
+            (repertoire_id, song_id), 
+            fetch_one=True
+        )
+        
+        logger.info(f"Added song '{song['title']}' to repertoire '{repertoire['name']}'")
+        
+        return jsonify({
+            'success': True,
+            'message': 'Song added to repertoire',
+            'song': dict(song),
+            'repertoire': dict(repertoire),
+            'added_at': result['created_at']
+        }), 201
+        
+    except Exception as e:
+        logger.error(f"Error adding song to repertoire: {e}")
+        return jsonify({'error': 'Failed to add song to repertoire', 'detail': str(e)}), 500
+
+
+@app.route('/api/repertoires/<repertoire_id>/songs/<int:song_id>', methods=['DELETE'])
+def remove_song_from_repertoire(repertoire_id, song_id):
+    """
+    Remove a song from a repertoire
+    
+    Returns:
+        Success message
+    """
+    try:
+        # Verify repertoire exists
+        rep_query = "SELECT id, name FROM repertoires WHERE id = %s"
+        repertoire = db_tools.execute_query(rep_query, (repertoire_id,), fetch_one=True)
+        
+        if not repertoire:
+            return jsonify({'error': 'Repertoire not found'}), 404
+        
+        # Check if song is in repertoire
+        check_query = """
+            SELECT rs.id, s.title 
+            FROM repertoire_songs rs
+            JOIN songs s ON rs.song_id = s.id
+            WHERE rs.repertoire_id = %s AND rs.song_id = %s
+        """
+        exists = db_tools.execute_query(
+            check_query, 
+            (repertoire_id, song_id), 
+            fetch_one=True
+        )
+        
+        if not exists:
+            return jsonify({'error': 'Song not found in repertoire'}), 404
+        
+        # Delete the association
+        delete_query = """
+            DELETE FROM repertoire_songs 
+            WHERE repertoire_id = %s AND song_id = %s
+        """
+        db_tools.execute_query(delete_query, (repertoire_id, song_id))
+        
+        logger.info(f"Removed song '{exists['title']}' from repertoire '{repertoire['name']}'")
+        
+        return jsonify({
+            'success': True,
+            'message': 'Song removed from repertoire'
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error removing song from repertoire: {e}")
+        return jsonify({'error': 'Failed to remove song from repertoire', 'detail': str(e)}), 500
 
 if __name__ == '__main__':
     # Don't initialize pool at startup - let it initialize on first request
