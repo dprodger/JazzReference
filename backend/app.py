@@ -1168,6 +1168,9 @@ def get_repertoire_songs(repertoire_id):
     Args:
         repertoire_id: UUID of the repertoire, or "all" for all songs
         
+    Query Parameters:
+        search: Optional search term to filter songs by title or composer
+        
     Returns:
         List of songs in the repertoire
         
@@ -1186,15 +1189,30 @@ def get_repertoire_songs(repertoire_id):
         ]
     """
     try:
-        # Special case: "all" means return all songs (no filtering)
+        # Get search query parameter
+        search_query = request.args.get('search', '').strip()
+        
+        # Special case: "all" means return all songs (no filtering by repertoire)
         if repertoire_id.lower() == 'all':
-            query = """
-                SELECT id, title, composer, structure, musicbrainz_id, 
-                       song_reference, external_references, created_at, updated_at
-                FROM songs
-                ORDER BY title
-            """
-            songs = db_tools.execute_query(query)
+            if search_query:
+                query = """
+                    SELECT id, title, composer, structure, musicbrainz_id, 
+                           song_reference, external_references, created_at, updated_at
+                    FROM songs
+                    WHERE title ILIKE %s OR composer ILIKE %s
+                    ORDER BY title
+                """
+                params = (f'%{search_query}%', f'%{search_query}%')
+                songs = db_tools.execute_query(query, params)
+            else:
+                query = """
+                    SELECT id, title, composer, structure, musicbrainz_id, 
+                           song_reference, external_references, created_at, updated_at
+                    FROM songs
+                    ORDER BY title
+                """
+                songs = db_tools.execute_query(query)
+            
             return jsonify(songs)
         
         # Verify repertoire exists
@@ -1207,31 +1225,52 @@ def get_repertoire_songs(repertoire_id):
             return jsonify({'error': 'Repertoire not found'}), 404
         
         # Get songs in this repertoire
-        query = """
-            SELECT 
-                s.id,
-                s.title,
-                s.composer,
-                s.structure,
-                s.musicbrainz_id,
-                s.song_reference,
-                s.external_references,
-                s.created_at,
-                s.updated_at,
-                rs.created_at as added_to_repertoire_at
-            FROM songs s
-            INNER JOIN repertoire_songs rs ON s.id = rs.song_id
-            WHERE rs.repertoire_id = %s
-            ORDER BY s.title
-        """
-        songs = db_tools.execute_query(query, (repertoire_id,))
+        if search_query:
+            query = """
+                SELECT 
+                    s.id,
+                    s.title,
+                    s.composer,
+                    s.structure,
+                    s.musicbrainz_id,
+                    s.song_reference,
+                    s.external_references,
+                    s.created_at,
+                    s.updated_at,
+                    rs.created_at as added_to_repertoire_at
+                FROM songs s
+                INNER JOIN repertoire_songs rs ON s.id = rs.song_id
+                WHERE rs.repertoire_id = %s
+                  AND (s.title ILIKE %s OR s.composer ILIKE %s)
+                ORDER BY s.title
+            """
+            params = (repertoire_id, f'%{search_query}%', f'%{search_query}%')
+            songs = db_tools.execute_query(query, params)
+        else:
+            query = """
+                SELECT 
+                    s.id,
+                    s.title,
+                    s.composer,
+                    s.structure,
+                    s.musicbrainz_id,
+                    s.song_reference,
+                    s.external_references,
+                    s.created_at,
+                    s.updated_at,
+                    rs.created_at as added_to_repertoire_at
+                FROM songs s
+                INNER JOIN repertoire_songs rs ON s.id = rs.song_id
+                WHERE rs.repertoire_id = %s
+                ORDER BY s.title
+            """
+            songs = db_tools.execute_query(query, (repertoire_id,))
         
         return jsonify(songs)
         
     except Exception as e:
         logger.error(f"Error fetching repertoire songs: {e}")
         return jsonify({'error': 'Failed to fetch repertoire songs', 'detail': str(e)}), 500
-
 # =============================================================================
 # REPERTOIRE CRUD ENDPOINTS - Add these to app.py after the existing GET endpoints
 # =============================================================================
