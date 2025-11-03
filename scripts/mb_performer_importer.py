@@ -249,7 +249,7 @@ class PerformerImporter:
                 if not instruments:
                     logger.debug(f"      Warning: 'instrument' relation for {artist_name} has no instruments")
             
-            elif rel_type in ['engineer', 'producer', 'vocal', 'mix', 'mastering']:
+            elif rel_type in ['engineer', 'producer', 'mix', 'mastering']:
                 # These are valid relationship types but don't have instrument attributes
                 # They represent roles rather than instruments
                 role = rel_type
@@ -481,7 +481,7 @@ class PerformerImporter:
                 
                 if is_leader:
                     role_display = 'leader'
-                elif role_str in ['engineer', 'producer', 'vocal', 'mix', 'mastering']:
+                elif role_str in ['engineer', 'producer', 'mix', 'mastering']:
                     role_display = role_str
                 else:
                     role_display = 'sideman'
@@ -536,7 +536,7 @@ class PerformerImporter:
                                 is_leader = True
                                 break                    
                                 
-                    if performer_role in ['engineer', 'producer', 'vocal', 'mix', 'mastering']:
+                    if performer_role in ['engineer', 'producer', 'mix', 'mastering']:
                         # These are technical/production roles, not performance roles
                         db_role = 'other'
                     elif is_leader:
