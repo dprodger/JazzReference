@@ -2,7 +2,7 @@
 //  Models.swift
 //  JazzReference
 //
-//  Updated with album artwork support
+//  Updated with Repertoire support
 //
 
 import Foundation
@@ -158,5 +158,47 @@ struct ArtistImage: Codable, Identifiable {
         case licenseUrl = "license_url"
         case thumbnailUrl = "thumbnail_url"
         case sourcePageUrl = "source_page_url"
+    }
+}
+
+// MARK: - NEW: Repertoire Models
+
+/// Represents a named collection of songs (a repertoire)
+struct Repertoire: Codable, Identifiable, Hashable {
+    let id: String
+    let name: String
+    let description: String?
+    let songCount: Int
+    let createdAt: String?
+    let updatedAt: String?
+    
+    enum CodingKeys: String, CodingKey {
+        case id, name, description
+        case songCount = "song_count"
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+    }
+    
+    // Hashable conformance for use in Picker
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
+    }
+    
+    static func == (lhs: Repertoire, rhs: Repertoire) -> Bool {
+        lhs.id == rhs.id
+    }
+}
+
+/// Special repertoire option for "All Songs"
+extension Repertoire {
+    static var allSongs: Repertoire {
+        Repertoire(
+            id: "all",
+            name: "All Songs",
+            description: "View all songs in the database",
+            songCount: 0,
+            createdAt: nil,
+            updatedAt: nil
+        )
     }
 }
