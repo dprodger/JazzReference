@@ -194,7 +194,7 @@ class ArtistCreator:
                 if artist_name_mb == artist_name.lower():
                     mb_id = artist.get('id')
                     # Verify this is the right artist
-                    verification = self.verify_musicbrainz_reference(artist_name, mb_id, context)
+                    verification = self.mb_searcher.verify_musicbrainz_reference(artist_name, mb_id, context)
                     if verification['valid']:
                         logger.debug(f"  ✓ Found MusicBrainz: {mb_id} (confidence: {verification['confidence']})")
                         logger.debug(f"    Reason: {verification['reason']}")
@@ -208,65 +208,6 @@ class ArtistCreator:
             logger.error(f"Error searching MusicBrainz for {artist_name}: {e}")
             self.stats['errors'] += 1
             return None
-    
-    def verify_musicbrainz_reference(self, artist_name, mb_id, context):
-        """
-        Verify that a MusicBrainz artist ID is valid
-        
-        Args:
-            artist_name: Name of the artist
-            mb_id: MusicBrainz artist ID (UUID)
-            context: Dict with sample_songs for verification
-            
-        Returns:
-            Dict with 'valid' (bool), 'confidence' (str), 'reason' (str)
-        """
-        try:
-            logger.debug(f"Verifying MusicBrainz ID: {mb_id}")
-            
-            # Use the cached detail lookup
-            data = self.mb_searcher.get_artist_details(mb_id)
-            
-            if data is None:
-                return {
-                    'valid': False,
-                    'confidence': 'certain',
-                    'reason': 'MusicBrainz ID not found (404)'
-                }
-            
-            # Check name similarity
-            mb_name = data.get('name', '').lower()
-            artist_name_lower = artist_name.lower()
-            
-            if mb_name != artist_name_lower:
-                # Check if it's a close match
-                if mb_name not in artist_name_lower and artist_name_lower not in mb_name:
-                    return {
-                        'valid': False,
-                        'confidence': 'high',
-                        'reason': f'Name mismatch: searched for "{artist_name}", MusicBrainz has "{data.get("name")}"'
-                    }
-            
-            # Name matches, this is valid
-            return {
-                'valid': True,
-                'confidence': 'high',
-                'reason': f'Name matches: "{data.get("name")}"'
-            }
-            
-        except requests.exceptions.Timeout:
-            return {
-                'valid': False,
-                'confidence': 'uncertain',
-                'reason': 'Request timed out'
-            }
-        except Exception as e:
-            logger.error(f"Unexpected error verifying MusicBrainz: {e}", exc_info=True)
-            return {
-                'valid': False,
-                'confidence': 'uncertain',
-                'reason': f'Verification error: {str(e)}'
-            }
     
     def create_with_research(self, name, wikipedia_url=None, musicbrainz_id=None):
         """
