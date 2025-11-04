@@ -8,10 +8,6 @@ import sys
 import argparse
 import logging
 import json
-import time
-
-# Third-party imports
-import requests
 
 # Local imports
 from db_utils import get_db_connection
@@ -44,13 +40,6 @@ class ArtistCreator:
         self.dry_run = dry_run
         self.wiki_searcher = WikipediaSearcher()
         self.mb_searcher = MusicBrainzSearcher()
-        
-        # Set up session for API calls
-        self.session = requests.Session()
-        self.session.headers.update({
-            'User-Agent': 'JazzReference/1.0 (Educational; Contact: support@jazzreference.app)',
-            'Accept': 'application/json'
-        })
         
         self.stats = {
             'artists_checked': 0,
@@ -173,71 +162,6 @@ class ArtistCreator:
             logger.error(f"Error updating artist references: {e}", exc_info=True)
             self.stats['errors'] += 1
             return False
-    
-    def search_wikipedia(self, artist_name):
-        """
-        Search Wikipedia for an artist
-        
-        Args:
-            artist_name: Name to search for
-            
-        Returns:
-            Wikipedia URL if found with reasonable confidence, None otherwise
-        """
-        try:
-            logger.debug(f"  Searching Wikipedia for: {artist_name}")
-            
-            # Build minimal context (we don't have sample songs yet)
-            context = {
-                'birth_date': None,
-                'death_date': None,
-                'sample_songs': []
-            }
-            
-            # Use Wikipedia API to search
-            search_url = "https://en.wikipedia.org/w/api.php"
-            params = {
-                'action': 'opensearch',
-                'search': artist_name,
-                'limit': 5,
-                'namespace': 0,
-                'format': 'json'
-            }
-            
-            response = self.session.get(search_url, params=params, timeout=10)
-            time.sleep(1.0)  # Rate limiting
-            
-            if response.status_code != 200:
-                logger.warning(f"  ✗ Wikipedia search failed (status {response.status_code})")
-                return None
-            
-            data = response.json()
-            if len(data) < 4 or not data[3]:
-                logger.debug(f"  ✗ No Wikipedia results found")
-                return None
-            
-            # Get the URLs from the response
-            urls = data[3]
-            
-            # Check top 5 results
-            for url in urls[:5]:
-                verification = self.wiki_searcher.verify_wikipedia_reference(artist_name, url, context)
-                logger.debug(f"  Checked {url}: valid={verification['valid']}, confidence={verification['confidence']}, score={verification.get('score', 0)}")
-                
-                # Accept any valid result (low, medium, or high - not very_low)
-                if verification['valid']:
-                    logger.debug(f"  ✓ Found Wikipedia: {url} (confidence: {verification['confidence']}, score: {verification.get('score', 0)})")
-                    logger.debug(f"    Reason: {verification['reason']}")
-                    self.stats['wikipedia_found'] += 1
-                    return url
-            
-            logger.debug(f"  ✗ No valid Wikipedia match found")
-            return None
-            
-        except Exception as e:
-            logger.error(f"Error searching Wikipedia for {artist_name}: {e}")
-            self.stats['errors'] += 1
-            return None
     
     def search_musicbrainz(self, artist_name):
         """
@@ -389,9 +313,16 @@ class ArtistCreator:
                             external_refs['wikipedia'] = wikipedia_url
                             self.stats['wikipedia_found'] += 1
                         else:
-                            wiki_url = self.search_wikipedia(name)
+                            # Build minimal context (we don't have sample songs yet)
+                            context = {
+                                'birth_date': None,
+                                'death_date': None,
+                                'sample_songs': []
+                            }
+                            wiki_url = self.wiki_searcher.search_wikipedia(name, context)
                             if wiki_url:
                                 external_refs['wikipedia'] = wiki_url
+                                self.stats['wikipedia_found'] += 1
                     
                     # Look up MusicBrainz if missing
                     if missing_mb:
@@ -443,9 +374,16 @@ class ArtistCreator:
                 self.stats['wikipedia_found'] += 1
             else:
                 # Search for Wikipedia
-                wiki_url = self.search_wikipedia(name)
+                # Build minimal context (we don't have sample songs yet)
+                context = {
+                    'birth_date': None,
+                    'death_date': None,
+                    'sample_songs': []
+                }
+                wiki_url = self.wiki_searcher.search_wikipedia(name, context)
                 if wiki_url:
                     external_refs['wikipedia'] = wiki_url
+                    self.stats['wikipedia_found'] += 1
             
             # Handle MusicBrainz reference
             if musicbrainz_id:
