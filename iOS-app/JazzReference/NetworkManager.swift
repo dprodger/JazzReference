@@ -327,4 +327,44 @@ class NetworkManager: ObservableObject {
             return .failure(error)
         }
     }
+        
+    func refreshSongData(songId: String) async -> Bool {
+        guard let url = URL(string: "\(NetworkManager.baseURL)/songs/\(songId)/refresh") else {
+            print("Error: Invalid refresh URL")
+            return false
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            
+            guard let httpResponse = response as? HTTPURLResponse else {
+                print("Error: Invalid response")
+                return false
+            }
+            
+            // 202 Accepted is the expected success status
+            if httpResponse.statusCode == 202 {
+                // Optionally parse the response to get queue info
+                if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                    if let queueSize = json["queue_size"] as? Int {
+                        print("✓ Song queued for research (queue size: \(queueSize))")
+                    }
+                }
+                return true
+            } else {
+                print("Error: Unexpected status code \(httpResponse.statusCode)")
+                if let responseString = String(data: data, encoding: .utf8) {
+                    print("Response: \(responseString)")
+                }
+                return false
+            }
+        } catch {
+            print("Error refreshing song data: \(error.localizedDescription)")
+            return false
+        }
+    }
 }

@@ -73,6 +73,11 @@ struct SongDetailView: View {
     @State private var alertMessage = ""
     @State private var isAddingToRepertoire = false
     
+    // Song refresh management
+    @State private var showRefreshConfirmation = false
+    @State private var isRefreshing = false
+    @State private var showRefreshSuccess = false
+    
     // MARK: - Initializer
     init(songId: String, allSongs: [Song] = [], repertoireId: String = "all") {
         self.songId = songId
@@ -189,17 +194,31 @@ struct SongDetailView: View {
         }
     }
     
-    var body: some View {
-        ScrollView {
-            if isLoading {
-                VStack {
-                    Spacer()
-                    ProgressView("Loading...")
-                        .tint(JazzTheme.burgundy)
-                    Spacer()
+    // MARK: - Song Refresh
+    
+    private func refreshSongData() {
+        isRefreshing = true
+        
+        Task {
+            let networkManager = NetworkManager()
+            let success = await networkManager.refreshSongData(songId: currentSongId)
+            
+            await MainActor.run {
+                isRefreshing = false
+                if success {
+                    showRefreshSuccess = true
+                } else {
+                    showErrorAlert = true
+                    alertMessage = "Failed to queue song for refresh. Please try again."
                 }
-                .frame(maxWidth: .infinity, minHeight: 300)
-            } else if let song = song {
+            }
+        }
+    }
+    
+    // MARK: - Song Content View
+    
+    @ViewBuilder
+    private func songContentView(for song: Song) -> some View {
                 VStack(alignment: .leading, spacing: 0) {
                     // Styled Header with Jazz Theme
                     HStack {
@@ -222,6 +241,9 @@ struct SongDetailView: View {
                             .font(.largeTitle)
                             .bold()
                             .foregroundColor(JazzTheme.charcoal)
+                            .onLongPressGesture {
+                                showRefreshConfirmation = true
+                            }
                         
                         if let composer = song.composer {
                             HStack {
@@ -425,6 +447,20 @@ struct SongDetailView: View {
                 }
                 .padding(.bottom)
                 }
+    }
+    
+    var body: some View {
+        ScrollView {
+            if isLoading {
+                VStack {
+                    Spacer()
+                    ProgressView("Loading...")
+                        .tint(JazzTheme.burgundy)
+                    Spacer()
+                }
+                .frame(maxWidth: .infinity, minHeight: 300)
+            } else if let song = song {
+                songContentView(for: song)
             } else {
                 VStack {
                     Spacer()
@@ -513,6 +549,19 @@ struct SongDetailView: View {
             Button("OK", role: .cancel) { }
         } message: {
             Text(alertMessage)
+        }
+        .alert("Refresh Song Data?", isPresented: $showRefreshConfirmation) {
+            Button("Cancel", role: .cancel) { }
+            Button("Refresh", role: .destructive) {
+                refreshSongData()
+            }
+        } message: {
+            Text("This will queue \"\(song?.title ?? "this song")\" for background research to update its information from external sources.")
+        }
+        .alert("Song Queued", isPresented: $showRefreshSuccess) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text("The song has been queued for research. Data will be updated in the background.")
         }
         .overlay(alignment: .bottom) {
             // Navigation indicators
