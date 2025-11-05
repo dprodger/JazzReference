@@ -16,7 +16,9 @@ import json
 # Import database tools
 import db_tools
 
-
+# Import research tools
+import research_queue
+import song_research
 
 # Custom JSON encoder to format dates without timestamps
 from flask.json.provider import DefaultJSONProvider
@@ -89,6 +91,147 @@ def health_check():
         health_status['status'] = 'unhealthy'
         health_status['database'] = f'error: {str(e)}'
         return jsonify(health_status), 503
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+"""
+Jazz Reference API Backend - Updated with Song Research Queue
+A Flask API with background song research capabilities
+"""
+
+from flask import Flask, jsonify, request
+from flask_cors import CORS
+from datetime import date
+import logging
+import time
+from api_doc import api_docs
+import sys
+import os
+import json
+
+# Import database tools
+import db_tools
+
+# Import research modules
+import research_queue
+import song_research
+
+
+# Custom JSON encoder to format dates without timestamps
+from flask.json.provider import DefaultJSONProvider
+
+class CustomJSONProvider(DefaultJSONProvider):
+    """Custom JSON provider that formats dates as YYYY-MM-DD"""
+    def default(self, obj):
+        if isinstance(obj, date):
+            return obj.strftime('%Y-%m-%d')
+        return super().default(obj)
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+app = Flask(__name__)
+CORS(app)
+app.json = CustomJSONProvider(app)
+app.register_blueprint(api_docs)
+
+def safe_strip(value):
+    """Safely strip a string value, handling None"""
+    if value is None:
+        return None
+    if isinstance(value, str):
+        stripped = value.strip()
+        return stripped if stripped else None
+    return value
+
+
+# ============================================================================
+# SONG RESEARCH ENDPOINTS
+# ============================================================================
+
+@app.route('/api/songs/<song_id>/refresh', methods=['POST'])
+def refresh_song_data(song_id):
+    """
+    Queue a song for background research and data refresh
+    
+    This endpoint accepts a song ID and adds it to the background processing
+    queue. The actual research happens asynchronously in a worker thread.
+    
+    Args:
+        song_id: UUID of the song to research
+        
+    Returns:
+        JSON response with queue status
+    """
+    try:
+        # First verify the song exists and get its name
+        query = "SELECT id, title FROM songs WHERE id = %s"
+        song = db_tools.execute_query(query, (song_id,), fetch_one=True)
+        
+        if not song:
+            return jsonify({
+                'error': 'Song not found',
+                'song_id': song_id
+            }), 404
+        
+        # Add to research queue
+        success = research_queue.add_song_to_queue(song['id'], song['title'])
+        
+        if success:
+            return jsonify({
+                'success': True,
+                'message': 'Song queued for research',
+                'song_id': song['id'],
+                'song_title': song['title'],
+                'queue_size': research_queue.get_queue_size()
+            }), 202  # 202 Accepted - processing will happen asynchronously
+        else:
+            return jsonify({
+                'error': 'Failed to queue song',
+                'song_id': song_id
+            }), 500
+            
+    except Exception as e:
+        logger.error(f"Error queueing song {song_id} for research: {e}")
+        return jsonify({
+            'error': 'Internal server error',
+            'detail': str(e)
+        }), 500
+
+
+@app.route('/api/research/queue', methods=['GET'])
+def get_queue_status():
+    """Get the current status of the research queue"""
+    return jsonify({
+        'queue_size': research_queue.get_queue_size(),
+        'worker_active': research_queue._worker_running
+    })
+
+
+
+
+
+
+
 
 @app.route('/api/songs', methods=['GET'])
 def get_songs():
@@ -1578,10 +1721,19 @@ if __name__ == '__main__':
     
     # Start keepalive thread
     db_tools.start_keepalive_thread()
-    
+
+    # Start research worker thread
+    research_queue.start_worker(song_research.research_song)
+    logger.info("Research worker started and ready to process songs")
+        
     try:
         app.run(debug=True, host='0.0.0.0', port=5001)
     finally:
-        # Stop keepalive thread and close pool
+        # Cleanup
+        logger.info("Shutting down...")
+        research_queue.stop_worker()
         db_tools.stop_keepalive_thread()
         db_tools.close_connection_pool()
+        logger.info("Shutdown complete")
+       
+        
