@@ -13,8 +13,11 @@ import sys
 import os
 import json
 
+# Set pooling mode BEFORE importing db_utils
+os.environ['DB_USE_POOLING'] = 'true'
+
 # Import database tools
-import db_tools
+import db_utils as db_tools
 
 # Import research tools
 import research_queue
@@ -107,66 +110,6 @@ def health_check():
 
 
 
-
-
-"""
-Jazz Reference API Backend - Updated with Song Research Queue
-A Flask API with background song research capabilities
-"""
-
-from flask import Flask, jsonify, request
-from flask_cors import CORS
-from datetime import date
-import logging
-import time
-from api_doc import api_docs
-import sys
-import os
-import json
-
-# Import database tools
-import db_tools
-
-# Import research modules
-import research_queue
-import song_research
-
-
-# Custom JSON encoder to format dates without timestamps
-from flask.json.provider import DefaultJSONProvider
-
-class CustomJSONProvider(DefaultJSONProvider):
-    """Custom JSON provider that formats dates as YYYY-MM-DD"""
-    def default(self, obj):
-        if isinstance(obj, date):
-            return obj.strftime('%Y-%m-%d')
-        return super().default(obj)
-
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
-
-app = Flask(__name__)
-CORS(app)
-app.json = CustomJSONProvider(app)
-app.register_blueprint(api_docs)
-
-def safe_strip(value):
-    """Safely strip a string value, handling None"""
-    if value is None:
-        return None
-    if isinstance(value, str):
-        stripped = value.strip()
-        return stripped if stripped else None
-    return value
-
-
-# ============================================================================
-# SONG RESEARCH ENDPOINTS
-# ============================================================================
 
 @app.route('/api/songs/<song_id>/refresh', methods=['POST'])
 def refresh_song_data(song_id):
