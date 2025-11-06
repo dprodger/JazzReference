@@ -45,6 +45,15 @@ CORS(app)
 app.json = CustomJSONProvider(app)
 app.register_blueprint(api_docs)
 
+# Initialize research worker thread at module level
+# This runs when the module is imported, which happens:
+# - When running with 'python app.py'
+# - When loaded by gunicorn/uwsgi
+# - After Flask reloader restarts the process
+if not research_queue._worker_running:
+    research_queue.start_worker(song_research.research_song)
+    logger.info("Research worker thread initialized and ready to process songs")
+
 def safe_strip(value):
     """Safely strip a string value, handling None"""
     if value is None:
@@ -1661,13 +1670,10 @@ if __name__ == '__main__':
     # This prevents deployment failures if DB is temporarily unavailable
     logger.info("Starting Flask application...")
     logger.info("Database connection pool will initialize on first request")
+    logger.info("Research worker thread initialized at module level")
     
     # Start keepalive thread
     db_tools.start_keepalive_thread()
-
-    # Start research worker thread
-    research_queue.start_worker(song_research.research_song)
-    logger.info("Research worker started and ready to process songs")
         
     try:
         app.run(debug=True, host='0.0.0.0', port=5001)
@@ -1678,5 +1684,3 @@ if __name__ == '__main__':
         db_tools.stop_keepalive_thread()
         db_tools.close_connection_pool()
         logger.info("Shutdown complete")
-       
-        
