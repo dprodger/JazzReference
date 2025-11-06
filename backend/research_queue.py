@@ -96,35 +96,62 @@ def _worker_loop(research_function):
     Args:
         research_function: Function to call for each song
     """
-    logger.info("Worker loop started - waiting for songs to research")
-    
-    while _worker_running:
-        try:
-            # Get next song from queue (blocks until available)
-            song_data = research_queue.get(timeout=1.0)
+    try:
+        logger.info("=== Worker loop starting ===")
+        logger.info(f"Thread ID: {threading.current_thread().ident}")
+        logger.info(f"Thread name: {threading.current_thread().name}")
+        logger.info(f"_worker_running at start: {_worker_running}")
+        logger.info(f"research_function: {research_function}")
+        
+        iteration = 0
+        while _worker_running:
+            iteration += 1
             
-            # Check for poison pill
-            if song_data is None:
-                break
+            # Log heartbeat every 30 seconds (30 iterations of 1 second timeout)
+            if iteration % 30 == 1:
+                logger.info(f"Worker heartbeat - iteration {iteration}, still running")
             
-            song_id = song_data['song_id']
-            song_name = song_data['song_name']
-            
-            logger.info(f"Processing queued song: {song_id} / {song_name}")
-            
-            # Call the research function
             try:
-                research_function(song_id, song_name)
+                # Get next song from queue (blocks until available)
+                song_data = research_queue.get(timeout=1.0)
+                
+                logger.info(f"!!! Got item from queue: {song_data}")
+                
+                # Check for poison pill
+                if song_data is None:
+                    logger.info("Received poison pill - exiting")
+                    break
+                
+                song_id = song_data['song_id']
+                song_name = song_data['song_name']
+                
+                logger.info(f"Processing queued song: {song_id} / {song_name}")
+                
+                # Call the research function
+                try:
+                    logger.info(f"Calling research_function({song_id}, {song_name})")
+                    research_function(song_id, song_name)
+                    logger.info(f"Successfully completed research for {song_id}")
+                except Exception as e:
+                    logger.error(f"Error researching song {song_id}: {e}", exc_info=True)
+                
+                # Mark task as done
+                research_queue.task_done()
+                logger.info(f"Marked task as done for {song_id}")
+                
+            except queue.Empty:
+                # No items in queue, continue waiting
+                continue
             except Exception as e:
-                logger.error(f"Error researching song {song_id}: {e}", exc_info=True)
-            
-            # Mark task as done
-            research_queue.task_done()
-            
-        except queue.Empty:
-            # No items in queue, continue waiting
-            continue
-        except Exception as e:
-            logger.error(f"Error in worker loop: {e}", exc_info=True)
-    
-    logger.info("Worker loop exited")
+                logger.error(f"Error in worker loop iteration {iteration}: {e}", exc_info=True)
+                # Continue running even if one iteration fails
+                continue
+        
+        logger.info(f"=== Worker loop exited normally after {iteration} iterations ===")
+        logger.info(f"_worker_running at exit: {_worker_running}")
+        
+    except Exception as e:
+        logger.error(f"!!! FATAL ERROR in worker loop: {e}", exc_info=True)
+        logger.error("Worker thread is terminating due to unhandled exception")
+    finally:
+        logger.info("Worker thread finally block executed")
