@@ -46,6 +46,7 @@ def research_song(song_id: str, song_name: str) -> Dict[str, Any]:
         # Pass in the logger so all output goes to Flask's logging
         importer = MBReleaseImporter(dry_run=False, logger=logger)
         
+        logger.info("received the mbreleaseimporter")
         # Import releases for this song (using song_id for exact match)
         result = importer.import_releases(song_id)
         

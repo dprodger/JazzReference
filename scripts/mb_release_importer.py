@@ -46,6 +46,7 @@ class MBReleaseImporter:
             'releases_imported': 0,
             'errors': 0
         }
+        logger.info("MBReleaseImport::init completed")
     
     def find_song(self, song_identifier: str) -> Optional[Dict[str, Any]]:
         """
