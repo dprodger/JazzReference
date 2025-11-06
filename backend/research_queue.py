@@ -29,12 +29,17 @@ def add_song_to_queue(song_id: str, song_name: str) -> bool:
     Returns:
         True if successfully queued, False otherwise
     """
+    import os
     try:
         research_queue.put({
             'song_id': song_id,
             'song_name': song_name
         })
         logger.info(f"Queued song for research: {song_id} / {song_name}")
+        logger.info(f"  Queue size after add: {research_queue.qsize()}")
+        logger.info(f"  Process ID: {os.getpid()}")
+        logger.info(f"  Worker running flag: {_worker_running}")
+        logger.info(f"  Worker thread: {_worker_thread}")
         return True
     except Exception as e:
         logger.error(f"Error queuing song {song_id}: {e}")
@@ -96,8 +101,10 @@ def _worker_loop(research_function):
     Args:
         research_function: Function to call for each song
     """
+    import os
     try:
         logger.info("=== Worker loop starting ===")
+        logger.info(f"Process ID: {os.getpid()}")
         logger.info(f"Thread ID: {threading.current_thread().ident}")
         logger.info(f"Thread name: {threading.current_thread().name}")
         logger.info(f"_worker_running at start: {_worker_running}")
