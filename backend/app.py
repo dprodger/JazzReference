@@ -46,13 +46,14 @@ app.json = CustomJSONProvider(app)
 app.register_blueprint(api_docs)
 
 # Initialize research worker thread at module level
-# This runs when the module is imported, which happens:
-# - When running with 'python app.py'
-# - When loaded by gunicorn/uwsgi
-# - After Flask reloader restarts the process
-if not research_queue._worker_running:
-    research_queue.start_worker(song_research.research_song)
-    logger.info("Research worker thread initialized and ready to process songs")
+# IMPORTANT: Only initialize in the actual Flask process, not the reloader parent
+# - WERKZEUG_RUN_MAIN is set by Flask's reloader in the child process
+# - In production (gunicorn/uwsgi), this variable won't exist, so we initialize
+# - This ensures the worker runs in the same process that handles HTTP requests
+if os.environ.get('WERKZEUG_RUN_MAIN') == 'true' or os.environ.get('WERKZEUG_RUN_MAIN') is None:
+    if not research_queue._worker_running:
+        research_queue.start_worker(song_research.research_song)
+        logger.info("Research worker thread initialized and ready to process songs")
 
 def safe_strip(value):
     """Safely strip a string value, handling None"""
