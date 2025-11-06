@@ -199,7 +199,78 @@ def get_queue_status():
 
 
 
+@app.route('/api/research/diagnostics', methods=['GET'])
+def get_research_diagnostics():
+    """Get detailed diagnostic information about the research queue and worker"""
+    import threading
+    
+    diagnostics = {
+        'queue_size': research_queue.get_queue_size(),
+        'worker_active': research_queue._worker_running,
+        'worker_thread': None,
+        'all_threads': [],
+    }
+    
+    # Get worker thread info if it exists
+    if research_queue._worker_thread:
+        diagnostics['worker_thread'] = {
+            'name': research_queue._worker_thread.name,
+            'alive': research_queue._worker_thread.is_alive(),
+            'daemon': research_queue._worker_thread.daemon,
+            'ident': research_queue._worker_thread.ident,
+        }
+    
+    # List all active threads
+    for thread in threading.enumerate():
+        diagnostics['all_threads'].append({
+            'name': thread.name,
+            'alive': thread.is_alive(),
+            'daemon': thread.daemon,
+            'ident': thread.ident,
+        })
+    
+    return jsonify(diagnostics)
 
+
+@app.route('/api/research/test', methods=['POST'])
+def test_research_queue():
+    """Test endpoint to verify queue is working"""
+    import threading
+    import time
+    
+    test_results = {
+        'before_queue': {
+            'size': research_queue.get_queue_size(),
+            'worker_running': research_queue._worker_running,
+        },
+        'thread_info': {
+            'current_thread': threading.current_thread().name,
+            'current_thread_id': threading.current_thread().ident,
+        }
+    }
+    
+    # Add a test item
+    test_song_id = 'test-123'
+    test_song_name = 'Test Song'
+    
+    logger.info(f"TEST: Adding test song to queue from thread {threading.current_thread().name}")
+    success = research_queue.add_song_to_queue(test_song_id, test_song_name)
+    
+    test_results['add_result'] = success
+    test_results['after_queue'] = {
+        'size': research_queue.get_queue_size(),
+        'worker_running': research_queue._worker_running,
+    }
+    
+    # Wait a moment and check again
+    time.sleep(2)
+    
+    test_results['after_2_seconds'] = {
+        'size': research_queue.get_queue_size(),
+        'worker_running': research_queue._worker_running,
+    }
+    
+    return jsonify(test_results)
 
 
 
