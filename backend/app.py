@@ -46,11 +46,28 @@ app.json = CustomJSONProvider(app)
 app.register_blueprint(api_docs)
 
 # Initialize research worker thread at module level
-# IMPORTANT: Only initialize in the actual Flask process, not the reloader parent
-# - WERKZEUG_RUN_MAIN is set by Flask's reloader in the child process
-# - In production (gunicorn/uwsgi), this variable won't exist, so we initialize
-# - This ensures the worker runs in the same process that handles HTTP requests
-if os.environ.get('WERKZEUG_RUN_MAIN') == 'true' or os.environ.get('WERKZEUG_RUN_MAIN') is None:
+# CRITICAL: Must only initialize in the process that handles HTTP requests
+# 
+# Flask's debug reloader creates two processes:
+#   - Parent process: WERKZEUG_RUN_MAIN not in environment (monitors files)
+#   - Child process: WERKZEUG_RUN_MAIN='true' (handles requests)
+# 
+# We must ONLY initialize in child process or when there's no reloader (production)
+
+# Determine if we should start the worker
+start_worker_flag = False
+
+if 'WERKZEUG_RUN_MAIN' in os.environ:
+    # Reloader is active - only start worker in child process
+    if os.environ['WERKZEUG_RUN_MAIN'] == 'true':
+        start_worker_flag = True
+        logger.info("Detected Flask reloader child process - will initialize worker")
+else:
+    # No reloader (production or use_reloader=False)
+    start_worker_flag = True
+    logger.info("No reloader detected - will initialize worker")
+
+if start_worker_flag:
     if not research_queue._worker_running:
         research_queue.start_worker(song_research.research_song)
         logger.info("Research worker thread initialized and ready to process songs")
