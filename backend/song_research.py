@@ -42,9 +42,8 @@ def update_song_composer(song_id: str) -> bool:
                 if not row:
                     return False
                 
-                mb_id = row[0]
-                composer = row[1]
-                
+                mb_id = row['musicbrainz_id']
+                composer = row['composer']                
                 # Skip if no MusicBrainz ID or already has composer
                 if not mb_id or composer:
                     return False
