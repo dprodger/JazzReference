@@ -104,6 +104,10 @@ class SpotifyMatcher:
         
         # Normalize "and" vs "&"
         text = text.replace(' & ', ' and ')
+
+        # Normalize spacing around punctuation (e.g., "St. / Denis" → "St./Denis")
+        text = re.sub(r'\s*/\s*', '/', text)
+        text = re.sub(r'\s*-\s*', '-', text)
         
         # Remove extra whitespace
         text = ' '.join(text.split())
