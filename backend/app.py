@@ -45,32 +45,12 @@ CORS(app)
 app.json = CustomJSONProvider(app)
 app.register_blueprint(api_docs)
 
-# Initialize research worker thread at module level
-# CRITICAL: Must only initialize in the process that handles HTTP requests
-# 
-# Flask's debug reloader creates two processes:
-#   - Parent process: WERKZEUG_RUN_MAIN not in environment (monitors files)
-#   - Child process: WERKZEUG_RUN_MAIN='true' (handles requests)
-# 
-# We must ONLY initialize in child process or when there's no reloader (production)
+# Worker thread initialization:
+# - When running under gunicorn: Initialized via post_worker_init hook in gunicorn.conf.py
+# - When running directly (python app.py): Initialized in __main__ block at bottom
+# This ensures the worker runs in the process that handles HTTP requests
 
-# Determine if we should start the worker
-start_worker_flag = False
-
-if 'WERKZEUG_RUN_MAIN' in os.environ:
-    # Reloader is active - only start worker in child process
-    if os.environ['WERKZEUG_RUN_MAIN'] == 'true':
-        start_worker_flag = True
-        logger.info("Detected Flask reloader child process - will initialize worker")
-else:
-    # No reloader (production or use_reloader=False)
-    start_worker_flag = True
-    logger.info("No reloader detected - will initialize worker")
-
-if start_worker_flag:
-    if not research_queue._worker_running:
-        research_queue.start_worker(song_research.research_song)
-        logger.info("Research worker thread initialized and ready to process songs")
+logger.info(f"Flask app initialized in PID {os.getpid()}")
 
 def safe_strip(value):
     """Safely strip a string value, handling None"""
@@ -199,81 +179,7 @@ def get_queue_status():
 
 
 
-# Update your /api/research/diagnostics endpoint in app.py to include process ID:
 
-@app.route('/api/research/diagnostics', methods=['GET'])
-def get_research_diagnostics():
-    """Get detailed diagnostic information about the research queue and worker"""
-    import threading
-    import os
-    
-    diagnostics = {
-        'process_id': os.getpid(),  # ADD THIS LINE
-        'queue_size': research_queue.get_queue_size(),
-        'worker_active': research_queue._worker_running,
-        'worker_thread': None,
-        'all_threads': [],
-    }
-    
-    # Get worker thread info if it exists
-    if research_queue._worker_thread:
-        diagnostics['worker_thread'] = {
-            'name': research_queue._worker_thread.name,
-            'alive': research_queue._worker_thread.is_alive(),
-            'daemon': research_queue._worker_thread.daemon,
-            'ident': research_queue._worker_thread.ident,
-        }
-    
-    # List all active threads
-    for thread in threading.enumerate():
-        diagnostics['all_threads'].append({
-            'name': thread.name,
-            'alive': thread.is_alive(),
-            'daemon': thread.daemon,
-            'ident': thread.ident,
-        })
-    
-    return jsonify(diagnostics)
-    
-@app.route('/api/research/test', methods=['POST'])
-def test_research_queue():
-    """Test endpoint to verify queue is working"""
-    import threading
-    import time
-    
-    test_results = {
-        'before_queue': {
-            'size': research_queue.get_queue_size(),
-            'worker_running': research_queue._worker_running,
-        },
-        'thread_info': {
-            'current_thread': threading.current_thread().name,
-            'current_thread_id': threading.current_thread().ident,
-        }
-    }
-    
-    # Add a test item
-    test_song_id = 'test-123'
-    test_song_name = 'Test Song'
-    
-    logger.info(f"TEST: Adding test song to queue from thread {threading.current_thread().name}")
-    success = research_queue.add_song_to_queue(test_song_id, test_song_name)
-    
-    test_results['add_result'] = success
-    test_results['after_queue'] = {
-        'size': research_queue.get_queue_size(),
-        'worker_running': research_queue._worker_running,
-    }
-    
-    # Wait a moment and check again
-    time.sleep(2)
-    
-    test_results['after_2_seconds'] = {
-        'size': research_queue.get_queue_size(),
-        'worker_running': research_queue._worker_running,
-    }
-    
-    return jsonify(test_results)
 
 
 
@@ -1758,14 +1664,17 @@ def remove_song_from_repertoire(repertoire_id, song_id):
         return jsonify({'error': 'Failed to remove song from repertoire', 'detail': str(e)}), 500
 
 if __name__ == '__main__':
-    # Don't initialize pool at startup - let it initialize on first request
-    # This prevents deployment failures if DB is temporarily unavailable
-    logger.info("Starting Flask application...")
+    # Running directly with 'python app.py' (not gunicorn)
+    logger.info("Starting Flask application directly (not gunicorn)...")
     logger.info("Database connection pool will initialize on first request")
-    logger.info("Research worker thread initialized at module level")
     
     # Start keepalive thread
     db_tools.start_keepalive_thread()
+    
+    # Start research worker thread (only when running directly)
+    if not research_queue._worker_running:
+        research_queue.start_worker(song_research.research_song)
+        logger.info("Research worker thread initialized")
         
     try:
         app.run(debug=True, host='0.0.0.0', port=5001)
