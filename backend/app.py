@@ -1687,3 +1687,14 @@ if __name__ == '__main__':
         db_tools.stop_keepalive_thread()
         db_tools.close_connection_pool()
         logger.info("Shutdown complete")
+        
+        # In app.py, add this at the bottom:
+import atexit
+
+def cleanup_connections():
+    """Close the connection pool on shutdown"""
+    logger.info("Shutting down connection pool...")
+    db_tools.close_connection_pool()
+    logger.info("Connection pool closed")
+
+atexit.register(cleanup_connections)
