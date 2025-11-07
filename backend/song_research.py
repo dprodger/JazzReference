@@ -13,8 +13,77 @@ from typing import Dict, Any
 
 from mb_release_importer import MBReleaseImporter
 from spotify_utils import SpotifyMatcher
+from db_utils import get_db_connection
+from mb_utils import MusicBrainzSearcher
 
 logger = logging.getLogger(__name__)
+
+
+def update_song_composer(song_id: str) -> bool:
+    """
+    Update song composer from MusicBrainz if not already set
+    
+    Args:
+        song_id: UUID of the song
+        
+    Returns:
+        bool: True if composer was updated, False otherwise
+    """
+    try:
+        # Check if song has musicbrainz_id and no composer
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT musicbrainz_id, composer FROM songs WHERE id = %s",
+                    (song_id,)
+                )
+                row = cur.fetchone()
+                
+                if not row:
+                    return False
+                
+                mb_id = row[0]
+                composer = row[1]
+                
+                # Skip if no MusicBrainz ID or already has composer
+                if not mb_id or composer:
+                    return False
+        
+        # Fetch work details from MusicBrainz
+        mb = MusicBrainzSearcher()
+        work_data = mb.get_work_recordings(mb_id)
+        
+        if not work_data:
+            logger.debug("No MusicBrainz work data found")
+            return False
+        
+        # Extract composer from artist relationships
+        composer_name = None
+        for relation in work_data.get('relations', []):
+            if relation.get('type') == 'composer':
+                artist = relation.get('artist', {})
+                composer_name = artist.get('name')
+                break
+        
+        if not composer_name:
+            logger.debug("No composer found in MusicBrainz work data")
+            return False
+        
+        # Update song with composer
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE songs SET composer = %s, updated_at = CURRENT_TIMESTAMP WHERE id = %s",
+                    (composer_name, song_id)
+                )
+                conn.commit()
+        
+        logger.info(f"✓ Updated composer to '{composer_name}'")
+        return True
+        
+    except Exception as e:
+        logger.error(f"Error updating composer: {e}")
+        return False
 
 
 def research_song(song_id: str, song_name: str) -> Dict[str, Any]:
@@ -67,6 +136,12 @@ def research_song(song_id: str, song_name: str) -> Dict[str, Any]:
         logger.info(f"  Credits added: {mb_stats['credits_added']} (to existing recordings)")
         if mb_stats['errors'] > 0:
             logger.info(f"  Errors: {mb_stats['errors']}")
+        
+        # Step 1.5: Update composer from MusicBrainz if needed
+        logger.info("Checking for composer update...")
+        composer_updated = update_song_composer(str(song_id))
+        if not composer_updated:
+            logger.debug("Composer not updated (already set or not found)")
         
         # Step 2: Match Spotify tracks
         matcher = SpotifyMatcher(dry_run=False, strict_mode=True, logger=logger)
