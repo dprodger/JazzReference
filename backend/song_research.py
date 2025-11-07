@@ -48,7 +48,7 @@ def research_song(song_id: str, song_name: str) -> Dict[str, Any]:
         
         logger.info("received the mbreleaseimporter")
         # Import releases for this song (using song_id for exact match)
-        result = importer.import_releases(song_id)
+        result = importer.import_releases(str(song_id))
         
         if result['success']:
             stats = result['stats']

@@ -59,6 +59,8 @@ class MBReleaseImporter:
             Song dict with keys: id, title, composer, musicbrainz_id
             Returns None if song not found
         """
+        song_identifier = str(song_identifier)
+        
         # Check if it looks like a UUID
         if song_identifier.startswith('song-') or len(song_identifier) == 36:
             return self._find_song_by_id(song_identifier)
