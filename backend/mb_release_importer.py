@@ -132,15 +132,39 @@ class MBReleaseImporter:
         
         self.logger.info(f"Processing {len(recordings)} recordings...")
         
+        # OPTIMIZATION: Batch-check which recordings already exist
+        # This replaces 200+ individual queries with a single query
+        self.logger.info("Checking database for existing recordings...")
+        existing_map = self._batch_check_existing_recordings(song['id'], recordings)
+        
+        existing_count = sum(1 for info in existing_map.values() if info['exists'])
+        existing_with_credits = sum(1 for info in existing_map.values() 
+                                   if info['exists'] and info['has_credits'])
+        
+        self.logger.info(f"Found {existing_count} recordings in database")
+        self.logger.info(f"  - {existing_with_credits} have performer credits (will skip)")
+        self.logger.info(f"  - {existing_count - existing_with_credits} need credits added")
+        self.logger.info("")
+        
         # STEP 3: Process each recording with its own short transaction
         # CRITICAL FIX: Each recording gets its own connection that is quickly released
         errors = []
         for i, recording in enumerate(recordings, 1):
-            self.logger.info(f"[{i}/{len(recordings)}] Processing: {recording.get('title', 'Unknown')}")
+            releases = recording.get('releases', [])
+            if not releases:
+                self.logger.debug(f"[{i}/{len(recordings)}] Skipping - no releases")
+                continue
+            
+            album_title = releases[0].get('title', 'Unknown Album')
+            self.logger.info(f"[{i}/{len(recordings)}] {album_title[:60]}")
+            
+            # Use pre-checked existence info from batch query
+            existing_info = existing_map.get(album_title)
+            
             try:
                 # Open connection ONLY for this one recording
                 with get_db_connection() as conn:
-                    self._import_recording(conn, song['id'], recording)
+                    self._import_recording(conn, song['id'], recording, existing_info)
                     # Connection is automatically committed and closed here
                     
             except Exception as e:
@@ -271,7 +295,8 @@ class MBReleaseImporter:
             self.stats['errors'] += 1
             return []
     
-    def _import_recording(self, conn, song_id: str, recording_data: Dict[str, Any]) -> bool:
+    def _import_recording(self, conn, song_id: str, recording_data: Dict[str, Any],
+                         existing_info: Optional[Dict[str, Any]] = None) -> bool:
         """
         Import a single recording
         
@@ -282,6 +307,8 @@ class MBReleaseImporter:
             conn: Database connection (must be managed by caller)
             song_id: ID of the song this recording belongs to
             recording_data: MusicBrainz recording data dict
+            existing_info: Optional pre-checked existence info from batch query
+                          Format: {'exists': bool, 'id': str, 'has_credits': bool}
             
         Returns:
             True if imported, False if skipped
@@ -327,20 +354,31 @@ class MBReleaseImporter:
             return True
         
         # Check if recording already exists
-        existing_recording = self._find_existing_recording(conn, song_id, mb_recording_id, album_title)
+        # Use pre-checked info from batch query if available, otherwise do individual query
+        if existing_info:
+            # Use batch-checked existence info (FAST)
+            recording_exists = existing_info['exists']
+            recording_id = existing_info['id']
+            has_credits = existing_info['has_credits']
+        else:
+            # Fall back to individual queries (SLOW - only happens if batch check wasn't done)
+            existing_recording = self._find_existing_recording(conn, song_id, mb_recording_id, album_title)
+            if existing_recording:
+                recording_exists = True
+                recording_id = existing_recording['id']
+                has_credits = self._recording_has_credits(conn, recording_id)
+            else:
+                recording_exists = False
+                recording_id = None
+                has_credits = False
         
-        if existing_recording:
-            recording_id = existing_recording['id']
-            
-            # Check if it already has performer credits
-            has_credits = self._recording_has_credits(conn, recording_id)
-            
+        if recording_exists:
             if has_credits:
-                self.logger.info(f"⊘ Skipped: {album_title} (already exists with credits)")
+                self.logger.info(f"⊘ Skipped: already exists with credits")
                 self.stats['releases_skipped'] += 1
                 return False
             else:
-                self.logger.info(f"+ Adding credits to existing: {album_title}")
+                self.logger.info(f"+ Adding credits to existing recording")
                 # Add performer credits to existing recording
                 self.performer_importer.link_performers_to_recording(conn, recording_id, recording_data)
                 # Caller will commit
@@ -366,7 +404,7 @@ class MBReleaseImporter:
             ))
             
             recording_id = cur.fetchone()['id']
-            self.logger.info(f"✓ Imported recording: {album_title} (ID: {recording_id})")
+            self.logger.info(f"✓ Imported new recording (ID: {recording_id})")
             
             # Link performers using shared importer
             self.performer_importer.link_performers_to_recording(conn, recording_id, recording_data)
@@ -432,3 +470,76 @@ class MBReleaseImporter:
             """, (recording_id,))
             
             return cur.fetchone()['exists']
+    
+    def _batch_check_existing_recordings(self, song_id: str, 
+                                         recording_data_list: List[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
+        """
+        Batch check which recordings already exist in database
+        
+        This replaces 200+ individual queries with a single batch query,
+        significantly improving performance on repeat runs.
+        
+        Args:
+            song_id: Song ID to check recordings for
+            recording_data_list: List of MusicBrainz recording data dicts
+            
+        Returns:
+            Dict mapping album_title -> {
+                'exists': bool,
+                'id': str (UUID),
+                'has_credits': bool,
+                'mb_id': str (MusicBrainz ID)
+            }
+        """
+        # Extract album titles and MusicBrainz IDs
+        album_data = {}
+        for rec_data in recording_data_list:
+            releases = rec_data.get('releases', [])
+            if releases:
+                album_title = releases[0].get('title', 'Unknown Album')
+                mb_recording_id = rec_data.get('id')
+                album_data[album_title] = mb_recording_id
+        
+        if not album_data:
+            return {}
+        
+        album_titles = list(album_data.keys())
+        
+        # Single batch query to check all recordings at once
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT 
+                        r.album_title,
+                        r.id,
+                        r.musicbrainz_id,
+                        (
+                            SELECT COUNT(*) 
+                            FROM recording_performers rp 
+                            WHERE rp.recording_id = r.id
+                        ) as credit_count
+                    FROM recordings r
+                    WHERE r.song_id = %s
+                    AND r.album_title = ANY(%s)
+                """, (song_id, album_titles))
+                
+                results = {}
+                for row in cur.fetchall():
+                    results[row['album_title']] = {
+                        'exists': True,
+                        'id': row['id'],
+                        'has_credits': row['credit_count'] > 0,
+                        'mb_id': row['musicbrainz_id']
+                    }
+                
+                # Add entries for albums that don't exist
+                for title, mb_id in album_data.items():
+                    if title not in results:
+                        results[title] = {
+                            'exists': False,
+                            'id': None,
+                            'has_credits': False,
+                            'mb_id': mb_id
+                        }
+                
+                return results
