@@ -424,7 +424,7 @@ class MBReleaseImporter:
             cur.execute("""
                 SELECT EXISTS(
                     SELECT 1 
-                    FROM performer_credits 
+                    FROM recording_performers
                     WHERE recording_id = %s
                 )
             """, (recording_id,))
