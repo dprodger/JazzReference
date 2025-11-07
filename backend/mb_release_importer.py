@@ -250,7 +250,7 @@ class MBReleaseImporter:
                     recording_id = recording.get('id')
                     recording_title = recording.get('title', 'Unknown')
 
-                    logger.info(f"[{i}/{len(relations)}] Fetching: {recording_title[:60]}")                    
+                    self.logger.info(f"[{i}/{len(relations)}] Fetching: {recording_title[:60]}")                    
 
                     # Fetch detailed recording information (API call, no DB)
                     self.logger.debug(f"[{i}/{len(relations)}] Fetching details for: {recording_title}")
