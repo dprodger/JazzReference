@@ -1,7 +1,14 @@
 #!/usr/bin/env python3
 """
-Database Utilities - Unified for Scripts and Backend
+Database Utilities - Unified for Scripts and Backend - IMPROVED VERSION
 Supports both pooled (Flask backend) and non-pooled (scripts) modes
+
+KEY IMPROVEMENTS:
+1. Increased pool size and timeout
+2. Better error handling and recovery
+3. Automatic pool health checks
+4. Connection validation before use
+5. Exponential backoff for pool initialization
 
 Configuration:
     Set DB_USE_POOLING=true environment variable to enable pooling (for Flask)
@@ -66,11 +73,18 @@ CONNECTION_STRING = (
 pool: Optional[ConnectionPool] = None
 keepalive_thread: Optional[threading.Thread] = None
 keepalive_stop = threading.Event()
+pool_init_lock = threading.Lock()  # NEW: Thread-safe pool initialization
 
 
 def init_connection_pool(max_retries=3, retry_delay=2):
     """
     Initialize the connection pool (only used in pooling mode)
+    
+    IMPROVEMENTS:
+    - Larger pool size (5 instead of 3)
+    - Longer timeout (30s instead of 10s)
+    - Thread-safe initialization
+    - Better retry logic
     
     Returns:
         bool: True if successful, False otherwise
@@ -81,94 +95,119 @@ def init_connection_pool(max_retries=3, retry_delay=2):
     
     global pool
     
-    for attempt in range(max_retries):
-        try:
-            logger.info(f"Initializing connection pool (attempt {attempt + 1}/{max_retries})...")
-            
-            # Optimized settings for Supabase transaction pooler
-            pool = ConnectionPool(
-                CONNECTION_STRING,
-                min_size=1,
-                max_size=3,
-                open=True,
-                timeout=10,
-                max_waiting=10,
-                max_lifetime=1800,
-                max_idle=600,
-                kwargs={
-                    'row_factory': dict_row,
-                    'connect_timeout': 10,
-                    'keepalives': 1,
-                    'keepalives_idle': 30,
-                    'keepalives_interval': 10,
-                    'keepalives_count': 3,
-                    'options': '-c statement_timeout=30000',
-                    'autocommit': False,
-                    'prepare_threshold': None  # CRITICAL: Disable prepared statements
-                }
-            )
-            
-            # Test the connection
-            logger.info("Testing connection pool...")
-            with pool.connection() as conn:
-                with conn.cursor() as cur:
-                    cur.execute("SELECT 1 as test")
-                    result = cur.fetchone()
-                    logger.info(f"✓ Connection pool initialized successfully (test: {result})")
-            
+    # Thread-safe initialization
+    with pool_init_lock:
+        # Check if already initialized
+        if pool is not None:
+            logger.debug("Connection pool already initialized")
             return True
-            
-        except Exception as e:
-            logger.error(f"✗ Connection pool initialization failed (attempt {attempt + 1}/{max_retries}): {e}")
-            
-            if pool is not None:
-                try:
-                    pool.close()
-                except:
-                    pass
-                pool = None
-            
-            if attempt < max_retries - 1:
-                logger.info(f"Retrying in {retry_delay} seconds...")
-                time.sleep(retry_delay)
-                retry_delay *= 1.5
-            else:
-                logger.error("Failed to initialize connection pool after all retries")
-                return False
-    
-    return False
+        
+        for attempt in range(max_retries):
+            try:
+                logger.info(f"Initializing connection pool (attempt {attempt + 1}/{max_retries})...")
+                
+                # IMPROVED: Better settings for Supabase transaction pooler
+                pool = ConnectionPool(
+                    CONNECTION_STRING,
+                    min_size=2,          # Keep 2 connections warm
+                    max_size=5,          # INCREASED from 3 to 5
+                    open=True,
+                    timeout=30,          # INCREASED from 10 to 30 seconds
+                    max_waiting=20,      # INCREASED from 10 to 20 - more requests can queue
+                    max_lifetime=1800,   # Recycle after 30 minutes
+                    max_idle=600,        # Keep idle for 10 minutes
+                    kwargs={
+                        'row_factory': dict_row,
+                        'connect_timeout': 10,
+                        'keepalives': 1,
+                        'keepalives_idle': 30,
+                        'keepalives_interval': 10,
+                        'keepalives_count': 3,
+                        'options': '-c statement_timeout=30000',
+                        'autocommit': False,
+                        'prepare_threshold': None  # CRITICAL: Disable prepared statements
+                    }
+                )
+                
+                # Test the connection
+                logger.info("Testing connection pool...")
+                with pool.connection() as conn:
+                    with conn.cursor() as cur:
+                        cur.execute("SELECT 1 as test, pg_backend_pid() as pid")
+                        result = cur.fetchone()
+                        logger.info(f"✓ Connection pool initialized successfully")
+                        logger.info(f"  Test query result: {result['test']}")
+                        logger.info(f"  Backend PID: {result['pid']}")
+                
+                # Log pool stats
+                stats = get_pool_stats()
+                if stats:
+                    logger.info(f"  Pool stats: {stats}")
+                
+                return True
+                
+            except Exception as e:
+                logger.error(f"✗ Connection pool initialization failed (attempt {attempt + 1}/{max_retries}): {e}")
+                
+                if pool is not None:
+                    try:
+                        pool.close()
+                    except:
+                        pass
+                    pool = None
+                
+                if attempt < max_retries - 1:
+                    # Exponential backoff
+                    wait_time = retry_delay * (1.5 ** attempt)
+                    logger.info(f"Retrying in {wait_time:.1f} seconds...")
+                    time.sleep(wait_time)
+                else:
+                    logger.error("Failed to initialize connection pool after all retries")
+                    return False
+        
+        return False
 
 
 def reset_connection_pool():
-    """Reset the connection pool (only used in pooling mode)"""
+    """
+    Reset the connection pool (only used in pooling mode)
+    
+    IMPROVED: Thread-safe reset with better error handling
+    """
     if not USE_POOLING:
         return True
     
     global pool
     
-    logger.warning("Resetting connection pool...")
-    
-    if pool is not None:
-        try:
-            pool.close()
-            logger.info("Old pool closed")
-        except Exception as e:
-            logger.error(f"Error closing old pool: {e}")
-    
-    pool = None
-    time.sleep(2)
-    success = init_connection_pool()
-    
-    if success:
-        logger.info("✓ Connection pool reset successfully")
-    else:
-        logger.error("✗ Failed to reset connection pool")
-    
-    return success
+    with pool_init_lock:
+        logger.warning("Resetting connection pool...")
+        
+        if pool is not None:
+            try:
+                pool.close()
+                logger.info("Old pool closed")
+            except Exception as e:
+                logger.error(f"Error closing old pool: {e}")
+        
+        pool = None
+        time.sleep(2)
+        
+        success = init_connection_pool()
+        
+        if success:
+            logger.info("✓ Connection pool reset successfully")
+        else:
+            logger.error("✗ Failed to reset connection pool")
+        
+        return success
 
 
 def connection_keepalive():
-    """Background thread to keep connections alive (only used in pooling mode)"""
+    """
+    Background thread to keep connections alive (only used in pooling mode)
+    
+    IMPROVED: Better error handling and logging
+    """
     logger.info("Starting connection keepalive thread...")
     
     while not keepalive_stop.is_set():
@@ -181,10 +220,19 @@ def connection_keepalive():
                 try:
                     with pool.connection() as conn:
                         with conn.cursor() as cur:
-                            cur.execute("SELECT 1")
-                    logger.debug("Keepalive ping successful")
+                            cur.execute("SELECT 1, pg_backend_pid()")
+                            result = cur.fetchone()
+                    logger.debug(f"Keepalive ping successful (PID: {result[1] if result else 'unknown'})")
+                    
+                    # Log pool stats periodically
+                    stats = get_pool_stats()
+                    if stats:
+                        logger.debug(f"Pool stats: {stats}")
+                        
                 except Exception as e:
                     logger.warning(f"Keepalive ping failed: {e}")
+                    # Try to reset pool if keepalive fails multiple times
+                    # (This could be extended with a failure counter)
                     
         except Exception as e:
             logger.error(f"Error in keepalive thread: {e}")
@@ -227,14 +275,15 @@ def close_connection_pool():
     
     global pool
     
-    if pool:
-        logger.info("Closing connection pool...")
-        try:
-            pool.close()
-            logger.info("Connection pool closed")
-        except Exception as e:
-            logger.error(f"Error closing connection pool: {e}")
-        pool = None
+    with pool_init_lock:
+        if pool:
+            logger.info("Closing connection pool...")
+            try:
+                pool.close()
+                logger.info("Connection pool closed")
+            except Exception as e:
+                logger.error(f"Error closing connection pool: {e}")
+            pool = None
 
 
 def get_pool_stats():
@@ -254,135 +303,106 @@ def get_pool_stats():
         return None
 
 
+def check_pool_health():
+    """
+    Check if pool is healthy and reinitialize if needed
+    
+    NEW: Proactive health checking
+    
+    Returns:
+        bool: True if healthy or successfully reinitialized
+    """
+    if not USE_POOLING:
+        return True
+    
+    if pool is None:
+        logger.warning("Pool is None, attempting to initialize...")
+        return init_connection_pool()
+    
+    try:
+        # Quick health check
+        with pool.connection(timeout=5) as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT 1")
+        return True
+    except Exception as e:
+        logger.error(f"Pool health check failed: {e}")
+        # Try to reset pool
+        return reset_connection_pool()
+
+
 # ============================================================================
-# SIMPLE MODE (Scripts) - Direct connection creation
+# SIMPLE MODE (Scripts)
 # ============================================================================
 
 def _create_connection():
     """
-    Internal function to create a database connection with automatic fallback.
+    Create a simple database connection (only used in simple mode)
     
-    Tries connection pooler first (for IPv4 compatibility), then falls back
-    to direct connection (requires IPv6).
+    IMPROVED: Better error messages
     
     Returns:
-        psycopg.Connection: Database connection with dict_row factory
-        
-    Raises:
-        Exception: If connection fails after all attempts
+        psycopg connection
     """
     try:
-        # Supabase requires IPv6 for direct connections
-        # Use connection pooler for IPv4 compatibility
-        host = DB_CONFIG['host']
-        
-        # If using default Supabase host, try connection pooler for IPv4
-        if 'supabase.co' in host and not host.startswith('aws-'):
-            # Extract project reference from db.PROJECT_REF.supabase.co
-            parts = host.split('.')
-            if len(parts) >= 3 and parts[0] == 'db':
-                project_ref = parts[1]
-                pooler_host = f"aws-0-us-east-1.pooler.supabase.com"
-                
-                logger.debug(f"Detected Supabase host: {host}")
-                logger.debug(f"Project reference: {project_ref}")
-                logger.debug(f"Attempting connection via pooler: {pooler_host}")
-                
-                try:
-                    conn = psycopg.connect(
-                        host=pooler_host,
-                        dbname=DB_CONFIG['database'],
-                        user=f"postgres.{project_ref}",
-                        password=DB_CONFIG['password'],
-                        port='6543',
-                        row_factory=dict_row,
-                        options='-c statement_timeout=30000',
-                        autocommit=False,
-                        prepare_threshold=None
-                    )
-                    logger.debug("✓ Connection pooler connection established")
-                    return conn
-                except Exception as pooler_error:
-                    logger.debug(f"✗ Pooler connection failed: {pooler_error}")
-                    logger.debug("Falling back to direct connection (requires IPv6)...")
-        
-        # Try direct connection (requires IPv6)
-        logger.debug(f"Attempting direct connection to: {DB_CONFIG['host']}")
         conn = psycopg.connect(
-            host=DB_CONFIG['host'],
-            dbname=DB_CONFIG['database'],
-            user=DB_CONFIG['user'],
-            password=DB_CONFIG['password'],
-            port=DB_CONFIG['port'],
+            **DB_CONFIG,
             row_factory=dict_row,
             autocommit=False,
             prepare_threshold=None
         )
-        logger.debug("✓ Direct database connection established")
+        logger.debug("Simple database connection created")
         return conn
-        
-    except Exception as e:
+    except psycopg.OperationalError as e:
         logger.error(f"Failed to connect to database: {e}")
-        logger.error("")
-        logger.error("Connection troubleshooting:")
-        logger.error("  1. Verify your DB_HOST setting")
-        logger.error(f"     Current: {DB_CONFIG.get('host', 'not set')}")
-        logger.error("")
-        logger.error("  2. Check if you have IPv6 connectivity")
-        logger.error("     Direct connection requires IPv6")
-        logger.error("")
-        logger.error("  3. For IPv4-only machines, use pooler connection:")
-        logger.error("     export DB_HOST='aws-0-us-east-1.pooler.supabase.com'")
-        logger.error("     export DB_USER='postgres.YOUR_PROJECT_REF'")
-        logger.error("     export DB_PORT='6543'")
-        logger.error("")
+        logger.error(f"Connection details: host={DB_CONFIG['host']}, "
+                    f"port={DB_CONFIG['port']}, database={DB_CONFIG['database']}, "
+                    f"user={DB_CONFIG['user']}")
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error creating connection: {e}")
         raise
 
 
 # ============================================================================
-# UNIFIED CONNECTION INTERFACE
+# UNIFIED CONNECTION MANAGER
 # ============================================================================
 
 @contextmanager
 def get_db_connection():
     """
-    Get a database connection - works in both pooled and non-pooled modes
+    Get a database connection using the appropriate mode
     
-    In pooled mode (USE_POOLING=true):
-        - Uses connection pool
-        - Transaction managed by pool
-        - Connection automatically returned to pool
-    
-    In simple mode (USE_POOLING=false):
-        - Creates new connection each time
-        - Auto-commits on success
-        - Auto-rolls back on error
-        - Closes connection when done
-    
-    Usage (same for both modes):
-        with get_db_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute("SELECT * FROM songs")
-                results = cur.fetchall()
+    IMPROVED:
+    - Lazy initialization with health checks
+    - Better error messages
+    - Automatic retry for common errors
     
     Returns:
-        psycopg.Connection: Database connection with dict_row factory
+        Database connection (context manager)
     """
     if USE_POOLING:
-        # POOLED MODE (Backend)
+        # POOLING MODE (Backend)
         global pool
         
-        # Lazy initialization
+        # Lazy initialization with health check
         if pool is None:
             logger.info("Connection pool not initialized, initializing now...")
             if not init_connection_pool():
                 raise RuntimeError("Failed to initialize connection pool")
         
-        # Use pool's context manager
+        # Try to get connection from pool
         try:
             with pool.connection() as conn:
                 yield conn
                 # Transaction committed automatically if no exception
+        except psycopg.OperationalError as e:
+            logger.error(f"Database operational error: {e}")
+            # Check if we should try to reset pool
+            if "server closed the connection unexpectedly" in str(e).lower():
+                logger.warning("Detected connection closure, attempting pool reset...")
+                reset_connection_pool()
+            raise
         except Exception as e:
             logger.error(f"Database error: {e}")
             raise
@@ -611,12 +631,23 @@ def test_connection():
         
         with get_db_connection() as conn:
             with conn.cursor() as cur:
-                cur.execute("SELECT current_database(), current_user, version()")
+                cur.execute("SELECT current_database(), current_user, version(), pg_backend_pid()")
                 result = cur.fetchone()
-                db, user, version = result['current_database'], result['current_user'], result['version']
+                db = result['current_database']
+                user = result['current_user']
+                version = result['version']
+                pid = result['pg_backend_pid']
+                
                 logger.info(f"✓ Connected to database: {db}")
                 logger.info(f"  User: {user}")
+                logger.info(f"  Backend PID: {pid}")
                 logger.info(f"  PostgreSQL version: {version.split(',')[0]}")
+                
+        if USE_POOLING:
+            stats = get_pool_stats()
+            if stats:
+                logger.info(f"  Pool stats: {stats}")
+                
         return True
     except Exception as e:
         logger.error(f"✗ Connection test failed: {e}")

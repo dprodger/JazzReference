@@ -1,14 +1,12 @@
 """
-MusicBrainz Release Import Module
-Core business logic for importing releases - can be used by CLI or background tasks
+MusicBrainz Release Import Module - FIXED VERSION
+Core business logic for importing releases - optimized for connection pooling
 
-This module provides the MBReleaseImporter class which handles all the business logic
-for importing MusicBrainz releases. It's designed to be reusable by both:
-- Command-line scripts (import_mb_releases.py)
-- Background workers (song_research.py via Flask app)
-
-The module is decoupled from logging configuration and exit handling, allowing
-callers to control these aspects.
+KEY FIXES:
+1. Don't hold connections during MusicBrainz API calls
+2. Use shorter transactions - one per recording
+3. Minimize connection hold time
+4. Properly release connections between operations
 """
 
 import logging
@@ -24,9 +22,10 @@ class MBReleaseImporter:
     """
     Handles MusicBrainz release import operations
     
-    This class encapsulates all the business logic for importing releases from
-    MusicBrainz, including finding songs, fetching recordings, and importing
-    them with performer credits.
+    OPTIMIZED FOR CONNECTION POOLING:
+    - Opens connections only when needed
+    - Closes connections quickly
+    - No connections held during API calls
     """
     
     def __init__(self, dry_run: bool = False, logger: Optional[logging.Logger] = None):
@@ -48,7 +47,7 @@ class MBReleaseImporter:
             'credits_added': 0,
             'errors': 0
         }
-        logger.info("MBReleaseImport::init completed")
+        self.logger.info("MBReleaseImport::init completed")
     
     def find_song(self, song_identifier: str) -> Optional[Dict[str, Any]]:
         """
@@ -73,11 +72,8 @@ class MBReleaseImporter:
         """
         Main method to import releases for a song
         
-        This is the primary entry point for importing releases. It handles:
-        1. Finding the song in the database
-        2. Verifying it has a MusicBrainz ID
-        3. Fetching recordings from MusicBrainz
-        4. Importing each recording with performer credits
+        CRITICAL FIX: No longer holds a connection open for the entire operation.
+        Instead, uses short-lived connections for each step.
         
         Args:
             song_identifier: Song name or database ID
@@ -94,7 +90,7 @@ class MBReleaseImporter:
         """
         self.logger.info(f"Starting release import for: {song_identifier}")
         
-        # Find the song
+        # STEP 1: Find the song (opens and closes connection)
         song = self.find_song(song_identifier)
         if not song:
             self.logger.error("Song not found")
@@ -118,7 +114,8 @@ class MBReleaseImporter:
                 'stats': self.stats
             }
         
-        # Fetch recordings from MusicBrainz
+        # STEP 2: Fetch recordings from MusicBrainz (NO DATABASE CONNECTION)
+        # This is a potentially slow operation, so we don't hold any DB connections
         recordings = self._fetch_musicbrainz_recordings(
             song['musicbrainz_id'], 
             limit
@@ -135,20 +132,23 @@ class MBReleaseImporter:
         
         self.logger.info(f"Processing {len(recordings)} recordings...")
         
-        # Process recordings
+        # STEP 3: Process each recording with its own short transaction
+        # CRITICAL FIX: Each recording gets its own connection that is quickly released
         errors = []
-        with get_db_connection() as conn:
-            for i, recording in enumerate(recordings, 1):
-                self.logger.info(f"[{i}/{len(recordings)}] Processing: {recording.get('title', 'Unknown')}")
-                try:
+        for i, recording in enumerate(recordings, 1):
+            self.logger.info(f"[{i}/{len(recordings)}] Processing: {recording.get('title', 'Unknown')}")
+            try:
+                # Open connection ONLY for this one recording
+                with get_db_connection() as conn:
                     self._import_recording(conn, song['id'], recording)
-                except Exception as e:
-                    error_msg = f"Error importing recording: {e}"
-                    self.logger.error(error_msg)
-                    self.stats['errors'] += 1
-                    errors.append(error_msg)
-                    if not self.dry_run:
-                        conn.rollback()
+                    # Connection is automatically committed and closed here
+                    
+            except Exception as e:
+                error_msg = f"Error importing recording: {e}"
+                self.logger.error(error_msg)
+                self.stats['errors'] += 1
+                errors.append(error_msg)
+                # Connection was already rolled back automatically
         
         return {
             'success': True,
@@ -165,6 +165,7 @@ class MBReleaseImporter:
         """Find a song in the database by name"""
         self.logger.info(f"Searching for song: {song_name}")
         
+        # Open connection only for this query
         with get_db_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute("""
@@ -202,6 +203,7 @@ class MBReleaseImporter:
         """Find a song in the database by ID"""
         self.logger.info(f"Looking up song ID: {song_id}")
         
+        # Open connection only for this query
         with get_db_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute("""
@@ -219,7 +221,12 @@ class MBReleaseImporter:
                 return result
     
     def _fetch_musicbrainz_recordings(self, work_id: str, limit: int = 100) -> List[Dict[str, Any]]:
-        """Fetch recordings for a MusicBrainz work ID"""
+        """
+        Fetch recordings for a MusicBrainz work ID
+        
+        IMPORTANT: This method does NOT use any database connections.
+        It only makes API calls to MusicBrainz.
+        """
         self.logger.info(f"Fetching recordings for MusicBrainz work: {work_id}")
         
         try:
@@ -243,7 +250,7 @@ class MBReleaseImporter:
                     recording_id = recording.get('id')
                     recording_title = recording.get('title', 'Unknown')
                     
-                    # Fetch detailed recording information
+                    # Fetch detailed recording information (API call, no DB)
                     self.logger.debug(f"[{i}/{len(relations)}] Fetching details for: {recording_title}")
                     recording_details = self.mb_searcher.get_recording_details(recording_id)
                     
@@ -265,6 +272,9 @@ class MBReleaseImporter:
     def _import_recording(self, conn, song_id: str, recording_data: Dict[str, Any]) -> bool:
         """
         Import a single recording
+        
+        IMPORTANT: This method expects an active connection to be passed in.
+        The connection is managed by the caller and should be committed by the caller.
         
         Args:
             conn: Database connection (must be managed by caller)
@@ -331,7 +341,7 @@ class MBReleaseImporter:
                 self.logger.info(f"+ Adding credits to existing: {album_title}")
                 # Add performer credits to existing recording
                 self.performer_importer.link_performers_to_recording(conn, recording_id, recording_data)
-                conn.commit()
+                # Caller will commit
                 self.stats['credits_added'] += 1
                 return True
         
@@ -359,7 +369,7 @@ class MBReleaseImporter:
             # Link performers using shared importer
             self.performer_importer.link_performers_to_recording(conn, recording_id, recording_data)
             
-            conn.commit()
+            # Caller will commit
             self.stats['releases_imported'] += 1
             return True
     
