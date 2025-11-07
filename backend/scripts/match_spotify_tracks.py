@@ -16,6 +16,10 @@ from datetime import datetime
 import requests
 from rapidfuzz import fuzz
 
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
 # Import shared database utilities
 from db_utils import get_db_connection
 from db_utils import normalize_apostrophes

@@ -12,6 +12,10 @@ import argparse
 import logging
 from pathlib import Path
 
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
 # Import the core business logic
 from mb_release_importer import MBReleaseImporter
 from db_utils import normalize_apostrophes
