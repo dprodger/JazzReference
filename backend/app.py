@@ -45,6 +45,8 @@ CORS(app)
 app.json = CustomJSONProvider(app)
 app.register_blueprint(api_docs)
 
+logger.info(f"Spotify credentials present: {bool(os.environ.get('SPOTIFY_CLIENT_ID'))}")
+
 # Worker thread initialization:
 # - When running under gunicorn: Initialized via post_worker_init hook in gunicorn.conf.py
 # - When running directly (python app.py): Initialized in __main__ block at bottom
