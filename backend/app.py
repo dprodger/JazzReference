@@ -199,12 +199,16 @@ def get_queue_status():
 
 
 
+# Update your /api/research/diagnostics endpoint in app.py to include process ID:
+
 @app.route('/api/research/diagnostics', methods=['GET'])
 def get_research_diagnostics():
     """Get detailed diagnostic information about the research queue and worker"""
     import threading
+    import os
     
     diagnostics = {
+        'process_id': os.getpid(),  # ADD THIS LINE
         'queue_size': research_queue.get_queue_size(),
         'worker_active': research_queue._worker_running,
         'worker_thread': None,
@@ -230,8 +234,7 @@ def get_research_diagnostics():
         })
     
     return jsonify(diagnostics)
-
-
+    
 @app.route('/api/research/test', methods=['POST'])
 def test_research_queue():
     """Test endpoint to verify queue is working"""
