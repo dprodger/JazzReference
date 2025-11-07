@@ -44,6 +44,8 @@ class MBReleaseImporter:
         self.stats = {
             'releases_found': 0,
             'releases_imported': 0,
+            'releases_skipped': 0,
+            'credits_added': 0,
             'errors': 0
         }
         logger.info("MBReleaseImport::init completed")
@@ -312,7 +314,28 @@ class MBReleaseImporter:
             self.stats['releases_found'] += 1
             return True
         
-        # Insert recording
+        # Check if recording already exists
+        existing_recording = self._find_existing_recording(conn, song_id, mb_recording_id, album_title)
+        
+        if existing_recording:
+            recording_id = existing_recording['id']
+            
+            # Check if it already has performer credits
+            has_credits = self._recording_has_credits(conn, recording_id)
+            
+            if has_credits:
+                self.logger.info(f"⊘ Skipped: {album_title} (already exists with credits)")
+                self.stats['releases_skipped'] += 1
+                return False
+            else:
+                self.logger.info(f"+ Adding credits to existing: {album_title}")
+                # Add performer credits to existing recording
+                self.performer_importer.link_performers_to_recording(conn, recording_id, recording_data)
+                conn.commit()
+                self.stats['credits_added'] += 1
+                return True
+        
+        # Insert new recording
         with conn.cursor() as cur:
             cur.execute("""
                 INSERT INTO recordings (
@@ -339,3 +362,61 @@ class MBReleaseImporter:
             conn.commit()
             self.stats['releases_imported'] += 1
             return True
+    
+    def _find_existing_recording(self, conn, song_id: str, mb_recording_id: Optional[str], 
+                                 album_title: str) -> Optional[Dict[str, Any]]:
+        """
+        Check if a recording already exists
+        
+        Args:
+            conn: Database connection
+            song_id: Song ID to search within
+            mb_recording_id: MusicBrainz recording ID (preferred)
+            album_title: Album title (fallback)
+            
+        Returns:
+            Recording dict with 'id' key, or None if not found
+        """
+        with conn.cursor() as cur:
+            # First try to find by MusicBrainz ID (most reliable)
+            if mb_recording_id:
+                cur.execute("""
+                    SELECT id
+                    FROM recordings
+                    WHERE song_id = %s AND musicbrainz_id = %s
+                """, (song_id, mb_recording_id))
+                
+                result = cur.fetchone()
+                if result:
+                    return result
+            
+            # Fallback: find by song_id + album_title
+            cur.execute("""
+                SELECT id
+                FROM recordings
+                WHERE song_id = %s AND album_title = %s
+            """, (song_id, album_title))
+            
+            return cur.fetchone()
+    
+    def _recording_has_credits(self, conn, recording_id: str) -> bool:
+        """
+        Check if a recording has any performer credits
+        
+        Args:
+            conn: Database connection
+            recording_id: Recording ID to check
+            
+        Returns:
+            True if recording has performer credits, False otherwise
+        """
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT EXISTS(
+                    SELECT 1 
+                    FROM performer_credits 
+                    WHERE recording_id = %s
+                )
+            """, (recording_id,))
+            
+            return cur.fetchone()['exists']

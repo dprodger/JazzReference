@@ -54,6 +54,8 @@ def research_song(song_id: str, song_name: str) -> Dict[str, Any]:
             stats = result['stats']
             logger.info(f"✓ Successfully researched {song_name}")
             logger.info(f"  Imported: {stats['releases_imported']} releases")
+            logger.info(f"  Skipped: {stats['releases_skipped']} (already exist with credits)")
+            logger.info(f"  Credits added: {stats['credits_added']} (to existing recordings)")
             if stats['errors'] > 0:
                 logger.info(f"  Errors: {stats['errors']}")
             
