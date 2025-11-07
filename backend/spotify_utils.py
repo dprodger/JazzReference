@@ -584,50 +584,53 @@ class SpotifyMatcher:
             self.logger.info("")
             
             # Process each recording
-            with get_db_connection() as conn:
-                for i, recording in enumerate(recordings, 1):
-                    self.stats['recordings_processed'] += 1
-                    
-                    album = recording['album_title'] or 'Unknown Album'
-                    year = recording['recording_year']
-                    
-                    # Get primary artist
-                    performers = recording.get('performers', [])
-                    leaders = [p['name'] for p in performers if p['role'] == 'leader']
-                    artist_name = leaders[0] if leaders else (
-                        performers[0]['name'] if performers else None
-                    )
-                    
-                    self.logger.info(f"[{i}/{len(recordings)}] {album}")
-                    self.logger.info(f"    Artist: {artist_name or 'Unknown'}")
-                    self.logger.info(f"    Year: {year or 'Unknown'}")
-                    
-                    # Check if already has Spotify URL
-                    if recording['spotify_url']:
-                        self.logger.info(f"    ⊙ Already has Spotify URL, skipping")
-                        self.stats['recordings_skipped'] += 1
-                        continue
-                    
-                    # Search Spotify
-                    spotify_match = self.search_spotify_track(
-                        song['title'],
-                        album,
-                        artist_name,
-                        year
-                    )
-                    
-                    if spotify_match:
-                        self.stats['recordings_with_spotify'] += 1
+            # CRITICAL: Open connection for EACH recording to avoid holding connections during Spotify API calls
+            for i, recording in enumerate(recordings, 1):
+                self.stats['recordings_processed'] += 1
+                
+                album = recording['album_title'] or 'Unknown Album'
+                year = recording['recording_year']
+                
+                # Get primary artist
+                performers = recording.get('performers', [])
+                leaders = [p['name'] for p in performers if p['role'] == 'leader']
+                artist_name = leaders[0] if leaders else (
+                    performers[0]['name'] if performers else None
+                )
+                
+                self.logger.info(f"[{i}/{len(recordings)}] {album}")
+                self.logger.info(f"    Artist: {artist_name or 'Unknown'}")
+                self.logger.info(f"    Year: {year or 'Unknown'}")
+                
+                # Check if already has Spotify URL
+                if recording['spotify_url']:
+                    self.logger.info(f"    ⊙ Already has Spotify URL, skipping")
+                    self.stats['recordings_skipped'] += 1
+                    continue
+                
+                # Search Spotify WITHOUT holding a database connection
+                spotify_match = self.search_spotify_track(
+                    song['title'],
+                    album,
+                    artist_name,
+                    year
+                )
+                
+                if spotify_match:
+                    self.stats['recordings_with_spotify'] += 1
+                    # Open connection ONLY for this update, then close immediately
+                    with get_db_connection() as conn:
                         self.update_recording_spotify_url(
                             conn,
                             recording['id'],
                             spotify_match
                         )
-                    else:
-                        self.logger.info(f"    ✗ No valid Spotify match found")
-                        self.stats['recordings_no_match'] += 1
-                    
-                    self.logger.info("")
+                        # Connection automatically committed and closed here
+                else:
+                    self.logger.info(f"    ✗ No valid Spotify match found")
+                    self.stats['recordings_no_match'] += 1
+                
+                self.logger.info("")
             
             return {
                 'success': True,
