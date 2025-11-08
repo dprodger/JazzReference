@@ -5,3 +5,8 @@ scripts/*.log
 scripts/__pcache__
 log
 scripts/cache/*
+backend/scripts/log
+backend/scripts/cache
+backend/log
+backend/cache
+

@@ -44,11 +44,6 @@ struct SongsListView: View {
                 .toolbarBackground(JazzTheme.burgundy, for: .navigationBar)
                 .toolbarBackground(.visible, for: .navigationBar)
                 .toolbarColorScheme(.dark, for: .navigationBar)
-                .toolbar {
-                    ToolbarItem(placement: .navigationBarTrailing) {
-                        repertoireButton
-                    }
-                }
                 .searchable(text: $searchText, prompt: "Search songs")
                 .onChange(of: searchText) { oldValue, newValue in
                     searchTask?.cancel()
@@ -71,41 +66,8 @@ struct SongsListView: View {
                     // Then load songs for the selected repertoire
                     await loadSongs()
                 }
-                .sheet(isPresented: $showRepertoirePicker) {
-                    RepertoirePickerSheet(
-                        repertoireManager: repertoireManager,
-                        isPresented: $showRepertoirePicker
-                    )
-                }
         }
         .tint(JazzTheme.burgundy)
-    }
-    
-    // MARK: - Repertoire Button
-    
-    private var repertoireButton: some View {
-        Button(action: {
-            showRepertoirePicker = true
-        }) {
-            HStack(spacing: 4) {
-                Image(systemName: "music.note.list")
-                    .font(.system(size: 16))
-                if !repertoireManager.isShowingAllSongs {
-                    Text(repertoireManager.selectedRepertoire.name)
-                        .font(.system(size: 14, weight: .medium))
-                        .lineLimit(1)
-                }
-            }
-            .foregroundColor(.white)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 6)
-            .background(
-                Capsule()
-                    .fill(repertoireManager.isShowingAllSongs ?
-                          Color.white.opacity(0.2) :
-                          JazzTheme.amber)
-            )
-        }
     }
     
     // MARK: - Helper Methods
@@ -122,10 +84,8 @@ struct SongsListView: View {
     @ViewBuilder
     private var contentView: some View {
         VStack(spacing: 0) {
-            // Show current repertoire at top
-            if !repertoireManager.isShowingAllSongs {
-                currentRepertoireBanner
-            }
+            // Always show current repertoire header
+            currentRepertoireBanner
             
             if networkManager.isLoading {
                 loadingView
@@ -152,6 +112,13 @@ struct SongsListView: View {
                 Text("Change")
                     .font(.subheadline)
                     .foregroundColor(JazzTheme.burgundy)
+            }
+            .popover(isPresented: $showRepertoirePicker, arrowEdge: .top) {
+                RepertoirePickerSheet(
+                    repertoireManager: repertoireManager,
+                    isPresented: $showRepertoirePicker
+                )
+                .presentationCompactAdaptation(.popover)
             }
         }
         .padding(.horizontal)
@@ -256,8 +223,8 @@ struct RepertoirePickerSheet: View {
     @Binding var isPresented: Bool
     
     var body: some View {
-        NavigationStack {
-            List {
+        ScrollView {
+            VStack(spacing: 0) {
                 ForEach(repertoireManager.repertoires) { repertoire in
                     Button(action: {
                         repertoireManager.selectRepertoire(repertoire)
@@ -292,28 +259,27 @@ struct RepertoirePickerSheet: View {
                             }
                         }
                         .contentShape(Rectangle())
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
+                        .frame(maxWidth: .infinity)
+                        .background(
+                            repertoire.id == repertoireManager.selectedRepertoire.id ?
+                                JazzTheme.burgundy.opacity(0.1) :
+                                JazzTheme.cardBackground
+                        )
                     }
                     .buttonStyle(.plain)
-                    .listRowBackground(JazzTheme.cardBackground)
-                }
-            }
-            .listStyle(.plain)
-            .scrollContentBackground(.hidden)
-            .background(JazzTheme.backgroundLight)
-            .navigationTitle("Select Repertoire")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(JazzTheme.burgundy, for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
-            .toolbarColorScheme(.dark, for: .navigationBar)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
-                        isPresented = false
+                    
+                    if repertoire.id != repertoireManager.repertoires.last?.id {
+                        Divider()
+                            .background(JazzTheme.smokeGray.opacity(0.3))
                     }
-                    .foregroundColor(.white)
                 }
             }
         }
+        .background(JazzTheme.backgroundLight)
+        .frame(width: 320)
+        .frame(maxHeight: UIScreen.main.bounds.height * 0.5)
     }
 }
 
