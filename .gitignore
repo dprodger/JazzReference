@@ -1,5 +1,9 @@
+scripts/log
+scripts/cache
 scripts/log/*
 scripts/cache/*
+backend/scripts/log
+backend/scripts/cache
 
 ### Xcode Patch ###
 *.xcodeproj/*
