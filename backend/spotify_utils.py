@@ -93,6 +93,14 @@ class SpotifyMatcher:
         # Remove date/venue at end
         text = re.sub(r'\s*/\s+[a-z]+\s+\d+.*$', '', text, flags=re.IGNORECASE)
         
+        # Remove tempo/arrangement annotations (common in jazz)
+        text = re.sub(r'\s*-\s*(slow|fast|up tempo|medium|ballad)(\s+version)?.*$', '', text, flags=re.IGNORECASE)
+        text = re.sub(r'\s*\((slow|fast|up tempo|medium|ballad)(\s+version)?\).*$', '', text, flags=re.IGNORECASE)
+        
+        # Remove take numbers and alternate versions
+        text = re.sub(r'\s*-\s*(take|version|alternate|alt\.?)\s*\d*.*$', '', text, flags=re.IGNORECASE)
+        text = re.sub(r'\s*\((take|version|alternate|alt\.?)\s*\d*\).*$', '', text, flags=re.IGNORECASE)
+        
         # Remove ensemble suffixes
         text = text.replace(' trio', '')
         text = text.replace(' quartet', '')
