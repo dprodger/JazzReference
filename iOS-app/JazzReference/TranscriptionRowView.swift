@@ -1,3 +1,11 @@
+//
+//  TranscriptionRowView.swift
+//  JazzReference
+//
+//  Created by Dave Rodger on 11/9/25.
+//
+
+
 // TranscriptionRowView.swift
 // Standalone component for displaying solo transcriptions
 // Add this to your project if you prefer a separate file

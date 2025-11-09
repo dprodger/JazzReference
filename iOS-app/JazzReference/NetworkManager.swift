@@ -368,3 +368,115 @@ class NetworkManager: ObservableObject {
         }
     }
 }
+// MARK: - NetworkManager Extensions for Solo Transcriptions
+
+extension NetworkManager {
+    
+    func fetchSongTranscriptions(songId: String) async -> [SoloTranscription] {
+        #if DEBUG
+        if Self.isPreviewMode {
+            return [.preview1, .preview2]
+        }
+        #endif
+        
+        guard let url = URL(string: "\(NetworkManager.baseURL)/songs/\(songId)/transcriptions") else {
+            return []
+        }
+        
+        do {
+            let (data, _) = try await URLSession.shared.data(from: url)
+            let transcriptions = try JSONDecoder().decode([SoloTranscription].self, from: data)
+            return transcriptions
+        } catch {
+            print("Error fetching song transcriptions: \(error)")
+            return []
+        }
+    }
+    
+    func fetchRecordingTranscriptions(recordingId: String) async -> [SoloTranscription] {
+        #if DEBUG
+        if Self.isPreviewMode {
+            return [.preview1]
+        }
+        #endif
+        
+        guard let url = URL(string: "\(NetworkManager.baseURL)/recordings/\(recordingId)/transcriptions") else {
+            return []
+        }
+        
+        do {
+            let (data, _) = try await URLSession.shared.data(from: url)
+            let transcriptions = try JSONDecoder().decode([SoloTranscription].self, from: data)
+            return transcriptions
+        } catch {
+            print("Error fetching recording transcriptions: \(error)")
+            return []
+        }
+    }
+    
+    func fetchTranscriptionDetail(id: String) async -> SoloTranscription? {
+        #if DEBUG
+        if Self.isPreviewMode {
+            switch id {
+            case "preview-transcription-1":
+                return .preview1
+            case "preview-transcription-2":
+                return .preview2
+            case "preview-transcription-3":
+                return .previewMinimal
+            default:
+                return .preview1
+            }
+        }
+        #endif
+        
+        guard let url = URL(string: "\(NetworkManager.baseURL)/transcriptions/\(id)") else {
+            return nil
+        }
+        
+        do {
+            let (data, _) = try await URLSession.shared.data(from: url)
+            let transcription = try JSONDecoder().decode(SoloTranscription.self, from: data)
+            return transcription
+        } catch {
+            print("Error fetching transcription detail: \(error)")
+            return nil
+        }
+    }
+}
+
+// MARK: - Preview Mode Extension for Sync Methods
+
+#if DEBUG
+extension NetworkManager {
+    func fetchSongTranscriptionsSync(songId: String) -> [SoloTranscription] {
+        if Self.isPreviewMode {
+            return [.preview1, .preview2]
+        }
+        return []
+    }
+    
+    func fetchRecordingTranscriptionsSync(recordingId: String) -> [SoloTranscription] {
+        if Self.isPreviewMode {
+            return [.preview1]
+        }
+        return []
+    }
+    
+    func fetchTranscriptionDetailSync(id: String) -> SoloTranscription? {
+        if Self.isPreviewMode {
+            switch id {
+            case "preview-transcription-1":
+                return .preview1
+            case "preview-transcription-2":
+                return .preview2
+            case "preview-transcription-3":
+                return .previewMinimal
+            default:
+                return .preview1
+            }
+        }
+        return nil
+    }
+}
+#endif
