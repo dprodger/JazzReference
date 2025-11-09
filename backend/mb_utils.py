@@ -752,6 +752,7 @@ def update_song_composer(song_id: str, mb_searcher: MusicBrainzSearcher = None) 
     Returns:
         bool: True if composer was updated, False otherwise
     """
+    logger.debug("in update_song_composer")
     from db_utils import get_db_connection
     
     try:
@@ -772,7 +773,8 @@ def update_song_composer(song_id: str, mb_searcher: MusicBrainzSearcher = None) 
                 # Skip if no MusicBrainz ID or already has composer
                 if not mb_id or composer:
                     return False
-        
+
+        logger.debug("song is missing composer")        
         # Create MusicBrainzSearcher if not provided
         if mb_searcher is None:
             mb_searcher = MusicBrainzSearcher()
