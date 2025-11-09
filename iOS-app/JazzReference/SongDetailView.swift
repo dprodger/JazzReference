@@ -575,6 +575,7 @@ struct SongDetailView: View {
             if ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1" {
                 let networkManager = NetworkManager()
                 song = networkManager.fetchSongDetailSync(id: currentSongId)
+                transcriptions = networkManager.fetchSongTranscriptionsSync(songId: currentSongId)
                 isLoading = false
                 return
             }
@@ -582,6 +583,7 @@ struct SongDetailView: View {
             
             let networkManager = NetworkManager()
             song = await networkManager.fetchSongDetail(id: currentSongId)
+            transcriptions = await networkManager.fetchSongTranscriptions(songId: currentSongId)
             isLoading = false
         }
         .gesture(
