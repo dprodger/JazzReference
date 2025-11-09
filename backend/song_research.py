@@ -14,90 +14,9 @@ from typing import Dict, Any
 from mb_release_importer import MBReleaseImporter
 from spotify_utils import SpotifyMatcher
 from db_utils import get_db_connection
-from mb_utils import MusicBrainzSearcher
+from mb_utils import MusicBrainzSearcher, update_song_composer
 
 logger = logging.getLogger(__name__)
-
-
-def update_song_composer(song_id: str) -> bool:
-    """
-    Update song composer from MusicBrainz if not already set
-    
-    Checks for composer, writer, and lyricist relationships in MusicBrainz work data.
-    
-    Args:
-        song_id: UUID of the song
-        
-    Returns:
-        bool: True if composer was updated, False otherwise
-    """
-    try:
-        # Check if song has musicbrainz_id and no composer
-        with get_db_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    "SELECT musicbrainz_id, composer FROM songs WHERE id = %s",
-                    (song_id,)
-                )
-                row = cur.fetchone()
-                
-                if not row:
-                    return False
-                
-                mb_id = row['musicbrainz_id']
-                composer = row['composer']                
-                # Skip if no MusicBrainz ID or already has composer
-                if not mb_id or composer:
-                    return False
-        
-        # Fetch work details from MusicBrainz
-        mb = MusicBrainzSearcher()
-        work_data = mb.get_work_recordings(mb_id)
-        
-        if not work_data:
-            logger.debug("No MusicBrainz work data found")
-            return False
-        
-        # Extract composer/writer from artist relationships
-        # Check multiple relationship types: composer, writer, lyricist
-        creators = []
-        creator_types_found = set()
-        
-        for relation in work_data.get('relations', []):
-            rel_type = relation.get('type')
-            
-            # Check for any creator relationship type
-            if rel_type in ['composer', 'writer', 'lyricist']:
-                artist = relation.get('artist', {})
-                creator_name = artist.get('name')
-                
-                if creator_name and creator_name not in creators:
-                    creators.append(creator_name)
-                    creator_types_found.add(rel_type)
-        
-        if not creators:
-            logger.debug("No composer, writer, or lyricist found in MusicBrainz work data")
-            return False
-        
-        # Join multiple creators with comma
-        composer_name = ', '.join(creators)
-        types_str = ', '.join(sorted(creator_types_found))
-        
-        # Update song with composer
-        with get_db_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    "UPDATE songs SET composer = %s, updated_at = CURRENT_TIMESTAMP WHERE id = %s",
-                    (composer_name, song_id)
-                )
-                conn.commit()
-        
-        logger.info(f"✓ Updated composer to '{composer_name}' (from {types_str})")
-        return True        
-
-    except Exception as e:
-        logger.error(f"Error updating composer: {e}")
-        return False
 
 
 def research_song(song_id: str, song_name: str) -> Dict[str, Any]:
