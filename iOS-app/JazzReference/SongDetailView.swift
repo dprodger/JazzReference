@@ -220,21 +220,7 @@ struct SongDetailView: View {
     @ViewBuilder
     private func songContentView(for song: Song) -> some View {
                 VStack(alignment: .leading, spacing: 0) {
-                    // Styled Header with Jazz Theme
-                    HStack {
-                        Image(systemName: "music.note")
-                            .font(.title2)
-                            .foregroundColor(JazzTheme.cream)
-                        Text("SONG")
-                            .font(.headline)
-                            .fontWeight(.semibold)
-                            .foregroundColor(JazzTheme.cream)
-                        Spacer()
-                    }
-                    .padding()
-                    .background(JazzTheme.burgundyGradient)
-                    
-                    VStack(alignment: .leading, spacing: 20) {
+                    VStack(alignment: .leading, spacing: 16) {
                     // Song Information Header
                     VStack(alignment: .leading, spacing: 12) {
                         Text(song.title)
