@@ -274,18 +274,26 @@ class MBReleaseImporter:
                     recording_id = recording.get('id')
                     recording_title = recording.get('title', 'Unknown')
 
-                    self.logger.info(f"[{i}/{len(relations)}] Fetching: {recording_title[:60]}")                    
-
                     # Fetch detailed recording information (API call, no DB)
                     self.logger.debug(f"[{i}/{len(relations)}] Fetching details for: {recording_title}")
                     recording_details = self.mb_searcher.get_recording_details(recording_id)
                     
                     if recording_details:
+                        # Log recording name and album/release name
+                        releases = recording_details.get('releases', [])
+                        release_info = releases[0].get('title', 'Unknown Release') if releases else 'No releases'
+                        self.logger.info(f"[{i}/{len(relations)}] Recording: {recording_title[:50]} | Album: {release_info[:50]}")
+                        
                         recordings.append(recording_details)
                         
                         if len(recordings) >= limit:
                             self.logger.info(f"Reached limit of {limit} recordings")
                             break
+                else:
+                    # Log skipped relations for debugging
+                    rel_type = relation.get('type', 'unknown')
+                    has_recording = 'recording' in relation
+                    self.logger.debug(f"[{i}/{len(relations)}] Skipping relation: type={rel_type}, has_recording={has_recording}")
             
             self.logger.info(f"Successfully fetched {len(recordings)} recording details")
             return recordings
