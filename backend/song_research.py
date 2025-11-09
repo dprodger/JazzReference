@@ -23,6 +23,8 @@ def update_song_composer(song_id: str) -> bool:
     """
     Update song composer from MusicBrainz if not already set
     
+    Checks for composer, writer, and lyricist relationships in MusicBrainz work data.
+    
     Args:
         song_id: UUID of the song
         
@@ -56,17 +58,30 @@ def update_song_composer(song_id: str) -> bool:
             logger.debug("No MusicBrainz work data found")
             return False
         
-        # Extract composer from artist relationships
-        composer_name = None
-        for relation in work_data.get('relations', []):
-            if relation.get('type') == 'composer':
-                artist = relation.get('artist', {})
-                composer_name = artist.get('name')
-                break
+        # Extract composer/writer from artist relationships
+        # Check multiple relationship types: composer, writer, lyricist
+        creators = []
+        creator_types_found = set()
         
-        if not composer_name:
-            logger.debug("No composer found in MusicBrainz work data")
+        for relation in work_data.get('relations', []):
+            rel_type = relation.get('type')
+            
+            # Check for any creator relationship type
+            if rel_type in ['composer', 'writer', 'lyricist']:
+                artist = relation.get('artist', {})
+                creator_name = artist.get('name')
+                
+                if creator_name and creator_name not in creators:
+                    creators.append(creator_name)
+                    creator_types_found.add(rel_type)
+        
+        if not creators:
+            logger.debug("No composer, writer, or lyricist found in MusicBrainz work data")
             return False
+        
+        # Join multiple creators with comma
+        composer_name = ', '.join(creators)
+        types_str = ', '.join(sorted(creator_types_found))
         
         # Update song with composer
         with get_db_connection() as conn:
@@ -77,9 +92,9 @@ def update_song_composer(song_id: str) -> bool:
                 )
                 conn.commit()
         
-        logger.info(f"✓ Updated composer to '{composer_name}'")
-        return True
-        
+        logger.info(f"✓ Updated composer to '{composer_name}' (from {types_str})")
+        return True        
+
     except Exception as e:
         logger.error(f"Error updating composer: {e}")
         return False
