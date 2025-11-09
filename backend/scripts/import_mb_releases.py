@@ -18,7 +18,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # Import the core business logic
 from mb_release_importer import MBReleaseImporter
-from db_utils import normalize_apostrophes
+from db_utils import find_song_by_name_or_id
 
 # Configure logging for CLI
 logging.basicConfig(
@@ -138,8 +138,20 @@ Examples:
     # Create importer with CLI logger
     importer = MBReleaseImporter(dry_run=args.dry_run, logger=logger)
     
-    # Determine song identifier (normalize apostrophes in names)
-    song_identifier = normalize_apostrophes(args.name) if args.name else args.id
+    # Retrieve song from database
+    try:
+        song = find_song_by_name_or_id(name=args.name, song_id=args.id)
+        if song is None:
+            identifier = args.name if args.name else args.id
+            logger.error(f"Song not found: {identifier}")
+            sys.exit(1)
+        
+        song_identifier = song['id']
+        logger.info(f"Found song: {song['title']} (ID: {song_identifier})")
+        
+    except ValueError as e:
+        logger.error(f"Error: {e}")
+        sys.exit(1)
     
     try:
         # Run the import

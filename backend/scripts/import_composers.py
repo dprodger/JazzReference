@@ -17,7 +17,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # Import the core business logic
 from mb_utils import update_song_composer
-from db_utils import normalize_apostrophes
+from db_utils import find_song_by_name_or_id
 
 # Configure logging for CLI
 logging.basicConfig(
@@ -129,13 +129,24 @@ Examples:
     # Print header
     print_header(args.dry_run)
     
-    
-    # Determine song identifier (normalize apostrophes in names)
-    song_identifier = normalize_apostrophes(args.name) if args.name else args.id
+    # Retrieve song from database
+    try:
+        song = find_song_by_name_or_id(name=args.name, song_id=args.id)
+        if song is None:
+            identifier = args.name if args.name else args.id
+            logger.error(f"Song not found: {identifier}")
+            sys.exit(1)
+        
+        song_identifier = song['id']
+        logger.info(f"Found song: {song['title']} (ID: {song_identifier})")
+        
+    except ValueError as e:
+        logger.error(f"Error: {e}")
+        sys.exit(1)
     
     try:
         result = update_song_composer(song_identifier)
-        logger.info("\nUpdate_song_composer returned \(result)")
+        logger.info(f"\nUpdate_song_composer returned {result}")
         # Print summary
 # TODO
 #        print_summary(result)

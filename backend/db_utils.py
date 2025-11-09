@@ -535,6 +535,58 @@ def find_performer_by_id(performer_id):
     return execute_query(query, (performer_id,), fetch_one=True)
 
 
+def find_song_by_name(title):
+    """
+    Find a song by title (case-insensitive)
+    
+    Args:
+        title: Song title to search for
+    
+    Returns:
+        Song record or None if not found
+    """
+    query = "SELECT * FROM songs WHERE LOWER(title) = LOWER(%s) LIMIT 1"
+    return execute_query(query, (title,), fetch_one=True)
+
+
+def find_song_by_id(song_id):
+    """
+    Find a song by UUID
+    
+    Args:
+        song_id: UUID of the song
+    
+    Returns:
+        Song record or None if not found
+    """
+    query = "SELECT * FROM songs WHERE id = %s"
+    return execute_query(query, (song_id,), fetch_one=True)
+
+
+def find_song_by_name_or_id(name=None, song_id=None):
+    """
+    Find a song by either name or ID
+    
+    Args:
+        name: Song title to search for (will be normalized for apostrophes)
+        song_id: UUID of the song
+    
+    Returns:
+        Song record or None if not found
+    
+    Raises:
+        ValueError: If neither name nor song_id is provided
+    """
+    if name is None and song_id is None:
+        raise ValueError("Either name or song_id must be provided")
+    
+    if name is not None:
+        normalized_name = normalize_apostrophes(name)
+        return find_song_by_name(normalized_name)
+    else:
+        return find_song_by_id(song_id)
+
+
 def update_performer_external_references(performer_id, external_refs, dry_run=False):
     """
     Update external_references JSONB field for a performer
