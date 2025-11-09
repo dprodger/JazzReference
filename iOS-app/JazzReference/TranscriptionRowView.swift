@@ -1,11 +1,3 @@
-//
-//  TranscriptionRowView.swift
-//  JazzReference
-//
-//  Created by Dave Rodger on 11/9/25.
-//
-
-
 // TranscriptionRowView.swift
 // Standalone component for displaying solo transcriptions
 // Add this to your project if you prefer a separate file
@@ -36,7 +28,7 @@ struct TranscriptionRowView: View {
                         Image(systemName: "calendar")
                             .foregroundColor(JazzTheme.brass)
                             .font(.caption)
-                        Text("\(year)")
+                        Text(String(format: "%d", year))
                             .font(.subheadline)
                             .foregroundColor(JazzTheme.smokeGray)
                     }

@@ -66,6 +66,10 @@ struct SongDetailView: View {
     @State private var selectedInstrument: InstrumentFamily? = nil
     @State private var isInstrumentFilterExpanded: Bool = false
     
+    // Section expansion states
+    @State private var isRecordingsSectionExpanded: Bool = true
+    @State private var isTranscriptionsSectionExpanded: Bool = true
+    
     // NEW: Repertoire management
     @EnvironmentObject var repertoireManager: RepertoireManager
     @State private var showAddToRepertoireSheet = false
@@ -286,14 +290,12 @@ struct SongDetailView: View {
             Divider()
                 .padding(.horizontal)
             
-            // MARK: - RECORDINGS SECTION
-            // Recordings Header
-            Text("Recordings")
-                .font(.title2)
-                .bold()
-                .foregroundColor(JazzTheme.charcoal)
-                .padding(.horizontal)
-                .padding(.top, 8)
+            // MARK: - RECORDINGS SECTION (Collapsible)
+            VStack(alignment: .leading, spacing: 0) {
+                DisclosureGroup(
+                    isExpanded: $isRecordingsSectionExpanded,
+                    content: {
+                        VStack(alignment: .leading, spacing: 0) {
             
             // MARK: - INSTRUMENT FILTER
             // Collapsible Instrument Filter (between Learn More and Spotify filter)
@@ -376,9 +378,11 @@ struct SongDetailView: View {
                 .background(JazzTheme.cardBackground)
                 .cornerRadius(10)
                 .padding(.horizontal)
+                .padding(.top, 8)
                 
                 Divider()
                     .padding(.horizontal)
+                    .padding(.vertical, 8)
             }
             
             // MARK: - SPOTIFY FILTER
@@ -391,6 +395,7 @@ struct SongDetailView: View {
                 }
                 .pickerStyle(SegmentedPickerStyle())
                 .padding(.horizontal)
+                .padding(.top, 8)
                 
                 // Recording count
                 HStack {
@@ -442,26 +447,79 @@ struct SongDetailView: View {
                 }
             }
             .padding(.top)
+                        }
+                        .padding(.top, 8)
+                    },
+                    label: {
+                        HStack {
+                            Image(systemName: "music.note.list")
+                                .foregroundColor(JazzTheme.burgundy)
+                            Text("Recordings")
+                                .font(.title2)
+                                .bold()
+                                .foregroundColor(JazzTheme.charcoal)
+                            
+                            Spacer()
+                            
+                            Text("\(filteredRecordings.count)")
+                                .font(.subheadline)
+                                .foregroundColor(JazzTheme.smokeGray)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(JazzTheme.burgundy.opacity(0.1))
+                                .cornerRadius(6)
+                        }
+                        .padding(.horizontal)
+                        .padding(.vertical, 12)
+                    }
+                )
+                .tint(JazzTheme.burgundy)
+            }
+            .background(JazzTheme.backgroundLight)
             
-            // MARK: - TRANSCRIPTIONS SECTION
+            // MARK: - TRANSCRIPTIONS SECTION (Collapsible)
             if !transcriptions.isEmpty {
                 Divider()
                     .padding(.horizontal)
                     .padding(.top, 16)
                 
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Solo Transcriptions")
-                        .font(.title2)
-                        .bold()
-                        .foregroundColor(JazzTheme.charcoal)
-                        .padding(.horizontal)
-                        .padding(.top, 8)
-                    
-                    ForEach(transcriptions) { transcription in
-                        TranscriptionRowView(transcription: transcription)
-                    }
+                VStack(alignment: .leading, spacing: 0) {
+                    DisclosureGroup(
+                        isExpanded: $isTranscriptionsSectionExpanded,
+                        content: {
+                            VStack(alignment: .leading, spacing: 12) {
+                                ForEach(transcriptions) { transcription in
+                                    TranscriptionRowView(transcription: transcription)
+                                }
+                            }
+                            .padding(.top, 12)
+                        },
+                        label: {
+                            HStack {
+                                Image(systemName: "music.quarternote.3")
+                                    .foregroundColor(JazzTheme.teal)
+                                Text("Solo Transcriptions")
+                                    .font(.title2)
+                                    .bold()
+                                    .foregroundColor(JazzTheme.charcoal)
+                                
+                                Spacer()
+                                
+                                Text("\(transcriptions.count)")
+                                    .font(.subheadline)
+                                    .foregroundColor(JazzTheme.smokeGray)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(JazzTheme.teal.opacity(0.1))
+                                    .cornerRadius(6)
+                            }
+                            .padding(.horizontal)
+                            .padding(.vertical, 12)
+                        }
+                    )
+                    .tint(JazzTheme.teal)
                 }
-                .padding(.top, 8)
+                .background(JazzTheme.backgroundLight)
             }
         }
         .padding(.bottom)
@@ -829,7 +887,6 @@ struct AddToRepertoireSheet: View {
         }
     }
 }
-
 
 //
 //  AddToRepertoireSheet.swift
