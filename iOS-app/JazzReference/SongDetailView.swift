@@ -474,7 +474,8 @@ struct SongDetailView: View {
             }
         }
         .background(JazzTheme.backgroundLight)
-        .navigationBarTitleDisplayMode(.inline)
+        .navigationTitle(song?.title ?? "Song Detail")
+        .navigationBarTitleDisplayMode(.large)
         .toolbarBackground(JazzTheme.burgundy, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
         .toolbarColorScheme(.dark, for: .navigationBar)
