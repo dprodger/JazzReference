@@ -3,10 +3,14 @@
 // Add this to your project if you prefer a separate file
 
 import SwiftUI
+import YouTubePlayerKit
 
 // MARK: - Transcription Row View
 struct TranscriptionRowView: View {
     let transcription: SoloTranscription
+    
+    let youTubePlayer: YouTubePlayer = "https://youtube.com/watch?v=psL_5RIBqnY"
+
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -45,24 +49,24 @@ struct TranscriptionRowView: View {
                     }
                 }
             }
-            
             // YouTube link button
-            if let youtubeUrl = transcription.youtubeUrl,
-               let url = URL(string: youtubeUrl) {
-                Link(destination: url) {
-                    HStack {
-                        Image(systemName: "play.rectangle.fill")
-                            .foregroundColor(.white)
-                        Text("Watch Transcription on YouTube")
-                            .font(.subheadline)
-                            .foregroundColor(.white)
+            if let youtubeUrl = transcription.youtubeUrl {
+                YouTubePlayerView(.init(stringLiteral: youtubeUrl)) { state in
+                    // An optional overlay view for the current state of the player
+                    switch state {
+                    case .idle:
+                        ProgressView()
+                    case .ready:
+                        EmptyView()
+                    case .error(let error):
+                        ContentUnavailableView(
+                            "Error",
+                            systemImage: "exclamationmark.triangle.fill",
+                            description: Text("YouTube player couldn't be loaded: \(error)")
+                        )
                     }
-                    .padding(.vertical, 8)
-                    .padding(.horizontal, 12)
-                    .background(Color.red)
-                    .cornerRadius(8)
                 }
-                .padding(.top, 4)
+                .aspectRatio(16/9, contentMode: .fit)
             }
         }
         .padding()
