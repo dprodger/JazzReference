@@ -15,7 +15,8 @@ CREATE TABLE songs (
     song_reference TEXT, -- written background information about the song
     structure TEXT, -- Chord progressions, form description
     external_references JSONB, -- Store Wikipedia links, book references, etc.
-	musicbrainz_id VARCHAR(36) UNIQUE;
+	musicbrainz_id VARCHAR(36) UNIQUE,
+	wikipedia_url VARCHAR(500),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     created_by VARCHAR(100),

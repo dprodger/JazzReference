@@ -14,7 +14,7 @@ from typing import Dict, Any
 from mb_release_importer import MBReleaseImporter
 from spotify_utils import SpotifyMatcher
 from db_utils import get_db_connection
-from mb_utils import MusicBrainzSearcher, update_song_composer
+from mb_utils import MusicBrainzSearcher, update_song_composer, update_song_wikipedia_url
 
 logger = logging.getLogger(__name__)
 
@@ -75,6 +75,12 @@ def research_song(song_id: str, song_name: str) -> Dict[str, Any]:
         composer_updated = update_song_composer(str(song_id))
         if not composer_updated:
             logger.debug("Composer not updated (already set or not found)")
+        
+        # Step 1.6: Update Wikipedia URL from MusicBrainz if needed
+        logger.info("Checking for Wikipedia URL update...")
+        wikipedia_updated = update_song_wikipedia_url(str(song_id))
+        if not wikipedia_updated:
+            logger.debug("Wikipedia URL not updated (already set or not found)")
         
         # Step 2: Match Spotify tracks
         matcher = SpotifyMatcher(dry_run=False, strict_mode=True, logger=logger)

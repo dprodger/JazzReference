@@ -826,3 +826,95 @@ def update_song_composer(song_id: str, mb_searcher: MusicBrainzSearcher = None) 
     except Exception as e:
         logger.error(f"Error updating composer: {e}")
         return False
+
+
+def update_song_wikipedia_url(song_id: str, mb_searcher: MusicBrainzSearcher = None) -> bool:
+    """
+    Update song Wikipedia URL from MusicBrainz if not already set
+    
+    Checks for Wikipedia URL in MusicBrainz work data URL relationships.
+    
+    Args:
+        song_id: UUID of the song
+        mb_searcher: Optional MusicBrainzSearcher instance (creates new one if not provided)
+        
+    Returns:
+        bool: True if Wikipedia URL was updated, False otherwise
+    """
+    from db_utils import get_db_connection
+    
+    try:
+        # Check if song has musicbrainz_id and current wikipedia_url
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT musicbrainz_id, wikipedia_url, title FROM songs WHERE id = %s",
+                    (song_id,)
+                )
+                row = cur.fetchone()
+                
+                if not row:
+                    return False
+                
+                mb_id = row['musicbrainz_id']
+                current_wikipedia_url = row['wikipedia_url']
+                song_title = row['title']
+                
+                # Skip if no MusicBrainz ID
+                if not mb_id:
+                    logger.debug("Song has no MusicBrainz ID, skipping Wikipedia URL update")
+                    return False
+        
+        # Create MusicBrainzSearcher if not provided
+        if mb_searcher is None:
+            mb_searcher = MusicBrainzSearcher()
+        
+        # Fetch work details from MusicBrainz
+        work_data = mb_searcher.get_work_recordings(mb_id)
+        
+        if not work_data:
+            logger.debug("No MusicBrainz work data found")
+            return False
+        
+        # Extract Wikipedia URL from URL relationships
+        wikipedia_url = None
+        
+        for relation in work_data.get('relations', []):
+            rel_type = relation.get('type')
+            
+            # Check for Wikipedia URL relationship
+            if rel_type == 'wikipedia':
+                url_data = relation.get('url', {})
+                resource = url_data.get('resource')
+                
+                if resource:
+                    wikipedia_url = resource
+                    break
+        
+        if not wikipedia_url:
+            logger.debug("No Wikipedia URL found in MusicBrainz work data")
+            return False
+        
+        # Check if song already has this Wikipedia URL
+        if current_wikipedia_url:
+            if current_wikipedia_url == wikipedia_url:
+                logger.debug(f"Song already has this Wikipedia URL: {wikipedia_url}")
+            else:
+                logger.info(f"Song '{song_title}' already has a different Wikipedia URL (existing: {current_wikipedia_url}, found: {wikipedia_url})")
+            return False
+        
+        # Update song with Wikipedia URL
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE songs SET wikipedia_url = %s, updated_at = CURRENT_TIMESTAMP WHERE id = %s",
+                    (wikipedia_url, song_id)
+                )
+                conn.commit()
+        
+        logger.info(f"✓ Updated Wikipedia URL for '{song_title}': {wikipedia_url}")
+        return True
+    
+    except Exception as e:
+        logger.error(f"Error updating Wikipedia URL: {e}")
+        return False
