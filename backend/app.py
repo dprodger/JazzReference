@@ -231,92 +231,115 @@ def get_songs():
         return jsonify({'error': 'Failed to fetch songs', 'detail': str(e)}), 500
 
 
+
 @app.route('/api/songs/<song_id>', methods=['GET'])
 def get_song_detail(song_id):
     """
     Get detailed information about a specific song with all recordings, performers, and transcriptions.
     
-    OPTIMIZED VERSION: Uses JSON aggregation to fetch everything in 3 queries instead of 50+.
+    ULTRA-OPTIMIZED VERSION: Uses a SINGLE query with CTEs instead of 3 separate queries.
+    This eliminates 2 network round trips between Render and Supabase.
     """
     try:
-        # Query 1: Get song information
-        song_query = """
+        # ONE QUERY to get everything - song, recordings+performers, transcriptions
+        combined_query = """
+            WITH song_data AS (
+                SELECT 
+                    id, title, composer, structure, song_reference,
+                    musicbrainz_id, wikipedia_url, external_references, 
+                    created_at, updated_at
+                FROM songs
+                WHERE id = %s
+            ),
+            recordings_with_performers AS (
+                SELECT 
+                    r.id,
+                    r.album_title,
+                    r.recording_date,
+                    r.recording_year,
+                    r.label,
+                    r.spotify_url,
+                    r.spotify_track_id,
+                    r.album_art_small,
+                    r.album_art_medium,
+                    r.album_art_large,
+                    r.youtube_url,
+                    r.apple_music_url,
+                    r.musicbrainz_id,
+                    r.is_canonical,
+                    r.notes,
+                    COALESCE(
+                        json_agg(
+                            json_build_object(
+                                'id', p.id,
+                                'name', p.name,
+                                'instrument', i.name,
+                                'role', rp.role
+                            ) ORDER BY 
+                                CASE rp.role 
+                                    WHEN 'leader' THEN 1 
+                                    WHEN 'sideman' THEN 2 
+                                    ELSE 3 
+                                END,
+                                p.name
+                        ) FILTER (WHERE p.id IS NOT NULL),
+                        '[]'::json
+                    ) as performers
+                FROM recordings r
+                LEFT JOIN recording_performers rp ON r.id = rp.recording_id
+                LEFT JOIN performers p ON rp.performer_id = p.id
+                LEFT JOIN instruments i ON rp.instrument_id = i.id
+                WHERE r.song_id = %s
+                GROUP BY r.id, r.album_title, r.recording_date, r.recording_year,
+                         r.label, r.spotify_url, r.spotify_track_id,
+                         r.album_art_small, r.album_art_medium, r.album_art_large,
+                         r.youtube_url, r.apple_music_url, r.musicbrainz_id,
+                         r.is_canonical, r.notes
+                ORDER BY r.is_canonical DESC, r.recording_year DESC
+            ),
+            transcriptions_data AS (
+                SELECT 
+                    st.id,
+                    st.song_id,
+                    st.recording_id,
+                    st.youtube_url,
+                    st.created_at,
+                    st.updated_at,
+                    r.album_title,
+                    r.recording_year
+                FROM solo_transcriptions st
+                LEFT JOIN recordings r ON st.recording_id = r.id
+                WHERE st.song_id = %s
+                ORDER BY r.recording_year DESC
+            )
             SELECT 
-                id, title, composer, structure, song_reference,
-                musicbrainz_id, wikipedia_url, external_references, 
-                created_at, updated_at
-            FROM songs
-            WHERE id = %s
+                (SELECT row_to_json(song_data.*) FROM song_data) as song,
+                (SELECT json_agg(recordings_with_performers.*) FROM recordings_with_performers) as recordings,
+                (SELECT json_agg(transcriptions_data.*) FROM transcriptions_data) as transcriptions
         """
-        song = db_tools.execute_query(song_query, (song_id,), fetch_one=True)
         
-        if not song:
+        # Execute the single query with song_id passed 3 times (for each CTE)
+        result = db_tools.execute_query(combined_query, (song_id, song_id, song_id), fetch_one=True)
+        
+        if not result or not result['song']:
             return jsonify({'error': 'Song not found'}), 404
         
-        # Query 2: Get ALL recordings with performers using json_agg
-        recordings_query = """
-            SELECT 
-                r.id, r.album_title, r.recording_date, r.recording_year,
-                r.label, r.spotify_url, r.spotify_track_id,
-                r.album_art_small, r.album_art_medium, r.album_art_large,
-                r.youtube_url, r.apple_music_url, r.musicbrainz_id,
-                r.is_canonical, r.notes,
-                COALESCE(
-                    json_agg(
-                        json_build_object(
-                            'id', p.id,
-                            'name', p.name,
-                            'instrument', i.name,
-                            'role', rp.role
-                        ) ORDER BY 
-                            CASE rp.role 
-                                WHEN 'leader' THEN 1 
-                                WHEN 'sideman' THEN 2 
-                                ELSE 3 
-                            END,
-                            p.name
-                    ) FILTER (WHERE p.id IS NOT NULL),
-                    '[]'::json
-                ) as performers
-            FROM recordings r
-            LEFT JOIN recording_performers rp ON r.id = rp.recording_id
-            LEFT JOIN performers p ON rp.performer_id = p.id
-            LEFT JOIN instruments i ON rp.instrument_id = i.id
-            WHERE r.song_id = %s
-            GROUP BY r.id, r.album_title, r.recording_date, r.recording_year,
-                     r.label, r.spotify_url, r.spotify_track_id,
-                     r.album_art_small, r.album_art_medium, r.album_art_large,
-                     r.youtube_url, r.apple_music_url, r.musicbrainz_id,
-                     r.is_canonical, r.notes
-            ORDER BY r.is_canonical DESC, r.recording_year DESC
-        """
-        recordings = db_tools.execute_query(recordings_query, (song_id,), fetch_all=True)
+        # Build response from the single query result
+        song_dict = result['song']
+        recordings = result['recordings'] if result['recordings'] else []
+        transcriptions = result['transcriptions'] if result['transcriptions'] else []
         
-        # Query 3: Get transcriptions
-        transcriptions_query = """
-            SELECT 
-                st.id, st.song_id, st.recording_id, st.youtube_url,
-                st.created_at, st.updated_at,
-                r.album_title, r.recording_year
-            FROM solo_transcriptions st
-            LEFT JOIN recordings r ON st.recording_id = r.id
-            WHERE st.song_id = %s
-            ORDER BY r.recording_year DESC
-        """
-        transcriptions = db_tools.execute_query(transcriptions_query, (song_id,), fetch_all=True)
-        
-        # Build response
-        song_dict = dict(song)
-        song_dict['recordings'] = recordings if recordings else []
-        song_dict['recording_count'] = len(recordings) if recordings else 0
-        song_dict['transcriptions'] = transcriptions if transcriptions else []  # NEW
-        song_dict['transcription_count'] = len(transcriptions) if transcriptions else 0  # NEW
+        song_dict['recordings'] = recordings
+        song_dict['recording_count'] = len(recordings)
+        song_dict['transcriptions'] = transcriptions
+        song_dict['transcription_count'] = len(transcriptions)
         
         return jsonify(song_dict)
         
     except Exception as e:
         logger.error(f"Error fetching song detail: {e}")
         return jsonify({'error': 'Failed to fetch song details', 'detail': str(e)}), 500
+
 
 
    
