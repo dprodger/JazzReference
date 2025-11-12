@@ -2,6 +2,8 @@
 //  TranscriptionsSection.swift
 //  JazzReference
 //
+//  Created by Dave Rodger on 11/12/25.
+//
 //  Collapsible section displaying solo transcriptions
 //
 
