@@ -237,26 +237,14 @@ def get_song_detail(song_id):
     Get detailed information about a specific song with all recordings, performers, and transcriptions.
     
     OPTIMIZED VERSION: Uses JSON aggregation to fetch everything in 3 queries instead of 50+.
-    - Query 1: Song metadata
-    - Query 2: All recordings with performers (using json_agg)
-    - Query 3: All solo transcriptions
-    
-    This eliminates both N+1 queries AND the need for a separate /transcriptions call.
     """
     try:
         # Query 1: Get song information
         song_query = """
             SELECT 
-                id, 
-                title, 
-                composer, 
-                structure, 
-                song_reference,
-                musicbrainz_id, 
-                wikipedia_url,
-                external_references, 
-                created_at, 
-                updated_at
+                id, title, composer, structure, song_reference,
+                musicbrainz_id, wikipedia_url, external_references, 
+                created_at, updated_at
             FROM songs
             WHERE id = %s
         """
@@ -265,26 +253,14 @@ def get_song_detail(song_id):
         if not song:
             return jsonify({'error': 'Song not found'}), 404
         
-        # Query 2: Get ALL recordings with their performers in ONE query using json_agg
-        # This eliminates the N+1 problem by aggregating performers within each recording
+        # Query 2: Get ALL recordings with performers using json_agg
         recordings_query = """
             SELECT 
-                r.id,
-                r.album_title,
-                r.recording_date,
-                r.recording_year,
-                r.label,
-                r.spotify_url,
-                r.spotify_track_id,
-                r.album_art_small,
-                r.album_art_medium,
-                r.album_art_large,
-                r.youtube_url,
-                r.apple_music_url,
-                r.musicbrainz_id,
-                r.is_canonical,
-                r.notes,
-                -- Aggregate all performers for this recording into a JSON array
+                r.id, r.album_title, r.recording_date, r.recording_year,
+                r.label, r.spotify_url, r.spotify_track_id,
+                r.album_art_small, r.album_art_medium, r.album_art_large,
+                r.youtube_url, r.apple_music_url, r.musicbrainz_id,
+                r.is_canonical, r.notes,
                 COALESCE(
                     json_agg(
                         json_build_object(
@@ -316,18 +292,12 @@ def get_song_detail(song_id):
         """
         recordings = db_tools.execute_query(recordings_query, (song_id,), fetch_all=True)
         
-        # Query 3: Get solo transcriptions for this song
-        # Include this in the main response to eliminate the second API call
+        # Query 3: Get transcriptions
         transcriptions_query = """
             SELECT 
-                st.id,
-                st.song_id,
-                st.recording_id,
-                st.youtube_url,
-                st.created_at,
-                st.updated_at,
-                r.album_title,
-                r.recording_year
+                st.id, st.song_id, st.recording_id, st.youtube_url,
+                st.created_at, st.updated_at,
+                r.album_title, r.recording_year
             FROM solo_transcriptions st
             LEFT JOIN recordings r ON st.recording_id = r.id
             WHERE st.song_id = %s
@@ -335,19 +305,18 @@ def get_song_detail(song_id):
         """
         transcriptions = db_tools.execute_query(transcriptions_query, (song_id,), fetch_all=True)
         
-        # Build response with all data
+        # Build response
         song_dict = dict(song)
         song_dict['recordings'] = recordings if recordings else []
         song_dict['recording_count'] = len(recordings) if recordings else 0
-        song_dict['transcriptions'] = transcriptions if transcriptions else []
-        song_dict['transcription_count'] = len(transcriptions) if transcriptions else 0
+        song_dict['transcriptions'] = transcriptions if transcriptions else []  # NEW
+        song_dict['transcription_count'] = len(transcriptions) if transcriptions else 0  # NEW
         
         return jsonify(song_dict)
         
     except Exception as e:
         logger.error(f"Error fetching song detail: {e}")
         return jsonify({'error': 'Failed to fetch song details', 'detail': str(e)}), 500
-
 
 
    
