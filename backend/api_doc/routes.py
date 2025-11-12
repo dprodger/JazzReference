@@ -23,7 +23,6 @@ def get_base_url():
         return f"{scheme}://{host}"
     return "http://localhost:5001"
 
-@api_docs.route('/')
 @api_docs.route('/docs')
 @api_docs.route('/docs/')
 def api_docs_home():

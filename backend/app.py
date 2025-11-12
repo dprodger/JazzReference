@@ -3,7 +3,7 @@ Jazz Reference API Backend - Improved Version
 A Flask API with robust database connection handling
 """
 
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, render_template
 from flask_cors import CORS
 from datetime import date
 import logging
@@ -62,6 +62,20 @@ def safe_strip(value):
         stripped = value.strip()
         return stripped if stripped else None
     return value
+
+
+# ============================================================================
+# LANDING PAGE
+# ============================================================================
+
+@app.route('/')
+def landing_page():
+    """Serve the main landing page"""
+    return render_template('index.html')
+
+# ============================================================================
+# API ENDPOINTS
+# ============================================================================
 
 @app.route('/api/health', methods=['GET'])
 def health_check():
