@@ -20,9 +20,13 @@ struct TranscriptionsSection: View {
                 .padding(.horizontal)
                 .padding(.top, 16)
             
-            VStack(alignment: .leading, spacing: 0) {
-                DisclosureGroup(
-                    isExpanded: $isSectionExpanded,
+            // HStack with explicit spacers ensures DisclosureGroup chevron is properly inset
+            HStack(spacing: 0) {
+                Spacer().frame(width: 16)
+                
+                VStack(alignment: .leading, spacing: 0) {
+                    DisclosureGroup(
+                        isExpanded: $isSectionExpanded,
                     content: {
                         VStack(alignment: .leading, spacing: 12) {
                             ForEach(transcriptions) { transcription in
@@ -50,11 +54,13 @@ struct TranscriptionsSection: View {
                                 .background(JazzTheme.teal.opacity(0.1))
                                 .cornerRadius(6)
                         }
-                        .padding(.horizontal)
                         .padding(.vertical, 12)
                     }
                 )
                 .tint(JazzTheme.teal)
+            }
+            
+            Spacer().frame(width: 16)
             }
             .background(JazzTheme.backgroundLight)
         }

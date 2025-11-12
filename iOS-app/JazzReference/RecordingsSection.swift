@@ -59,9 +59,13 @@ struct RecordingsSection: View {
     @State private var isSectionExpanded: Bool = true
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            DisclosureGroup(
-                isExpanded: $isSectionExpanded,
+        // HStack with explicit spacers ensures DisclosureGroup chevron is properly inset
+        HStack(spacing: 0) {
+            Spacer().frame(width: 16)
+            
+            VStack(alignment: .leading, spacing: 0) {
+                DisclosureGroup(
+                    isExpanded: $isSectionExpanded,
                 content: {
                     VStack(alignment: .leading, spacing: 0) {
                         
@@ -152,59 +156,55 @@ struct RecordingsSection: View {
                                     .padding()
                                 },
                                 label: {
-                                    HStack {
-                                        Image(systemName: "line.3.horizontal.decrease.circle")
-                                            .foregroundColor(JazzTheme.brass)
-                                        Text("Filters")
-                                            .font(.headline)
-                                            .foregroundColor(JazzTheme.charcoal)
+                                    HStack(spacing: 12) {
+                                        HStack(spacing: 8) {
+                                            Image(systemName: "line.3.horizontal.decrease.circle")
+                                                .foregroundColor(JazzTheme.brass)
+                                            Text("Filters")
+                                                .font(.headline)
+                                                .foregroundColor(JazzTheme.charcoal)
+                                            
+                                            // Active filter indicators
+                                            HStack(spacing: 6) {
+                                                if selectedFilter == .withSpotify {
+                                                    Text("Spotify")
+                                                        .font(.caption)
+                                                        .foregroundColor(JazzTheme.brass)
+                                                        .padding(.horizontal, 6)
+                                                        .padding(.vertical, 2)
+                                                        .background(JazzTheme.brass.opacity(0.2))
+                                                        .cornerRadius(4)
+                                                }
+                                                
+                                                if let family = selectedInstrument {
+                                                    Text(family.rawValue)
+                                                        .font(.caption)
+                                                        .foregroundColor(JazzTheme.brass)
+                                                        .padding(.horizontal, 6)
+                                                        .padding(.vertical, 2)
+                                                        .background(JazzTheme.brass.opacity(0.2))
+                                                        .cornerRadius(4)
+                                                }
+                                            }
+                                        }
                                         
                                         Spacer()
                                         
-                                        // Active filter indicators
-                                        HStack(spacing: 6) {
-                                            if selectedFilter == .withSpotify {
-                                                Text("Spotify")
-                                                    .font(.caption)
-                                                    .foregroundColor(JazzTheme.brass)
-                                                    .padding(.horizontal, 6)
-                                                    .padding(.vertical, 2)
-                                                    .background(JazzTheme.brass.opacity(0.2))
-                                                    .cornerRadius(4)
-                                            }
-                                            
-                                            if let family = selectedInstrument {
-                                                Text(family.rawValue)
-                                                    .font(.caption)
-                                                    .foregroundColor(JazzTheme.brass)
-                                                    .padding(.horizontal, 6)
-                                                    .padding(.vertical, 2)
-                                                    .background(JazzTheme.brass.opacity(0.2))
-                                                    .cornerRadius(4)
-                                            }
-                                        }
+                                        // Recording count on same line
+                                        Text("\(filteredRecordings.count) Recording\(filteredRecordings.count == 1 ? "" : "s")")
+                                            .font(.subheadline)
+                                            .foregroundColor(JazzTheme.smokeGray)
                                     }
                                     .padding(.vertical, 8)
                                 }
                             )
                             .tint(JazzTheme.brass)
-                            .padding(.horizontal)
                             .padding(.vertical, 8)
                         }
                         .background(JazzTheme.cardBackground)
                         .cornerRadius(10)
                         .padding(.horizontal)
                         .padding(.top, 8)
-                        
-                        // Recording count
-                        HStack {
-                            Text("\(filteredRecordings.count) Recording\(filteredRecordings.count == 1 ? "" : "s")")
-                                .font(.subheadline)
-                                .foregroundColor(JazzTheme.smokeGray)
-                            Spacer()
-                        }
-                        .padding(.horizontal)
-                        .padding(.top, 12)
                         
                         // Recordings List
                         VStack(alignment: .leading, spacing: 12) {
@@ -258,20 +258,14 @@ struct RecordingsSection: View {
                             .foregroundColor(JazzTheme.charcoal)
                         
                         Spacer()
-                        
-                        Text("\(filteredRecordings.count)")
-                            .font(.subheadline)
-                            .foregroundColor(JazzTheme.smokeGray)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(JazzTheme.burgundy.opacity(0.1))
-                            .cornerRadius(6)
                     }
-                    .padding(.horizontal)
                     .padding(.vertical, 12)
                 }
             )
             .tint(JazzTheme.burgundy)
+        }
+        
+        Spacer().frame(width: 16)
         }
         .background(JazzTheme.backgroundLight)
     }
