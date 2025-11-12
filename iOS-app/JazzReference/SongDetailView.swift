@@ -2,7 +2,7 @@
 //  SongDetailView.swift
 //  JazzReference
 //
-//  UPDATED: Added "Add to Repertoire" functionality
+//  UPDATED: Minimalist swipe navigation with page dots
 //
 
 import SwiftUI
@@ -302,45 +302,58 @@ struct SongDetailView: View {
             Text("The song has been queued for research. Data will be updated in the background.")
         }
         .overlay(alignment: .bottom) {
-            // Navigation indicators
-            if !allSongs.isEmpty && !isLoading {
-                HStack(spacing: 20) {
-                    Button(action: {
-                        withAnimation(.easeInOut(duration: 0.3)) {
-                            navigateToPrevious()
-                        }
-                    }) {
-                        Image(systemName: "chevron.left.circle.fill")
-                            .font(.system(size: 36))
-                            .foregroundColor(canNavigatePrevious ? JazzTheme.burgundy : JazzTheme.smokeGray.opacity(0.3))
-                    }
-                    .disabled(!canNavigatePrevious)
+            // Minimalist page indicator - only show if there are multiple songs
+            if !allSongs.isEmpty && allSongs.count > 1 && !isLoading, let index = currentIndex {
+                HStack(spacing: 6) {
+                    // Show up to 5 dots, with current in the middle when possible
+                    let visibleRange = calculateVisibleDotRange(current: index, total: allSongs.count)
                     
-                    if let index = currentIndex {
-                        Text("\(index + 1) of \(allSongs.count)")
-                            .font(.caption)
-                            .fontWeight(.medium)
-                            .foregroundColor(JazzTheme.charcoal)
+                    ForEach(visibleRange, id: \.self) { dotIndex in
+                        Circle()
+                            .fill(dotIndex == index ? JazzTheme.burgundy : JazzTheme.smokeGray.opacity(0.3))
+                            .frame(width: dotIndex == index ? 8 : 6, height: dotIndex == index ? 8 : 6)
+                            .animation(.easeInOut(duration: 0.2), value: index)
                     }
-                    
-                    Button(action: {
-                        withAnimation(.easeInOut(duration: 0.3)) {
-                            navigateToNext()
-                        }
-                    }) {
-                        Image(systemName: "chevron.right.circle.fill")
-                            .font(.system(size: 36))
-                            .foregroundColor(canNavigateNext ? JazzTheme.burgundy : JazzTheme.smokeGray.opacity(0.3))
-                    }
-                    .disabled(!canNavigateNext)
                 }
-                .padding(.horizontal, 24)
-                .padding(.vertical, 12)
+                .padding(.vertical, 8)
+                .padding(.horizontal, 12)
                 .background(.ultraThinMaterial)
-                .cornerRadius(20)
-                .padding(.bottom, 20)
+                .cornerRadius(12)
+                .padding(.bottom, 12)
             }
         }
+    }
+    
+    // MARK: - Helper for Page Dots
+    
+    private func calculateVisibleDotRange(current: Int, total: Int) -> Range<Int> {
+        let maxDots = 5
+        
+        if total <= maxDots {
+            return 0..<total
+        }
+        
+        // Try to center the current dot
+        let halfDots = maxDots / 2
+        var start = current - halfDots
+        var end = current + halfDots + 1
+        
+        // Adjust if we're near the beginning
+        if start < 0 {
+            end += abs(start)
+            start = 0
+        }
+        
+        // Adjust if we're near the end
+        if end > total {
+            start -= (end - total)
+            end = total
+        }
+        
+        // Ensure we don't go below 0
+        start = max(0, start)
+        
+        return start..<end
     }
 }
 
