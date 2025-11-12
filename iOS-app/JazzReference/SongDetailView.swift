@@ -3,6 +3,7 @@
 //  JazzReference
 //
 //  UPDATED: Minimalist swipe navigation with page dots
+//  FIXED: Broken up body to avoid type-checker timeout
 //
 
 import SwiftUI
@@ -74,11 +75,11 @@ struct SongDetailView: View {
         isLoading = true
         Task {
             let networkManager = NetworkManager()
+            // OPTIMIZED: Single API call now includes transcriptions
             let fetchedSong = await networkManager.fetchSongDetail(id: currentSongId)
-            let fetchedTranscriptions = await networkManager.fetchSongTranscriptions(songId: currentSongId)
             await MainActor.run {
                 song = fetchedSong
-                transcriptions = fetchedTranscriptions
+                transcriptions = fetchedSong?.transcriptions ?? []
                 isLoading = false
             }
         }
@@ -184,143 +185,189 @@ struct SongDetailView: View {
         }
     }
     
+    // MARK: - Body (broken into smaller chunks to avoid type-checker timeout)
+    
     var body: some View {
+        contentView
+            .onAppear(perform: loadInitialData)
+    }
+    
+    // MARK: - View Builders
+    
+    private var contentView: some View {
+        mainScrollView
+            .background(JazzTheme.backgroundLight)
+            .navigationTitle(song?.title ?? "Song Detail")
+            .navigationBarTitleDisplayMode(.large)
+            .toolbarBackground(JazzTheme.burgundy, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbarColorScheme(.dark, for: .navigationBar)
+            .toolbar {
+                toolbarContent
+            }
+            .task {
+                await loadSongData()
+            }
+            .gesture(swipeGesture)
+            .sheet(isPresented: $showAddToRepertoireSheet) {
+                repertoireSheet
+            }
+            .alert("Success", isPresented: $showSuccessAlert) {
+                Button("OK", role: .cancel) { }
+            } message: {
+                Text(alertMessage)
+            }
+            .alert("Error", isPresented: $showErrorAlert) {
+                Button("OK", role: .cancel) { }
+            } message: {
+                Text(alertMessage)
+            }
+            .alert("Refresh Song Data?", isPresented: $showRefreshConfirmation) {
+                Button("Cancel", role: .cancel) { }
+                Button("Refresh", role: .destructive) {
+                    refreshSongData()
+                }
+            } message: {
+                Text("This will queue \"\(song?.title ?? "this song")\" for background research to update its information from external sources.")
+            }
+            .alert("Song Queued", isPresented: $showRefreshSuccess) {
+                Button("OK", role: .cancel) { }
+            } message: {
+                Text("The song has been queued for research. Data will be updated in the background.")
+            }
+            .overlay(alignment: .bottom) {
+                pageIndicatorView
+            }
+    }
+    
+    private var mainScrollView: some View {
         ScrollView {
             if isLoading {
-                VStack {
-                    Spacer()
-                    ProgressView("Loading...")
-                        .tint(JazzTheme.burgundy)
-                    Spacer()
-                }
-                .frame(maxWidth: .infinity, minHeight: 300)
+                loadingView
             } else if let song = song {
                 songContentView(for: song)
             } else {
-                VStack {
-                    Spacer()
-                    Text("Song not found")
-                        .font(.title3)
-                        .foregroundColor(JazzTheme.smokeGray)
-                    Spacer()
-                }
-                .frame(maxWidth: .infinity, minHeight: 300)
-                .background(JazzTheme.backgroundLight)
+                notFoundView
             }
         }
+    }
+    
+    private var loadingView: some View {
+        VStack {
+            Spacer()
+            ProgressView("Loading...")
+                .tint(JazzTheme.burgundy)
+            Spacer()
+        }
+        .frame(maxWidth: .infinity, minHeight: 300)
+    }
+    
+    private var notFoundView: some View {
+        VStack {
+            Spacer()
+            Text("Song not found")
+                .font(.title3)
+                .foregroundColor(JazzTheme.smokeGray)
+            Spacer()
+        }
+        .frame(maxWidth: .infinity, minHeight: 300)
         .background(JazzTheme.backgroundLight)
-        .navigationTitle(song?.title ?? "Song Detail")
-        .navigationBarTitleDisplayMode(.large)
-        .toolbarBackground(JazzTheme.burgundy, for: .navigationBar)
-        .toolbarBackground(.visible, for: .navigationBar)
-        .toolbarColorScheme(.dark, for: .navigationBar)
-        .toolbar {
-            // NEW: Add to Repertoire button (only when viewing all songs)
-            if repertoireManager.isShowingAllSongs && song != nil {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: {
-                        showAddToRepertoireSheet = true
-                    }) {
-                        Image(systemName: "plus.circle")
-                            .foregroundColor(.white)
-                    }
-                    .disabled(isAddingToRepertoire)
+    }
+    
+    @ToolbarContentBuilder
+    private var toolbarContent: some ToolbarContent {
+        if repertoireManager.isShowingAllSongs && song != nil {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button(action: {
+                    showAddToRepertoireSheet = true
+                }) {
+                    Image(systemName: "plus.circle")
+                        .foregroundColor(.white)
                 }
+                .disabled(isAddingToRepertoire)
             }
         }
-        .task {
-            #if DEBUG
-            if ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1" {
-                let networkManager = NetworkManager()
-                song = networkManager.fetchSongDetailSync(id: currentSongId)
-                transcriptions = networkManager.fetchSongTranscriptionsSync(songId: currentSongId)
-                isLoading = false
-                return
-            }
-            #endif
-            
-            let networkManager = NetworkManager()
-            song = await networkManager.fetchSongDetail(id: currentSongId)
-            transcriptions = await networkManager.fetchSongTranscriptions(songId: currentSongId)
-            isLoading = false
-        }
-        .gesture(
-            DragGesture(minimumDistance: 50)
-                .onEnded { value in
-                    if abs(value.translation.width) > abs(value.translation.height) {
-                        if value.translation.width < -50 && canNavigateNext {
-                            // Swipe left - next song
-                            withAnimation(.easeInOut(duration: 0.3)) {
-                                navigateToNext()
-                            }
-                        } else if value.translation.width > 50 && canNavigatePrevious {
-                            // Swipe right - previous song
-                            withAnimation(.easeInOut(duration: 0.3)) {
-                                navigateToPrevious()
-                            }
+    }
+    
+    private var swipeGesture: some Gesture {
+        DragGesture(minimumDistance: 50)
+            .onEnded { value in
+                if abs(value.translation.width) > abs(value.translation.height) {
+                    if value.translation.width < -50 && canNavigateNext {
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            navigateToNext()
+                        }
+                    } else if value.translation.width > 50 && canNavigatePrevious {
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            navigateToPrevious()
                         }
                     }
                 }
+            }
+    }
+    
+    private var repertoireSheet: some View {
+        AddToRepertoireSheet(
+            songId: songId,
+            songTitle: song?.title ?? "Unknown",
+            repertoireManager: repertoireManager,
+            isPresented: $showAddToRepertoireSheet,
+            onSuccess: { message in
+                alertMessage = message
+                showSuccessAlert = true
+            },
+            onError: { message in
+                alertMessage = message
+                showErrorAlert = true
+            }
         )
-        .sheet(isPresented: $showAddToRepertoireSheet) {
-            AddToRepertoireSheet(
-                songId: songId,
-                songTitle: song?.title ?? "Unknown",
-                repertoireManager: repertoireManager,
-                isPresented: $showAddToRepertoireSheet,
-                onSuccess: { message in
-                    alertMessage = message
-                    showSuccessAlert = true
-                },
-                onError: { message in
-                    alertMessage = message
-                    showErrorAlert = true
+    }
+    
+    @ViewBuilder
+    private var pageIndicatorView: some View {
+        if !allSongs.isEmpty && allSongs.count > 1 && !isLoading, let index = currentIndex {
+            HStack(spacing: 6) {
+                let visibleRange = calculateVisibleDotRange(current: index, total: allSongs.count)
+                
+                ForEach(visibleRange, id: \.self) { dotIndex in
+                    Circle()
+                        .fill(dotIndex == index ? JazzTheme.burgundy : JazzTheme.smokeGray.opacity(0.3))
+                        .frame(width: dotIndex == index ? 8 : 6, height: dotIndex == index ? 8 : 6)
+                        .animation(.easeInOut(duration: 0.2), value: index)
                 }
-            )
-        }
-        .alert("Success", isPresented: $showSuccessAlert) {
-            Button("OK", role: .cancel) { }
-        } message: {
-            Text(alertMessage)
-        }
-        .alert("Error", isPresented: $showErrorAlert) {
-            Button("OK", role: .cancel) { }
-        } message: {
-            Text(alertMessage)
-        }
-        .alert("Refresh Song Data?", isPresented: $showRefreshConfirmation) {
-            Button("Cancel", role: .cancel) { }
-            Button("Refresh", role: .destructive) {
-                refreshSongData()
             }
-        } message: {
-            Text("This will queue \"\(song?.title ?? "this song")\" for background research to update its information from external sources.")
+            .padding(.vertical, 8)
+            .padding(.horizontal, 12)
+            .background(.ultraThinMaterial)
+            .cornerRadius(12)
+            .padding(.bottom, 12)
         }
-        .alert("Song Queued", isPresented: $showRefreshSuccess) {
-            Button("OK", role: .cancel) { }
-        } message: {
-            Text("The song has been queued for research. Data will be updated in the background.")
+    }
+    
+    // MARK: - Data Loading
+    
+    private func loadInitialData() {
+        // Empty - using .task instead for async loading
+    }
+    
+    private func loadSongData() async {
+        #if DEBUG
+        if ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1" {
+            let networkManager = NetworkManager()
+            song = networkManager.fetchSongDetailSync(id: currentSongId)
+            transcriptions = song?.transcriptions ?? []
+            isLoading = false
+            return
         }
-        .overlay(alignment: .bottom) {
-            // Minimalist page indicator - only show if there are multiple songs
-            if !allSongs.isEmpty && allSongs.count > 1 && !isLoading, let index = currentIndex {
-                HStack(spacing: 6) {
-                    // Show up to 5 dots, with current in the middle when possible
-                    let visibleRange = calculateVisibleDotRange(current: index, total: allSongs.count)
-                    
-                    ForEach(visibleRange, id: \.self) { dotIndex in
-                        Circle()
-                            .fill(dotIndex == index ? JazzTheme.burgundy : JazzTheme.smokeGray.opacity(0.3))
-                            .frame(width: dotIndex == index ? 8 : 6, height: dotIndex == index ? 8 : 6)
-                            .animation(.easeInOut(duration: 0.2), value: index)
-                    }
-                }
-                .padding(.vertical, 8)
-                .padding(.horizontal, 12)
-                .background(.ultraThinMaterial)
-                .cornerRadius(12)
-                .padding(.bottom, 12)
-            }
+        #endif
+        
+        let networkManager = NetworkManager()
+        // OPTIMIZED: Single API call now includes transcriptions
+        let fetchedSong = await networkManager.fetchSongDetail(id: currentSongId)
+        await MainActor.run {
+            song = fetchedSong
+            transcriptions = fetchedSong?.transcriptions ?? []
+            isLoading = false
         }
     }
     

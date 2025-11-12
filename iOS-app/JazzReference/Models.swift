@@ -7,7 +7,7 @@
 
 import Foundation
 
-struct Song: Codable, Identifiable {
+struct Song: Identifiable, Codable {
     let id: String
     let title: String
     let composer: String?
@@ -16,19 +16,31 @@ struct Song: Codable, Identifiable {
     let musicbrainzId: String?
     let wikipediaUrl: String?
     let externalReferences: [String: String]?
+    let createdAt: String?
+    let updatedAt: String?
+    
+    // Recordings data (included in detail view)
     let recordings: [Recording]?
     let recordingCount: Int?
     
+    // NEW: Transcriptions data (now included in song response)
+    let transcriptions: [SoloTranscription]?
+    let transcriptionCount: Int?
+    
     enum CodingKeys: String, CodingKey {
-        case id, title, composer, structure, recordings
+        case id, title, composer, structure
         case songReference = "song_reference"
         case musicbrainzId = "musicbrainz_id"
         case wikipediaUrl = "wikipedia_url"
         case externalReferences = "external_references"
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+        case recordings
         case recordingCount = "recording_count"
+        case transcriptions          // NEW
+        case transcriptionCount = "transcription_count"  // NEW
     }
 }
-
 struct Recording: Codable, Identifiable {
     let id: String
     let songId: String?
@@ -299,3 +311,4 @@ extension Repertoire {
         )
     }
 }
+

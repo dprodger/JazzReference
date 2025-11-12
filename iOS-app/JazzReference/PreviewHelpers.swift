@@ -24,8 +24,12 @@ extension Song {
             "wikipedia": "https://en.wikipedia.org/wiki/Take_Five",
             "jazzstandards": "https://www.jazzstandards.com/compositions/takefive.htm"
         ],
+        createdAt: "2024-01-15T10:30:00Z",
+        updatedAt: "2024-01-15T10:30:00Z",
         recordings: [Recording.preview1, Recording.preview2],
-        recordingCount: 2
+        recordingCount: 2,
+        transcriptions: [SoloTranscription.preview1, SoloTranscription.preview2],
+        transcriptionCount: 2
     )
     
     static let previewNoRecordings = Song(
@@ -37,8 +41,12 @@ extension Song {
         musicbrainzId: "musicbrainz id",
         wikipediaUrl: "wiki id",
         externalReferences: nil,
+        createdAt: "2024-01-15T10:30:00Z",
+        updatedAt: "2024-01-15T10:30:00Z",
         recordings: [],
-        recordingCount: 0
+        recordingCount: 0,
+        transcriptions: [],
+        transcriptionCount: 0
     )
 }
 
@@ -151,6 +159,8 @@ extension Performer {
         deathDate: nil
     )
 }
+
+
 
 extension PerformerDetail {
     static let preview = PerformerDetail(
