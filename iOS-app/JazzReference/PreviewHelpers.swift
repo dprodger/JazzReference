@@ -19,6 +19,7 @@ extension Song {
         structure: "AABA form in 5/4 time",
         songReference: "One of the most iconic jazz compositions, known for its unusual 5/4 time signature.",
         musicbrainzId: "musicbrainz id",
+        wikipediaUrl: "wiki id",
         externalReferences: [
             "wikipedia": "https://en.wikipedia.org/wiki/Take_Five",
             "jazzstandards": "https://www.jazzstandards.com/compositions/takefive.htm"
@@ -34,6 +35,7 @@ extension Song {
         structure: "10-bar form",
         songReference: "A hauntingly beautiful ballad from Kind of Blue.",
         musicbrainzId: "musicbrainz id",
+        wikipediaUrl: "wiki id",
         externalReferences: nil,
         recordings: [],
         recordingCount: 0

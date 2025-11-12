@@ -6,6 +6,8 @@
 //
 import SwiftUI
 
+// MARK: - Report Bad Reference View
+
 struct ReportLinkIssueView: View {
     let entityType: String
     let entityId: String
@@ -71,10 +73,9 @@ struct ReportLinkIssueView: View {
                                     .foregroundColor(JazzTheme.smokeGray)
                                 
                                 Text(externalUrl)
-                                    .font(.caption)
-                                    .foregroundColor(JazzTheme.burgundy)
+                                    .font(.system(.caption, design: .monospaced))
+                                    .foregroundColor(JazzTheme.charcoal)
                                     .lineLimit(3)
-                                    .fixedSize(horizontal: false, vertical: true)
                             }
                         }
                     }
@@ -83,19 +84,14 @@ struct ReportLinkIssueView: View {
                     .background(JazzTheme.cardBackground)
                     .cornerRadius(10)
                     
-                    // Issue Description Section (the only editable part)
+                    // Explanation Input
                     VStack(alignment: .leading, spacing: 12) {
-                        Text("Describe the Issue")
+                        Text("What's Wrong?")
                             .font(.headline)
                             .foregroundColor(JazzTheme.charcoal)
                         
-                        Text("Please explain what's wrong with this link")
-                            .font(.caption)
-                            .foregroundColor(JazzTheme.smokeGray)
-                        
                         TextEditor(text: $explanation)
                             .frame(minHeight: 120)
-                            .font(.body)
                             .padding(8)
                             .background(Color(UIColor.systemBackground))
                             .cornerRadius(8)

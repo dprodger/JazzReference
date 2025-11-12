@@ -9,6 +9,7 @@ import SwiftUI
 
 struct ExternalReferencesPanel: View {
     let externalReferences: [String: String]?
+    let wikipediaUrl: String?
     let musicbrainzId: String?
     let musicbrainzType: MusicBrainzType
     let entityType: String
@@ -33,9 +34,30 @@ struct ExternalReferencesPanel: View {
         case recording // For recordings
     }
     
-    // NEW: Initializer for artists with dedicated wikipedia and musicbrainz fields
-    init(wikipediaUrl: String?, musicbrainzId: String?, externalLinks: [String: String]?,
+    // NEW: Initializer for songs with dedicated wikipedia and musicbrainz fields
+    init(wikipediaUrl: String?, musicbrainzId: String?, externalReferences: [String: String]?,
          entityId: String, entityName: String) {
+        // Use dedicated fields first, fall back to external_references if needed
+        var references = externalReferences ?? [:]
+        if let wikipedia = wikipediaUrl {
+            references["wikipedia"] = wikipedia
+        }
+        if let musicbrainz = musicbrainzId {
+            references["musicbrainz"] = musicbrainz
+        }
+        
+        self.externalReferences = references
+        self.musicbrainzId = musicbrainzId
+        self.musicbrainzType = .work
+        self.wikipediaUrl = wikipediaUrl
+        self.entityType = "song"
+        self.entityId = entityId
+        self.entityName = entityName
+    }
+    
+    // Initializer for artists with dedicated wikipedia and musicbrainz fields
+    init(wikipediaUrl: String?, musicbrainzId: String?, externalLinks: [String: String]?,
+         entityId: String, entityName: String, isArtist: Bool) {
         // Use dedicated fields first, fall back to external_links if needed
         var references = externalLinks ?? [:]
         if let wikipedia = wikipediaUrl {
@@ -48,16 +70,19 @@ struct ExternalReferencesPanel: View {
         self.externalReferences = references
         self.musicbrainzId = musicbrainzId
         self.musicbrainzType = .artist
+        self.wikipediaUrl = wikipediaUrl
         self.entityType = "performer"
         self.entityId = entityId
         self.entityName = entityName
     }
-
-    // Convenience initializer for songs (with separate musicbrainzId field)
+    
+    // DEPRECATED: Legacy initializer for songs (for backward compatibility)
+    // This is kept for any existing code that hasn't been updated yet
     init(externalReferences: [String: String]?, musicbrainzId: String?, entityId: String, entityName: String) {
         self.externalReferences = externalReferences
         self.musicbrainzId = musicbrainzId
         self.musicbrainzType = .work
+        self.wikipediaUrl = nil as String?
         self.entityType = "song"
         self.entityId = entityId
         self.entityName = entityName
@@ -68,6 +93,7 @@ struct ExternalReferencesPanel: View {
         self.externalReferences = externalLinks
         self.musicbrainzId = externalLinks?["musicbrainz"]
         self.musicbrainzType = .artist
+        self.wikipediaUrl = nil as String?
         self.entityType = "performer"
         self.entityId = entityId
         self.entityName = entityName
@@ -78,13 +104,14 @@ struct ExternalReferencesPanel: View {
         self.externalReferences = nil
         self.musicbrainzId = musicbrainzId
         self.musicbrainzType = .recording
+        self.wikipediaUrl = nil as String?
         self.entityType = "recording"
         self.entityId = recordingId
         self.entityName = albumTitle
     }
     
     var wikipediaURL: String? {
-        externalReferences?["wikipedia"]
+        return wikipediaUrl
     }
     
     var jazzStandardsURL: String? {
@@ -92,138 +119,95 @@ struct ExternalReferencesPanel: View {
     }
     
     var musicbrainzURL: String? {
-        guard let mbId = musicbrainzId else { return nil }
+        guard let musicbrainzId = musicbrainzId else { return nil }
+        
         switch musicbrainzType {
         case .work:
-            return "https://musicbrainz.org/work/\(mbId)"
+            return "https://musicbrainz.org/work/\(musicbrainzId)"
         case .artist:
-            return "https://musicbrainz.org/artist/\(mbId)"
+            return "https://musicbrainz.org/artist/\(musicbrainzId)"
         case .recording:
-            return "https://musicbrainz.org/recording/\(mbId)"
+            return "https://musicbrainz.org/recording/\(musicbrainzId)"
         }
     }
     
     var body: some View {
-        if wikipediaURL != nil || jazzStandardsURL != nil || musicbrainzURL != nil {
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Learn More")
-                    .font(.headline)
-                    .foregroundColor(JazzTheme.charcoal)
-                
-                HStack(spacing: 16) {
-                    if let wikipediaURL = wikipediaURL, let url = URL(string: wikipediaURL) {
-                        let urlString = wikipediaURL  // Capture explicitly
-                        Button {
-                            if !longPressOccurred {
-                                openURL(url)
-                            }
-                            longPressOccurred = false
-                        } label: {
-                            VStack(spacing: 4) {
-                                Image(systemName: "book.circle.fill")
-                                    .font(.title2)
-                                    .foregroundColor(JazzTheme.brass)
-                                Text("Wikipedia")
-                                    .font(.caption)
-                                    .foregroundColor(JazzTheme.smokeGray)
-                            }
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Learn More")
+                .font(.headline)
+                .foregroundColor(JazzTheme.charcoal)
+            
+            VStack(spacing: 10) {
+                // Wikipedia
+                if let wikipediaURL = wikipediaURL {
+                    ExternalLinkButton(
+                        icon: "book.fill",
+                        label: "Wikipedia",
+                        color: JazzTheme.teal,
+                        url: wikipediaURL,
+                        onLongPress: {
+                            reportingInfo = ReportingInfo(source: "Wikipedia", url: wikipediaURL)
                         }
-                        .simultaneousGesture(
-                            LongPressGesture(minimumDuration: 0.5)
-                                .onEnded { _ in
-                                    longPressOccurred = true
-                                    reportingInfo = ReportingInfo(source: "Wikipedia", url: urlString)
-                                }
-                        )
-                    }
-                    
-                    if let jazzStandardsURL = jazzStandardsURL, let url = URL(string: jazzStandardsURL) {
-                        let urlString = jazzStandardsURL  // Capture explicitly
-                        Button {
-                            if !longPressOccurred {
-                                openURL(url)
-                            }
-                            longPressOccurred = false
-                        } label: {
-                            VStack(spacing: 4) {
-                                Image(systemName: "music.note.list")
-                                    .font(.title2)
-                                    .foregroundColor(JazzTheme.brass)
-                                Text("Jazz Standards")
-                                    .font(.caption)
-                                    .foregroundColor(JazzTheme.smokeGray)
-                            }
-                        }
-                        .simultaneousGesture(
-                            LongPressGesture(minimumDuration: 0.5)
-                                .onEnded { _ in
-                                    longPressOccurred = true
-                                    reportingInfo = ReportingInfo(source: "Jazz Standards", url: urlString)
-                                }
-                        )
-                    }
-                    
-                    if let musicbrainzURL = musicbrainzURL, let url = URL(string: musicbrainzURL) {
-                        let urlString = musicbrainzURL  // Capture explicitly
-                        Button {
-                            if !longPressOccurred {
-                                openURL(url)
-                            }
-                            longPressOccurred = false
-                        } label: {
-                            VStack(spacing: 4) {
-                                Image(systemName: "music.mic.circle.fill")
-                                    .font(.title2)
-                                    .foregroundColor(JazzTheme.brass)
-                                Text("MusicBrainz")
-                                    .font(.caption)
-                                    .foregroundColor(JazzTheme.smokeGray)
-                            }
-                        }
-                        .simultaneousGesture(
-                            LongPressGesture(minimumDuration: 0.5)
-                                .onEnded { _ in
-                                    longPressOccurred = true
-                                    reportingInfo = ReportingInfo(source: "MusicBrainz", url: urlString)
-                                }
-                        )
-                    }
+                    )
                 }
-                .padding(.top, 4)
+                
+                // Jazz Standards
+                if let jazzStandardsURL = jazzStandardsURL {
+                    ExternalLinkButton(
+                        icon: "music.note",
+                        label: "Jazz Standards",
+                        color: JazzTheme.amber,
+                        url: jazzStandardsURL,
+                        onLongPress: {
+                            reportingInfo = ReportingInfo(source: "JazzStandards.com", url: jazzStandardsURL)
+                        }
+                    )
+                }
+                
+                // MusicBrainz
+                if let musicbrainzURL = musicbrainzURL {
+                    ExternalLinkButton(
+                        icon: "waveform.circle.fill",
+                        label: "MusicBrainz",
+                        color: JazzTheme.charcoal,
+                        url: musicbrainzURL,
+                        onLongPress: {
+                            reportingInfo = ReportingInfo(source: "MusicBrainz", url: musicbrainzURL)
+                        }
+                    )
+                }
             }
-            .padding()
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(JazzTheme.cardBackground)
-            .cornerRadius(10)
-            .padding(.horizontal)
-            .sheet(item: $reportingInfo) { info in
-                ReportLinkIssueView(
-                    entityType: entityType,
-                    entityId: entityId,
-                    entityName: entityName,
-                    externalSource: info.source,
-                    externalUrl: info.url,
-                    onSubmit: { explanation in
-                        submitLinkReport(
-                            entityType: entityType,
-                            entityId: entityId,
-                            entityName: entityName,
-                            externalSource: info.source,
-                            externalUrl: info.url,
-                            explanation: explanation
-                        )
-                        reportingInfo = nil
-                    },
-                    onCancel: {
-                        reportingInfo = nil
-                    }
-                )
-            }
-            .alert("Report Submitted", isPresented: $showingSubmissionAlert) {
-                Button("OK", role: .cancel) { }
-            } message: {
-                Text(submissionAlertMessage)
-            }
+        }
+        .padding()
+        .background(JazzTheme.cardBackground)
+        .cornerRadius(10)
+        .sheet(item: $reportingInfo) { info in
+            ReportLinkIssueView(
+                entityType: entityType,
+                entityId: entityId,
+                entityName: entityName,
+                externalSource: info.source,
+                externalUrl: info.url,
+                onSubmit: { explanation in
+                    submitLinkReport(
+                        entityType: entityType,
+                        entityId: entityId,
+                        entityName: entityName,
+                        externalSource: info.source,
+                        externalUrl: info.url,
+                        explanation: explanation
+                    )
+                    reportingInfo = nil
+                },
+                onCancel: {
+                    reportingInfo = nil
+                }
+            )
+        }
+        .alert("Report Submitted", isPresented: $showingSubmissionAlert) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(submissionAlertMessage)
         }
     }
     
@@ -258,48 +242,74 @@ struct ExternalReferencesPanel: View {
     private func sendReportToAPI(entityType: String, entityId: String, entityName: String, externalSource: String, externalUrl: String, explanation: String) async throws -> Bool {
         
         // Get API base URL from environment or use default
-        let baseURL = ProcessInfo.processInfo.environment["API_BASE_URL"] ?? "https://linernotesjazz.com"
+        let baseURL = ProcessInfo.processInfo.environment["API_BASE_URL"] ?? NetworkManager.baseURL
         
-        guard let url = URL(string: "\(baseURL)/api/content-reports") else {
+        guard let url = URL(string: "\(baseURL)/report-bad-reference") else {
             throw URLError(.badURL)
         }
         
-        // Build request body
         let requestBody: [String: Any] = [
             "entity_type": entityType,
             "entity_id": entityId,
             "entity_name": entityName,
             "external_source": externalSource,
             "external_url": externalUrl,
-            "explanation": explanation,
-            "reporter_platform": "ios",
-            "reporter_app_version": Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
+            "explanation": explanation
         ]
         
-        // Create request
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
         
-        // Send request
         let (data, response) = try await URLSession.shared.data(for: request)
         
-        // Check response
         guard let httpResponse = response as? HTTPURLResponse else {
             return false
         }
         
-        if httpResponse.statusCode == 201 {
-            // Success
-            return true
-        } else {
-            // Log error for debugging
-            if let errorDict = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-               let errorMessage = errorDict["error"] as? String {
-                print("API Error: \(errorMessage)")
-            }
-            return false
-        }
+        // Consider 200-299 as success
+        return (200...299).contains(httpResponse.statusCode)
     }
 }
+
+// MARK: - External Link Button
+
+struct ExternalLinkButton: View {
+    let icon: String
+    let label: String
+    let color: Color
+    let url: String
+    let onLongPress: () -> Void
+    
+    @Environment(\.openURL) var openURL
+    
+    var body: some View {
+        Button(action: {
+            if let url = URL(string: url) {
+                openURL(url)
+            }
+        }) {
+            HStack {
+                Image(systemName: icon)
+                    .foregroundColor(color)
+                Text(label)
+                    .foregroundColor(JazzTheme.charcoal)
+                Spacer()
+                Image(systemName: "arrow.up.right")
+                    .font(.caption)
+                    .foregroundColor(JazzTheme.smokeGray)
+            }
+            .padding()
+            .background(Color(.systemBackground))
+            .cornerRadius(8)
+        }
+        .simultaneousGesture(
+            LongPressGesture(minimumDuration: 0.5)
+                .onEnded { _ in
+                    onLongPress()
+                }
+        )
+    }
+}
+

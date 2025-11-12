@@ -164,7 +164,8 @@ struct PerformerDetailView: View {
                                             musicbrainzId: performer.musicbrainzId,
                                             externalLinks: performer.externalLinks,
                                             entityId: performer.id,
-                                            entityName: performer.name
+                                            entityName: performer.name,
+                                            isArtist: true
                                         )
                                         .padding(.top, 8)
                                     }

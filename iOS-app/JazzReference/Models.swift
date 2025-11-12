@@ -14,6 +14,7 @@ struct Song: Codable, Identifiable {
     let structure: String?
     let songReference: String?
     let musicbrainzId: String?
+    let wikipediaUrl: String?
     let externalReferences: [String: String]?
     let recordings: [Recording]?
     let recordingCount: Int?
@@ -22,6 +23,7 @@ struct Song: Codable, Identifiable {
         case id, title, composer, structure, recordings
         case songReference = "song_reference"
         case musicbrainzId = "musicbrainz_id"
+        case wikipediaUrl = "wikipedia_url"
         case externalReferences = "external_references"
         case recordingCount = "recording_count"
     }
