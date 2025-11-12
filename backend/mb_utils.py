@@ -58,6 +58,8 @@ class MusicBrainzSearcher:
         self.recording_cache_dir.mkdir(parents=True, exist_ok=True)
         self.release_cache_dir = self.cache_dir / 'releases'
         self.release_cache_dir.mkdir(parents=True, exist_ok=True)
+        self.wikidata_cache_dir = self.cache_dir / 'wikidata'
+        self.wikidata_cache_dir.mkdir(parents=True, exist_ok=True)
         
         logger.debug(f"MusicBrainz cache: {self.cache_dir} (expires after {cache_days} days, force_refresh={force_refresh})")
 
@@ -203,6 +205,19 @@ class MusicBrainzSearcher:
         """
         filename = f"release_{release_id}.json"
         return self.release_cache_dir / filename
+    
+    def _get_wikidata_cache_path(self, wikidata_id):
+        """
+        Get the cache file path for a Wikidata lookup
+        
+        Args:
+            wikidata_id: Wikidata ID (e.g., 'Q12345')
+            
+        Returns:
+            Path object for the cache file
+        """
+        filename = f"wikidata_{wikidata_id}.json"
+        return self.wikidata_cache_dir / filename
     
     def _is_cache_valid(self, cache_path):
         """
@@ -583,7 +598,7 @@ class MusicBrainzSearcher:
         try:
             url = f"https://musicbrainz.org/ws/2/work/{work_id}"
             params = {
-                'inc': 'artist-rels+recording-rels',
+                'inc': 'artist-rels+recording-rels+url-rels',
                 'fmt': 'json'
             }
             
@@ -736,7 +751,91 @@ class MusicBrainzSearcher:
                 self.work_cache_dir.mkdir(parents=True, exist_ok=True)
                 self.recording_cache_dir.mkdir(parents=True, exist_ok=True)
                 self.release_cache_dir.mkdir(parents=True, exist_ok=True)
+                self.wikidata_cache_dir.mkdir(parents=True, exist_ok=True)
                 logger.info("Cleared all MusicBrainz cache")
+    
+    def get_wikipedia_from_wikidata(self, wikidata_id):
+        """
+        Get English Wikipedia URL from a Wikidata ID
+        
+        Args:
+            wikidata_id: Wikidata ID (e.g., 'Q12345')
+            
+        Returns:
+            Wikipedia URL string, or None if not found
+        """
+        # Check cache first (unless force_refresh is enabled)
+        cache_path = self._get_wikidata_cache_path(wikidata_id)
+        if not self.force_refresh:
+            cached = self._load_from_cache(cache_path)
+            if cached:
+                logger.debug(f"  Using cached Wikidata lookup (cached: {cached['cached_at'][:10]})")
+                self.last_made_api_call = False
+                return cached.get('data')
+        
+        # Fetch from Wikidata API
+        # Note: Wikidata has more lenient rate limits than MusicBrainz
+        # We'll still rate limit but at 0.5 seconds instead of 1 second
+        self.last_made_api_call = True
+        
+        # Apply lighter rate limiting for Wikidata (0.5 seconds)
+        current_time = time.time()
+        time_since_last = current_time - self.last_request_time
+        if time_since_last < 0.5:
+            time.sleep(0.5 - time_since_last)
+        self.last_request_time = time.time()
+        
+        try:
+            url = "https://www.wikidata.org/w/api.php"
+            params = {
+                'action': 'wbgetentities',
+                'ids': wikidata_id,
+                'props': 'sitelinks',
+                'format': 'json'
+            }
+            
+            logger.debug(f"Fetching Wikipedia URL from Wikidata: {wikidata_id}")
+            
+            response = self.session.get(url, params=params, timeout=10)
+            
+            if response.status_code != 200:
+                logger.debug(f"Wikidata API returned status {response.status_code}")
+                self._save_to_cache(cache_path, None)
+                return None
+            
+            data = response.json()
+            
+            # Extract English Wikipedia sitelink
+            entities = data.get('entities', {})
+            entity = entities.get(wikidata_id, {})
+            sitelinks = entity.get('sitelinks', {})
+            enwiki = sitelinks.get('enwiki', {})
+            
+            if not enwiki:
+                logger.debug(f"No English Wikipedia link found for Wikidata ID {wikidata_id}")
+                self._save_to_cache(cache_path, None)
+                return None
+            
+            # Construct Wikipedia URL from title
+            title = enwiki.get('title')
+            if title:
+                # URL encode the title (spaces become underscores in Wikipedia URLs)
+                import urllib.parse
+                encoded_title = urllib.parse.quote(title.replace(' ', '_'))
+                wikipedia_url = f"https://en.wikipedia.org/wiki/{encoded_title}"
+                
+                # Cache the result
+                self._save_to_cache(cache_path, wikipedia_url)
+                
+                logger.debug(f"Found Wikipedia URL from Wikidata: {wikipedia_url}")
+                return wikipedia_url
+            
+            self._save_to_cache(cache_path, None)
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error fetching Wikipedia URL from Wikidata: {e}")
+            return None
 
 
 def update_song_composer(song_id: str, mb_searcher: MusicBrainzSearcher = None) -> bool:
@@ -828,7 +927,7 @@ def update_song_composer(song_id: str, mb_searcher: MusicBrainzSearcher = None) 
         return False
 
 
-def update_song_wikipedia_url(song_id: str, mb_searcher: MusicBrainzSearcher = None) -> bool:
+def update_song_wikipedia_url(song_id: str, mb_searcher: MusicBrainzSearcher = None, dry_run: bool = False) -> bool:
     """
     Update song Wikipedia URL from MusicBrainz if not already set
     
@@ -837,9 +936,10 @@ def update_song_wikipedia_url(song_id: str, mb_searcher: MusicBrainzSearcher = N
     Args:
         song_id: UUID of the song
         mb_searcher: Optional MusicBrainzSearcher instance (creates new one if not provided)
+        dry_run: If True, show what would be done without making changes
         
     Returns:
-        bool: True if Wikipedia URL was updated, False otherwise
+        bool: True if Wikipedia URL was updated (or would be in dry-run), False otherwise
     """
     from db_utils import get_db_connection
     
@@ -878,21 +978,42 @@ def update_song_wikipedia_url(song_id: str, mb_searcher: MusicBrainzSearcher = N
         
         # Extract Wikipedia URL from URL relationships
         wikipedia_url = None
+        wikidata_id = None
         
         for relation in work_data.get('relations', []):
             rel_type = relation.get('type')
             
-            # Check for Wikipedia URL relationship
+            # Check for Wikipedia URL relationship (preferred - direct link)
             if rel_type == 'wikipedia':
                 url_data = relation.get('url', {})
                 resource = url_data.get('resource')
                 
                 if resource:
                     wikipedia_url = resource
+                    logger.debug(f"Found direct Wikipedia URL: {wikipedia_url}")
                     break
+            
+            # Also collect Wikidata ID as fallback
+            elif rel_type == 'wikidata' and not wikidata_id:
+                url_data = relation.get('url', {})
+                resource = url_data.get('resource')
+                
+                if resource:
+                    # Extract Wikidata ID from URL (e.g., https://www.wikidata.org/wiki/Q12345 -> Q12345)
+                    if '/wiki/' in resource:
+                        wikidata_id = resource.split('/wiki/')[-1]
+                        logger.debug(f"Found Wikidata ID: {wikidata_id}")
+        
+        # If no direct Wikipedia URL, try to get it from Wikidata
+        if not wikipedia_url and wikidata_id:
+            logger.debug(f"No direct Wikipedia URL, trying Wikidata lookup for {wikidata_id}")
+            wikipedia_url = mb_searcher.get_wikipedia_from_wikidata(wikidata_id)
+            
+            if wikipedia_url:
+                logger.debug(f"Got Wikipedia URL from Wikidata: {wikipedia_url}")
         
         if not wikipedia_url:
-            logger.debug("No Wikipedia URL found in MusicBrainz work data")
+            logger.debug("No Wikipedia URL found (checked direct link and Wikidata)")
             return False
         
         # Check if song already has this Wikipedia URL
@@ -904,16 +1025,20 @@ def update_song_wikipedia_url(song_id: str, mb_searcher: MusicBrainzSearcher = N
             return False
         
         # Update song with Wikipedia URL
-        with get_db_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    "UPDATE songs SET wikipedia_url = %s, updated_at = CURRENT_TIMESTAMP WHERE id = %s",
-                    (wikipedia_url, song_id)
-                )
-                conn.commit()
-        
-        logger.info(f"✓ Updated Wikipedia URL for '{song_title}': {wikipedia_url}")
-        return True
+        if dry_run:
+            logger.info(f"[DRY RUN] Would update Wikipedia URL for '{song_title}': {wikipedia_url}")
+            return True
+        else:
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        "UPDATE songs SET wikipedia_url = %s, updated_at = CURRENT_TIMESTAMP WHERE id = %s",
+                        (wikipedia_url, song_id)
+                    )
+                    conn.commit()
+            
+            logger.info(f"✓ Updated Wikipedia URL for '{song_title}': {wikipedia_url}")
+            return True
     
     except Exception as e:
         logger.error(f"Error updating Wikipedia URL: {e}")
