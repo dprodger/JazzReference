@@ -192,7 +192,7 @@ struct AddToRepertoireSheet: View {
                 isAdding = false
                 
                 switch result {
-                case .success(let message):
+                case .success(_):
                     // Update last used repertoire
                     repertoireManager.setLastUsedRepertoire(repertoire)
                     
