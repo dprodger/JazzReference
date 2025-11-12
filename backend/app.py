@@ -193,7 +193,7 @@ def get_songs():
     try:
         if search_query:
             query = """
-                SELECT id, title, composer, structure, musicbrainz_id, song_reference, external_references, 
+                SELECT id, title, composer, structure, musicbrainz_id, wikipedia_url, song_reference, external_references, 
                        created_at, updated_at
                 FROM songs
                 WHERE title ILIKE %s OR composer ILIKE %s
@@ -202,7 +202,7 @@ def get_songs():
             params = (f'%{search_query}%', f'%{search_query}%')
         else:
             query = """
-                SELECT id, title, composer, structure, musicbrainz_id, song_reference, external_references,
+                SELECT id, title, composer, structure, musicbrainz_id, wikipedia_url, song_reference, external_references,
                        created_at, updated_at
                 FROM songs
                 ORDER BY title
@@ -222,7 +222,7 @@ def get_song_detail(song_id):
     try:
         # Get song information
         song_query = """
-            SELECT id, title, composer, structure, song_reference, musicbrainz_id, 
+            SELECT id, title, composer, structure, song_reference, musicbrainz_id, wikipedia_url,
                    external_references, created_at, updated_at
             FROM songs
             WHERE id = %s
@@ -328,6 +328,7 @@ def search_songs():
                         composer,
                         structure,
                         musicbrainz_id,
+                        wikipedia_url,
                         external_references
                     FROM songs
                     WHERE LOWER(title) LIKE LOWER(%s)
@@ -365,6 +366,7 @@ def create_song():
         # Optional fields - safely handle None values
         composer = safe_strip(data.get('composer'))
         musicbrainz_id = safe_strip(data.get('musicbrainz_id'))
+        wikipedia_url = safe_strip(data.get('wikipedia_url'))
         structure = safe_strip(data.get('structure'))
         
         # Handle external references (JSON field)
@@ -372,10 +374,7 @@ def create_song():
         if not isinstance(external_refs, dict):
             external_refs = {}
         
-        # Add Wikipedia URL if provided separately
-        wikipedia_url = safe_strip(data.get('wikipedia_url'))
-        if wikipedia_url and 'wikipedia' not in external_refs:
-            external_refs['wikipedia'] = wikipedia_url
+        # Note: wikipedia_url is now stored in its own column, not in external_references
         
         # Start transaction
         with db_tools.get_db_connection() as conn:
@@ -412,17 +411,19 @@ def create_song():
                     INSERT INTO songs (
                         title, 
                         composer, 
-                        musicbrainz_id, 
+                        musicbrainz_id,
+                        wikipedia_url,
                         structure,
                         external_references,
                         created_at,
                         updated_at
-                    ) VALUES (%s, %s, %s, %s, %s::jsonb, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                    RETURNING id, title, composer, musicbrainz_id
+                    ) VALUES (%s, %s, %s, %s, %s, %s::jsonb, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                    RETURNING id, title, composer, musicbrainz_id, wikipedia_url
                 """, (
                     title,
                     composer,
                     musicbrainz_id,
+                    wikipedia_url,
                     structure,
                     json.dumps(external_refs) if external_refs else None
                 ))
@@ -455,15 +456,17 @@ def create_song():
 @app.route('/api/songs/<song_id>', methods=['PATCH'])
 def update_song_musicbrainz_id(song_id):
     """
-    Update a song's MusicBrainz ID
-    Used when associating an existing song with a MusicBrainz work
+    Update a song's metadata (MusicBrainz ID, Wikipedia URL, etc.)
+    Used when associating an existing song with external references
     """
     try:
         data = request.get_json()
-        musicbrainz_id = data.get('musicbrainz_id', '').strip()
+        musicbrainz_id = safe_strip(data.get('musicbrainz_id'))
+        wikipedia_url = safe_strip(data.get('wikipedia_url'))
         
-        if not musicbrainz_id:
-            return jsonify({'error': 'MusicBrainz ID is required'}), 400
+        # At least one field must be provided
+        if not musicbrainz_id and not wikipedia_url:
+            return jsonify({'error': 'At least one field (musicbrainz_id or wikipedia_url) is required'}), 400
         
         with db_tools.get_db_connection() as conn:
             with conn.cursor() as cur:
@@ -474,31 +477,46 @@ def update_song_musicbrainz_id(song_id):
                 if not song:
                     return jsonify({'error': 'Song not found'}), 404
                 
-                # Check if another song already has this MusicBrainz ID
-                cur.execute("""
-                    SELECT id, title FROM songs 
-                    WHERE musicbrainz_id = %s AND id != %s
-                """, (musicbrainz_id, song_id))
+                # Check if another song already has this MusicBrainz ID (if provided)
+                if musicbrainz_id:
+                    cur.execute("""
+                        SELECT id, title FROM songs 
+                        WHERE musicbrainz_id = %s AND id != %s
+                    """, (musicbrainz_id, song_id))
+                    
+                    conflict = cur.fetchone()
+                    if conflict:
+                        return jsonify({
+                            'error': 'Another song already has this MusicBrainz ID',
+                            'conflicting_song': conflict
+                        }), 409
                 
-                conflict = cur.fetchone()
-                if conflict:
-                    return jsonify({
-                        'error': 'Another song already has this MusicBrainz ID',
-                        'conflicting_song': conflict
-                    }), 409
+                # Build dynamic UPDATE query based on provided fields
+                update_fields = []
+                params = []
                 
-                # Update the MusicBrainz ID
-                cur.execute("""
+                if musicbrainz_id:
+                    update_fields.append("musicbrainz_id = %s")
+                    params.append(musicbrainz_id)
+                
+                if wikipedia_url:
+                    update_fields.append("wikipedia_url = %s")
+                    params.append(wikipedia_url)
+                
+                update_fields.append("updated_at = CURRENT_TIMESTAMP")
+                params.append(song_id)
+                
+                # Update the song
+                cur.execute(f"""
                     UPDATE songs
-                    SET musicbrainz_id = %s,
-                        updated_at = CURRENT_TIMESTAMP
+                    SET {', '.join(update_fields)}
                     WHERE id = %s
-                    RETURNING id, title, composer, musicbrainz_id
-                """, (musicbrainz_id, song_id))
+                    RETURNING id, title, composer, musicbrainz_id, wikipedia_url
+                """, params)
                 
                 updated_song = cur.fetchone()
                 
-        logger.info(f"Updated song {song_id} with MusicBrainz ID: {musicbrainz_id}")
+        logger.info(f"Updated song {song_id} - MusicBrainz ID: {musicbrainz_id}, Wikipedia URL: {wikipedia_url}")
         
         return jsonify({
             'success': True,
@@ -1291,7 +1309,7 @@ def get_repertoire_songs(repertoire_id):
         if repertoire_id.lower() == 'all':
             if search_query:
                 query = """
-                    SELECT id, title, composer, structure, musicbrainz_id, 
+                    SELECT id, title, composer, structure, musicbrainz_id, wikipedia_url,
                            song_reference, external_references, created_at, updated_at
                     FROM songs
                     WHERE title ILIKE %s OR composer ILIKE %s
@@ -1301,7 +1319,7 @@ def get_repertoire_songs(repertoire_id):
                 songs = db_tools.execute_query(query, params)
             else:
                 query = """
-                    SELECT id, title, composer, structure, musicbrainz_id, 
+                    SELECT id, title, composer, structure, musicbrainz_id, wikipedia_url,
                            song_reference, external_references, created_at, updated_at
                     FROM songs
                     ORDER BY title
@@ -1328,6 +1346,7 @@ def get_repertoire_songs(repertoire_id):
                     s.composer,
                     s.structure,
                     s.musicbrainz_id,
+                    s.wikipedia_url,
                     s.song_reference,
                     s.external_references,
                     s.created_at,
@@ -1349,6 +1368,7 @@ def get_repertoire_songs(repertoire_id):
                     s.composer,
                     s.structure,
                     s.musicbrainz_id,
+                    s.wikipedia_url,
                     s.song_reference,
                     s.external_references,
                     s.created_at,
