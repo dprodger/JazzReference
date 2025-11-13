@@ -1,0 +1,30 @@
+# routes/__init__.py
+"""
+Blueprint registration helper
+"""
+
+def register_blueprints(app):
+    """Register all application blueprints"""
+    from api_doc import api_docs
+
+    from routes.health import health_bp
+    from routes.research import research_bp
+    from routes.songs import songs_bp
+    from routes.recordings import recordings_bp
+    from routes.performers import performers_bp
+    from routes.images import images_bp
+    from routes.repertoires import repertoires_bp
+    from routes.transcriptions import transcriptions_bp
+    from routes.reports import reports_bp
+    
+    
+    
+    app.register_blueprint(health_bp)
+    app.register_blueprint(research_bp)
+    app.register_blueprint(songs_bp)
+    app.register_blueprint(recordings_bp)
+    app.register_blueprint(performers_bp)
+    app.register_blueprint(images_bp)
+    app.register_blueprint(repertoires_bp)
+    app.register_blueprint(transcriptions_bp)
+    app.register_blueprint(reports_bp)
