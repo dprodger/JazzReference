@@ -3,6 +3,7 @@
 //  JazzReference
 //
 //  UPDATED: Added visual swipe navigation cues with parallax and arrows
+//  UPDATED: Replaced alert with toast notification for song queue confirmation
 //  FIXED: Broken up body to avoid type-checker timeout
 //
 
@@ -34,7 +35,9 @@ struct SongDetailView: View {
     // Song refresh management
     @State private var showRefreshConfirmation = false
     @State private var isRefreshing = false
-    @State private var showRefreshSuccess = false
+    
+    // NEW: Toast notification
+    @State private var toast: ToastItem?
     
     // MARK: - Initializer
     init(songId: String, allSongs: [Song] = [], repertoireId: String = "all") {
@@ -100,10 +103,17 @@ struct SongDetailView: View {
             await MainActor.run {
                 isRefreshing = false
                 if success {
-                    showRefreshSuccess = true
+                    // Show success toast
+                    toast = ToastItem(
+                        type: .success,
+                        message: "Song queued for research. Data will be updated in the background."
+                    )
                 } else {
-                    showErrorAlert = true
-                    alertMessage = "Failed to queue song for refresh. Please try again."
+                    // Show error toast
+                    toast = ToastItem(
+                        type: .error,
+                        message: "Failed to queue song for refresh. Please try again."
+                    )
                 }
             }
         }
@@ -234,7 +244,7 @@ struct SongDetailView: View {
             } message: {
                 Text(alertMessage)
             }
-            .alert("Refresh Song Data?", isPresented: $showRefreshConfirmation) {
+            .alert("Queue Song for Research?", isPresented: $showRefreshConfirmation) {
                 Button("Cancel", role: .cancel) { }
                 Button("Refresh", role: .destructive) {
                     refreshSongData()
@@ -242,11 +252,7 @@ struct SongDetailView: View {
             } message: {
                 Text("This will queue \"\(song?.title ?? "this song")\" for background research to update its information from external sources.")
             }
-            .alert("Song Queued", isPresented: $showRefreshSuccess) {
-                Button("OK", role: .cancel) { }
-            } message: {
-                Text("The song has been queued for research. Data will be updated in the background.")
-            }
+            .toast($toast)
             .overlay(alignment: .bottom) {
                 pageIndicatorView
             }
