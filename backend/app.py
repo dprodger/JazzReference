@@ -3,7 +3,7 @@ Jazz Reference API Backend - Improved Version
 A Flask API with robust database connection handling
 """
 
-from flask import Flask, render_template
+from flask import Flask, render_template, request
 from flask_cors import CORS
 import logging
 import os
