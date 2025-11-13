@@ -156,44 +156,48 @@ struct RecordingsSection: View {
                                     .padding()
                                 },
                                 label: {
-                                    HStack(spacing: 12) {
-                                        HStack(spacing: 8) {
-                                            Image(systemName: "line.3.horizontal.decrease.circle")
-                                                .foregroundColor(JazzTheme.brass)
-                                            Text("Filters")
-                                                .font(.headline)
-                                                .foregroundColor(JazzTheme.charcoal)
+                                    HStack(spacing: 8) {
+                                        Image(systemName: "line.3.horizontal.decrease.circle")
+                                            .foregroundColor(JazzTheme.brass)
+                                            .imageScale(.medium)
+                                        
+                                        Text("Filters")
+                                            .font(.headline)
+                                            .foregroundColor(JazzTheme.charcoal)
+                                            .fixedSize(horizontal: true, vertical: false)
+                                        
+                                        // Active filter indicators
+                                        HStack(spacing: 6) {
+                                            if selectedFilter == .withSpotify {
+                                                Text("Spotify")
+                                                    .font(.caption)
+                                                    .foregroundColor(JazzTheme.brass)
+                                                    .padding(.horizontal, 6)
+                                                    .padding(.vertical, 2)
+                                                    .background(JazzTheme.brass.opacity(0.2))
+                                                    .cornerRadius(4)
+                                                    .fixedSize(horizontal: true, vertical: false)
+                                            }
                                             
-                                            // Active filter indicators
-                                            HStack(spacing: 6) {
-                                                if selectedFilter == .withSpotify {
-                                                    Text("Spotify")
-                                                        .font(.caption)
-                                                        .foregroundColor(JazzTheme.brass)
-                                                        .padding(.horizontal, 6)
-                                                        .padding(.vertical, 2)
-                                                        .background(JazzTheme.brass.opacity(0.2))
-                                                        .cornerRadius(4)
-                                                }
-                                                
-                                                if let family = selectedInstrument {
-                                                    Text(family.rawValue)
-                                                        .font(.caption)
-                                                        .foregroundColor(JazzTheme.brass)
-                                                        .padding(.horizontal, 6)
-                                                        .padding(.vertical, 2)
-                                                        .background(JazzTheme.brass.opacity(0.2))
-                                                        .cornerRadius(4)
-                                                }
+                                            if let family = selectedInstrument {
+                                                Text(family.rawValue)
+                                                    .font(.caption)
+                                                    .foregroundColor(JazzTheme.brass)
+                                                    .padding(.horizontal, 6)
+                                                    .padding(.vertical, 2)
+                                                    .background(JazzTheme.brass.opacity(0.2))
+                                                    .cornerRadius(4)
+                                                    .fixedSize(horizontal: true, vertical: false)
                                             }
                                         }
                                         
-                                        Spacer()
+                                        Spacer(minLength: 8)
                                         
                                         // Recording count on same line
                                         Text("\(filteredRecordings.count) Recording\(filteredRecordings.count == 1 ? "" : "s")")
                                             .font(.subheadline)
                                             .foregroundColor(JazzTheme.smokeGray)
+                                            .fixedSize(horizontal: true, vertical: false)
                                     }
                                     .padding(.vertical, 8)
                                 }
