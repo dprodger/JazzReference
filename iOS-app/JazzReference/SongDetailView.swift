@@ -2,7 +2,7 @@
 //  SongDetailView.swift
 //  JazzReference
 //
-//  UPDATED: Minimalist swipe navigation with page dots
+//  UPDATED: Added visual swipe navigation cues with parallax and arrows
 //  FIXED: Broken up body to avoid type-checker timeout
 //
 
@@ -19,6 +19,9 @@ struct SongDetailView: View {
     @State private var song: Song?
     @State private var isLoading = true
     @State private var transcriptions: [SoloTranscription] = []
+    
+    // NEW: Drag gesture state for visual feedback
+    @GestureState private var dragOffset: CGFloat = 0
     
     // NEW: Repertoire management
     @EnvironmentObject var repertoireManager: RepertoireManager
@@ -197,6 +200,15 @@ struct SongDetailView: View {
     private var contentView: some View {
         mainScrollView
             .background(JazzTheme.backgroundLight)
+            // NEW: Visual feedback for swipe gestures
+            .offset(x: dragOffset * 0.3) // Parallax effect - subtle movement
+            .opacity(1 - abs(dragOffset) / 1000.0) // Subtle fade during drag
+            .overlay(alignment: .leading) {
+                navigationArrow(direction: .left, isVisible: dragOffset > 50 && canNavigatePrevious)
+            }
+            .overlay(alignment: .trailing) {
+                navigationArrow(direction: .right, isVisible: dragOffset < -50 && canNavigateNext)
+            }
             .navigationTitle(song?.title ?? "Song Detail")
             .navigationBarTitleDisplayMode(.large)
             .toolbarBackground(JazzTheme.burgundy, for: .navigationBar)
@@ -289,8 +301,16 @@ struct SongDetailView: View {
         }
     }
     
+    // MARK: - Swipe Gesture with Visual Feedback
+    
     private var swipeGesture: some Gesture {
         DragGesture(minimumDistance: 50)
+            .updating($dragOffset) { value, state, _ in
+                // Only track horizontal drags
+                if abs(value.translation.width) > abs(value.translation.height) {
+                    state = value.translation.width
+                }
+            }
             .onEnded { value in
                 if abs(value.translation.width) > abs(value.translation.height) {
                     if value.translation.width < -50 && canNavigateNext {
@@ -304,6 +324,24 @@ struct SongDetailView: View {
                     }
                 }
             }
+    }
+    
+    // MARK: - Navigation Arrow Indicator
+    
+    private func navigationArrow(direction: NavigationDirection, isVisible: Bool) -> some View {
+        Image(systemName: direction == .left ? "chevron.left" : "chevron.right")
+            .font(.system(size: 40, weight: .bold))
+            .foregroundColor(JazzTheme.burgundy)
+            .opacity(isVisible ? 0.8 : 0)
+            .scaleEffect(isVisible ? 1.2 : 0.8)
+            .padding(.horizontal, 20)
+            .animation(.spring(response: 0.3), value: isVisible)
+    }
+    
+    // MARK: - Navigation Direction Enum
+    
+    private enum NavigationDirection {
+        case left, right
     }
     
     private var repertoireSheet: some View {
