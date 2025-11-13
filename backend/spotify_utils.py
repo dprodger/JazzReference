@@ -513,7 +513,9 @@ class SpotifyMatcher:
         self.logger.debug(f"    ✗ No valid Spotify matches found after trying all strategies")
         return None
     
-    def update_recording_spotify_url(self, conn, recording_id: str, spotify_data: dict):
+    def update_recording_spotify_url(self, conn, recording_id: str, spotify_data: dict, 
+                                     album: str = None, artist: str = None, year: int = None,
+                                     index: int = None, total: int = None):
         """Update recording with Spotify URL, track ID, and album artwork"""
         if self.dry_run:
             self.logger.info(f"    [DRY RUN] Would update recording with: {spotify_data['url']}")
@@ -544,7 +546,13 @@ class SpotifyMatcher:
             ), prepare=False)
             
             conn.commit()
-            self.logger.info(f"    ✓ Updated with Spotify URL and album artwork")
+            
+            # Consolidated INFO log with context if available
+            if index and total and album:
+                self.logger.info(f"[{index}/{total}] {album} ({artist or 'Unknown'}, {year or 'Unknown'}) - ✓ Updated with Spotify URL and album artwork")
+            else:
+                self.logger.info(f"    ✓ Updated with Spotify URL and album artwork")
+            
             self.stats['recordings_updated'] += 1
     
     def match_recordings(self, song_identifier: str) -> Dict[str, Any]:
@@ -610,13 +618,14 @@ class SpotifyMatcher:
                     performers[0]['name'] if performers else None
                 )
                 
-                self.logger.info(f"[{i}/{len(recordings)}] {album}")
-                self.logger.info(f"    Artist: {artist_name or 'Unknown'}")
-                self.logger.info(f"    Year: {year or 'Unknown'}")
+                # Log details at DEBUG level
+                self.logger.debug(f"[{i}/{len(recordings)}] {album}")
+                self.logger.debug(f"    Artist: {artist_name or 'Unknown'}")
+                self.logger.debug(f"    Year: {year or 'Unknown'}")
                 
                 # Check if already has Spotify URL
                 if recording['spotify_url']:
-                    self.logger.info(f"    ⊙ Already has Spotify URL, skipping")
+                    self.logger.info(f"[{i}/{len(recordings)}] {album} ({artist_name or 'Unknown'}, {year or 'Unknown'}) - ⊙ Already has Spotify URL, skipping")
                     self.stats['recordings_skipped'] += 1
                     continue
                 
@@ -635,14 +644,17 @@ class SpotifyMatcher:
                         self.update_recording_spotify_url(
                             conn,
                             recording['id'],
-                            spotify_match
+                            spotify_match,
+                            album,
+                            artist_name,
+                            year,
+                            i,
+                            len(recordings)
                         )
                         # Connection automatically committed and closed here
                 else:
-                    self.logger.info(f"    ✗ No valid Spotify match found")
+                    self.logger.info(f"[{i}/{len(recordings)}] {album} ({artist_name or 'Unknown'}, {year or 'Unknown'}) - ✗ No valid Spotify match found")
                     self.stats['recordings_no_match'] += 1
-                
-                self.logger.info("")
             
             return {
                 'success': True,
