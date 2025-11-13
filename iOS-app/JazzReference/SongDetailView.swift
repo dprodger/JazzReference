@@ -306,13 +306,20 @@ struct SongDetailView: View {
     private var swipeGesture: some Gesture {
         DragGesture(minimumDistance: 50)
             .updating($dragOffset) { value, state, _ in
-                // Only track horizontal drags
-                if abs(value.translation.width) > abs(value.translation.height) {
+                // Only track horizontal drags that don't start from the left edge
+                // (to avoid conflict with iOS back gesture)
+                let isHorizontalDrag = abs(value.translation.width) > abs(value.translation.height)
+                let startedFromLeftEdge = value.startLocation.x < 50 // iOS back gesture zone
+                
+                if isHorizontalDrag && !startedFromLeftEdge {
                     state = value.translation.width
                 }
             }
             .onEnded { value in
-                if abs(value.translation.width) > abs(value.translation.height) {
+                // Ignore gestures that started from the left edge (system back gesture)
+                let startedFromLeftEdge = value.startLocation.x < 50
+                
+                if !startedFromLeftEdge && abs(value.translation.width) > abs(value.translation.height) {
                     if value.translation.width < -50 && canNavigateNext {
                         withAnimation(.easeInOut(duration: 0.3)) {
                             navigateToNext()
