@@ -243,6 +243,134 @@ CREATE TABLE audit_log (
 
 
 
+-- ============================================================================
+-- USERS TABLE
+-- ============================================================================
+-- Core users table supporting multiple authentication methods
+-- Users can sign up with email/password, Google, or Apple
+CREATE TABLE users (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    email VARCHAR(255) NOT NULL UNIQUE,
+    email_verified BOOLEAN DEFAULT false,
+    password_hash VARCHAR(255), -- NULL for OAuth-only users
+    display_name VARCHAR(255),
+    profile_image_url VARCHAR(500),
+    
+    -- OAuth provider info
+    google_id VARCHAR(255) UNIQUE,
+    apple_id VARCHAR(255) UNIQUE,
+    
+    -- Account status
+    is_active BOOLEAN DEFAULT true,
+    account_locked BOOLEAN DEFAULT false,
+    failed_login_attempts INTEGER DEFAULT 0,
+    last_failed_login_at TIMESTAMP WITH TIME ZONE,
+    
+    -- Timestamps
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    last_login_at TIMESTAMP WITH TIME ZONE,
+    
+    -- Constraints
+    -- User must have at least one authentication method
+    CONSTRAINT check_auth_method CHECK (
+        password_hash IS NOT NULL OR 
+        google_id IS NOT NULL OR 
+        apple_id IS NOT NULL
+    )
+);
+
+-- ============================================================================
+-- PASSWORD RESET TOKENS
+-- ============================================================================
+-- Tokens for password reset flow
+-- Each token is single-use and expires after a set period
+CREATE TABLE password_reset_tokens (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token VARCHAR(255) NOT NULL UNIQUE,
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    used_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ============================================================================
+-- EMAIL VERIFICATION TOKENS
+-- ============================================================================
+-- Tokens for email verification flow
+-- Users must verify their email to enable certain features
+CREATE TABLE email_verification_tokens (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token VARCHAR(255) NOT NULL UNIQUE,
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    verified_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ============================================================================
+-- REFRESH TOKENS
+-- ============================================================================
+-- Long-lived tokens for JWT token rotation
+-- Allows secure automatic re-authentication
+CREATE TABLE refresh_tokens (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token VARCHAR(500) NOT NULL UNIQUE,
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    revoked_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    device_info JSONB -- Store device/app info for security auditing
+);
+
+-- ============================================================================
+-- INDEXES
+-- ============================================================================
+-- Indexes for efficient queries on authentication tables
+
+-- Users table indexes
+CREATE INDEX idx_users_email ON users(email);
+CREATE INDEX idx_users_google_id ON users(google_id);
+CREATE INDEX idx_users_apple_id ON users(apple_id);
+
+-- Password reset tokens indexes
+CREATE INDEX idx_password_reset_tokens_token ON password_reset_tokens(token);
+CREATE INDEX idx_password_reset_tokens_user_id ON password_reset_tokens(user_id);
+
+-- Email verification tokens indexes
+CREATE INDEX idx_email_verification_tokens_token ON email_verification_tokens(token);
+CREATE INDEX idx_email_verification_tokens_user_id ON email_verification_tokens(user_id);
+
+-- Refresh tokens indexes
+CREATE INDEX idx_refresh_tokens_token ON refresh_tokens(token);
+CREATE INDEX idx_refresh_tokens_user_id ON refresh_tokens(user_id);
+
+-- ============================================================================
+-- TRIGGERS
+-- ============================================================================
+-- Trigger to automatically update updated_at timestamp on users table
+CREATE TRIGGER update_users_updated_at 
+    BEFORE UPDATE ON users
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- ============================================================================
+-- COMMENTS
+-- ============================================================================
+-- Add documentation comments to tables and key columns
+COMMENT ON TABLE users IS 'Core users table for authentication supporting email/password, Google OAuth, and Apple Sign In';
+COMMENT ON TABLE password_reset_tokens IS 'Single-use tokens for password reset flow';
+COMMENT ON TABLE email_verification_tokens IS 'Tokens for email verification flow';
+COMMENT ON TABLE refresh_tokens IS 'Long-lived tokens for JWT token rotation';
+
+COMMENT ON COLUMN users.email IS 'User email address - must be unique';
+COMMENT ON COLUMN users.password_hash IS 'Bcrypt hashed password - NULL for OAuth-only users';
+COMMENT ON COLUMN users.google_id IS 'Google OAuth user identifier - unique';
+COMMENT ON COLUMN users.apple_id IS 'Apple Sign In user identifier - unique';
+COMMENT ON COLUMN users.failed_login_attempts IS 'Counter for rate limiting - resets on successful login';
+COMMENT ON COLUMN users.account_locked IS 'True if account locked due to excessive failed login attempts';
+
+
+
 
 -- ============================================================================
 -- Migration: Add Content Error Reporting
