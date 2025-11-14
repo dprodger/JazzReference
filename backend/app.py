@@ -8,6 +8,11 @@ from flask_cors import CORS
 import logging
 import os
 
+from dotenv import load_dotenv  # ADD THIS LINE
+
+# Load environment variables from .env file
+load_dotenv()  # ADD THIS LINE
+
 # Configuration
 from config import configure_logging, init_app_config
 
