@@ -1,12 +1,12 @@
 """
-Authentication routes: register, login, logout, refresh token, get current user
+Authentication routes: register, login, token refresh, logout
 
-This module provides the core authentication endpoints:
-- POST /auth/register - Register new user with email/password
-- POST /auth/login - Login with email/password
-- POST /auth/refresh-token - Get new access token using refresh token
-- GET /auth/me - Get current user info (requires authentication)
-- POST /auth/logout - Logout and revoke refresh token
+This module handles core authentication operations including:
+- User registration with email/password
+- User login and token generation
+- Access token refresh using refresh tokens
+- User logout and token revocation
+- Current user information retrieval
 """
 
 from flask import Blueprint, request, jsonify, g
@@ -26,6 +26,7 @@ from auth_utils import (
     decode_token
 )
 from middleware.auth_middleware import require_auth
+from email_service import send_welcome_email
 
 logger = logging.getLogger(__name__)
 auth_bp = Blueprint('auth', __name__, url_prefix='/api/auth')
@@ -102,6 +103,12 @@ def register():
                 conn.commit()
                 
                 logger.info(f"User registered: {email}")
+                
+                # Send welcome email (non-blocking - don't fail registration if email fails)
+                try:
+                    send_welcome_email(email, display_name)
+                except Exception as email_error:
+                    logger.warning(f"Welcome email failed for {email}: {email_error}")
                 
                 return jsonify({
                     'user': {

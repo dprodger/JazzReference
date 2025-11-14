@@ -1,10 +1,10 @@
 """
 Password management routes: forgot password, reset password, change password
 
-This module provides password management endpoints:
-- POST /password/forgot-password - Request password reset email
-- POST /password/reset-password - Reset password using token
-- POST /password/change-password - Change password for authenticated user
+This module handles password-related operations including:
+- Password reset requests
+- Password reset with token validation
+- Password changes for authenticated users
 """
 
 from flask import Blueprint, request, jsonify, g
@@ -19,6 +19,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from db_utils import get_db_connection
 from auth_utils import hash_password, verify_password, generate_reset_token
 from middleware.auth_middleware import require_auth
+from email_service import send_password_reset_email
 
 logger = logging.getLogger(__name__)
 password_bp = Blueprint('password', __name__, url_prefix='/api/password')
@@ -70,15 +71,18 @@ def forgot_password():
                 """, (user['id'], reset_token, expires_at))
                 conn.commit()
                 
-                # TODO: Send email (Phase 3)
-                # For now, log the token (REMOVE IN PRODUCTION)
-                logger.info(f"Password reset token for {email}: {reset_token}")
-                logger.info(f"Reset URL would be: /reset-password?token={reset_token}")
+                # Send password reset email
+                email_sent = send_password_reset_email(email, reset_token)
+                
+                if email_sent:
+                    logger.info(f"Password reset email sent to: {email}")
+                else:
+                    # Email failed to send, but still return success to user
+                    # (logged in email_service.py)
+                    logger.warning(f"Password reset email failed for: {email}")
                 
                 return jsonify({
-                    'message': 'If that email exists, a reset link has been sent',
-                    # TEMP: Include token in response for testing (REMOVE IN PRODUCTION)
-                    'reset_token': reset_token
+                    'message': 'If that email exists, a reset link has been sent'
                 }), 200
                 
     except Exception as e:
