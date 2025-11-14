@@ -43,6 +43,7 @@ struct JazzReferenceApp: App {
     @State private var showingSongCreation = false
     @State private var importedSongData: ImportedSongData?
     @StateObject private var repertoireManager = RepertoireManager()
+    @StateObject private var authManager = AuthenticationManager()
 
     // ADD THIS INITIALIZER
     init() {
@@ -115,6 +116,7 @@ struct JazzReferenceApp: App {
                     }                                                 // ← ADD THIS
                 }                                                     // ← ADD THIS
                 .ignoresSafeArea()
+                .environmentObject(authManager)
                 .environmentObject(repertoireManager)
         }
     }

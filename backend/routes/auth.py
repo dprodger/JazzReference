@@ -59,6 +59,14 @@ def register():
     email = data.get('email')
     password = data.get('password')
     display_name = data.get('display_name')
+
+    # ADD THIS DEBUG LOGGING
+    logger.info(f"🔍 Registration for: {email}")
+    logger.info(f"🔍 Password length: {len(password) if password else 0}")
+    logger.info(f"🔍 Password first char: {repr(password[0]) if password else 'N/A'}")
+    logger.info(f"🔍 Password last char: {repr(password[-1]) if password else 'N/A'}")
+    logger.info(f"🔍 Password repr: {repr(password)}")
+    # END DEBUG LOGGING
     
     # Validation
     if not email or not password:
@@ -150,6 +158,14 @@ def login():
     
     email = data.get('email')
     password = data.get('password')
+
+    # ADD THIS DEBUG LOGGING
+    logger.info(f"🔍 Login attempt for: {email}")
+    logger.info(f"🔍 Password length: {len(password) if password else 0}")
+    logger.info(f"🔍 Password first char: {repr(password[0]) if password else 'N/A'}")
+    logger.info(f"🔍 Password last char: {repr(password[-1]) if password else 'N/A'}")
+    logger.info(f"🔍 Password repr: {repr(password)}")
+    # END DEBUG LOGGING
     
     if not email or not password:
         return jsonify({'error': 'Email and password required'}), 400
