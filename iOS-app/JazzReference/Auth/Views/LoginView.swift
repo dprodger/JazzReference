@@ -83,7 +83,10 @@ struct LoginView: View {
                     // Login button
                     Button(action: {
                         Task {
-                            let success = await authManager.login(email: email, password: password)
+                            let success = await authManager.login(
+                                email: email.trimmingCharacters(in: .whitespacesAndNewlines),
+                                password: password.trimmingCharacters(in: .whitespacesAndNewlines)
+                            )
                             if success {
                                 dismiss()
                             }
@@ -149,6 +152,11 @@ struct LoginView: View {
             }
             .sheet(isPresented: $showingForgotPassword) {
                 ForgotPasswordView()
+            }
+            .onChange(of: authManager.isAuthenticated) { isAuthenticated in
+                if isAuthenticated {
+                    dismiss()
+                }
             }
         }
     }

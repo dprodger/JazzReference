@@ -14,7 +14,7 @@ struct User: Codable, Identifiable {
     let email: String
     let displayName: String?
     let profileImageUrl: String?
-    let emailVerified: Bool
+    let emailVerified: Bool?
     
     enum CodingKeys: String, CodingKey {
         case id, email

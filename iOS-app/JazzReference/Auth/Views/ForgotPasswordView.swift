@@ -103,7 +103,9 @@ struct ForgotPasswordView: View {
                         // Send button
                         Button(action: {
                             Task {
-                                let success = await authManager.requestPasswordReset(email: email)
+                                let success = await authManager.requestPasswordReset(
+                                    email: email.trimmingCharacters(in: .whitespacesAndNewlines)
+                                )
                                 if success {
                                     resetEmailSent = true
                                 }

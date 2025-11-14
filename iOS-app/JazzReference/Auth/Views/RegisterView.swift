@@ -131,9 +131,9 @@ struct RegisterView: View {
                     Button(action: {
                         Task {
                             let success = await authManager.register(
-                                email: email,
-                                password: password,
-                                displayName: displayName.isEmpty ? email : displayName
+                                email: email.trimmingCharacters(in: .whitespacesAndNewlines),
+                                password: password.trimmingCharacters(in: .whitespacesAndNewlines),
+                                displayName: (displayName.isEmpty ? email : displayName).trimmingCharacters(in: .whitespacesAndNewlines)
                             )
                             if success {
                                 dismiss()
