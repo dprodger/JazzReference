@@ -20,6 +20,7 @@ Data
 * running jazz_song_research, not sure I'm getting wikipedia on finding a new song
 * when running fetch_artist_images.py, it looks like it's slow either sleeping, or with db connection
 * if solo_transcriptions appears, show and allow access to it
+* consider pulling from https://thejazztome.info/about/
     
     
      
