@@ -29,6 +29,14 @@ init_app_config(app)
 logger.info(f"Spotify credentials present: {bool(os.environ.get('SPOTIFY_CLIENT_ID'))}")
 logger.info(f"Flask app initialized in PID {os.getpid()}")
 
+# Import authentication blueprints
+from routes.auth import auth_bp
+from routes.password import password_bp
+
+# Register authentication blueprints
+app.register_blueprint(auth_bp)
+app.register_blueprint(password_bp)
+
 # Register all route blueprints
 from routes import register_blueprints
 register_blueprints(app)
