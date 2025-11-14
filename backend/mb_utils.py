@@ -650,7 +650,7 @@ class MusicBrainzSearcher:
         try:
             url = f"https://musicbrainz.org/ws/2/recording/{recording_id}"
             params = {
-                'inc': 'releases+artist-credits+artist-rels',
+                'inc': 'releases+artist-credits+artist-rels+isrcs',
                 'fmt': 'json'
             }
             
