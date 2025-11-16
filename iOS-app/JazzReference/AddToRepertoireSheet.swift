@@ -3,6 +3,7 @@
 //  JazzReference
 //
 //  Created by Dave Rodger on 11/12/25.
+//  UPDATED FOR PHASE 5: Added authentication check
 //
 
 import SwiftUI
@@ -17,44 +18,18 @@ struct AddToRepertoireSheet: View {
     
     @State private var isAdding = false
     @State private var isLoadingRepertoires = false
-    @State private var networkManager = NetworkManager()
     
     var body: some View {
         NavigationStack {
             Group {
-                if isLoadingRepertoires {
-                    // Loading state
-                    VStack(spacing: 16) {
-                        ProgressView()
-                            .tint(JazzTheme.burgundy)
-                        Text("Loading repertoires...")
-                            .foregroundColor(JazzTheme.smokeGray)
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                // Check authentication first
+                if !repertoireManager.isAuthenticated {
+                    authRequiredView
+                } else if isLoadingRepertoires {
+                    loadingView
                 } else if repertoireManager.addableRepertoires.isEmpty {
-                    // Empty state - no repertoires exist
-                    VStack(spacing: 20) {
-                        Image(systemName: "music.note.list")
-                            .font(.system(size: 60))
-                            .foregroundColor(JazzTheme.smokeGray.opacity(0.5))
-                        
-                        Text("No Repertoires Yet")
-                            .font(.title2)
-                            .fontWeight(.semibold)
-                            .foregroundColor(JazzTheme.charcoal)
-                        
-                        Text("Create a repertoire first to start organizing your songs.")
-                            .font(.subheadline)
-                            .foregroundColor(JazzTheme.smokeGray)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal, 40)
-                        
-                        // TODO: Add "Create Repertoire" button when that feature is implemented
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(JazzTheme.backgroundLight)
+                    emptyRepertoiresView
                 } else {
-                    // Normal state - show repertoires
                     repertoireList
                 }
             }
@@ -93,9 +68,10 @@ struct AddToRepertoireSheet: View {
                 }
             }
             .task {
-                // Ensure repertoires are loaded when sheet appears
-                if repertoireManager.repertoires.isEmpty ||
-                   repertoireManager.addableRepertoires.isEmpty {
+                // Only load repertoires if authenticated
+                if repertoireManager.isAuthenticated &&
+                   (repertoireManager.repertoires.isEmpty ||
+                    repertoireManager.addableRepertoires.isEmpty) {
                     isLoadingRepertoires = true
                     await repertoireManager.loadRepertoires()
                     isLoadingRepertoires = false
@@ -110,6 +86,93 @@ struct AddToRepertoireSheet: View {
             }
         }
     }
+    
+    // MARK: - Auth Required View
+    
+    private var authRequiredView: some View {
+        VStack(spacing: 24) {
+            Image(systemName: "lock.fill")
+                .font(.system(size: 60))
+                .foregroundColor(JazzTheme.burgundy.opacity(0.6))
+            
+            Text("Sign In Required")
+                .font(.title2)
+                .fontWeight(.semibold)
+                .foregroundColor(JazzTheme.charcoal)
+            
+            Text("You need to be signed in to add songs to repertoires")
+                .font(.body)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 32)
+            
+            Button(action: {
+                isPresented = false
+            }) {
+                Text("Close")
+                    .fontWeight(.semibold)
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(JazzTheme.burgundy)
+                    .foregroundColor(.white)
+                    .cornerRadius(10)
+            }
+            .padding(.horizontal, 32)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(JazzTheme.backgroundLight)
+    }
+    
+    // MARK: - Loading View
+    
+    private var loadingView: some View {
+        VStack(spacing: 16) {
+            ProgressView()
+                .tint(JazzTheme.burgundy)
+            Text("Loading repertoires...")
+                .foregroundColor(JazzTheme.smokeGray)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(JazzTheme.backgroundLight)
+    }
+    
+    // MARK: - Empty Repertoires View
+    
+    private var emptyRepertoiresView: some View {
+        VStack(spacing: 20) {
+            Image(systemName: "music.note.list")
+                .font(.system(size: 60))
+                .foregroundColor(JazzTheme.smokeGray.opacity(0.5))
+            
+            Text("No Repertoires Yet")
+                .font(.title2)
+                .fontWeight(.semibold)
+                .foregroundColor(JazzTheme.charcoal)
+            
+            Text("Create a repertoire first to start organizing your songs.")
+                .font(.subheadline)
+                .foregroundColor(JazzTheme.smokeGray)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 40)
+            
+            // TODO: Add "Create Repertoire" button when that feature is implemented
+            Button(action: {
+                isPresented = false
+            }) {
+                Text("Close")
+                    .fontWeight(.semibold)
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 12)
+                    .background(JazzTheme.burgundy)
+                    .foregroundColor(.white)
+                    .cornerRadius(10)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(JazzTheme.backgroundLight)
+    }
+    
+    // MARK: - Repertoire List
     
     private var repertoireList: some View {
         List {
@@ -179,11 +242,13 @@ struct AddToRepertoireSheet: View {
         .background(JazzTheme.backgroundLight)
     }
     
+    // MARK: - Add to Repertoire Action
+    
     private func addToRepertoire(_ repertoire: Repertoire) {
         isAdding = true
         
         Task {
-            let result = await networkManager.addSongToRepertoire(
+            let success = await repertoireManager.addSongToRepertoire(
                 songId: songId,
                 repertoireId: repertoire.id
             )
@@ -191,17 +256,15 @@ struct AddToRepertoireSheet: View {
             await MainActor.run {
                 isAdding = false
                 
-                switch result {
-                case .success(_):
+                if success {
                     // Update last used repertoire
                     repertoireManager.setLastUsedRepertoire(repertoire)
                     
                     isPresented = false
                     onSuccess("Added \"\(songTitle)\" to \(repertoire.name)")
-                    
-                case .failure(let error):
+                } else {
                     isPresented = false
-                    let errorMessage = (error as NSError).localizedDescription
+                    let errorMessage = repertoireManager.errorMessage ?? "Failed to add song"
                     onError(errorMessage)
                 }
             }

@@ -3,8 +3,7 @@ import SwiftUI
 import Combine
 
 class NetworkManager: ObservableObject {
-    static let baseURL = "https://linernotesjazz.com/api"
-    
+    static let baseURL = "https://www.linernotesjazz.com/api"
     @Published var songs: [Song] = []
     @Published var performers: [Performer] = []
     @Published var isLoading = false
@@ -218,12 +217,13 @@ class NetworkManager: ObservableObject {
             errorMessage = nil
         }
         
-        // Build URL - use special endpoint for repertoire filtering
+        // Build URL - "all" uses public /songs endpoint, others use protected /repertoires endpoint
         var urlString: String
         if repertoireId == "all" {
-            // Use the repertoire endpoint for consistency
-            urlString = "\(NetworkManager.baseURL)/repertoires/all/songs"
+            // Use the public songs endpoint (no auth required)
+            urlString = "\(NetworkManager.baseURL)/songs"
         } else {
+            // Use the protected repertoire endpoint (requires auth)
             urlString = "\(NetworkManager.baseURL)/repertoires/\(repertoireId)/songs"
         }
         
@@ -250,7 +250,7 @@ class NetworkManager: ObservableObject {
             }
             
             let endpoint = repertoireId == "all" ?
-                "GET /repertoires/all/songs" :
+                "GET /songs" :
                 "GET /repertoires/\(repertoireId)/songs"
             NetworkManager.logRequest(endpoint + (searchQuery.isEmpty ? "" : "?search=..."), startTime: startTime)
             

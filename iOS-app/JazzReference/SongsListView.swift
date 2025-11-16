@@ -9,7 +9,7 @@ import SwiftUI
 
 struct SongsListView: View {
     @StateObject private var networkManager = NetworkManager()
-    @StateObject private var repertoireManager = RepertoireManager()
+    @EnvironmentObject var repertoireManager: RepertoireManager
     @State private var searchText = ""
     @State private var searchTask: Task<Void, Never>?
     @State private var showRepertoirePicker = false
@@ -337,4 +337,6 @@ struct AlphabetIndexView: View {
 
 #Preview {
     SongsListView()
+        .environmentObject(RepertoireManager())
+        .environmentObject(AuthenticationManager())
 }

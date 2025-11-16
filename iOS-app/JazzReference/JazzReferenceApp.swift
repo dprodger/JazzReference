@@ -1,5 +1,6 @@
 // Jazz Reference iOS App
 // SwiftUI application for browsing jazz standards
+// UPDATED FOR PHASE 5: Connected AuthenticationManager to RepertoireManager
 
 import SwiftUI
 import Combine
@@ -33,6 +34,7 @@ struct ContentView: View {
             .tabItem {
                 Label("Repertoire", systemImage: "bookmark.fill")
             }
+            
             AboutView()
                 .tabItem {
                     Label("About", systemImage: "info.circle")
@@ -110,11 +112,29 @@ struct JazzReferenceApp: App {
                 .onAppear {
                     checkForImportedArtist()
                     checkForImportedSong()
+                    
+                    // PHASE 5: Connect RepertoireManager to AuthenticationManager
+                    repertoireManager.setAuthManager(authManager)
+                    print("📚 Connected RepertoireManager to AuthenticationManager")
                 }
                 .onChange(of: scenePhase) { oldPhase, newPhase in
                     if newPhase == .active {
                         checkForImportedArtist()
                         checkForImportedSong()
+                    }
+                }
+                .onChange(of: authManager.isAuthenticated) { wasAuthenticated, isAuthenticated in
+                    // PHASE 5: Update repertoire manager when auth state changes
+                    if isAuthenticated {
+                        print("📚 User authenticated - loading repertoires")
+                        Task {
+                            await repertoireManager.loadRepertoires()
+                        }
+                    } else {
+                        print("📚 User logged out - clearing repertoires")
+                        Task {
+                            await repertoireManager.loadRepertoires()
+                        }
                     }
                 }
                 .sheet(item: $importedArtistData) { data in
@@ -123,11 +143,11 @@ struct JazzReferenceApp: App {
                         ArtistCreationView(importedData: data)
                     }
                 }
-                .sheet(item: $importedSongData) { data in           // ← ADD THIS
-                    NavigationStack {                                 // ← ADD THIS
-                        SongCreationView(importedData: data)         // ← ADD THIS
-                    }                                                 // ← ADD THIS
-                }                                                     // ← ADD THIS
+                .sheet(item: $importedSongData) { data in
+                    NavigationStack {
+                        SongCreationView(importedData: data)
+                    }
+                }
                 .ignoresSafeArea()
                 .environmentObject(authManager)
                 .environmentObject(repertoireManager)

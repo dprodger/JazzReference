@@ -177,6 +177,7 @@ COMMENT ON COLUMN recordings.album_art_large IS 'Large album artwork (640x640) f
 
 CREATE TABLE IF NOT EXISTS repertoires (
                     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
                     name VARCHAR(255) NOT NULL,
                     description TEXT,
                     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -185,6 +186,10 @@ CREATE TABLE IF NOT EXISTS repertoires (
                 
 CREATE INDEX IF NOT EXISTS idx_repertoires_name 
 	ON repertoires(name)
+	
+CREATE INDEX idx_repertoires_user_id ON repertoires(user_id)
+	
+COMMENT ON COLUMN repertoires.user_id IS 'Owner of this repertoire. NULL for system/public repertoires.'
 	
 CREATE TABLE IF NOT EXISTS repertoire_songs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
