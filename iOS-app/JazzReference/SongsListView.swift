@@ -68,6 +68,16 @@ struct SongsListView: View {
                     // Then load songs for the selected repertoire
                     await loadSongs()
                 }
+                .onChange(of: authManager.isAuthenticated) { wasAuthenticated, isAuthenticated in
+                    // Dismiss login prompt when user successfully authenticates
+                    if isAuthenticated && showLoginPrompt {
+                        showLoginPrompt = false
+                        // After dismissing login, show the repertoire picker
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            showRepertoirePicker = true
+                        }
+                    }
+                }
         }
         .tint(JazzTheme.burgundy)
     }
@@ -137,16 +147,6 @@ struct SongsListView: View {
             }
             .sheet(isPresented: $showLoginPrompt) {
                 RepertoireLoginPromptView()
-            }
-            .onChange(of: authManager.isAuthenticated) { wasAuthenticated, isAuthenticated in
-                // Dismiss login prompt when user successfully authenticates
-                if isAuthenticated && showLoginPrompt {
-                    showLoginPrompt = false
-                    // After dismissing login, show the repertoire picker
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                        showRepertoirePicker = true
-                    }
-                }
             }
         }
         .padding(.horizontal)

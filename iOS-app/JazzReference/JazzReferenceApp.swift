@@ -27,8 +27,94 @@ struct ContentView: View {
                 .tabItem {
                     Label("About", systemImage: "info.circle")
                 }
+            
+            // Settings Tab (protected)
+            Group {
+                if authManager.isAuthenticated {
+                    SettingsView()
+                        .environmentObject(authManager)
+                } else {
+                    RepertoireLoginPromptView()
+                }
+            }
+            .tabItem {
+                Label("Settings", systemImage: "gearshape.fill")
+            }
         }
         .tint(JazzTheme.burgundy) // Sets the active tab color
+    }
+}
+
+// MARK: - Settings View
+
+struct SettingsView: View {
+    @EnvironmentObject var authManager: AuthenticationManager
+    
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 24) {
+                    // User Info Section
+                    VStack(spacing: 16) {
+                        // Profile Icon
+                        Circle()
+                            .fill(JazzTheme.burgundy.gradient)
+                            .frame(width: 80, height: 80)
+                            .overlay {
+                                Image(systemName: "person.fill")
+                                    .font(.system(size: 40))
+                                    .foregroundColor(.white)
+                            }
+                        
+                        // Name
+                        if let displayName = authManager.currentUser?.displayName {
+                            Text(displayName)
+                                .font(.title2)
+                                .fontWeight(.semibold)
+                                .foregroundColor(JazzTheme.charcoal)
+                        }
+                        
+                        // Email
+                        if let email = authManager.currentUser?.email {
+                            Text(email)
+                                .font(.body)
+                                .foregroundColor(JazzTheme.smokeGray)
+                        }
+                    }
+                    .padding(.top, 32)
+                    
+                    Divider()
+                        .padding(.horizontal)
+                    
+                    // Account Actions
+                    VStack(spacing: 0) {
+                        // Log Out Button
+                        Button(action: {
+                            authManager.logout()
+                        }) {
+                            HStack {
+                                Image(systemName: "rectangle.portrait.and.arrow.right")
+                                    .foregroundColor(JazzTheme.burgundy)
+                                Text("Log Out")
+                                    .foregroundColor(JazzTheme.charcoal)
+                                Spacer()
+                            }
+                            .padding()
+                            .background(JazzTheme.cardBackground)
+                            .cornerRadius(8)
+                        }
+                        .padding(.horizontal)
+                    }
+                    
+                    Spacer()
+                }
+            }
+            .background(JazzTheme.backgroundLight)
+            .navigationTitle("Settings")
+            .toolbarBackground(JazzTheme.burgundy, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbarColorScheme(.dark, for: .navigationBar)
+        }
     }
 }
 
