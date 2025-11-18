@@ -10,6 +10,7 @@ import SwiftUI
 struct SongsListView: View {
     @StateObject private var networkManager = NetworkManager()
     @EnvironmentObject var repertoireManager: RepertoireManager
+    @EnvironmentObject var authManager: AuthenticationManager
     @State private var searchText = ""
     @State private var searchTask: Task<Void, Never>?
     @State private var showRepertoirePicker = false
@@ -73,10 +74,19 @@ struct SongsListView: View {
     // MARK: - Helper Methods
     
     private func loadSongs() async {
-        await networkManager.fetchSongsInRepertoire(
-            repertoireId: repertoireManager.selectedRepertoire.id,
-            searchQuery: searchText
-        )
+        if repertoireManager.selectedRepertoire.id != "all",
+           let token = authManager.getAccessToken() {
+            await networkManager.fetchSongsInRepertoire(
+                repertoireId: repertoireManager.selectedRepertoire.id,
+                searchQuery: searchText,
+                authToken: token
+            )
+        } else {
+            await networkManager.fetchSongsInRepertoire(
+                repertoireId: repertoireManager.selectedRepertoire.id,
+                searchQuery: searchText
+            )
+        }
     }
     
     // MARK: - Content Views

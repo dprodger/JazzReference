@@ -312,14 +312,27 @@ class RepertoireManager: ObservableObject {
         }
     }
     
-    /// Select a new repertoire and persist the choice
     func selectRepertoire(_ repertoire: Repertoire) {
         selectedRepertoire = repertoire
         
-        // Save to UserDefaults
-        UserDefaults.standard.set(repertoire.id, forKey: selectedRepertoireKey)
+        // Save selection
+        if repertoire.id != "all" {
+            UserDefaults.standard.set(repertoire.id, forKey: selectedRepertoireKey)
+        } else {
+            UserDefaults.standard.removeObject(forKey: selectedRepertoireKey)
+        }
         
-        print("📚 Selected repertoire: \(repertoire.name) (ID: \(repertoire.id))")
+        // Fetch songs with authentication if needed
+        Task {
+            if repertoire.id != "all", let authManager = authManager, let token = authManager.getAccessToken() {
+                await networkManager.fetchSongsInRepertoire(
+                    repertoireId: repertoire.id,
+                    authToken: token
+                )
+            } else {
+                await networkManager.fetchSongsInRepertoire(repertoireId: repertoire.id)
+            }
+        }
     }
     
     /// Update last used repertoire (when adding a song)

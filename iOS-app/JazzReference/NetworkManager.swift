@@ -209,8 +209,11 @@ class NetworkManager: ObservableObject {
     }
     
     /// Fetch songs in a specific repertoire
-    /// - Parameter repertoireId: The repertoire ID, or "all" for all songs
-    func fetchSongsInRepertoire(repertoireId: String, searchQuery: String = "") async {
+    /// - Parameters:
+    ///   - repertoireId: The repertoire ID, or "all" for all songs
+    ///   - searchQuery: Optional search query
+    ///   - authToken: Optional auth token for protected repertoires
+    func fetchSongsInRepertoire(repertoireId: String, searchQuery: String = "", authToken: String? = nil) async {
         let startTime = Date()
         await MainActor.run {
             isLoading = true
@@ -240,8 +243,32 @@ class NetworkManager: ObservableObject {
             return
         }
         
+        // Build request with optional authentication
+        var request = URLRequest(url: url)
+        if let token = authToken {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        
         do {
-            let (data, _) = try await URLSession.shared.data(from: url)
+            let (data, response) = try await URLSession.shared.data(for: request)
+            
+            // Check for HTTP errors
+            if let httpResponse = response as? HTTPURLResponse {
+                if httpResponse.statusCode == 401 {
+                    await MainActor.run {
+                        self.errorMessage = "Authentication required. Please log in again."
+                        self.isLoading = false
+                    }
+                    return
+                } else if httpResponse.statusCode != 200 {
+                    await MainActor.run {
+                        self.errorMessage = "Failed to load songs (HTTP \(httpResponse.statusCode))"
+                        self.isLoading = false
+                    }
+                    return
+                }
+            }
+            
             let decodedSongs = try JSONDecoder().decode([Song].self, from: data)
             
             await MainActor.run {
