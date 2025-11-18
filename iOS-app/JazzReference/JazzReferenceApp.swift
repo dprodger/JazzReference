@@ -133,6 +133,9 @@ struct JazzReferenceApp: App {
     @State private var importedSongData: ImportedSongData?
     @StateObject private var repertoireManager = RepertoireManager()
     @StateObject private var authManager = AuthenticationManager()
+    
+    // Password reset state
+    @State private var resetPasswordToken: String?
 
     // ADD THIS INITIALIZER
     init() {
@@ -179,8 +182,35 @@ struct JazzReferenceApp: App {
         WindowGroup {
             ContentView()
                 .onOpenURL { url in
-                    if url.scheme == "jazzreference" && url.host == "import-artist" {
+                    NSLog("🔗 Received deep link: \(url)")
+                    
+                    // Handle password reset: jazzreference://auth/reset-password?token=xyz
+                    if url.scheme == "jazzreference" && url.host == "auth" && url.path == "/reset-password" {
+                        NSLog("🔑 Password reset deep link detected")
+                        
+                        // Extract token from query parameters
+                        if let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+                           let queryItems = components.queryItems,
+                           let tokenItem = queryItems.first(where: { $0.name == "token" }),
+                           let token = tokenItem.value {
+                            NSLog("✅ Found reset token, showing ResetPasswordView")
+                            resetPasswordToken = token
+                        } else {
+                            NSLog("❌ No token found in reset password deep link")
+                        }
+                    }
+                    // Handle artist import: jazzreference://import-artist
+                    else if url.scheme == "jazzreference" && url.host == "import-artist" {
+                        NSLog("🎵 Artist import deep link detected")
                         checkForImportedArtist()
+                    }
+                    // Handle song import: jazzreference://import-song
+                    else if url.scheme == "jazzreference" && url.host == "import-song" {
+                        NSLog("🎵 Song import deep link detected")
+                        checkForImportedSong()
+                    }
+                    else {
+                        NSLog("❓ Unrecognized deep link format: \(url)")
                     }
                 }
                 .onAppear {
@@ -222,6 +252,13 @@ struct JazzReferenceApp: App {
                         SongCreationView(importedData: data)
                     }
                 }
+                .sheet(item: Binding(
+                    get: { resetPasswordToken.map { ResetPasswordData(token: $0) } },
+                    set: { resetPasswordToken = $0?.token }
+                )) { data in
+                    ResetPasswordView(token: data.token)
+                        .environmentObject(authManager)
+                }
                 .ignoresSafeArea()
                 .environmentObject(authManager)
                 .environmentObject(repertoireManager)
@@ -247,6 +284,14 @@ struct JazzReferenceApp: App {
             NSLog("ℹ️ No imported song data found")
         }
     }
+}
+
+// MARK: - Helper Structs
+
+// Helper struct for password reset sheet binding
+struct ResetPasswordData: Identifiable {
+    let id = UUID()
+    let token: String
 }
 
 // MARK: - Preview

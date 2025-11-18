@@ -42,3 +42,10 @@ struct AuthError: Codable {
     let error: String
     let details: String?
 }
+
+
+struct ResetPassword: Codable {
+    let token: String
+    let password: String
+}
+

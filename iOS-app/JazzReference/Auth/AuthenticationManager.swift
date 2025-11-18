@@ -315,4 +315,49 @@ class AuthenticationManager: ObservableObject {
     func getAccessToken() -> String? {
         return accessToken
     }
+    
+    /// Reset password using token from email
+    func resetPassword(token: String, newPassword: String) async -> Bool {
+        isLoading = true
+        errorMessage = nil
+        
+        let url = URL(string: "\(NetworkManager.baseURL)/auth/reset-password")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        let body: [String: String] = [
+            "token": token,
+            "password": newPassword
+        ]
+        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
+        
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            
+            guard let httpResponse = response as? HTTPURLResponse else {
+                throw URLError(.badServerResponse)
+            }
+            
+            isLoading = false
+            
+            if httpResponse.statusCode == 200 {
+                print("✅ Password reset successful")
+                return true
+            } else {
+                if let errorResponse = try? JSONDecoder().decode(AuthError.self, from: data) {
+                    errorMessage = errorResponse.error
+                } else {
+                    errorMessage = "Password reset failed"
+                }
+                print("❌ Password reset failed: \(errorMessage ?? "Unknown error")")
+                return false
+            }
+        } catch {
+            errorMessage = "Password reset failed: \(error.localizedDescription)"
+            print("❌ Password reset error: \(error)")
+            isLoading = false
+            return false
+        }
+    }
 }

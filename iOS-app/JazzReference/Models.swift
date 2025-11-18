@@ -204,10 +204,6 @@ struct Repertoire: Codable, Identifiable, Hashable {
 }
 
 
-
-
-
-
 // Solo Transcriptions - iOS Models and API Methods
 // Add these to iOS-app/JazzReference/JazzReferenceApp.swift
 
