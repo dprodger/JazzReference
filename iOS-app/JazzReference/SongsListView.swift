@@ -138,12 +138,13 @@ struct SongsListView: View {
                     .font(.subheadline)
                     .foregroundColor(JazzTheme.burgundy)
             }
-            .popover(isPresented: $showRepertoirePicker, arrowEdge: .top) {
+            .sheet(isPresented: $showRepertoirePicker) {
                 RepertoirePickerSheet(
                     repertoireManager: repertoireManager,
                     isPresented: $showRepertoirePicker
                 )
-                .presentationCompactAdaptation(.popover)
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
             }
             .sheet(isPresented: $showLoginPrompt) {
                 RepertoireLoginPromptView()
@@ -251,63 +252,73 @@ struct RepertoirePickerSheet: View {
     @Binding var isPresented: Bool
     
     var body: some View {
-        ScrollView {
-            VStack(spacing: 0) {
-                ForEach(repertoireManager.repertoires) { repertoire in
-                    Button(action: {
-                        repertoireManager.selectRepertoire(repertoire)
-                        isPresented = false
-                    }) {
-                        HStack {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(repertoire.name)
-                                    .font(.headline)
-                                    .foregroundColor(JazzTheme.charcoal)
-                                
-                                if let description = repertoire.description {
-                                    Text(description)
-                                        .font(.subheadline)
-                                        .foregroundColor(JazzTheme.smokeGray)
-                                        .lineLimit(2)
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 0) {
+                    ForEach(repertoireManager.repertoires) { repertoire in
+                        Button(action: {
+                            repertoireManager.selectRepertoire(repertoire)
+                            isPresented = false
+                        }) {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(repertoire.name)
+                                        .font(.headline)
+                                        .foregroundColor(JazzTheme.charcoal)
+                                    
+                                    if let description = repertoire.description {
+                                        Text(description)
+                                            .font(.subheadline)
+                                            .foregroundColor(JazzTheme.smokeGray)
+                                            .lineLimit(2)
+                                    }
+                                    
+                                    if repertoire.id != "all" {
+                                        Text("\(repertoire.songCount) songs")
+                                            .font(.caption)
+                                            .foregroundColor(JazzTheme.burgundy)
+                                    }
                                 }
                                 
-                                if repertoire.id != "all" {
-                                    Text("\(repertoire.songCount) songs")
-                                        .font(.caption)
+                                Spacer()
+                                
+                                if repertoire.id == repertoireManager.selectedRepertoire.id {
+                                    Image(systemName: "checkmark.circle.fill")
                                         .foregroundColor(JazzTheme.burgundy)
+                                        .font(.title3)
                                 }
                             }
-                            
-                            Spacer()
-                            
-                            if repertoire.id == repertoireManager.selectedRepertoire.id {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .foregroundColor(JazzTheme.burgundy)
-                                    .font(.title3)
-                            }
+                            .contentShape(Rectangle())
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 12)
+                            .frame(maxWidth: .infinity)
+                            .background(
+                                repertoire.id == repertoireManager.selectedRepertoire.id ?
+                                    JazzTheme.burgundy.opacity(0.1) :
+                                    JazzTheme.cardBackground
+                            )
                         }
-                        .contentShape(Rectangle())
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 12)
-                        .frame(maxWidth: .infinity)
-                        .background(
-                            repertoire.id == repertoireManager.selectedRepertoire.id ?
-                                JazzTheme.burgundy.opacity(0.1) :
-                                JazzTheme.cardBackground
-                        )
-                    }
-                    .buttonStyle(.plain)
-                    
-                    if repertoire.id != repertoireManager.repertoires.last?.id {
-                        Divider()
-                            .background(JazzTheme.smokeGray.opacity(0.3))
+                        .buttonStyle(.plain)
+                        
+                        if repertoire.id != repertoireManager.repertoires.last?.id {
+                            Divider()
+                                .background(JazzTheme.smokeGray.opacity(0.3))
+                        }
                     }
                 }
             }
+            .background(JazzTheme.backgroundLight)
+            .navigationTitle("Select Repertoire")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") {
+                        isPresented = false
+                    }
+                    .foregroundColor(JazzTheme.burgundy)
+                }
+            }
         }
-        .background(JazzTheme.backgroundLight)
-        .frame(width: 320)
-        .frame(maxHeight: UIScreen.main.bounds.height * 0.5)
     }
 }
 
