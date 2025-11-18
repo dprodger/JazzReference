@@ -14,6 +14,7 @@ struct SongsListView: View {
     @State private var searchText = ""
     @State private var searchTask: Task<Void, Never>?
     @State private var showRepertoirePicker = false
+    @State private var showLoginPrompt = false
     
     // Computed property to group songs by first letter
     private var groupedSongs: [(String, [Song])] {
@@ -117,7 +118,11 @@ struct SongsListView: View {
                 .foregroundColor(JazzTheme.charcoal)
             Spacer()
             Button(action: {
-                showRepertoirePicker = true
+                if authManager.isAuthenticated {
+                    showRepertoirePicker = true
+                } else {
+                    showLoginPrompt = true
+                }
             }) {
                 Text("Change")
                     .font(.subheadline)
@@ -129,6 +134,19 @@ struct SongsListView: View {
                     isPresented: $showRepertoirePicker
                 )
                 .presentationCompactAdaptation(.popover)
+            }
+            .sheet(isPresented: $showLoginPrompt) {
+                RepertoireLoginPromptView()
+            }
+            .onChange(of: authManager.isAuthenticated) { wasAuthenticated, isAuthenticated in
+                // Dismiss login prompt when user successfully authenticates
+                if isAuthenticated && showLoginPrompt {
+                    showLoginPrompt = false
+                    // After dismissing login, show the repertoire picker
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        showRepertoirePicker = true
+                    }
+                }
             }
         }
         .padding(.horizontal)

@@ -23,18 +23,6 @@ struct ContentView: View {
                     Label("Artists", systemImage: "person.2.fill")
                 }
             
-            // Repertoire Tab (protected)
-            Group {
-                if authManager.isAuthenticated {
-                    Text("My Repertoire - Coming in Phase 5!")
-                } else {
-                    RepertoireLoginPromptView()
-                }
-            }
-            .tabItem {
-                Label("Repertoire", systemImage: "bookmark.fill")
-            }
-            
             AboutView()
                 .tabItem {
                     Label("About", systemImage: "info.circle")
