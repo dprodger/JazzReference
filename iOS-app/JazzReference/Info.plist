@@ -18,9 +18,15 @@
     <string>$(MARKETING_VERSION)</string>
     <key>CFBundleVersion</key>
     <string>$(CURRENT_PROJECT_VERSION)</string>
-    <!-- Register Custom URL Scheme -->
+    
+    <!-- Google Sign In Configuration -->
+    <key>GIDClientID</key>
+    <string>771367679852-bns841o89en9bfdulo5s5vltpucqj1vh.apps.googleusercontent.com</string>
+    
+    <!-- URL Schemes (both app deep linking and Google Sign In) -->
     <key>CFBundleURLTypes</key>
     <array>
+        <!-- App deep linking scheme -->
         <dict>
             <key>CFBundleTypeRole</key>
             <string>Editor</string>
@@ -31,7 +37,18 @@
                 <string>jazzreference</string>
             </array>
         </dict>
+        <!-- Google Sign In URL scheme -->
+        <dict>
+            <key>CFBundleTypeRole</key>
+            <string>Editor</string>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>com.googleusercontent.apps.771367679852-bns841o89en9bfdulo5s5vltpucqj1vh</string>
+            </array>
+        </dict>
     </array>
+    
+    <!-- UI Configuration -->
     <key>UIApplicationSceneManifest</key>
     <dict>
         <key>UIApplicationSupportsMultipleScenes</key>

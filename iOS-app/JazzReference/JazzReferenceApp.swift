@@ -5,6 +5,8 @@
 import SwiftUI
 import Combine
 
+import GoogleSignIn
+
 
 // MARK: - Main View
 
@@ -176,6 +178,15 @@ struct JazzReferenceApp: App {
         
         NSLog("\nBundle ID: %@", Bundle.main.bundleIdentifier ?? "nil")
         NSLog("========================================\n")
+        
+        // In your App init or AppDelegate didFinishLaunching
+        GIDSignIn.sharedInstance.restorePreviousSignIn { user, error in
+            if error != nil || user == nil {
+                // User is not signed in
+            } else {
+                // User is signed in
+            }
+        }
     }
     
     var body: some Scene {
@@ -284,6 +295,14 @@ struct JazzReferenceApp: App {
             NSLog("ℹ️ No imported song data found")
         }
     }
+    
+    // Handle URL for Google Sign In
+    func application(_ app: UIApplication,
+                    open url: URL,
+                    options: [UIApplication.OpenURLOptionsKey: Any] = [:]) -> Bool {
+        return GIDSignIn.sharedInstance.handle(url)
+    }
+
 }
 
 // MARK: - Helper Structs

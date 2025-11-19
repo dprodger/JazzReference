@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		B4C535842ECE5FFF0030A127 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = B4C535832ECE5FFF0030A127 /* GoogleSignIn */; };
+		B4C535862ECE5FFF0030A127 /* GoogleSignInSwift in Frameworks */ = {isa = PBXBuildFile; productRef = B4C535852ECE5FFF0030A127 /* GoogleSignInSwift */; };
 		B4EE328C2EB3ED5E00C643D1 /* MusicBrainzImporter.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = B4911D2A2EB316F600326CA7 /* MusicBrainzImporter.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		B4F38C242EC166A800231130 /* YouTubePlayerKit in Frameworks */ = {isa = PBXBuildFile; productRef = B4F38C232EC166A800231130 /* YouTubePlayerKit */; };
 /* End PBXBuildFile section */
@@ -125,7 +127,9 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B4C535862ECE5FFF0030A127 /* GoogleSignInSwift in Frameworks */,
 				B4F38C242EC166A800231130 /* YouTubePlayerKit in Frameworks */,
+				B4C535842ECE5FFF0030A127 /* GoogleSignIn in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -213,6 +217,8 @@
 			name = JazzReference;
 			packageProductDependencies = (
 				B4F38C232EC166A800231130 /* YouTubePlayerKit */,
+				B4C535832ECE5FFF0030A127 /* GoogleSignIn */,
+				B4C535852ECE5FFF0030A127 /* GoogleSignInSwift */,
 			);
 			productName = JazzReference;
 			productReference = B4C160402E91B03600EB8D2C /* JazzReference.app */;
@@ -301,6 +307,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				B4F38C222EC166A800231130 /* XCRemoteSwiftPackageReference "YouTubePlayerKit" */,
+				B4C535822ECE5FFF0030A127 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = B4C160412E91B03600EB8D2C /* Products */;
@@ -776,6 +783,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		B4C535822ECE5FFF0030A127 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/google/GoogleSignIn-iOS";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 9.0.0;
+			};
+		};
 		B4F38C222EC166A800231130 /* XCRemoteSwiftPackageReference "YouTubePlayerKit" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/SvenTiigi/YouTubePlayerKit.git";
@@ -787,6 +802,16 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		B4C535832ECE5FFF0030A127 /* GoogleSignIn */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B4C535822ECE5FFF0030A127 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
+			productName = GoogleSignIn;
+		};
+		B4C535852ECE5FFF0030A127 /* GoogleSignInSwift */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B4C535822ECE5FFF0030A127 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
+			productName = GoogleSignInSwift;
+		};
 		B4F38C232EC166A800231130 /* YouTubePlayerKit */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = B4F38C222EC166A800231130 /* XCRemoteSwiftPackageReference "YouTubePlayerKit" */;
