@@ -77,30 +77,18 @@ struct LoginView: View {
                     .padding(.vertical, 16)
 
                     // Google Sign In Button
-                    Button(action: {
+                    GoogleSignInButton(action: {
                         Task {
                             let success = await authManager.signInWithGoogle()
                             if success {
                                 dismiss()
                             }
                         }
-                    }) {
-                        HStack {
-                            Image(systemName: "g.circle.fill")
-                                .font(.system(size: 20))
-                            Text("Sign in with Google")
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.white)
-                        .foregroundColor(.black)
-                        .cornerRadius(10)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 10)
-                                .stroke(Color.gray.opacity(0.3), lineWidth: 1)
-                        )
-                    }
+                    })
+                    .frame(height: 50)
+                    .cornerRadius(10)
                     .disabled(authManager.isLoading)
+                    
                     // Forgot password
                     HStack {
                         Spacer()
