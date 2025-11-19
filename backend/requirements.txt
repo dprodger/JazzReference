@@ -24,4 +24,4 @@ sendgrid==6.11.0
 # Flask-Limiter==3.5.0
 
 # Google OAuth (Phase 6 - optional for Phase 2)
-# google-auth==2.27.0
+google-auth==2.27.0

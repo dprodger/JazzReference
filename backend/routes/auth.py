@@ -28,9 +28,15 @@ from auth_utils import (
 from middleware.auth_middleware import require_auth
 from email_service import send_welcome_email
 
+# Google OAuth imports (ADD THESE LINES)
+from google.auth.transport import requests as google_requests
+from google.oauth2 import id_token as google_id_token
+
 logger = logging.getLogger(__name__)
 auth_bp = Blueprint('auth', __name__, url_prefix='/api/auth')
 
+# Google OAuth configuration (NEW - ADD THIS)
+GOOGLE_CLIENT_ID = os.getenv('GOOGLE_CLIENT_ID')
 
 @auth_bp.route('/register', methods=['POST'])
 def register():
@@ -390,3 +396,132 @@ def logout():
             logger.error(f"Logout error: {e}", exc_info=True)
     
     return jsonify({'message': 'Logged out successfully'}), 200
+    
+@auth_bp.route('/google', methods=['POST'])
+def google_login():
+    """
+    Authenticate with Google ID token
+    
+    Request body:
+        {
+            "id_token": "eyJhbGciOiJSUzI1NiIsImtpZCI6..."
+        }
+    
+    Returns:
+        200: {
+            "user": {"id": "...", "email": "...", "display_name": "..."},
+            "access_token": "...",
+            "refresh_token": "..."
+        }
+        400: Invalid input
+        401: Invalid token
+        500: Server error
+    """
+    data = request.get_json()
+    id_token_str = data.get('id_token')
+    
+    if not id_token_str:
+        return jsonify({'error': 'ID token required'}), 400
+    
+    if not GOOGLE_CLIENT_ID:
+        logger.error("GOOGLE_CLIENT_ID not configured")
+        return jsonify({'error': 'Google authentication not configured'}), 500
+    
+    try:
+        # Verify Google ID token
+        idinfo = google_id_token.verify_oauth2_token(
+            id_token_str, 
+            google_requests.Request(), 
+            GOOGLE_CLIENT_ID
+        )
+        
+        # Extract user information from token
+        google_id = idinfo['sub']
+        email = idinfo['email']
+        display_name = idinfo.get('name')
+        profile_image = idinfo.get('picture')
+        
+        logger.info(f"🔐 Google login attempt for: {email}")
+        
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                # Check if user exists with this Google ID or email
+                cur.execute("""
+                    SELECT id, email, display_name, google_id
+                    FROM users
+                    WHERE google_id = %s OR email = %s
+                """, (google_id, email))
+                
+                user = cur.fetchone()
+                
+                if user:
+                    # User exists
+                    user_id = user['id']
+                    
+                    # Update Google ID if not set (linking existing email account)
+                    if not user.get('google_id'):
+                        logger.info(f"🔗 Linking Google account to existing user: {email}")
+                        cur.execute("""
+                            UPDATE users
+                            SET google_id = %s, 
+                                email_verified = true,
+                                profile_image_url = %s,
+                                updated_at = CURRENT_TIMESTAMP
+                            WHERE id = %s
+                        """, (google_id, profile_image, user_id))
+                        conn.commit()
+                else:
+                    # Create new user
+                    logger.info(f"✨ Creating new user via Google: {email}")
+                    cur.execute("""
+                        INSERT INTO users (
+                            email, google_id, display_name, 
+                            profile_image_url, email_verified
+                        )
+                        VALUES (%s, %s, %s, %s, true)
+                        RETURNING id
+                    """, (email, google_id, display_name, profile_image))
+                    
+                    result = cur.fetchone()
+                    user_id = result['id']
+                    conn.commit()
+                
+                # Generate tokens
+                access_token = generate_access_token(user_id)
+                refresh_token = generate_refresh_token(user_id)
+                
+                # Store refresh token
+                cur.execute("""
+                    INSERT INTO refresh_tokens (user_id, token, expires_at)
+                    VALUES (%s, %s, NOW() + INTERVAL '30 days')
+                """, (user_id, refresh_token))
+                conn.commit()
+                
+                # Get complete user details
+                cur.execute("""
+                    SELECT id, email, display_name, profile_image_url, email_verified
+                    FROM users WHERE id = %s
+                """, (user_id,))
+                
+                user_data = cur.fetchone()
+                
+                logger.info(f"✅ Google login successful for: {email}")
+                
+                return jsonify({
+                    'user': {
+                        'id': str(user_data['id']),
+                        'email': user_data['email'],
+                        'display_name': user_data['display_name'],
+                        'profile_image_url': user_data.get('profile_image_url'),
+                        'email_verified': user_data.get('email_verified', False)
+                    },
+                    'access_token': access_token,
+                    'refresh_token': refresh_token
+                }), 200
+                
+    except ValueError as e:
+        logger.warning(f"Invalid Google token: {e}")
+        return jsonify({'error': f'Invalid token: {str(e)}'}), 401
+    except Exception as e:
+        logger.error(f"Google login error: {e}", exc_info=True)
+        return jsonify({'error': 'Authentication failed'}), 500 
