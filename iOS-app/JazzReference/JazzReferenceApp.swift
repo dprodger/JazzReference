@@ -272,6 +272,9 @@ struct JazzReferenceApp: App {
                 }
                 .ignoresSafeArea()
                 .environmentObject(authManager)
+                .onOpenURL { url in
+                    GIDSignIn.sharedInstance.handle(url)
+                }
                 .environmentObject(repertoireManager)
         }
     }

@@ -8,6 +8,7 @@
 
 import SwiftUI
 import Combine
+import GoogleSignIn
 
 @MainActor
 class AuthenticationManager: ObservableObject {
@@ -357,6 +358,102 @@ class AuthenticationManager: ObservableObject {
             errorMessage = "Password reset failed: \(error.localizedDescription)"
             print("❌ Password reset error: \(error)")
             isLoading = false
+            return false
+        }
+    }
+    
+    @MainActor
+    func signInWithGoogle() async -> Bool {
+        isLoading = true
+        errorMessage = nil
+        
+        // Get the presenting view controller
+        guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+              let rootViewController = windowScene.windows.first?.rootViewController else {
+            errorMessage = "Unable to find window"
+            isLoading = false
+            return false
+        }
+        
+        // Get the GIDClientID from Info.plist
+        guard let clientID = Bundle.main.object(forInfoDictionaryKey: "GIDClientID") as? String else {
+            errorMessage = "Google Client ID not configured"
+            isLoading = false
+            return false
+        }
+        
+        // Configure Google Sign In
+        let config = GIDConfiguration(clientID: clientID)
+        GIDSignIn.sharedInstance.configuration = config
+        
+        do {
+            // Start Google Sign In
+            let result = try await GIDSignIn.sharedInstance.signIn(
+                withPresenting: rootViewController
+            )
+            
+            // Get ID token
+            guard let idToken = result.user.idToken?.tokenString else {
+                errorMessage = "Failed to get ID token from Google"
+                isLoading = false
+                return false
+            }
+            
+            // Send ID token to backend
+            let success = await authenticateWithGoogle(idToken: idToken)
+            isLoading = false
+            return success
+            
+        } catch {
+            errorMessage = "Google Sign In failed: \(error.localizedDescription)"
+            isLoading = false
+            return false
+        }
+    }
+
+    private func authenticateWithGoogle(idToken: String) async -> Bool {
+        let url = URL(string: "\(NetworkManager.baseURL)/auth/google")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        let body: [String: Any] = ["id_token": idToken]
+        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
+        
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            
+            // Check HTTP status
+            guard let httpResponse = response as? HTTPURLResponse else {
+                errorMessage = "Invalid response from server"
+                return false
+            }
+            
+            if httpResponse.statusCode != 200 {
+                // Try to parse error message
+                if let errorResponse = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                   let error = errorResponse["error"] as? String {
+                    errorMessage = error
+                } else {
+                    errorMessage = "Authentication failed with status \(httpResponse.statusCode)"
+                }
+                return false
+            }
+            
+            // Parse successful response
+            let authResponse = try JSONDecoder().decode(AuthResponse.self, from: data)
+            
+            // Save tokens
+            saveTokens(accessToken: authResponse.accessToken,
+                      refreshToken: authResponse.refreshToken)
+            
+            // Update user state
+            currentUser = authResponse.user
+            isAuthenticated = true
+            
+            return true
+        } catch {
+            errorMessage = "Authentication failed: \(error.localizedDescription)"
             return false
         }
     }

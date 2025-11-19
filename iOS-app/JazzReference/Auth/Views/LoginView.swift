@@ -7,6 +7,7 @@
 //
 
 import SwiftUI
+import GoogleSignInSwift
 
 struct LoginView: View {
     @EnvironmentObject var authManager: AuthenticationManager
@@ -61,6 +62,45 @@ struct LoginView: View {
                             .cornerRadius(10)
                     }
                     
+                    // Divider
+                    HStack {
+                        Rectangle()
+                            .frame(height: 1)
+                            .foregroundColor(.gray.opacity(0.3))
+                        Text("or")
+                            .foregroundColor(.secondary)
+                            .padding(.horizontal, 8)
+                        Rectangle()
+                            .frame(height: 1)
+                            .foregroundColor(.gray.opacity(0.3))
+                    }
+                    .padding(.vertical, 16)
+
+                    // Google Sign In Button
+                    Button(action: {
+                        Task {
+                            let success = await authManager.signInWithGoogle()
+                            if success {
+                                dismiss()
+                            }
+                        }
+                    }) {
+                        HStack {
+                            Image(systemName: "g.circle.fill")
+                                .font(.system(size: 20))
+                            Text("Sign in with Google")
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color.white)
+                        .foregroundColor(.black)
+                        .cornerRadius(10)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10)
+                                .stroke(Color.gray.opacity(0.3), lineWidth: 1)
+                        )
+                    }
+                    .disabled(authManager.isLoading)
                     // Forgot password
                     HStack {
                         Spacer()
