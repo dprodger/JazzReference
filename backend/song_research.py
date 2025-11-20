@@ -54,7 +54,7 @@ def research_song(song_id: str, song_name: str) -> Dict[str, Any]:
         importer = MBReleaseImporter(dry_run=False, logger=logger)
         
         logger.info("Importing MusicBrainz releases...")
-        mb_result = importer.import_releases(str(song_id))
+        mb_result = importer.import_releases(str(song_id), 500)
         
         if not mb_result['success']:
             error = mb_result.get('error', 'Unknown error')
