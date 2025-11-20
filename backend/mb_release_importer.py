@@ -68,7 +68,7 @@ class MBReleaseImporter:
         else:
             return self._find_song_by_name(song_identifier)
     
-    def import_releases(self, song_identifier: str, limit: int = 100) -> Dict[str, Any]:
+    def import_releases(self, song_identifier: str, limit: int = 200) -> Dict[str, Any]:
         """
         Main method to import releases for a song
         
