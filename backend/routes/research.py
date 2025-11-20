@@ -1,5 +1,5 @@
 # routes/research.py
-from flask import Blueprint, jsonify
+from flask import Blueprint, jsonify, request
 import logging
 import db_utils as db_tools
 import research_queue
@@ -78,12 +78,14 @@ def queue_all_songs_for_research():
         JSON response with summary statistics
     """
     try:
-        # Query all songs from database
-        query = """
-            SELECT id, title 
-            FROM songs 
-            ORDER BY title
-        """
+        # Get optional batch_size parameter
+        batch_size = request.args.get('batch_size', type=int)
+        
+        # Query with optional LIMIT
+        query = "SELECT id, title FROM songs ORDER BY title"
+        if batch_size and batch_size > 0:
+            query += f" LIMIT {batch_size}"        
+            
         songs = db_tools.execute_query(query)
         
         if not songs:
