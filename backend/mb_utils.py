@@ -13,18 +13,42 @@ import re
 from datetime import datetime
 from pathlib import Path
 
+from cache_utils import get_cache_dir
+
 logger = logging.getLogger(__name__)
 
 
 class MusicBrainzSearcher:
     """Shared MusicBrainz search functionality with caching"""
     
-    def __init__(self, cache_dir='cache/musicbrainz', cache_days=30, force_refresh=False):
+#!/usr/bin/env python3
+"""
+MusicBrainz Utilities
+Shared utilities for searching and interacting with MusicBrainz API with caching support
+"""
+
+import time
+import logging
+import requests
+import json
+import hashlib
+import re
+from datetime import datetime
+from pathlib import Path
+
+from cache_utils import get_cache_dir
+
+logger = logging.getLogger(__name__)
+
+
+class MusicBrainzSearcher:
+    """Shared MusicBrainz search functionality with caching"""
+    
+    def __init__(self, cache_days=30, force_refresh=False):
         """
         Initialize MusicBrainz searcher with caching support
         
         Args:
-            cache_dir: Directory to store cached MusicBrainz data
             cache_days: Number of days before cache is considered stale
             force_refresh: If True, always fetch fresh data ignoring cache
         """
@@ -39,29 +63,31 @@ class MusicBrainzSearcher:
         self.min_request_interval = 1.0  # MusicBrainz requires 1 second between requests
         
         # Cache configuration
-        self.cache_dir = Path(cache_dir)
         self.cache_days = cache_days
         self.force_refresh = force_refresh
         
         # Track whether last operation made an API call
         self.last_made_api_call = False
         
-        # Create cache directories if they don't exist
-        self.cache_dir.mkdir(parents=True, exist_ok=True)
+        # Get cache directories using the shared utility
+        # This ensures we use the persistent disk mount on Render
+        self.cache_dir = get_cache_dir('musicbrainz')
         self.search_cache_dir = self.cache_dir / 'searches'
-        self.search_cache_dir.mkdir(parents=True, exist_ok=True)
         self.artist_cache_dir = self.cache_dir / 'artists'
-        self.artist_cache_dir.mkdir(parents=True, exist_ok=True)
         self.work_cache_dir = self.cache_dir / 'works'
-        self.work_cache_dir.mkdir(parents=True, exist_ok=True)
         self.recording_cache_dir = self.cache_dir / 'recordings'
-        self.recording_cache_dir.mkdir(parents=True, exist_ok=True)
         self.release_cache_dir = self.cache_dir / 'releases'
-        self.release_cache_dir.mkdir(parents=True, exist_ok=True)
         self.wikidata_cache_dir = self.cache_dir / 'wikidata'
+        
+        # Create subdirectories
+        self.search_cache_dir.mkdir(parents=True, exist_ok=True)
+        self.artist_cache_dir.mkdir(parents=True, exist_ok=True)
+        self.work_cache_dir.mkdir(parents=True, exist_ok=True)
+        self.recording_cache_dir.mkdir(parents=True, exist_ok=True)
+        self.release_cache_dir.mkdir(parents=True, exist_ok=True)
         self.wikidata_cache_dir.mkdir(parents=True, exist_ok=True)
         
-        logger.debug(f"MusicBrainz cache: {self.cache_dir} (expires after {cache_days} days, force_refresh={force_refresh})")
+        logger.debug(f"MusicBrainz cache directory: {self.cache_dir}")
 
     def verify_musicbrainz_reference(self, artist_name, mb_id, context):
         """

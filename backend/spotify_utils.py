@@ -29,6 +29,8 @@ from rapidfuzz import fuzz
 
 from db_utils import get_db_connection
 
+from cache_utils import get_cache_dir
+
 logger = logging.getLogger(__name__)
 
 # Sentinel value to distinguish "no cache exists" from "cached None (no match found)"
@@ -40,8 +42,8 @@ class SpotifyMatcher:
     Handles matching recordings to Spotify tracks with fuzzy validation and caching
     """
     
-    def __init__(self, dry_run=False, artist_filter=None, strict_mode=True, logger=None,
-                 cache_dir='cache/spotify', cache_days=30, force_refresh=False):
+    def __init__(self, dry_run=False, strict_mode=False, force_refresh=False, 
+                 artist_filter=False, cache_days=30, logger=None):
         """
         Initialize Spotify Matcher
         
@@ -50,7 +52,6 @@ class SpotifyMatcher:
             artist_filter: Filter to recordings by specific artist
             strict_mode: If True, use stricter validation thresholds (recommended)
             logger: Optional logger instance (uses module logger if not provided)
-            cache_dir: Directory to store cached Spotify data
             cache_days: Number of days before cache is considered stale
             force_refresh: If True, always fetch fresh data ignoring cache
         """
@@ -60,12 +61,23 @@ class SpotifyMatcher:
         self.logger = logger or logging.getLogger(__name__)
         self.access_token = None
         self.token_expires = 0
-        
-        # Cache configuration
-        self.cache_dir = Path(cache_dir)
+       
+        # Cache configuration - use shared cache utility for persistent storage
         self.cache_days = cache_days
         self.force_refresh = force_refresh
         
+        # Get cache directories using the shared utility
+        # This ensures we use the persistent disk mount on Render
+        self.cache_dir = get_cache_dir('spotify')
+        self.search_cache_dir = self.cache_dir / 'searches'
+        self.track_cache_dir = self.cache_dir / 'tracks'
+        
+        # Create subdirectories
+        self.search_cache_dir.mkdir(parents=True, exist_ok=True)
+        self.track_cache_dir.mkdir(parents=True, exist_ok=True)
+        
+        self.logger.debug(f"Spotify cache directory: {self.cache_dir}")
+
         # Track whether last operation made an API call
         self.last_made_api_call = False
         
@@ -864,7 +876,7 @@ class SpotifyMatcher:
                 year = recording['recording_year']
                 
                 # Get primary artist
-                performers = recording.get('performers', [])
+                performers = recording.get('performers') or []
                 leaders = [p['name'] for p in performers if p['role'] == 'leader']
                 artist_name = leaders[0] if leaders else (
                     performers[0]['name'] if performers else None

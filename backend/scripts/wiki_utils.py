@@ -15,12 +15,14 @@ import hashlib
 from datetime import datetime, timedelta
 from pathlib import Path
 
+from cache_utils import get_cache_dir
+
 logger = logging.getLogger(__name__)
 
 class WikipediaSearcher:
     """Shared Wikipedia search functionality with caching"""
     
-    def __init__(self, cache_dir='cache/wikipedia', cache_days=7, force_refresh=False):
+    def __init__(self, cache_days=7, force_refresh=False):  # Remove cache_dir parameter
         """
         Initialize Wikipedia searcher with caching support
         
@@ -39,10 +41,17 @@ class WikipediaSearcher:
         self.last_request_time = 0
         self.min_request_interval = 1.0
         
-        # Cache configuration
-        self.cache_dir = Path(cache_dir)
-        self.cache_days = cache_days
-        self.force_refresh = force_refresh
+        # ...
+        
+        # Get cache directories using the shared utility
+        # This ensures we use the persistent disk mount on Render
+        self.cache_dir = get_cache_dir('wikipedia')
+        self.search_cache_dir = self.cache_dir / 'searches'
+        
+        # Create subdirectories
+        self.search_cache_dir.mkdir(parents=True, exist_ok=True)
+        
+        logger.debug(f"Wikipedia cache directory: {self.cache_dir}")        
         
         # Track whether last operation made an API call
         self.last_made_api_call = False
