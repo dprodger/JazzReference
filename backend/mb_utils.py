@@ -546,15 +546,17 @@ class MusicBrainzSearcher:
             logger.error(f"Error searching MusicBrainz for {artist_name}: {e}")
             return []
     
-    def get_artist_details(self, mb_id):
+
+    def get_artist_details(self, mb_id, max_retries=3):
         """
-        Get detailed information about a MusicBrainz artist
+        Get artist details from MusicBrainz with retry logic
         
         Args:
             mb_id: MusicBrainz artist ID
+            max_retries: Maximum number of retry attempts (default 3)
             
         Returns:
-            Dict with artist details, or None if not found
+            Artist data dict or None
         """
         # Check cache first (unless force_refresh is enabled)
         cache_path = self._get_artist_detail_cache_path(mb_id)
@@ -565,45 +567,81 @@ class MusicBrainzSearcher:
                 self.last_made_api_call = False
                 return cached.get('data')
         
-        # Fetch from API
-        self.last_made_api_call = True
-        self.rate_limit()
+        # Fetch from API with retry logic
+        for attempt in range(max_retries):
+            try:
+                # Progressive delay based on attempt number
+                if attempt > 0:
+                    sleep_time = 2.0 + (attempt * 1.5)
+                    logger.info(f"  Retry attempt {attempt + 1}/{max_retries} after {sleep_time}s delay...")
+                    time.sleep(sleep_time)
+                
+                # Rate limiting for first attempt
+                if attempt == 0:
+                    self.last_made_api_call = True
+                    self.rate_limit()
+                
+                url = f"https://musicbrainz.org/ws/2/artist/{mb_id}"
+                params = {
+                    'fmt': 'json',
+                    'inc': 'recordings+tags'
+                }
+                
+                logger.debug(f"Fetching MusicBrainz artist details: {mb_id}")
+                
+                response = self.session.get(url, params=params, timeout=15)
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    # Cache the successful result
+                    self._save_to_cache(cache_path, data)
+                    return data
+                elif response.status_code == 404:
+                    # Cache the negative result (404 is not transient)
+                    self._save_to_cache(cache_path, None)
+                    logger.warning(f"Artist not found in MusicBrainz: {mb_id}")
+                    return None
+                elif response.status_code == 503:
+                    # Service unavailable - retry
+                    logger.warning(f"MusicBrainz service unavailable (503), will retry...")
+                    if attempt < max_retries - 1:
+                        continue
+                    logger.error("All retry attempts failed (503)")
+                    return None
+                else:
+                    logger.error(f"MusicBrainz API error {response.status_code}")
+                    if attempt < max_retries - 1:
+                        continue
+                    return None
+                    
+            except requests.exceptions.ConnectionError as e:
+                logger.warning(f"Connection error (attempt {attempt + 1}/{max_retries}): {e}")
+                if attempt < max_retries - 1:
+                    continue
+                logger.error("All retry attempts failed - connection error")
+                return None
+            except requests.exceptions.Timeout as e:
+                logger.warning(f"Timeout error (attempt {attempt + 1}/{max_retries}): {e}")
+                if attempt < max_retries - 1:
+                    continue
+                logger.error("All retry attempts failed - timeout")
+                return None
+            except Exception as e:
+                logger.error(f"Error fetching artist details from MusicBrainz: {e}")
+                if attempt < max_retries - 1:
+                    logger.warning("Retrying after unexpected error...")
+                    continue
+                return None
         
-        try:
-            url = f"https://musicbrainz.org/ws/2/artist/{mb_id}"
-            params = {
-                'fmt': 'json',
-                'inc': 'recordings+tags'
-            }
-            
-            logger.debug(f"Fetching MusicBrainz artist details: {mb_id}")
-            
-            response = self.session.get(url, params=params, timeout=10)
-            
-            if response.status_code == 404:
-                # Cache the negative result
-                self._save_to_cache(cache_path, None)
-                return None
-            elif response.status_code != 200:
-                return None
-            
-            data = response.json()
-            
-            # Cache the result
-            self._save_to_cache(cache_path, data)
-            
-            return data
-            
-        except Exception as e:
-            logger.error(f"Error fetching artist details from MusicBrainz: {e}")
-            return None
-    
-    def get_work_recordings(self, work_id):
+        return None
+
+    def get_work_recordings(self, work_id, max_retries=3):
         """
-        Get recordings for a MusicBrainz work
+        Get recordings for a MusicBrainz work with retry logic
         
         Args:
             work_id: MusicBrainz work ID
+            max_retries: Maximum number of retry attempts (default 3)
             
         Returns:
             Dict with work data including recording relations, or None if not found
@@ -617,45 +655,81 @@ class MusicBrainzSearcher:
                 self.last_made_api_call = False
                 return cached.get('data')
         
-        # Fetch from API
-        self.last_made_api_call = True
-        self.rate_limit()
+        # Fetch from API with retry logic
+        for attempt in range(max_retries):
+            try:
+                # Progressive delay based on attempt number
+                if attempt > 0:
+                    sleep_time = 2.0 + (attempt * 1.5)
+                    logger.info(f"  Retry attempt {attempt + 1}/{max_retries} after {sleep_time}s delay...")
+                    time.sleep(sleep_time)
+                
+                # Rate limiting for first attempt
+                if attempt == 0:
+                    self.last_made_api_call = True
+                    self.rate_limit()
+                
+                url = f"https://musicbrainz.org/ws/2/work/{work_id}"
+                params = {
+                    'inc': 'artist-rels+recording-rels+url-rels',
+                    'fmt': 'json'
+                }
+                
+                logger.debug(f"Fetching MusicBrainz work recordings: {work_id}")
+                
+                response = self.session.get(url, params=params, timeout=15)
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    # Cache the successful result
+                    self._save_to_cache(cache_path, data)
+                    return data
+                elif response.status_code == 404:
+                    # Cache the negative result (404 is not transient)
+                    self._save_to_cache(cache_path, None)
+                    logger.warning(f"Work not found in MusicBrainz: {work_id}")
+                    return None
+                elif response.status_code == 503:
+                    # Service unavailable - retry
+                    logger.warning(f"MusicBrainz service unavailable (503), will retry...")
+                    if attempt < max_retries - 1:
+                        continue
+                    logger.error("All retry attempts failed (503)")
+                    return None
+                else:
+                    logger.error(f"MusicBrainz API error {response.status_code}")
+                    if attempt < max_retries - 1:
+                        continue
+                    return None
+                    
+            except requests.exceptions.ConnectionError as e:
+                logger.warning(f"Connection error (attempt {attempt + 1}/{max_retries}): {e}")
+                if attempt < max_retries - 1:
+                    continue
+                logger.error("All retry attempts failed - connection error")
+                return None
+            except requests.exceptions.Timeout as e:
+                logger.warning(f"Timeout error (attempt {attempt + 1}/{max_retries}): {e}")
+                if attempt < max_retries - 1:
+                    continue
+                logger.error("All retry attempts failed - timeout")
+                return None
+            except Exception as e:
+                logger.error(f"Error fetching work recordings from MusicBrainz: {e}")
+                if attempt < max_retries - 1:
+                    logger.warning("Retrying after unexpected error...")
+                    continue
+                return None
         
-        try:
-            url = f"https://musicbrainz.org/ws/2/work/{work_id}"
-            params = {
-                'inc': 'artist-rels+recording-rels+url-rels',
-                'fmt': 'json'
-            }
-            
-            logger.debug(f"Fetching MusicBrainz work recordings: {work_id}")
-            
-            response = self.session.get(url, params=params, timeout=10)
-            
-            if response.status_code == 404:
-                # Cache the negative result
-                self._save_to_cache(cache_path, None)
-                return None
-            elif response.status_code != 200:
-                return None
-            
-            data = response.json()
-            
-            # Cache the result
-            self._save_to_cache(cache_path, data)
-            
-            return data
-            
-        except Exception as e:
-            logger.error(f"Error fetching work recordings from MusicBrainz: {e}")
-            return None
-    
-    def get_recording_details(self, recording_id):
+        return None
+        
+    def get_recording_details(self, recording_id, max_retries=3):
         """
-        Get detailed information about a MusicBrainz recording
+        Get detailed information about a MusicBrainz recording with retry logic
         
         Args:
             recording_id: MusicBrainz recording ID
+            max_retries: Maximum number of retry attempts (default 3)
             
         Returns:
             Dict with recording details, or None if not found
@@ -669,39 +743,75 @@ class MusicBrainzSearcher:
                 self.last_made_api_call = False
                 return cached.get('data')
         
-        # Fetch from API
-        self.last_made_api_call = True
-        self.rate_limit()
+        # Fetch from API with retry logic
+        for attempt in range(max_retries):
+            try:
+                # Progressive delay based on attempt number
+                if attempt > 0:
+                    sleep_time = 2.0 + (attempt * 1.5)
+                    logger.info(f"  Retry attempt {attempt + 1}/{max_retries} after {sleep_time}s delay...")
+                    time.sleep(sleep_time)
+                
+                # Rate limiting for first attempt
+                if attempt == 0:
+                    self.last_made_api_call = True
+                    self.rate_limit()
+                
+                url = f"https://musicbrainz.org/ws/2/recording/{recording_id}"
+                params = {
+                    'inc': 'releases+artist-credits+artist-rels+isrcs',
+                    'fmt': 'json'
+                }
+                
+                logger.debug(f"Fetching MusicBrainz recording details: {recording_id}")
+                
+                response = self.session.get(url, params=params, timeout=15)
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    # Cache the successful result
+                    self._save_to_cache(cache_path, data)
+                    return data
+                elif response.status_code == 404:
+                    # Cache the negative result (404 is not transient)
+                    self._save_to_cache(cache_path, None)
+                    logger.warning(f"Recording not found in MusicBrainz: {recording_id}")
+                    return None
+                elif response.status_code == 503:
+                    # Service unavailable - retry
+                    logger.warning(f"MusicBrainz service unavailable (503), will retry...")
+                    if attempt < max_retries - 1:
+                        continue
+                    logger.error("All retry attempts failed (503)")
+                    return None
+                else:
+                    logger.error(f"MusicBrainz API error {response.status_code}")
+                    if attempt < max_retries - 1:
+                        continue
+                    return None
+                    
+            except requests.exceptions.ConnectionError as e:
+                logger.warning(f"Connection error (attempt {attempt + 1}/{max_retries}): {e}")
+                if attempt < max_retries - 1:
+                    continue
+                logger.error("All retry attempts failed - connection error")
+                return None
+            except requests.exceptions.Timeout as e:
+                logger.warning(f"Timeout error (attempt {attempt + 1}/{max_retries}): {e}")
+                if attempt < max_retries - 1:
+                    continue
+                logger.error("All retry attempts failed - timeout")
+                return None
+            except Exception as e:
+                logger.error(f"Error fetching recording details from MusicBrainz: {e}")
+                if attempt < max_retries - 1:
+                    logger.warning("Retrying after unexpected error...")
+                    continue
+                return None
         
-        try:
-            url = f"https://musicbrainz.org/ws/2/recording/{recording_id}"
-            params = {
-                'inc': 'releases+artist-credits+artist-rels+isrcs',
-                'fmt': 'json'
-            }
-            
-            logger.debug(f"Fetching MusicBrainz recording details: {recording_id}")
-            
-            response = self.session.get(url, params=params, timeout=10)
-            
-            if response.status_code == 404:
-                # Cache the negative result
-                self._save_to_cache(cache_path, None)
-                return None
-            elif response.status_code != 200:
-                return None
-            
-            data = response.json()
-            
-            # Cache the result
-            self._save_to_cache(cache_path, data)
-            
-            return data
-            
-        except Exception as e:
-            logger.error(f"Error fetching recording details from MusicBrainz: {e}")
-            return None
+        return None
     
+        
     def get_release_details(self, release_id):
         """
         Get detailed information about a MusicBrainz release
