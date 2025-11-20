@@ -41,8 +41,10 @@ class WikipediaSearcher:
         self.last_request_time = 0
         self.min_request_interval = 1.0
         
-        # ...
-        
+        # Store cache settings as instance variables
+        self.cache_days = cache_days
+        self.force_refresh = force_refresh        
+
         # Get cache directories using the shared utility
         # This ensures we use the persistent disk mount on Render
         self.cache_dir = get_cache_dir('wikipedia')
