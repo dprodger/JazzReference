@@ -16,9 +16,17 @@ struct AboutView: View {
                 .scaledToFill()
                 .ignoresSafeArea()
             
-            // Semi-transparent overlay for better text readability
-            Color.black.opacity(0.4)
-                .ignoresSafeArea()
+            // Vignette gradient overlay - darker at top and bottom for toolbar visibility
+            LinearGradient(
+                gradient: Gradient(colors: [
+                    Color.black.opacity(0.75),  // Darker at top for navigation bar
+                    Color.black.opacity(0.3),   // Lighter in middle
+                    Color.black.opacity(0.85)   // Darkest at bottom for tab bar
+                ]),
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
             
             // Content
             VStack(spacing: 20) {
@@ -66,7 +74,7 @@ struct AboutView: View {
                     .foregroundColor(.white.opacity(0.8))
                     .padding(.bottom, 10)
                 
-                Link("www.linernotesjazz.com", destination: URL(string: "linernotesjazz.com")!)
+                Link("www.linernotesjazz.com", destination: URL(string: "https://www.linernotesjazz.com")!)
                     .font(.caption)
                     .tint(.white.opacity(0.8))
                     .padding(.bottom, 40)
