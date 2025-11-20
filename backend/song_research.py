@@ -1,11 +1,10 @@
 """
 Song Research Module
-Handles researching and updating song data from external sources
+Coordinates background research tasks for songs
 
-This module is called by the Flask background worker thread (via research_queue.py)
-to perform asynchronous song research tasks. It uses:
+It uses:
 - MBReleaseImporter for MusicBrainz releases and performer data
-- SpotifyMatcher for Spotify track matching
+- SpotifyMatcher for Spotify track matching (with caching)
 """
 
 import logging
@@ -30,6 +29,10 @@ def research_song(song_id: str, song_name: str) -> Dict[str, Any]:
     The function is designed to be fault-tolerant and will not raise exceptions
     to the caller - all errors are logged and returned in the result dict.
     
+    Note: This function uses caching for both MusicBrainz and Spotify API calls.
+    By default, cache expires after 30 days. This helps minimize API rate limiting
+    and speeds up repeated research operations.
+    
     Args:
         song_id: UUID of the song to research
         song_name: Name of the song (for logging)
@@ -47,6 +50,7 @@ def research_song(song_id: str, song_name: str) -> Dict[str, Any]:
     
     try:
         # Step 1: Import MusicBrainz releases
+        # MBReleaseImporter uses MusicBrainzSearcher internally which has caching
         importer = MBReleaseImporter(dry_run=False, logger=logger)
         
         logger.info("Importing MusicBrainz releases...")
@@ -83,6 +87,8 @@ def research_song(song_id: str, song_name: str) -> Dict[str, Any]:
             logger.debug("Wikipedia URL not updated (already set or not found)")
         
         # Step 2: Match Spotify tracks
+        # SpotifyMatcher uses default cache settings: 30 days expiration, no force_refresh
+        # This minimizes API calls and speeds up repeated research operations
         matcher = SpotifyMatcher(dry_run=False, strict_mode=True, logger=logger)
         
         logger.info("Matching Spotify tracks...")
@@ -116,6 +122,8 @@ def research_song(song_id: str, song_name: str) -> Dict[str, Any]:
         logger.info(f"  Recordings updated: {spotify_stats['recordings_updated']}")
         logger.info(f"  No match found: {spotify_stats['recordings_no_match']}")
         logger.info(f"  Already had URL: {spotify_stats['recordings_skipped']}")
+        logger.info(f"  Cache hits: {spotify_stats['cache_hits']}")
+        logger.info(f"  API calls: {spotify_stats['api_calls']}")
         
         # Combine stats from both operations
         combined_stats = {

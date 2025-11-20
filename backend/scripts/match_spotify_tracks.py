@@ -34,7 +34,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def print_header(dry_run: bool, strict_mode: bool, min_artist: int, min_album: int, min_track: int):
+def print_header(dry_run: bool, strict_mode: bool, min_artist: int, min_album: int, min_track: int, force_refresh: bool):
     """Print CLI header"""
     logger.info("="*80)
     logger.info("Spotify Track Matching")
@@ -42,6 +42,10 @@ def print_header(dry_run: bool, strict_mode: bool, min_artist: int, min_album: i
     
     if dry_run:
         logger.info("*** DRY RUN MODE - No database changes will be made ***")
+        logger.info("")
+    
+    if force_refresh:
+        logger.info("*** FORCE REFRESH MODE - Bypassing cache for all API calls ***")
         logger.info("")
     
     if strict_mode:
@@ -73,6 +77,8 @@ def print_summary(result: dict):
         logger.info(f"Recordings updated:         {stats['recordings_updated']}")
         logger.info(f"No match found:             {stats['recordings_no_match']}")
         logger.info(f"Errors:                     {stats['errors']}")
+        logger.info(f"Cache hits:                 {stats['cache_hits']}")
+        logger.info(f"API calls:                  {stats['api_calls']}")
     else:
         logger.error(f"Matching failed: {result.get('error', 'Unknown error')}")
         if 'song' in result:
@@ -103,13 +109,16 @@ Examples:
   # Filter to only recordings by a specific artist
   python match_spotify_tracks.py --name "Autumn Leaves" --artist "Bill Evans"
   
+  # Force refresh from API (bypass cache)
+  python match_spotify_tracks.py --name "Blue in Green" --force-refresh
+  
   # Use looser validation thresholds (not recommended)
   python match_spotify_tracks.py --name "Blue in Green" --no-strict
   
   # Dry run to see what would be matched
   python match_spotify_tracks.py --name "Blue in Green" --dry-run
   
-  # Enable debug logging to see validation details
+  # Enable debug logging to see validation details and cache operations
   python match_spotify_tracks.py --name "Autumn Leaves" --debug
         """
     )
@@ -143,6 +152,19 @@ Examples:
     )
     
     parser.add_argument(
+        '--force-refresh',
+        action='store_true',
+        help='Bypass cache and fetch fresh data from Spotify API'
+    )
+    
+    parser.add_argument(
+        '--cache-days',
+        type=int,
+        default=30,
+        help='Number of days before cache expires (default: 30)'
+    )
+    
+    parser.add_argument(
         '--debug',
         action='store_true',
         help='Enable debug logging'
@@ -163,7 +185,9 @@ Examples:
         dry_run=args.dry_run,
         artist_filter=args.artist,
         strict_mode=strict_mode,
-        logger=logger
+        logger=logger,
+        cache_days=args.cache_days,
+        force_refresh=args.force_refresh
     )
     
     # Print header
@@ -172,24 +196,23 @@ Examples:
         strict_mode,
         matcher.min_artist_similarity,
         matcher.min_album_similarity,
-        matcher.min_track_similarity
+        matcher.min_track_similarity,
+        args.force_refresh
     )
     
-    # Determine song identifier
-    song_identifier = normalize_apostrophes(args.name) if args.name else args.id
+    # Get song identifier
+    song_identifier = args.name or args.id
     
+    # Match recordings
     try:
-        # Run the matching
         result = matcher.match_recordings(song_identifier)
-        
-        # Print summary
         print_summary(result)
         
         # Exit with appropriate code
         sys.exit(0 if result['success'] else 1)
         
     except KeyboardInterrupt:
-        logger.info("\nMatching cancelled by user")
+        logger.info("\nProcess cancelled by user")
         sys.exit(1)
     except Exception as e:
         logger.error(f"Unexpected error: {e}", exc_info=True)
