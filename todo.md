@@ -19,7 +19,6 @@ Data
 * running Jazz_song_research in dry-run mode, doesn't show me the musicbrainz search
 * running jazz_song_research, not sure I'm getting wikipedia on finding a new song
 * when running fetch_artist_images.py, it looks like it's slow either sleeping, or with db connection
-* if solo_transcriptions appears, show and allow access to it
 * consider pulling from https://thejazztome.info/about/
     
     
@@ -66,6 +65,7 @@ Done:
 * create a "bad reference" table and system -- allow me to indicate while using the App that something (musicbrainz, Wikipedia, image) is not right. 
 	Use that as an exclusion, but also as possible training data for the future.
 * implement the 'bad link' code
+* if solo_transcriptions appears, show and allow access to it
 
 
 
