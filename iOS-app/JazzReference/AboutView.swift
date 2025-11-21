@@ -8,6 +8,12 @@
 import SwiftUI
 
 struct AboutView: View {
+    @State private var queueSize: Int = 0
+    @State private var workerActive: Bool = false
+    @State private var isLoadingQueue: Bool = true
+    
+    let networkManager = NetworkManager()
+    
     var body: some View {
         ZStack {
             // Background image
@@ -64,10 +70,48 @@ struct AboutView: View {
                 
                 Spacer()
                 
+                // Research Queue Status
+                VStack(spacing: 8) {
+                    if isLoadingQueue {
+                        ProgressView()
+                            .tint(.white)
+                    } else {
+                        HStack(spacing: 6) {
+                            Image(systemName: workerActive ? "arrow.triangle.2.circlepath" : "clock")
+                                .foregroundColor(.white.opacity(0.9))
+                                .font(.body)
+                            
+                            Text("Research Queue: \(queueSize)")
+                                .font(.body)
+                                .foregroundColor(.white.opacity(0.9))
+                        }
+                        
+                        if workerActive && queueSize > 0 {
+                            Text("Processing...")
+                                .font(.caption)
+                                .foregroundColor(.white.opacity(0.7))
+                                .italic()
+                        }
+                    }
+                }
+                .padding(.vertical, 16)
+                .padding(.horizontal, 24)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color.black.opacity(0.3))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                )
+                .shadow(color: .black.opacity(0.5), radius: 5, x: 0, y: 2)
+                
+                Spacer()
+                
                 Text("Version 1.0")
                     .font(.caption)
                     .foregroundColor(.white.opacity(0.8))
-                    .padding(.bottom, 40)
+                    .padding(.bottom, 10)
 
                 Text("Written by Dave Rodger")
                     .font(.caption)
@@ -78,13 +122,23 @@ struct AboutView: View {
                     .font(.caption)
                     .tint(.white.opacity(0.8))
                     .padding(.bottom, 40)
-
             }
         }
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(JazzTheme.burgundy, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
         .toolbarColorScheme(.dark, for: .navigationBar)
+        .task {
+            await loadQueueStatus()
+        }
+    }
+    
+    private func loadQueueStatus() async {
+        if let status = await networkManager.fetchQueueStatus() {
+            queueSize = status.queueSize
+            workerActive = status.workerActive
+        }
+        isLoadingQueue = false
     }
 }
 

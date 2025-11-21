@@ -394,6 +394,31 @@ class NetworkManager: ObservableObject {
             return false
         }
     }
+    
+    /// Fetch the current research queue status
+    func fetchQueueStatus() async -> (queueSize: Int, workerActive: Bool)? {
+        let startTime = Date()
+        guard let url = URL(string: "\(NetworkManager.baseURL)/research/queue") else {
+            print("Error: Invalid queue status URL")
+            return nil
+        }
+        
+        do {
+            let (data, _) = try await URLSession.shared.data(from: url)
+            let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+            
+            NetworkManager.logRequest("GET /research/queue", startTime: startTime)
+            
+            if let queueSize = json?["queue_size"] as? Int,
+               let workerActive = json?["worker_active"] as? Bool {
+                return (queueSize, workerActive)
+            }
+            return nil
+        } catch {
+            print("Error fetching queue status: \(error.localizedDescription)")
+            return nil
+        }
+    }
 }
 // MARK: - NetworkManager Extensions for Solo Transcriptions
 
