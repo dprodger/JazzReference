@@ -92,7 +92,7 @@ def research_song(song_id: str, song_name: str) -> Dict[str, Any]:
         matcher = SpotifyMatcher(dry_run=False, strict_mode=True, logger=logger)
         
         logger.info("Matching Spotify tracks...")
-        spotify_result = matcher.match_recordings(str(song_id))
+#        spotify_result = matcher.match_recordings(str(song_id))
         
         if not spotify_result['success']:
             # Spotify matching failed, but MusicBrainz succeeded

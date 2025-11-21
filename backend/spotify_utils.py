@@ -8,6 +8,7 @@ This module provides the SpotifyMatcher class which handles:
 - Album artwork extraction
 - Database updates for recordings
 - Caching of API responses to minimize rate limiting
+- Intelligent rate limit handling with exponential backoff
 
 Used by:
 - scripts/match_spotify_tracks.py (CLI interface)
@@ -37,13 +38,21 @@ logger = logging.getLogger(__name__)
 _CACHE_MISS = object()
 
 
+class SpotifyRateLimitError(Exception):
+    """Raised when Spotify API rate limit is hit"""
+    def __init__(self, retry_after: int = None):
+        self.retry_after = retry_after
+        super().__init__(f"Spotify rate limit exceeded. Retry after {retry_after} seconds." if retry_after else "Spotify rate limit exceeded.")
+
+
 class SpotifyMatcher:
     """
     Handles matching recordings to Spotify tracks with fuzzy validation and caching
     """
     
     def __init__(self, dry_run=False, strict_mode=False, force_refresh=False, 
-                 artist_filter=False, cache_days=30, logger=None):
+                 artist_filter=False, cache_days=30, logger=None, 
+                 rate_limit_delay=0.2, max_retries=3):
         """
         Initialize Spotify Matcher
         
@@ -54,6 +63,8 @@ class SpotifyMatcher:
             logger: Optional logger instance (uses module logger if not provided)
             cache_days: Number of days before cache is considered stale
             force_refresh: If True, always fetch fresh data ignoring cache
+            rate_limit_delay: Base delay between API calls (seconds)
+            max_retries: Maximum number of retries for rate-limited requests
         """
         self.dry_run = dry_run
         self.artist_filter = artist_filter
@@ -65,6 +76,12 @@ class SpotifyMatcher:
         # Cache configuration - use shared cache utility for persistent storage
         self.cache_days = cache_days
         self.force_refresh = force_refresh
+        
+        # Rate limiting configuration
+        self.rate_limit_delay = rate_limit_delay
+        self.max_retries = max_retries
+        self.rate_limit_hits = 0  # Track how many times we hit rate limits
+        self.last_request_time = 0  # Track time of last request
         
         # Get cache directories using the shared utility
         # This ensures we use the persistent disk mount on Render
@@ -81,14 +98,8 @@ class SpotifyMatcher:
         # Track whether last operation made an API call
         self.last_made_api_call = False
         
-        # Create cache directories if they don't exist
-        self.cache_dir.mkdir(parents=True, exist_ok=True)
-        self.search_cache_dir = self.cache_dir / 'searches'
-        self.search_cache_dir.mkdir(parents=True, exist_ok=True)
-        self.track_cache_dir = self.cache_dir / 'tracks'
-        self.track_cache_dir.mkdir(parents=True, exist_ok=True)
-        
         self.logger.debug(f"Spotify cache: {self.cache_dir} (expires after {cache_days} days, force_refresh={force_refresh})")
+        self.logger.debug(f"Rate limit: {rate_limit_delay}s delay, {max_retries} max retries")
         
         self.stats = {
             'recordings_processed': 0,
@@ -99,7 +110,9 @@ class SpotifyMatcher:
             'recordings_rejected': 0,
             'errors': 0,
             'cache_hits': 0,
-            'api_calls': 0
+            'api_calls': 0,
+            'rate_limit_hits': 0,
+            'rate_limit_waits': 0
         }
         
         # Validation thresholds
@@ -111,6 +124,124 @@ class SpotifyMatcher:
             self.min_artist_similarity = 65
             self.min_album_similarity = 55
             self.min_track_similarity = 75
+    
+    # ========================================================================
+    # RATE LIMITING METHODS
+    # ========================================================================
+    
+    def _wait_for_rate_limit(self):
+        """Enforce minimum delay between requests"""
+        if self.rate_limit_delay > 0:
+            elapsed = time.time() - self.last_request_time
+            if elapsed < self.rate_limit_delay:
+                sleep_time = self.rate_limit_delay - elapsed
+                time.sleep(sleep_time)
+        self.last_request_time = time.time()
+    
+    def _handle_rate_limit_response(self, response: requests.Response) -> Optional[int]:
+        """
+        Extract rate limit information from response headers
+        
+        Args:
+            response: Response object from requests
+            
+        Returns:
+            Number of seconds to wait before retrying, or None if not rate limited
+        """
+        if response.status_code != 429:
+            return None
+        
+        # Check for Retry-After header (number of seconds to wait)
+        retry_after = response.headers.get('Retry-After')
+        if retry_after:
+            try:
+                return int(retry_after)
+            except ValueError:
+                self.logger.warning(f"Invalid Retry-After header: {retry_after}")
+        
+        # Check for X-RateLimit-Reset (Unix timestamp)
+        rate_limit_reset = response.headers.get('X-RateLimit-Reset')
+        if rate_limit_reset:
+            try:
+                reset_time = int(rate_limit_reset)
+                wait_time = max(0, reset_time - int(time.time()))
+                return wait_time
+            except ValueError:
+                self.logger.warning(f"Invalid X-RateLimit-Reset header: {rate_limit_reset}")
+        
+        # Log all rate limit headers for debugging
+        rate_limit_headers = {
+            k: v for k, v in response.headers.items() 
+            if 'rate' in k.lower() or k == 'Retry-After'
+        }
+        if rate_limit_headers:
+            self.logger.debug(f"Rate limit headers: {rate_limit_headers}")
+        
+        # Default fallback if no headers available
+        return None
+    
+    def _make_api_request(self, method: str, url: str, **kwargs) -> requests.Response:
+        """
+        Make an API request with rate limit handling and retries
+        
+        Args:
+            method: HTTP method ('get', 'post', etc.)
+            url: URL to request
+            **kwargs: Additional arguments to pass to requests
+            
+        Returns:
+            Response object
+            
+        Raises:
+            SpotifyRateLimitError: If rate limit exceeded after all retries
+            requests.exceptions.RequestException: For other request failures
+        """
+        retry_count = 0
+        base_delay = 1  # Start with 1 second for exponential backoff
+        
+        while retry_count <= self.max_retries:
+            # Enforce minimum delay between requests
+            self._wait_for_rate_limit()
+            
+            try:
+                response = getattr(requests, method)(url, **kwargs)
+                
+                # Check for rate limiting
+                if response.status_code == 429:
+                    self.rate_limit_hits += 1
+                    self.stats['rate_limit_hits'] += 1
+                    
+                    retry_after = self._handle_rate_limit_response(response)
+                    
+                    if retry_count >= self.max_retries:
+                        # Out of retries
+                        raise SpotifyRateLimitError(retry_after)
+                    
+                    # Calculate wait time
+                    if retry_after is not None:
+                        wait_time = retry_after
+                        self.logger.warning(f"Rate limit hit (attempt {retry_count + 1}/{self.max_retries + 1}). "
+                                          f"Waiting {wait_time}s as specified by Spotify.")
+                    else:
+                        # Use exponential backoff if no explicit retry time
+                        wait_time = base_delay * (2 ** retry_count)
+                        self.logger.warning(f"Rate limit hit (attempt {retry_count + 1}/{self.max_retries + 1}). "
+                                          f"Using exponential backoff: {wait_time}s")
+                    
+                    self.stats['rate_limit_waits'] += 1
+                    time.sleep(wait_time)
+                    retry_count += 1
+                    continue
+                
+                # Not rate limited - return response (caller will handle raise_for_status)
+                return response
+                
+            except requests.exceptions.RequestException as e:
+                # Network error or other request exception - don't retry
+                raise
+        
+        # Should not reach here, but just in case
+        raise SpotifyRateLimitError()
     
     # ========================================================================
     # CACHE METHODS
@@ -394,8 +525,9 @@ class SpotifyMatcher:
             credentials = f"{client_id}:{client_secret}"
             credentials_b64 = base64.b64encode(credentials.encode()).decode()
             
-            # Request token
-            response = requests.post(
+            # Request token (auth endpoint typically not rate limited, but use request wrapper anyway)
+            response = self._make_api_request(
+                'post',
                 'https://accounts.spotify.com/api/token',
                 headers={
                     'Authorization': f'Basic {credentials_b64}',
@@ -415,6 +547,9 @@ class SpotifyMatcher:
             self.logger.debug("Spotify authentication successful")
             return self.access_token
             
+        except SpotifyRateLimitError as e:
+            self.logger.error(f"Rate limit exceeded during authentication: {e}")
+            return None
         except requests.exceptions.RequestException as e:
             self.logger.error(f"Failed to authenticate with Spotify: {e}")
             return None
@@ -443,7 +578,8 @@ class SpotifyMatcher:
             return None
         
         try:
-            response = requests.get(
+            response = self._make_api_request(
+                'get',
                 f'https://api.spotify.com/v1/tracks/{track_id}',
                 headers={'Authorization': f'Bearer {token}'},
                 timeout=10
@@ -461,6 +597,9 @@ class SpotifyMatcher:
             
             return data
             
+        except SpotifyRateLimitError as e:
+            self.logger.error(f"Rate limit exceeded fetching track details: {e}")
+            return None
         except requests.exceptions.HTTPError as e:
             if e.response.status_code == 404:
                 # Cache the "not found" result
@@ -537,7 +676,8 @@ class SpotifyMatcher:
             try:
                 self.logger.debug(f"  → Trying: {strategy['description']}")
                 
-                response = requests.get(
+                response = self._make_api_request(
+                    'get',
                     'https://api.spotify.com/v1/search',
                     headers={'Authorization': f'Bearer {token}'},
                     params={
@@ -554,9 +694,6 @@ class SpotifyMatcher:
                 # Track API call
                 self.stats['api_calls'] += 1
                 self.last_made_api_call = True
-                
-                # Rate limiting - be nice to Spotify's API
-                time.sleep(0.1)
                 
                 tracks = data.get('tracks', {}).get('items', [])
                 
@@ -614,6 +751,10 @@ class SpotifyMatcher:
                 else:
                     self.logger.debug(f"    ✗ No results with {strategy['description']}")
                     
+            except SpotifyRateLimitError as e:
+                self.logger.error(f"Rate limit exceeded during search: {e}")
+                # Don't cache rate limit errors - might succeed later
+                return None
             except requests.exceptions.HTTPError as e:
                 if e.response.status_code == 401:
                     self.access_token = None
@@ -700,9 +841,8 @@ class SpotifyMatcher:
                     WHERE r.song_id = %s
                 """
                 
-                params = [song_id]
-                
                 # Add artist filter if specified
+                params = [song_id]
                 if self.artist_filter:
                     query += """
                         AND EXISTS (
@@ -710,14 +850,14 @@ class SpotifyMatcher:
                             FROM recording_performers rp2
                             JOIN performers p2 ON rp2.performer_id = p2.id
                             WHERE rp2.recording_id = r.id
-                            AND LOWER(p2.name) LIKE LOWER(%s)
+                            AND LOWER(p2.name) = LOWER(%s)
                         )
                     """
-                    params.append(f"%{self.artist_filter}%")
+                    params.append(self.artist_filter)
                 
                 query += """
                     GROUP BY r.id, r.album_title, r.recording_year, r.spotify_url
-                    ORDER BY r.recording_year DESC
+                    ORDER BY r.recording_year
                 """
                 
                 cur.execute(query, params)
@@ -747,6 +887,31 @@ class SpotifyMatcher:
             return match.group(1)
         
         return None
+    
+    def update_recording_artwork(self, conn, recording_id: str, album_art: dict):
+        """Update recording with album artwork only"""
+        if self.dry_run:
+            self.logger.info(f"    [DRY RUN] Would update with album artwork")
+            return
+        
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE recordings
+                SET album_art_small = %s,
+                    album_art_medium = %s,
+                    album_art_large = %s,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = %s
+            """, (
+                album_art.get('small'),
+                album_art.get('medium'),
+                album_art.get('large'),
+                recording_id
+            ))
+            
+            conn.commit()
+            self.logger.info(f"    ✓ Updated with album artwork")
+            self.stats['recordings_updated'] += 1
     
     def update_recording_spotify_url(self, conn, recording_id: str, spotify_data: dict, 
                                      album: str = None, artist: str = None, year: int = None,
@@ -778,7 +943,7 @@ class SpotifyMatcher:
                 album_art.get('medium'),
                 album_art.get('large'),
                 recording_id
-            ), prepare=False)
+            ))
             
             conn.commit()
             
@@ -789,35 +954,6 @@ class SpotifyMatcher:
                 self.logger.info(f"    ✓ Updated with Spotify URL and album artwork")
             
             self.stats['recordings_updated'] += 1
-    
-    def update_recording_artwork(self, conn, recording_id: str, album_art: dict):
-        """Update recording with album artwork only"""
-        if self.dry_run:
-            self.logger.info(f"    [DRY RUN] Would update with album artwork")
-            return
-        
-        with conn.cursor() as cur:
-            cur.execute("""
-                UPDATE recordings
-                SET album_art_small = %s,
-                    album_art_medium = %s,
-                    album_art_large = %s,
-                    updated_at = CURRENT_TIMESTAMP
-                WHERE id = %s
-            """, (
-                album_art.get('small'),
-                album_art.get('medium'),
-                album_art.get('large'),
-                recording_id
-            ), prepare=False)
-            
-            conn.commit()
-            self.logger.info(f"    ✓ Updated with album artwork")
-            self.stats['recordings_updated'] += 1
-    
-    # ========================================================================
-    # MAIN PROCESSING METHODS
-    # ========================================================================
     
     def match_recordings(self, song_identifier: str) -> Dict[str, Any]:
         """
@@ -1015,3 +1151,24 @@ class SpotifyMatcher:
         self.logger.info("="*80)
         
         return True
+    
+    def print_summary(self):
+        """Print summary of matching statistics"""
+        self.logger.info("\n" + "=" * 70)
+        self.logger.info("SPOTIFY MATCHING SUMMARY")
+        self.logger.info("=" * 70)
+        self.logger.info(f"Recordings processed:      {self.stats['recordings_processed']}")
+        self.logger.info(f"Already had Spotify URL:   {self.stats['recordings_skipped']}")
+        self.logger.info(f"Newly matched:             {self.stats['recordings_updated']}")
+        self.logger.info(f"No match found:            {self.stats['recordings_no_match']}")
+        self.logger.info(f"Errors:                    {self.stats['errors']}")
+        self.logger.info("-" * 70)
+        self.logger.info(f"Total with Spotify:        {self.stats['recordings_with_spotify']}")
+        self.logger.info("-" * 70)
+        self.logger.info(f"API calls made:            {self.stats['api_calls']}")
+        self.logger.info(f"Cache hits:                {self.stats['cache_hits']}")
+        self.logger.info(f"Rate limit hits:           {self.stats['rate_limit_hits']}")
+        self.logger.info(f"Rate limit waits:          {self.stats['rate_limit_waits']}")
+        cache_hit_rate = (self.stats['cache_hits'] / (self.stats['api_calls'] + self.stats['cache_hits']) * 100) if (self.stats['api_calls'] + self.stats['cache_hits']) > 0 else 0
+        self.logger.info(f"Cache hit rate:            {cache_hit_rate:.1f}%")
+        self.logger.info("=" * 70)
