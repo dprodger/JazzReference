@@ -21,7 +21,9 @@ if not JWT_SECRET:
     raise ValueError("JWT_SECRET environment variable must be set")
 
 JWT_ALGORITHM = 'HS256'
-ACCESS_TOKEN_EXPIRY = timedelta(minutes=15)
+# ACCESS_TOKEN_EXPIRY = timedelta(minutes=15)
+ACCESS_TOKEN_EXPIRY = timedelta(seconds=30)
+
 REFRESH_TOKEN_EXPIRY = timedelta(days=30)
 
 
