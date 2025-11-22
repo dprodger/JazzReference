@@ -250,6 +250,8 @@ struct SongsListView: View {
 struct RepertoirePickerSheet: View {
     @ObservedObject var repertoireManager: RepertoireManager
     @Binding var isPresented: Bool
+    @EnvironmentObject var authManager: AuthenticationManager
+    @State private var showCreateRepertoire = false
     
     var body: some View {
         NavigationStack {
@@ -305,6 +307,34 @@ struct RepertoirePickerSheet: View {
                                 .background(JazzTheme.smokeGray.opacity(0.3))
                         }
                     }
+                    
+                    // Add "Create New Repertoire" button for authenticated users
+                    if authManager.isAuthenticated {
+                        Divider()
+                            .background(JazzTheme.smokeGray.opacity(0.3))
+                        
+                        Button(action: {
+                            showCreateRepertoire = true
+                        }) {
+                            HStack {
+                                Image(systemName: "plus.circle.fill")
+                                    .foregroundColor(JazzTheme.burgundy)
+                                    .font(.title3)
+                                
+                                Text("Create New Repertoire")
+                                    .font(.headline)
+                                    .foregroundColor(JazzTheme.burgundy)
+                                
+                                Spacer()
+                            }
+                            .contentShape(Rectangle())
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 12)
+                            .frame(maxWidth: .infinity)
+                            .background(JazzTheme.cardBackground)
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
             }
             .background(JazzTheme.backgroundLight)
@@ -317,6 +347,9 @@ struct RepertoirePickerSheet: View {
                     }
                     .foregroundColor(JazzTheme.burgundy)
                 }
+            }
+            .sheet(isPresented: $showCreateRepertoire) {
+                CreateRepertoireView(repertoireManager: repertoireManager)
             }
         }
     }

@@ -1,3 +1,11 @@
+//
+//  CreateRepertoireView.swift
+//  JazzReference
+//
+//  Created by Dave Rodger on 11/22/25.
+//
+import SwiftUI
+
 // MARK: - Create Repertoire View
 
 struct CreateRepertoireView: View {
