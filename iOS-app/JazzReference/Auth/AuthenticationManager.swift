@@ -51,6 +51,57 @@ class AuthenticationManager: ObservableObject {
         _ = keychainHelper.save(refreshToken, forKey: "refresh_token")
     }
     
+    /// Refresh the access token using the stored refresh token
+    private func refreshAccessToken() async -> Bool {
+        guard let refreshToken = keychainHelper.load(forKey: "refresh_token") else {
+            print("❌ No refresh token available")
+            return false
+        }
+        
+        let url = URL(string: "\(NetworkManager.baseURL)/auth/refresh-token")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        let body: [String: String] = ["refresh_token": refreshToken]
+        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
+        
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            
+            guard let httpResponse = response as? HTTPURLResponse else {
+                throw URLError(.badServerResponse)
+            }
+            
+            if httpResponse.statusCode == 200 {
+                struct RefreshResponse: Codable {
+                    let accessToken: String
+                    let refreshToken: String
+                    
+                    enum CodingKeys: String, CodingKey {
+                        case accessToken = "access_token"
+                        case refreshToken = "refresh_token"
+                    }
+                }
+                
+                let refreshResponse = try JSONDecoder().decode(RefreshResponse.self, from: data)
+                
+                // Save new tokens
+                saveTokens(accessToken: refreshResponse.accessToken,
+                          refreshToken: refreshResponse.refreshToken)
+                
+                print("✅ Access token refreshed successfully")
+                return true
+            } else {
+                print("❌ Token refresh failed with status: \(httpResponse.statusCode)")
+                return false
+            }
+        } catch {
+            print("❌ Token refresh error: \(error)")
+            return false
+        }
+    }
+
     private func clearTokens() {
         self.accessToken = nil
         keychainHelper.clearAll()
@@ -287,7 +338,7 @@ class AuthenticationManager: ObservableObject {
     // MARK: - Authenticated API Requests
     
     /// Make an authenticated API request with automatic token inclusion
-    func makeAuthenticatedRequest(url: URL) async throws -> Data {
+    func makeAuthenticatedRequest(url: URL, maxRetries: Int = 1) async throws -> Data {
         guard let token = accessToken else {
             throw URLError(.userAuthenticationRequired)
         }
@@ -301,17 +352,31 @@ class AuthenticationManager: ObservableObject {
             throw URLError(.badServerResponse)
         }
         
-        // If unauthorized, clear tokens
+        // If unauthorized, try to refresh token and retry
         if httpResponse.statusCode == 401 {
-            print("⚠️ 401 Unauthorized - clearing tokens")
-            clearTokens()
-            isAuthenticated = false
-            throw URLError(.userAuthenticationRequired)
+            print("⚠️ 401 Unauthorized - attempting token refresh")
+            
+            // Try to refresh token
+            let refreshed = await refreshAccessToken()
+            
+            if refreshed && maxRetries > 0 {
+                // Retry the request with new token
+                print("🔄 Retrying request with refreshed token")
+                return try await makeAuthenticatedRequest(url: url, maxRetries: maxRetries - 1)
+            } else {
+                // Refresh failed or no retries left, clear tokens
+                print("❌ Token refresh failed - clearing authentication")
+                await MainActor.run {
+                    clearTokens()
+                    isAuthenticated = false
+                }
+                throw URLError(.userAuthenticationRequired)
+            }
         }
         
         return data
     }
-    
+
     /// Get current access token (for manual requests)
     func getAccessToken() -> String? {
         return accessToken
