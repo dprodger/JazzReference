@@ -3,7 +3,7 @@
 //  JazzReference
 //
 //  Manages repertoire selection and persistence across app launches
-//  UPDATED FOR PHASE 5: Added authentication support for user-specific repertoires
+//  UPDATED FOR AUTOMATIC TOKEN REFRESH: Uses AuthenticationManager for all API calls
 //
 
 import SwiftUI
@@ -66,8 +66,7 @@ class RepertoireManager: ObservableObject {
     func loadRepertoires() async {
         // Check authentication
         guard let authManager = authManager,
-              authManager.isAuthenticated,
-              let token = authManager.getAccessToken() else {
+              authManager.isAuthenticated else {
             await MainActor.run {
                 self.repertoires = [.allSongs]
                 self.selectedRepertoire = .allSongs
@@ -82,7 +81,7 @@ class RepertoireManager: ObservableObject {
             errorMessage = nil
         }
         
-        // Build authenticated request
+        // Build URL
         let urlString = "\(NetworkManager.baseURL)/repertoires/"
         guard let url = URL(string: urlString) else {
             await MainActor.run {
@@ -92,59 +91,15 @@ class RepertoireManager: ObservableObject {
             return
         }
         
-        var request = URLRequest(url: url)
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        
-        // DEBUG: Log request details
-        print("🔐 Sending token to /repertoires")
-        print("   URL: \(url.absoluteString)")
-        print("   Token prefix: \(String(token.prefix(20)))...")
-        print("   Token length: \(token.count)")
-        print("   Authorization header set: \(request.value(forHTTPHeaderField: "Authorization") != nil)")
-        if let authHeader = request.value(forHTTPHeaderField: "Authorization") {
-            print("   Header value prefix: \(String(authHeader.prefix(30)))...")
-        }
-        print("   All headers: \(request.allHTTPHeaderFields ?? [:])")
+        print("📚 Loading repertoires from: \(url.absoluteString)")
         
         do {
-            let (data, response) = try await URLSession.shared.data(for: request)
+            // Use AuthenticationManager's method which handles token refresh automatically
+            let data = try await authManager.makeAuthenticatedRequest(url: url)
             
-            // DEBUG: Log response details
-            print("📥 Response received from /repertoires")
-            if let httpResponse = response as? HTTPURLResponse {
-                print("   Status: \(httpResponse.statusCode)")
-                print("   URL: \(httpResponse.url?.absoluteString ?? "nil")")
-            }
+            // DEBUG: Log response
             if let responseString = String(data: data, encoding: .utf8) {
-                print("   Body preview: \(String(responseString.prefix(200)))...")
-            }
-            
-            // Check for auth errors
-            if let httpResponse = response as? HTTPURLResponse {
-                if httpResponse.statusCode == 401 {
-                    // Try to parse error message
-                    if let errorJson = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                       let errorMsg = errorJson["error"] as? String {
-                        print("⚠️ 401 Unauthorized - Backend says: \(errorMsg)")
-                    } else if let errorText = String(data: data, encoding: .utf8) {
-                        print("⚠️ 401 Unauthorized - Raw response: \(errorText)")
-                    } else {
-                        print("⚠️ 401 Unauthorized - token expired")
-                    }
-                    await MainActor.run {
-                        errorMessage = "Authentication expired. Please sign in again."
-                        isLoading = false
-                        isAuthenticated = false
-                    }
-                    return
-                } else if httpResponse.statusCode != 200 {
-                    await MainActor.run {
-                        errorMessage = "Failed to load repertoires"
-                        isLoading = false
-                        print("❌ HTTP \(httpResponse.statusCode)")
-                    }
-                    return
-                }
+                print("📥 Response received: \(String(responseString.prefix(200)))...")
             }
             
             let fetchedRepertoires = try JSONDecoder().decode([Repertoire].self, from: data)
@@ -172,7 +127,17 @@ class RepertoireManager: ObservableObject {
                 self.isLoading = false
                 self.isAuthenticated = true
                 
-                print("📚 Loaded \(fetchedRepertoires.count) user repertoires")
+                print("✅ Loaded \(fetchedRepertoires.count) user repertoires")
+            }
+        } catch URLError.userAuthenticationRequired {
+            // Token refresh failed - user needs to log in again
+            await MainActor.run {
+                self.isAuthenticated = false
+                self.repertoires = [.allSongs]
+                self.selectedRepertoire = .allSongs
+                errorMessage = "Authentication expired. Please sign in again."
+                isLoading = false
+                print("⚠️ Authentication required - token refresh failed")
             }
         } catch {
             await MainActor.run {
@@ -185,8 +150,7 @@ class RepertoireManager: ObservableObject {
     
     /// Add song to repertoire (requires authentication)
     func addSongToRepertoire(songId: String, repertoireId: String) async -> Bool {
-        guard let authManager = authManager,
-              let token = authManager.getAccessToken() else {
+        guard let authManager = authManager else {
             await MainActor.run {
                 errorMessage = "Not authenticated"
             }
@@ -198,46 +162,48 @@ class RepertoireManager: ObservableObject {
             return false
         }
         
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        print("📚 Adding song \(songId) to repertoire \(repertoireId)")
         
         do {
-            let (_, response) = try await URLSession.shared.data(for: request)
+            // POST request with automatic token refresh
+            _ = try await authManager.makeAuthenticatedRequest(
+                url: url,
+                method: "POST"
+            )
             
-            if let httpResponse = response as? HTTPURLResponse {
-                if httpResponse.statusCode == 201 {
-                    print("✅ Song added to repertoire")
-                    // Refresh repertoires to update counts
-                    await loadRepertoires()
-                    return true
-                } else if httpResponse.statusCode == 409 {
-                    await MainActor.run {
-                        errorMessage = "Song already in repertoire"
-                    }
-                    return false
-                } else if httpResponse.statusCode == 401 {
-                    await MainActor.run {
-                        errorMessage = "Authentication expired"
-                        isAuthenticated = false
-                    }
-                    return false
-                }
+            print("✅ Song added to repertoire")
+            // Refresh repertoires to update counts
+            await loadRepertoires()
+            return true
+            
+        } catch let error as NSError where error.code == 409 {
+            // Song already in repertoire
+            await MainActor.run {
+                errorMessage = "Song already in repertoire"
             }
-            
+            print("⚠️ Song already in repertoire")
             return false
+            
+        } catch URLError.userAuthenticationRequired {
+            await MainActor.run {
+                errorMessage = "Authentication expired"
+                isAuthenticated = false
+            }
+            print("⚠️ Authentication required")
+            return false
+            
         } catch {
             await MainActor.run {
                 errorMessage = "Failed to add song: \(error.localizedDescription)"
             }
+            print("❌ Failed to add song: \(error)")
             return false
         }
     }
     
     /// Create new repertoire (requires authentication)
     func createRepertoire(name: String, description: String?) async -> Bool {
-        guard let authManager = authManager,
-              let token = authManager.getAccessToken() else {
+        guard let authManager = authManager else {
             await MainActor.run {
                 errorMessage = "Not authenticated"
             }
@@ -249,41 +215,47 @@ class RepertoireManager: ObservableObject {
             return false
         }
         
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        
         var body: [String: Any] = ["name": name]
         if let desc = description {
             body["description"] = desc
         }
         
-        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
+        guard let bodyData = try? JSONSerialization.data(withJSONObject: body) else {
+            return false
+        }
+        
+        print("📚 Creating repertoire: \(name)")
         
         do {
-            let (_, response) = try await URLSession.shared.data(for: request)
+            _ = try await authManager.makeAuthenticatedRequest(
+                url: url,
+                method: "POST",
+                body: bodyData
+            )
             
-            if let httpResponse = response as? HTTPURLResponse,
-               httpResponse.statusCode == 201 {
-                print("✅ Repertoire created: \(name)")
-                await loadRepertoires()
-                return true
+            print("✅ Repertoire created: \(name)")
+            await loadRepertoires()
+            return true
+            
+        } catch URLError.userAuthenticationRequired {
+            await MainActor.run {
+                errorMessage = "Authentication expired"
+                isAuthenticated = false
             }
-            
             return false
+            
         } catch {
             await MainActor.run {
                 errorMessage = "Failed to create repertoire: \(error.localizedDescription)"
             }
+            print("❌ Failed to create repertoire: \(error)")
             return false
         }
     }
     
     /// Delete repertoire (requires authentication)
     func deleteRepertoire(id: String) async -> Bool {
-        guard let authManager = authManager,
-              let token = authManager.getAccessToken() else {
+        guard let authManager = authManager else {
             return false
         }
         
@@ -292,22 +264,26 @@ class RepertoireManager: ObservableObject {
             return false
         }
         
-        var request = URLRequest(url: url)
-        request.httpMethod = "DELETE"
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        print("📚 Deleting repertoire: \(id)")
         
         do {
-            let (_, response) = try await URLSession.shared.data(for: request)
+            _ = try await authManager.makeAuthenticatedRequest(
+                url: url,
+                method: "DELETE"
+            )
             
-            if let httpResponse = response as? HTTPURLResponse,
-               httpResponse.statusCode == 200 {
-                print("✅ Repertoire deleted")
-                await loadRepertoires()
-                return true
+            print("✅ Repertoire deleted")
+            await loadRepertoires()
+            return true
+            
+        } catch URLError.userAuthenticationRequired {
+            await MainActor.run {
+                isAuthenticated = false
             }
-            
             return false
+            
         } catch {
+            print("❌ Failed to delete repertoire: \(error)")
             return false
         }
     }

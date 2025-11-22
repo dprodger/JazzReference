@@ -338,13 +338,40 @@ class AuthenticationManager: ObservableObject {
     // MARK: - Authenticated API Requests
     
     /// Make an authenticated API request with automatic token inclusion
-    func makeAuthenticatedRequest(url: URL, maxRetries: Int = 1) async throws -> Data {
+    // ENHANCED VERSION: Add this to AuthenticationManager.swift
+    // This version supports GET, POST, DELETE with optional body data
+
+    /// Make an authenticated API request with automatic token refresh on 401
+    /// - Parameters:
+    ///   - url: The URL to request
+    ///   - method: HTTP method (GET, POST, DELETE, etc.)
+    ///   - body: Optional request body data
+    ///   - contentType: Optional content type header
+    ///   - maxRetries: Maximum retry attempts (default 1)
+    /// - Returns: Response data
+    /// - Throws: URLError if authentication fails or network error occurs
+    func makeAuthenticatedRequest(
+        url: URL,
+        method: String = "GET",
+        body: Data? = nil,
+        contentType: String? = "application/json",
+        maxRetries: Int = 1
+    ) async throws -> Data {
         guard let token = accessToken else {
             throw URLError(.userAuthenticationRequired)
         }
         
         var request = URLRequest(url: url)
+        request.httpMethod = method
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        
+        if let contentType = contentType {
+            request.setValue(contentType, forHTTPHeaderField: "Content-Type")
+        }
+        
+        if let body = body {
+            request.httpBody = body
+        }
         
         let (data, response) = try await URLSession.shared.data(for: request)
         
@@ -362,7 +389,13 @@ class AuthenticationManager: ObservableObject {
             if refreshed && maxRetries > 0 {
                 // Retry the request with new token
                 print("🔄 Retrying request with refreshed token")
-                return try await makeAuthenticatedRequest(url: url, maxRetries: maxRetries - 1)
+                return try await makeAuthenticatedRequest(
+                    url: url,
+                    method: method,
+                    body: body,
+                    contentType: contentType,
+                    maxRetries: maxRetries - 1
+                )
             } else {
                 // Refresh failed or no retries left, clear tokens
                 print("❌ Token refresh failed - clearing authentication")
@@ -374,9 +407,20 @@ class AuthenticationManager: ObservableObject {
             }
         }
         
+        // For non-200 responses, throw an error with status code
+        if httpResponse.statusCode >= 400 {
+            let errorMessage = String(data: data, encoding: .utf8) ?? "HTTP \(httpResponse.statusCode)"
+            print("❌ API error \(httpResponse.statusCode): \(errorMessage)")
+            throw NSError(
+                domain: "APIError",
+                code: httpResponse.statusCode,
+                userInfo: [NSLocalizedDescriptionKey: errorMessage]
+            )
+        }
+        
         return data
     }
-
+    
     /// Get current access token (for manual requests)
     func getAccessToken() -> String? {
         return accessToken
