@@ -359,7 +359,7 @@ struct SongDetailView: View {
     
     private var repertoireSheet: some View {
         AddToRepertoireSheet(
-            songId: songId,
+            songId: currentSongId,
             songTitle: song?.title ?? "Unknown",
             repertoireManager: repertoireManager,
             isPresented: $showAddToRepertoireSheet,
