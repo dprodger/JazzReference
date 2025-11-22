@@ -27,7 +27,6 @@ struct SongDetailView: View {
     // NEW: Repertoire management
     @EnvironmentObject var repertoireManager: RepertoireManager
     @State private var showAddToRepertoireSheet = false
-    @State private var showSuccessAlert = false
     @State private var showErrorAlert = false
     @State private var alertMessage = ""
     @State private var isAddingToRepertoire = false
@@ -234,11 +233,6 @@ struct SongDetailView: View {
             .sheet(isPresented: $showAddToRepertoireSheet) {
                 repertoireSheet
             }
-            .alert("Success", isPresented: $showSuccessAlert) {
-                Button("OK", role: .cancel) { }
-            } message: {
-                Text(alertMessage)
-            }
             .alert("Error", isPresented: $showErrorAlert) {
                 Button("OK", role: .cancel) { }
             } message: {
@@ -364,8 +358,7 @@ struct SongDetailView: View {
             repertoireManager: repertoireManager,
             isPresented: $showAddToRepertoireSheet,
             onSuccess: { message in
-                alertMessage = message
-                showSuccessAlert = true
+                toast = ToastItem(type: .success, message: message)
             },
             onError: { message in
                 alertMessage = message
