@@ -1,3 +1,26 @@
+// MARK: - Queue Status Models
+struct CurrentSong: Codable {
+    let songId: String
+    let songName: String
+    
+    enum CodingKeys: String, CodingKey {
+        case songId = "song_id"
+        case songName = "song_name"
+    }
+}
+
+struct QueueStatus: Codable {
+    let queueSize: Int
+    let workerActive: Bool
+    let currentSong: CurrentSong?
+    
+    enum CodingKeys: String, CodingKey {
+        case queueSize = "queue_size"
+        case workerActive = "worker_active"
+        case currentSong = "current_song"
+    }
+}
+
 // MARK: - Network Manager
 import SwiftUI
 import Combine
@@ -396,7 +419,7 @@ class NetworkManager: ObservableObject {
     }
     
     /// Fetch the current research queue status
-    func fetchQueueStatus() async -> (queueSize: Int, workerActive: Bool)? {
+    func fetchQueueStatus() async -> QueueStatus? {
         let startTime = Date()
         guard let url = URL(string: "\(NetworkManager.baseURL)/research/queue") else {
             print("Error: Invalid queue status URL")
@@ -405,15 +428,19 @@ class NetworkManager: ObservableObject {
         
         do {
             let (data, _) = try await URLSession.shared.data(from: url)
-            let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+            let queueStatus = try JSONDecoder().decode(QueueStatus.self, from: data)
             
             NetworkManager.logRequest("GET /research/queue", startTime: startTime)
             
-            if let queueSize = json?["queue_size"] as? Int,
-               let workerActive = json?["worker_active"] as? Bool {
-                return (queueSize, workerActive)
+            if NetworkManager.diagnosticsEnabled {
+                if let currentSong = queueStatus.currentSong {
+                    print("   ↳ Queue: \(queueStatus.queueSize), Processing: \(currentSong.songName)")
+                } else {
+                    print("   ↳ Queue: \(queueStatus.queueSize)")
+                }
             }
-            return nil
+            
+            return queueStatus
         } catch {
             print("Error fetching queue status: \(error.localizedDescription)")
             return nil

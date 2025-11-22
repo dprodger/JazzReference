@@ -10,6 +10,7 @@ import SwiftUI
 struct AboutView: View {
     @State private var queueSize: Int = 0
     @State private var workerActive: Bool = false
+    @State private var currentSongName: String? = nil
     @State private var isLoadingQueue: Bool = true
     
     let networkManager = NetworkManager()
@@ -87,10 +88,17 @@ struct AboutView: View {
                         }
                         
                         if workerActive && queueSize > 0 {
-                            Text("Processing...")
-                                .font(.caption)
-                                .foregroundColor(.white.opacity(0.7))
-                                .italic()
+                            if let songName = currentSongName {
+                                Text("Processing: \(songName)")
+                                    .font(.caption)
+                                    .foregroundColor(.white.opacity(0.9))
+                                    .fontWeight(.medium)
+                            } else {
+                                Text("Processing...")
+                                    .font(.caption)
+                                    .foregroundColor(.white.opacity(0.7))
+                                    .italic()
+                            }
                         }
                     }
                 }
@@ -137,6 +145,7 @@ struct AboutView: View {
         if let status = await networkManager.fetchQueueStatus() {
             queueSize = status.queueSize
             workerActive = status.workerActive
+            currentSongName = status.currentSong?.songName
         }
         isLoadingQueue = false
     }
