@@ -970,13 +970,16 @@ class SpotifyMatcher:
                 'error': str (if failed)
             }
         """
+
+        """
         self.logger.warning(f"TEMPORARILY BYPASSING SPOTIFY")
         return {
             'success': False,
             'error': "TEMPORARILY BYPASSING SPOTIFY",
             'stats': self.stats
         }
-
+        """
+        
         try:
             # Find the song
             if song_identifier.startswith('song-') or len(song_identifier) == 36:
