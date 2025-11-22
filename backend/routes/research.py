@@ -59,10 +59,41 @@ def refresh_song_data(song_id):
 @research_bp.route('/api/research/queue', methods=['GET'])
 def get_queue_status():
     """Get the current status of the research queue"""
-    return jsonify({
+    current_song = research_queue.get_current_song()
+    
+    response = {
         'queue_size': research_queue.get_queue_size(),
-        'worker_active': research_queue._worker_running
-    })
+        'worker_active': research_queue._worker_running,
+        'current_song': current_song
+    }
+    
+    return jsonify(response)
+
+
+@research_bp.route('/api/research/queue/items', methods=['GET'])
+def get_queue_items():
+    """
+    Get a list of all songs currently in the research queue
+    
+    Returns:
+        JSON response with list of queued songs in order
+    """
+    try:
+        queued_songs = research_queue.get_queued_songs()
+        
+        return jsonify({
+            'success': True,
+            'queue_size': len(queued_songs),
+            'queued_songs': queued_songs
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error retrieving queued songs: {e}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': 'Internal server error',
+            'detail': str(e)
+        }), 500
   
 # Add this route to routes/research.py
 
@@ -135,5 +166,4 @@ def queue_all_songs_for_research():
             'success': False,
             'error': 'Internal server error',
             'detail': str(e)
-        }), 500    
-
+        }), 500

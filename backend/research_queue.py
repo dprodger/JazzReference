@@ -17,6 +17,10 @@ research_queue = queue.Queue()
 _worker_running = False
 _worker_thread: Optional[threading.Thread] = None
 
+# Currently processing song
+_current_song: Optional[dict] = None
+_current_song_lock = threading.Lock()
+
 
 def add_song_to_queue(song_id: str, song_name: str) -> bool:
     """
@@ -49,6 +53,30 @@ def add_song_to_queue(song_id: str, song_name: str) -> bool:
 def get_queue_size() -> int:
     """Get the current size of the research queue"""
     return research_queue.qsize()
+
+
+def get_current_song() -> Optional[dict]:
+    """
+    Get the currently processing song
+    
+    Returns:
+        Dict with song_id and song_name if a song is being processed, None otherwise
+    """
+    with _current_song_lock:
+        return _current_song.copy() if _current_song else None
+
+
+def get_queued_songs() -> list[dict]:
+    """
+    Get all songs currently in the queue
+    
+    Returns:
+        List of dicts with song_id and song_name, in queue order
+    """
+    # Access the underlying deque from queue.Queue
+    # Note: This is not thread-safe for modification, but safe for reading
+    with research_queue.mutex:
+        return list(research_queue.queue)
 
 
 def start_worker(research_function):
@@ -132,6 +160,14 @@ def _worker_loop(research_function):
                 song_id = song_data['song_id']
                 song_name = song_data['song_name']
                 
+                # Set current song
+                with _current_song_lock:
+                    global _current_song
+                    _current_song = {
+                        'song_id': song_id,
+                        'song_name': song_name
+                    }
+                
                 logger.info(f"Processing queued song: {song_id} / {song_name}")
                 
                 # Call the research function
@@ -141,6 +177,10 @@ def _worker_loop(research_function):
                     logger.info(f"Successfully completed research for {song_id}")
                 except Exception as e:
                     logger.error(f"Error researching song {song_id}: {e}", exc_info=True)
+                finally:
+                    # Clear current song
+                    with _current_song_lock:
+                        _current_song = None
                 
                 # Mark task as done
                 research_queue.task_done()
