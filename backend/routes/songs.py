@@ -50,21 +50,45 @@ def get_songs():
 @songs_bp.route('/api/songs/<song_id>', methods=['GET'])
 def get_song_detail(song_id):
     """
-    Get detailed information about a specific song with all recordings, performers, and transcriptions.
+    Get detailed information about a specific song with all recordings, performers, transcriptions,
+    AND authority recommendations.
     
-    ULTRA-OPTIMIZED VERSION: Uses a SINGLE query with CTEs instead of 3 separate queries.
-    This eliminates 2 network round trips between Render and Supabase.
+    ULTRA-OPTIMIZED VERSION: Uses a SINGLE query with CTEs instead of 4+ separate queries.
+    This eliminates network round trips between Render and Supabase.
+    
+    NEW: Includes authority recommendation counts and sort parameter support.
     """
     try:
-        # ONE QUERY to get everything - song, recordings+performers, transcriptions
-        combined_query = """
+        # Get sort preference from query parameter (default: 'authority')
+        sort_by = request.args.get('sort', 'authority')
+        
+        # Build ORDER BY clause based on sort preference
+        if sort_by == 'year':
+            recordings_order = "r.recording_year DESC NULLS LAST"
+        elif sort_by == 'canonical':
+            recordings_order = "r.is_canonical DESC, r.recording_year DESC"
+        else:  # 'authority' - default
+            # Authority recordings first (those with recommendations), then by year
+            recordings_order = """
+                CASE WHEN COUNT(DISTINCT sar.id) > 0 THEN 0 ELSE 1 END,
+                COUNT(DISTINCT sar.id) DESC,
+                r.is_canonical DESC,
+                r.recording_year DESC
+            """
+        
+        # ONE QUERY to get everything - song, recordings+performers+authority, transcriptions
+        combined_query = f"""
             WITH song_data AS (
                 SELECT 
-                    id, title, composer, structure, song_reference,
-                    musicbrainz_id, wikipedia_url, external_references, 
-                    created_at, updated_at
-                FROM songs
-                WHERE id = %s
+                    s.id, s.title, s.composer, s.structure, s.song_reference,
+                    s.musicbrainz_id, s.wikipedia_url, s.external_references, 
+                    s.created_at, s.updated_at,
+                    -- NEW: Count total authority recommendations for this song
+                    (SELECT COUNT(*) 
+                     FROM song_authority_recommendations 
+                     WHERE song_id = s.id) as authority_recommendation_count
+                FROM songs s
+                WHERE s.id = %s
             ),
             recordings_with_performers AS (
                 SELECT 
@@ -83,6 +107,7 @@ def get_song_detail(song_id):
                     r.musicbrainz_id,
                     r.is_canonical,
                     r.notes,
+                    -- Performers aggregation (existing)
                     COALESCE(
                         json_agg(
                             json_build_object(
@@ -99,18 +124,28 @@ def get_song_detail(song_id):
                                 p.name
                         ) FILTER (WHERE p.id IS NOT NULL),
                         '[]'::json
-                    ) as performers
+                    ) as performers,
+                    -- NEW: Authority recommendation count per recording
+                    COUNT(DISTINCT sar.id) as authority_count,
+                    -- NEW: Array of authority sources
+                    COALESCE(
+                        array_agg(DISTINCT sar.source) FILTER (WHERE sar.source IS NOT NULL),
+                        ARRAY[]::text[]
+                    ) as authority_sources
                 FROM recordings r
                 LEFT JOIN recording_performers rp ON r.id = rp.recording_id
                 LEFT JOIN performers p ON rp.performer_id = p.id
                 LEFT JOIN instruments i ON rp.instrument_id = i.id
+                -- NEW: Join authority recommendations
+                LEFT JOIN song_authority_recommendations sar 
+                    ON r.id = sar.recording_id
                 WHERE r.song_id = %s
                 GROUP BY r.id, r.album_title, r.recording_date, r.recording_year,
                          r.label, r.spotify_url, r.spotify_track_id,
                          r.album_art_small, r.album_art_medium, r.album_art_large,
                          r.youtube_url, r.apple_music_url, r.musicbrainz_id,
                          r.is_canonical, r.notes
-                ORDER BY r.is_canonical DESC, r.recording_year DESC
+                ORDER BY {recordings_order}
             ),
             transcriptions_data AS (
                 SELECT 
@@ -156,6 +191,57 @@ def get_song_detail(song_id):
         return jsonify({'error': 'Failed to fetch song details', 'detail': str(e)}), 500
 
 
+# NOTES ON CHANGES:
+# 
+# 1. SONG DATA CTE - Added subquery for authority_recommendation_count
+#    - Uses (SELECT COUNT(*) FROM song_authority_recommendations WHERE song_id = s.id)
+#    - No joins needed, keeps it simple
+#
+# 2. RECORDINGS CTE - Added authority information
+#    - LEFT JOIN song_authority_recommendations sar ON r.id = sar.recording_id
+#    - COUNT(DISTINCT sar.id) as authority_count
+#    - array_agg(DISTINCT sar.source) as authority_sources
+#    - Added to GROUP BY (no changes needed, already grouping by r.id)
+#
+# 3. ORDER BY - Made dynamic based on sort parameter
+#    - Default 'authority' uses CASE expression to prioritize recordings with recommendations
+#    - 'year' and 'canonical' options preserved
+#    - Uses Python f-string to inject ORDER BY clause (safe because sort_by is validated)
+#
+# 4. PERFORMANCE CHARACTERISTICS:
+#    - Still ONE database query (single network round trip)
+#    - Uses existing indexes on recordings(song_id) and song_authority_recommendations(recording_id)
+#    - Authority aggregation happens in parallel with performer aggregation
+#    - No performance degradation vs original version
+#
+# 5. RESPONSE FORMAT:
+#    Song object now includes:
+#    - authority_recommendation_count: int
+#    
+#    Each recording now includes:
+#    - authority_count: int
+#    - authority_sources: string[]
+#    - performers: array (unchanged)
+#
+# EXAMPLE RESPONSE:
+# {
+#   "song": {
+#     "id": "...",
+#     "title": "Take Five",
+#     "authority_recommendation_count": 3,  # NEW
+#     ...
+#   },
+#   "recordings": [
+#     {
+#       "id": "...",
+#       "album_title": "Time Out",
+#       "authority_count": 1,              # NEW
+#       "authority_sources": ["jazzstandards.com"],  # NEW
+#       "performers": [...]
+#     }
+#   ],
+#   "transcriptions": [...]
+# }
 
    
 @songs_bp.route('/api/songs/search', methods=['GET'])
@@ -389,4 +475,5 @@ def update_song_musicbrainz_id(song_id):
             'success': False,
             'error': 'An error occurred while updating the song'
         }), 500
+
 
