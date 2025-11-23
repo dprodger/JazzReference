@@ -1,0 +1,934 @@
+#!/usr/bin/env python3
+"""
+Extract Recording Recommendations from JazzStandards.com
+Fetches JazzStandards.com pages for songs and extracts "Recommendations for this tune",
+storing them in the song_authority_recommendations table with caching support.
+"""
+
+import sys
+import argparse
+import logging
+import json
+import os
+import re
+from typing import Dict, List, Optional
+from datetime import datetime, timedelta
+
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+import requests
+from bs4 import BeautifulSoup
+
+from db_utils import get_db_connection
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(sys.stdout),
+        logging.FileHandler('log/extract_jazzstandards_recs.log')
+    ]
+)
+logger = logging.getLogger(__name__)
+
+# Cache configuration
+# Cache is peer to backend directory: JazzReference/cache/jazzstandards
+CACHE_DIR = Path(__file__).parent.parent.parent / 'cache' / 'jazzstandards'
+CACHE_DAYS = 30  # Default cache expiration
+
+
+class JazzStandardsRecommendationExtractor:
+    """Extracts and stores recording recommendations from JazzStandards.com"""
+    
+    def __init__(self, dry_run: bool = False, force_refresh: bool = False, cache_days: int = CACHE_DAYS):
+        self.dry_run = dry_run
+        self.force_refresh = force_refresh
+        self.cache_days = cache_days
+        self.stats = {
+            'songs_processed': 0,
+            'pages_fetched': 0,
+            'cache_hits': 0,
+            'recommendations_found': 0,
+            'recommendations_stored': 0,
+            'already_stored': 0,
+            'itunes_api_calls': 0,
+            'itunes_enriched': 0,
+            'errors': 0
+        }
+        
+        # Setup cache directory
+        CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        
+        # Setup session for HTTP requests
+        self.session = requests.Session()
+        self.session.headers.update({
+            'User-Agent': 'JazzReferenceApp/1.0 (Educational Research; dave@example.com)'
+        })
+    
+    def get_cache_path(self, url: str) -> Path:
+        """Generate cache file path for a URL"""
+        # Create a safe filename from the URL
+        safe_name = re.sub(r'[^\w\-]', '_', url)
+        # Limit filename length
+        if len(safe_name) > 200:
+            safe_name = safe_name[:200]
+        return CACHE_DIR / f"{safe_name}.json"
+    
+    def get_cached_page(self, url: str) -> Optional[str]:
+        """Get cached HTML content if available and not expired. Returns HTML string."""
+        if self.force_refresh:
+            return None
+        
+        cache_path = self.get_cache_path(url)
+        
+        if not cache_path.exists():
+            return None
+        
+        try:
+            with open(cache_path, 'r', encoding='utf-8') as f:
+                cached_data = json.load(f)
+            
+            # Check expiration
+            cached_at = datetime.fromisoformat(cached_data['cached_at'])
+            expiration = cached_at + timedelta(days=self.cache_days)
+            
+            if datetime.now() < expiration:
+                logger.debug(f"  Cache HIT: {url}")
+                self.stats['cache_hits'] += 1
+                return cached_data['content']  # Return just the HTML string
+            else:
+                logger.debug(f"  Cache EXPIRED: {url}")
+                return None
+                
+        except (json.JSONDecodeError, KeyError, ValueError) as e:
+            logger.debug(f"  Cache error: {e}")
+            return None
+    
+    def cache_page(self, url: str, content: str):
+        """Cache raw HTML page content only. Always re-parse when reading from cache."""
+        cache_path = self.get_cache_path(url)
+        
+        cache_data = {
+            'url': url,
+            'content': content,
+            'cached_at': datetime.now().isoformat()
+        }
+        
+        try:
+            with open(cache_path, 'w', encoding='utf-8') as f:
+                json.dump(cache_data, f, indent=2)
+            logger.debug(f"  Cached HTML: {url}")
+        except Exception as e:
+            logger.warning(f"Failed to cache page: {e}")
+    
+    def fetch_page(self, url: str) -> Optional[str]:
+        """Fetch page content from URL"""
+        logger.debug(f"  Fetching: {url}")
+        
+        try:
+            response = self.session.get(url, timeout=30)
+            response.raise_for_status()
+            self.stats['pages_fetched'] += 1
+            return response.text
+            
+        except requests.RequestException as e:
+            logger.error(f"  Failed to fetch {url}: {e}")
+            self.stats['errors'] += 1
+            return None
+    
+    def extract_recommendations(self, html_content: str) -> List[Dict]:
+        """
+        Extract recommendations from JazzStandards.com page HTML.
+        Looks for "Recommendations for this tune" section and parses recommendations.
+        """
+        soup = BeautifulSoup(html_content, 'html.parser')
+        recommendations = []
+        
+        # Look for the recommendations section
+        # The exact HTML structure may vary, so we'll look for common patterns
+        
+        # Pattern 1: Look for text containing "recommendation"
+        # Find ALL tags with "recommendations for this tune", then pick the most specific one
+        all_rec_tags = soup.find_all(lambda tag: 
+                                      tag.get_text(strip=True) and
+                                      'recommendations for this tune' in tag.get_text(strip=True).lower())
+        
+        # Pick the smallest/most specific tag (excluding huge containers like html, body)
+        rec_heading = None
+        min_length = float('inf')
+        
+        for tag in all_rec_tags:
+            text_len = len(tag.get_text(strip=True))
+            # Exclude very large containers (probably html, body, or main content divs)
+            # The actual heading should be < 500 chars
+            if text_len < 500 and text_len < min_length:
+                rec_heading = tag
+                min_length = text_len
+        
+        # Always look for JSRecommendationInset tables (even without heading)
+        # Some pages use iTunes panel format without standard heading
+        rec_tables = soup.find_all('table', class_='JSRecommendationInset')
+        
+        if rec_heading:
+            logger.debug("  Pattern 1: Found recommendations heading")
+            logger.debug(f"    Heading text: '{rec_heading.get_text(strip=True)[:100]}'")
+            logger.debug(f"    Heading tag: <{rec_heading.name}>")
+        
+        if rec_tables:
+            logger.debug(f"  Found {len(rec_tables)} JSRecommendationInset tables")
+            
+            # Check if this is an iTunes panel format (different structure)
+            # iTunes panel format: Single table with JSiTunesPanelColumn cells
+            # Standard format: Multiple tables, each is one recommendation
+            is_itunes_panel = False
+            
+            if len(rec_tables) == 1:
+                # Only 1 table - check if it's iTunes panel format
+                first_table = rec_tables[0]
+                itunes_columns = first_table.find_all('td', class_='JSiTunesPanelColumn')
+                
+                if len(itunes_columns) > 0:
+                    # Has iTunes panel columns - this is iTunes panel format
+                    is_itunes_panel = True
+                    logger.debug(f"  Detected iTunes panel format (1 table with {len(itunes_columns)} columns)")
+            
+            if is_itunes_panel:
+                recommendations = self.parse_itunes_panel(rec_tables[0])
+                if recommendations:
+                    logger.debug(f"  iTunes panel result: {len(recommendations)} recommendations extracted")
+                else:
+                    logger.debug("  iTunes panel parsing failed, continuing with standard parsing")
+            
+            # Standard parsing if not iTunes panel or iTunes panel failed
+            if not recommendations:
+                # Parse each recommendation table
+                for i, table in enumerate(rec_tables, 1):
+                    # Get the first <td> which contains all the metadata
+                    first_td = table.find('td')
+                    if not first_td:
+                        logger.debug(f"    Rec #{i}: No <td> found, skipping")
+                        continue
+                    
+                    # Parse structured HTML instead of text blob
+                    rec = self.parse_recommendation_html(first_td, table)
+                    
+                    if rec and rec['artist_name']:
+                        # Get full text for recommendation_text field
+                        full_text = first_td.get_text(strip=True)
+                        # Add description if available
+                        desc_row = table.find('tr', class_='JSBody')
+                        if desc_row:
+                            desc_td = desc_row.find('td')
+                            if desc_td:
+                                desc_text = desc_td.get_text(strip=True)
+                                if len(desc_text) > 200:
+                                    desc_text = desc_text[:200]
+                                full_text = f"{full_text} {desc_text}"
+                        
+                        rec['recommendation_text'] = full_text
+                        recommendations.append(rec)
+                        
+                        logger.debug(f"    Parsing recommendation #{i}:")
+                        logger.debug(f"      ✓ Artist: {rec['artist_name']}")
+                        logger.debug(f"      ✓ Album: {rec['album_title'] or '(none)'}")
+                        logger.debug(f"      ✓ Year: {rec['recording_year'] or '(none)'}")
+                        if rec.get('itunes_album_id'):
+                            logger.debug(f"      ✓ iTunes Album ID: {rec['itunes_album_id']}")
+                        if rec.get('itunes_track_id'):
+                            logger.debug(f"      ✓ iTunes Track ID: {rec['itunes_track_id']}")
+                    else:
+                        logger.debug(f"    Rec #{i}: Could not parse")
+            
+            logger.debug(f"  Pattern 1 result: {len(recommendations)} recommendations extracted")
+        
+        # Pattern 2: Look for links to recordings/albums in specific sections
+        # (This is a backup if Pattern 1 doesn't work)
+        if not recommendations:
+            logger.debug("  Pattern 1 found no recommendations, trying Pattern 2...")
+            # Try to find any structured data about recordings
+            album_links = soup.find_all('a', href=lambda x: x and ('/album' in x or '/recording' in x))
+            logger.debug(f"    Found {len(album_links)} album/recording links on page")
+            
+            for i, link in enumerate(album_links[:20], 1):  # Limit to first 20 to avoid noise
+                text = link.get_text(strip=True)
+                parent_text = link.parent.get_text(strip=True) if link.parent else text
+                
+                logger.debug(f"    Parsing link #{i}: {parent_text[:100]}...")
+                
+                rec = self.parse_recommendation_text(parent_text)
+                if rec:
+                    recommendations.append(rec)
+                    logger.debug(f"      ✓ Extracted: {rec['artist_name']}" + 
+                               (f" - {rec['album_title']}" if rec['album_title'] else "") +
+                               (f" ({rec['recording_year']})" if rec['recording_year'] else ""))
+            
+            logger.debug(f"  Pattern 2 result: {len(recommendations)} recommendations from {min(20, len(album_links))} links")
+        
+        logger.debug(f"  Total extracted: {len(recommendations)} recommendations")
+        return recommendations
+    
+    def extract_itunes_ids(self, table_elem) -> Dict[str, Optional[int]]:
+        """
+        Extract iTunes album and track IDs from links in the recommendation table.
+        
+        iTunes URL pattern: https://itunes.apple.com/us/album/id123456789?i=987654321
+        - id123456789 = album ID
+        - ?i=987654321 = track ID (optional)
+        """
+        result = {
+            'itunes_album_id': None,
+            'itunes_track_id': None
+        }
+        
+        # Find all iTunes links
+        itunes_links = table_elem.find_all('a', href=re.compile(r'itunes\.apple\.com'))
+        
+        for link in itunes_links:
+            href = link.get('href', '')
+            
+            # Extract album ID: /album/id123456789
+            album_match = re.search(r'/album/id(\d+)', href)
+            if album_match and not result['itunes_album_id']:
+                result['itunes_album_id'] = int(album_match.group(1))
+            
+            # Extract track ID: ?i=123456789 or &i=123456789
+            track_match = re.search(r'[?&]i=(\d+)', href)
+            if track_match and not result['itunes_track_id']:
+                result['itunes_track_id'] = int(track_match.group(1))
+        
+        return result
+    
+    def fetch_itunes_metadata(self, itunes_id: int, lookup_type: str = 'album') -> Optional[Dict]:
+        """
+        Fetch metadata from iTunes API.
+        
+        Args:
+            itunes_id: The iTunes album or track ID
+            lookup_type: 'album' or 'track'
+        
+        Returns:
+            Dict with artistName, collectionName, releaseDate, etc.
+        """
+        cache_key = f"itunes_{lookup_type}_{itunes_id}"
+        cache_path = CACHE_DIR / 'itunes' / f"{cache_key}.json"
+        cache_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        # Check cache
+        if not self.force_refresh and cache_path.exists():
+            try:
+                with open(cache_path, 'r', encoding='utf-8') as f:
+                    cached_data = json.load(f)
+                
+                cached_at = datetime.fromisoformat(cached_data['cached_at'])
+                expiration = cached_at + timedelta(days=self.cache_days)
+                
+                if datetime.now() < expiration:
+                    logger.debug(f"    iTunes cache HIT: {itunes_id}")
+                    return cached_data.get('metadata')
+            except Exception as e:
+                logger.debug(f"    iTunes cache error: {e}")
+        
+        # Fetch from iTunes API
+        try:
+            url = f"https://itunes.apple.com/lookup?id={itunes_id}"
+            logger.debug(f"    Fetching iTunes metadata: {url}")
+            
+            self.stats['itunes_api_calls'] += 1
+            
+            response = self.session.get(url, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+            
+            if data.get('resultCount', 0) > 0:
+                metadata = data['results'][0]
+                
+                # Cache the response
+                cache_data = {
+                    'itunes_id': itunes_id,
+                    'lookup_type': lookup_type,
+                    'metadata': metadata,
+                    'cached_at': datetime.now().isoformat()
+                }
+                
+                with open(cache_path, 'w', encoding='utf-8') as f:
+                    json.dump(cache_data, f, indent=2)
+                
+                logger.debug(f"    ✓ iTunes: {metadata.get('artistName')} - {metadata.get('collectionName')}")
+                return metadata
+            else:
+                logger.debug(f"    iTunes API returned no results for ID: {itunes_id}")
+                return None
+                
+        except Exception as e:
+            logger.warning(f"Error fetching iTunes metadata: {e}")
+            return None
+    
+    def parse_itunes_panel(self, table_elem) -> List[Dict]:
+        """
+        Parse iTunes panel format recommendations.
+        
+        Structure:
+        <table class="JSRecommendationInset">
+          <tr class="JSiTunesPanelRow">
+            <td class="JSiTunesPanelColumn">
+              <a href="https://itunes.apple.com/us/album/id286173678?i=286174089">
+                <img alt="A Child Is Born - Benny Carter & Hank Jones" />
+              </a>
+              <br>Artist Name</br>
+            </td>
+            <td class="JSiTunesPanelColumn">...</td>
+          </tr>
+        </table>
+        """
+        recommendations = []
+        
+        try:
+            # Find all iTunes panel columns
+            columns = table_elem.find_all('td', class_='JSiTunesPanelColumn')
+            
+            logger.debug(f"    Found {len(columns)} iTunes panel columns")
+            
+            for i, column in enumerate(columns, 1):
+                # Extract iTunes link
+                link = column.find('a', href=re.compile(r'itunes\.apple\.com'))
+                if not link:
+                    continue
+                
+                href = link.get('href', '')
+                
+                # Extract iTunes IDs
+                album_id = None
+                track_id = None
+                
+                album_match = re.search(r'/album/id(\d+)', href)
+                if album_match:
+                    album_id = int(album_match.group(1))
+                
+                track_match = re.search(r'[?&]i=(\d+)', href)
+                if track_match:
+                    track_id = int(track_match.group(1))
+                
+                # Extract artist name from <br>text</br> or after <br/>
+                artist_name = None
+                br_tag = column.find('br')
+                if br_tag:
+                    # Check if text is inside <br></br>
+                    if br_tag.string:
+                        artist_name = br_tag.string.strip()
+                    else:
+                        # Check next sibling after <br/>
+                        next_text = br_tag.next_sibling
+                        if next_text and isinstance(next_text, str):
+                            artist_name = next_text.strip()
+                
+                if not artist_name or not album_id:
+                    logger.debug(f"      Column {i}: Missing artist or album ID")
+                    continue
+                
+                logger.debug(f"      Column {i}: {artist_name} (iTunes: {album_id})")
+                
+                # Fetch album metadata from iTunes API
+                album_title = None
+                recording_year = None
+                
+                itunes_data = self.fetch_itunes_metadata(album_id, lookup_type='album')
+                if itunes_data:
+                    album_title = itunes_data.get('collectionName')
+                    
+                    # Extract year from releaseDate
+                    if itunes_data.get('releaseDate'):
+                        year_match = re.search(r'(\d{4})', itunes_data['releaseDate'])
+                        if year_match:
+                            recording_year = int(year_match.group(1))
+                    
+                    self.stats['itunes_enriched'] += 1
+                    logger.debug(f"        ✓ Album: {album_title}")
+                    logger.debug(f"        ✓ Year: {recording_year}")
+                
+                # Build recommendation text
+                rec_text = artist_name
+                if album_title:
+                    rec_text = f"{artist_name} - {album_title}"
+                if recording_year:
+                    rec_text += f" ({recording_year})"
+                
+                rec = {
+                    'artist_name': artist_name[:255],
+                    'album_title': album_title[:255] if album_title else None,
+                    'recording_year': recording_year,
+                    'itunes_album_id': album_id,
+                    'itunes_track_id': track_id,
+                    'recommendation_text': rec_text
+                }
+                
+                recommendations.append(rec)
+            
+        except Exception as e:
+            logger.error(f"Error parsing iTunes panel: {e}", exc_info=True)
+        
+        return recommendations
+    
+    def parse_recommendation_html(self, td_elem, table_elem) -> Optional[Dict]:
+        """
+        Parse recommendation from HTML structure.
+        
+        HTML structure:
+        <td>
+          <b>
+          Artist Name<br/>
+          <span style="font-size: smaller;"><i>
+          <a>Album Title</a></i><br/>
+          Label Catalog<br/>
+          Original recording YYYY<br/>  OR  YYYY, Label<br/>
+          </span></b>
+        </td>
+        """
+        try:
+            # Extract iTunes IDs first
+            itunes_ids = self.extract_itunes_ids(table_elem)
+            
+            # Find the <b> tag containing metadata
+            b_tag = td_elem.find('b')
+            if not b_tag:
+                return None
+            
+            # Get all text, then split by <br/> tags
+            # Artist is before first <br/>
+            artist_name = None
+            for content in b_tag.contents:
+                if content.name == 'br':
+                    break
+                if isinstance(content, str):
+                    text = content.strip()
+                    if text:
+                        artist_name = text
+                        break
+            
+            if not artist_name:
+                return None
+            
+            # Find album title in <i> or <a> tag
+            album_title = None
+            i_tag = b_tag.find('i')
+            if i_tag:
+                a_tag = i_tag.find('a')
+                if a_tag:
+                    album_title = a_tag.get_text(strip=True)
+                else:
+                    album_title = i_tag.get_text(strip=True)
+            
+            # Find year - look for "Original recording YYYY" or "YYYY,"
+            recording_year = None
+            span_tag = b_tag.find('span')
+            if span_tag:
+                span_text = span_tag.get_text()
+                
+                # Try "Original recording YYYY"
+                match = re.search(r'Original recording[,\s]+(\d{4})', span_text, re.IGNORECASE)
+                if match:
+                    recording_year = int(match.group(1))
+                else:
+                    # Try "YYYY," pattern
+                    match = re.search(r'\b(\d{4}),', span_text)
+                    if match:
+                        recording_year = int(match.group(1))
+            
+            # If album_title is missing but we have iTunes ID, fetch from iTunes API
+            if not album_title and itunes_ids['itunes_album_id']:
+                logger.debug(f"    Missing album_title, fetching from iTunes API...")
+                itunes_data = self.fetch_itunes_metadata(
+                    itunes_ids['itunes_album_id'], 
+                    lookup_type='album'
+                )
+                
+                if itunes_data:
+                    # Use iTunes metadata
+                    if not artist_name or len(artist_name) < 3:
+                        artist_name = itunes_data.get('artistName')
+                    album_title = itunes_data.get('collectionName')
+                    
+                    # Extract year from releaseDate if not already found
+                    if not recording_year and itunes_data.get('releaseDate'):
+                        release_date = itunes_data['releaseDate']
+                        year_match = re.search(r'(\d{4})', release_date)
+                        if year_match:
+                            recording_year = int(year_match.group(1))
+                    
+                    # Track successful enrichment
+                    self.stats['itunes_enriched'] += 1
+            
+            return {
+                'artist_name': artist_name[:255] if artist_name else None,  # Truncate to DB limit
+                'album_title': album_title[:255] if album_title else None,  # Truncate to DB limit
+                'recording_year': recording_year,
+                'itunes_album_id': itunes_ids['itunes_album_id'],
+                'itunes_track_id': itunes_ids['itunes_track_id'],
+                'recommendation_text': ''  # Will be filled in by caller
+            }
+            
+        except Exception as e:
+            logger.debug(f"      Error parsing HTML: {e}")
+            return None
+    
+    def parse_recommendation_text(self, text: str) -> Optional[Dict]:
+        """
+        Parse a single recommendation text to extract artist, album, and year.
+        
+        Examples:
+            "Miles Davis - Kind of Blue (1959)"
+            "Bill Evans Trio, Portrait in Jazz, 1960"
+            "Chet Baker (1953)"
+        """
+        if not text or len(text) < 5:
+            return None
+        
+        rec = {
+            'artist_name': None,
+            'album_title': None,
+            'recording_year': None,
+            'recommendation_text': text
+        }
+        
+        # Extract year (4 digits, typically in parentheses or at the end)
+        year_match = re.search(r'\(?(\d{4})\)?', text)
+        if year_match:
+            try:
+                year = int(year_match.group(1))
+                if 1900 <= year <= 2030:  # Reasonable year range
+                    rec['recording_year'] = year
+            except ValueError:
+                pass
+        
+        # Remove year from text for further parsing
+        text_without_year = re.sub(r'\(?\d{4}\)?', '', text).strip()
+        
+        # Try to split on common delimiters
+        # Pattern: "Artist - Album" or "Artist, Album"
+        if ' - ' in text_without_year:
+            parts = text_without_year.split(' - ', 1)
+            rec['artist_name'] = parts[0].strip()
+            if len(parts) > 1:
+                rec['album_title'] = parts[1].strip()
+        elif ', ' in text_without_year:
+            parts = text_without_year.split(', ')
+            if len(parts) >= 2:
+                rec['artist_name'] = parts[0].strip()
+                rec['album_title'] = parts[1].strip()
+        else:
+            # Just artist name, possibly
+            rec['artist_name'] = text_without_year.strip()
+        
+        # Clean up any remaining punctuation
+        if rec['artist_name']:
+            rec['artist_name'] = rec['artist_name'].rstrip(',-:')
+        if rec['album_title']:
+            rec['album_title'] = rec['album_title'].rstrip(',-:')
+        
+        # Only return if we have at least an artist name
+        if rec['artist_name'] and len(rec['artist_name']) > 2:
+            return rec
+        
+        return None
+    
+    def get_songs_with_jazzstandards_url(self) -> List[Dict]:
+        """Fetch songs that have a JazzStandards URL in external_references"""
+        logger.info("Fetching songs with JazzStandards URLs...")
+        
+        try:
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        SELECT 
+                            id,
+                            title,
+                            external_references
+                        FROM songs
+                        WHERE external_references ? 'jazzstandards'
+                        ORDER BY title
+                    """)
+                    
+                    songs = []
+                    for row in cur.fetchall():
+                        ext_refs = row['external_references'] or {}
+                        js_url = ext_refs.get('jazzstandards')
+                        
+                        if js_url:
+                            songs.append({
+                                'id': row['id'],
+                                'title': row['title'],
+                                'jazzstandards_url': js_url
+                            })
+                    
+                    logger.info(f"✓ Found {len(songs)} songs with JazzStandards URLs")
+                    return songs
+                    
+        except Exception as e:
+            logger.error(f"Database error: {e}", exc_info=True)
+            return []
+    
+    def check_existing_recommendations(self, song_id: str, source_url: str) -> List[Dict]:
+        """Check if we already have recommendations for this song from this URL"""
+        try:
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        SELECT 
+                            id,
+                            artist_name,
+                            album_title,
+                            recording_year
+                        FROM song_authority_recommendations
+                        WHERE song_id = %s
+                          AND source = 'jazzstandards.com'
+                          AND source_url = %s
+                    """, (song_id, source_url))
+                    
+                    return cur.fetchall()
+                    
+        except Exception as e:
+            logger.debug(f"Error checking existing recommendations: {e}")
+            return []
+    
+    def store_recommendations(self, song_id: str, song_title: str, source_url: str, recommendations: List[Dict]) -> int:
+        """Store recommendations in the database"""
+        if not recommendations:
+            return 0
+        
+        stored_count = 0
+        
+        # Check if we already have these recommendations
+        existing = self.check_existing_recommendations(song_id, source_url)
+        if existing and not self.force_refresh:
+            logger.info(f"  Already have {len(existing)} recommendations for: {song_title}")
+            self.stats['already_stored'] += len(existing)
+            return 0
+        
+        if self.dry_run:
+            logger.info(f"  [DRY RUN] Would store {len(recommendations)} recommendations for: {song_title}")
+            for rec in recommendations:
+                logger.info(f"    - {rec['artist_name']}" + 
+                          (f" - {rec['album_title']}" if rec['album_title'] else "") +
+                          (f" ({rec['recording_year']})" if rec['recording_year'] else ""))
+            return len(recommendations)
+        
+        try:
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    # If force_refresh, delete existing recommendations for this URL
+                    if self.force_refresh and existing:
+                        cur.execute("""
+                            DELETE FROM song_authority_recommendations
+                            WHERE song_id = %s
+                              AND source = 'jazzstandards.com'
+                              AND source_url = %s
+                        """, (song_id, source_url))
+                        logger.debug(f"  Deleted {len(existing)} existing recommendations")
+                    
+                    # Insert new recommendations
+                    for rec in recommendations:
+                        cur.execute("""
+                            INSERT INTO song_authority_recommendations (
+                                song_id,
+                                source,
+                                source_url,
+                                recommendation_text,
+                                artist_name,
+                                album_title,
+                                recording_year,
+                                itunes_album_id,
+                                itunes_track_id,
+                                captured_at
+                            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
+                        """, (
+                            song_id,
+                            'jazzstandards.com',
+                            source_url,
+                            rec['recommendation_text'],
+                            rec['artist_name'],
+                            rec['album_title'],
+                            rec['recording_year'],
+                            rec.get('itunes_album_id'),
+                            rec.get('itunes_track_id')
+                        ))
+                        stored_count += 1
+                    
+                    conn.commit()
+                    
+                    logger.info(f"  ✓ Stored {stored_count} recommendations for: {song_title}")
+                    
+        except Exception as e:
+            logger.error(f"Error storing recommendations: {e}", exc_info=True)
+            self.stats['errors'] += 1
+        
+        return stored_count
+    
+    def process_song(self, song: Dict) -> bool:
+        """Process a single song: fetch page, extract recommendations, store"""
+        song_id = song['id']
+        song_title = song['title']
+        js_url = song['jazzstandards_url']
+        
+        logger.info(f"\nProcessing: {song_title}")
+        logger.debug(f"  URL: {js_url}")
+        
+        # Check cache first (returns HTML string if cached)
+        html_content = self.get_cached_page(js_url)
+        
+        if not html_content:
+            # Fetch page from web
+            html_content = self.fetch_page(js_url)
+            if not html_content:
+                return False
+            
+            # Cache the raw HTML
+            self.cache_page(js_url, html_content)
+        
+        # Always parse HTML fresh (allows logic improvements without re-fetching)
+        recommendations = self.extract_recommendations(html_content)
+        
+        self.stats['recommendations_found'] += len(recommendations)
+        
+        # Store recommendations
+        if recommendations:
+            stored = self.store_recommendations(song_id, song_title, js_url, recommendations)
+            self.stats['recommendations_stored'] += stored
+        else:
+            logger.info(f"  No recommendations found on page")
+        
+        return True
+    
+    def run(self, limit: Optional[int] = None) -> bool:
+        """Main execution method"""
+        logger.info("="*80)
+        logger.info("EXTRACT JAZZSTANDARDS.COM RECOMMENDATIONS")
+        logger.info("="*80)
+        logger.info(f"Mode: {'DRY RUN' if self.dry_run else 'LIVE'}")
+        logger.info(f"Force refresh: {self.force_refresh}")
+        logger.info(f"Cache expiration: {self.cache_days} days")
+        logger.info("")
+        
+        # Get songs with JazzStandards URLs
+        songs = self.get_songs_with_jazzstandards_url()
+        if not songs:
+            logger.info("No songs with JazzStandards URLs found")
+            return True
+        
+        # Apply limit if specified
+        if limit:
+            songs = songs[:limit]
+            logger.info(f"Processing first {limit} songs")
+        
+        # Process each song
+        for i, song in enumerate(songs, 1):
+            logger.debug(f"[{i}/{len(songs)}]")
+            self.stats['songs_processed'] += 1
+            self.process_song(song)
+        
+        # Print summary
+        self.print_summary()
+        
+        return True
+    
+    def print_summary(self):
+        """Print statistics summary"""
+        logger.info("\n" + "="*80)
+        logger.info("EXTRACTION SUMMARY")
+        logger.info("="*80)
+        logger.info(f"Songs processed:            {self.stats['songs_processed']}")
+        logger.info(f"Pages fetched:              {self.stats['pages_fetched']}")
+        logger.info(f"Cache hits:                 {self.stats['cache_hits']}")
+        logger.info(f"Recommendations found:      {self.stats['recommendations_found']}")
+        logger.info(f"Recommendations stored:     {self.stats['recommendations_stored']}")
+        logger.info(f"Already stored:             {self.stats['already_stored']}")
+        if self.stats['itunes_api_calls'] > 0:
+            logger.info(f"iTunes API calls:           {self.stats['itunes_api_calls']}")
+            logger.info(f"iTunes enriched:            {self.stats['itunes_enriched']}")
+        logger.info(f"Errors:                     {self.stats['errors']}")
+        logger.info("="*80)
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description='Extract recording recommendations from JazzStandards.com pages',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Preview extraction without storing
+  python extract_jazzstandards_recommendations.py --dry-run
+  
+  # Extract and store recommendations
+  python extract_jazzstandards_recommendations.py
+  
+  # Process only first 10 songs
+  python extract_jazzstandards_recommendations.py --limit 10
+  
+  # Force refresh cached pages
+  python extract_jazzstandards_recommendations.py --force-refresh
+  
+  # Custom cache expiration (60 days)
+  python extract_jazzstandards_recommendations.py --cache-days 60
+  
+  # With debug logging
+  python extract_jazzstandards_recommendations.py --debug
+        """
+    )
+    
+    parser.add_argument(
+        '--dry-run',
+        action='store_true',
+        help='Show what would be done without making changes'
+    )
+    
+    parser.add_argument(
+        '--debug',
+        action='store_true',
+        help='Enable debug logging'
+    )
+    
+    parser.add_argument(
+        '--force-refresh',
+        action='store_true',
+        help='Force refresh cached pages and overwrite existing recommendations'
+    )
+    
+    parser.add_argument(
+        '--cache-days',
+        type=int,
+        default=CACHE_DAYS,
+        help=f'Number of days to cache pages (default: {CACHE_DAYS})'
+    )
+    
+    parser.add_argument(
+        '--limit',
+        type=int,
+        help='Maximum number of songs to process'
+    )
+    
+    args = parser.parse_args()
+    
+    # Set logging level
+    if args.debug:
+        logging.getLogger().setLevel(logging.DEBUG)
+    
+    # Create extractor and run
+    extractor = JazzStandardsRecommendationExtractor(
+        dry_run=args.dry_run,
+        force_refresh=args.force_refresh,
+        cache_days=args.cache_days
+    )
+    
+    try:
+        success = extractor.run(limit=args.limit)
+        sys.exit(0 if success else 1)
+    except KeyboardInterrupt:
+        logger.info("\nProcess cancelled by user")
+        sys.exit(1)
+    except Exception as e:
+        logger.error(f"Unexpected error: {e}", exc_info=True)
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
