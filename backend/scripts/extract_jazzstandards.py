@@ -36,6 +36,7 @@ logger = logging.getLogger(__name__)
 # Cache configuration
 # Cache is peer to backend directory: JazzReference/cache/jazzstandards
 CACHE_DIR = Path(__file__).parent.parent.parent / 'cache' / 'jazzstandards'
+ITUNES_CACHE_DIR = Path(__file__).parent.parent.parent / 'cache' / 'itunes'
 CACHE_DAYS = 30  # Default cache expiration
 
 
@@ -46,6 +47,7 @@ class JazzStandardsRecommendationExtractor:
         self.dry_run = dry_run
         self.force_refresh = force_refresh
         self.cache_days = cache_days
+        self.existing_rec_counts = {}  # Pre-fetched recommendation counts by song_id
         self.stats = {
             'songs_processed': 0,
             'pages_fetched': 0,
@@ -60,6 +62,7 @@ class JazzStandardsRecommendationExtractor:
         
         # Setup cache directory
         CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        ITUNES_CACHE_DIR.mkdir(parents=True, exist_ok=True)
         
         # Setup session for HTTP requests
         self.session = requests.Session()
@@ -312,8 +315,7 @@ class JazzStandardsRecommendationExtractor:
             Dict with artistName, collectionName, releaseDate, etc.
         """
         cache_key = f"itunes_{lookup_type}_{itunes_id}"
-        cache_path = CACHE_DIR / 'itunes' / f"{cache_key}.json"
-        cache_path.parent.mkdir(parents=True, exist_ok=True)
+        cache_path = ITUNES_CACHE_DIR / f"{cache_key}.json"
         
         # Check cache
         if not self.force_refresh and cache_path.exists():
@@ -662,33 +664,22 @@ class JazzStandardsRecommendationExtractor:
                             })
                     
                     logger.info(f"✓ Found {len(songs)} songs with JazzStandards URLs")
+                    
+                    # Pre-fetch existing recommendation counts to avoid per-song DB queries
+                    logger.debug("Pre-fetching existing recommendation counts...")
+                    cur.execute("""
+                        SELECT song_id, COUNT(*) as rec_count
+                        FROM song_authority_recommendations
+                        WHERE source = 'jazzstandards.com'
+                        GROUP BY song_id
+                    """)
+                    self.existing_rec_counts = {row['song_id']: row['rec_count'] for row in cur.fetchall()}
+                    logger.debug(f"  Found existing recommendations for {len(self.existing_rec_counts)} songs")
+                    
                     return songs
                     
         except Exception as e:
             logger.error(f"Database error: {e}", exc_info=True)
-            return []
-    
-    def check_existing_recommendations(self, song_id: str, source_url: str) -> List[Dict]:
-        """Check if we already have recommendations for this song from this URL"""
-        try:
-            with get_db_connection() as conn:
-                with conn.cursor() as cur:
-                    cur.execute("""
-                        SELECT 
-                            id,
-                            artist_name,
-                            album_title,
-                            recording_year
-                        FROM song_authority_recommendations
-                        WHERE song_id = %s
-                          AND source = 'jazzstandards.com'
-                          AND source_url = %s
-                    """, (song_id, source_url))
-                    
-                    return cur.fetchall()
-                    
-        except Exception as e:
-            logger.debug(f"Error checking existing recommendations: {e}")
             return []
     
     def store_recommendations(self, song_id: str, song_title: str, source_url: str, recommendations: List[Dict]) -> int:
@@ -697,13 +688,6 @@ class JazzStandardsRecommendationExtractor:
             return 0
         
         stored_count = 0
-        
-        # Check if we already have these recommendations
-        existing = self.check_existing_recommendations(song_id, source_url)
-        if existing and not self.force_refresh:
-            logger.info(f"  Already have {len(existing)} recommendations for: {song_title}")
-            self.stats['already_stored'] += len(existing)
-            return 0
         
         if self.dry_run:
             logger.info(f"  [DRY RUN] Would store {len(recommendations)} recommendations for: {song_title}")
@@ -716,15 +700,16 @@ class JazzStandardsRecommendationExtractor:
         try:
             with get_db_connection() as conn:
                 with conn.cursor() as cur:
-                    # If force_refresh, delete existing recommendations for this URL
-                    if self.force_refresh and existing:
+                    # If force_refresh, delete existing recommendations first
+                    existing_count = self.existing_rec_counts.get(song_id, 0)
+                    if self.force_refresh and existing_count > 0:
                         cur.execute("""
                             DELETE FROM song_authority_recommendations
                             WHERE song_id = %s
                               AND source = 'jazzstandards.com'
                               AND source_url = %s
                         """, (song_id, source_url))
-                        logger.debug(f"  Deleted {len(existing)} existing recommendations")
+                        logger.debug(f"  Deleted {existing_count} existing recommendations")
                     
                     # Insert new recommendations
                     for rec in recommendations:
@@ -756,6 +741,9 @@ class JazzStandardsRecommendationExtractor:
                     
                     conn.commit()
                     
+                    # Update cached count
+                    self.existing_rec_counts[song_id] = stored_count
+                    
                     logger.info(f"  ✓ Stored {stored_count} recommendations for: {song_title}")
                     
         except Exception as e:
@@ -773,6 +761,15 @@ class JazzStandardsRecommendationExtractor:
         logger.info(f"\nProcessing: {song_title}")
         logger.debug(f"  URL: {js_url}")
         
+        # Quick check: do we already have recommendations? (avoids extraction + iTunes calls)
+        existing_count = self.existing_rec_counts.get(song_id, 0)
+        if existing_count > 0 and not self.force_refresh:
+            logger.info(f"  Already have {existing_count} recommendations for: {song_title}")
+            self.stats['already_stored'] += existing_count
+            # Still count as "found" for stats accuracy
+            self.stats['recommendations_found'] += existing_count
+            return True
+        
         # Check cache first (returns HTML string if cached)
         html_content = self.get_cached_page(js_url)
         
@@ -785,7 +782,7 @@ class JazzStandardsRecommendationExtractor:
             # Cache the raw HTML
             self.cache_page(js_url, html_content)
         
-        # Always parse HTML fresh (allows logic improvements without re-fetching)
+        # Parse HTML and extract recommendations (may call iTunes API)
         recommendations = self.extract_recommendations(html_content)
         
         self.stats['recommendations_found'] += len(recommendations)
