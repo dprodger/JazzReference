@@ -214,6 +214,53 @@ ON repertoire_songs(repertoire_id)
 CREATE INDEX IF NOT EXISTS idx_repertoire_songs_song_id 
 ON repertoire_songs(song_id)
 
+- Create the authority recommendations table
+CREATE TABLE IF NOT EXISTS song_authority_recommendations (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    song_id UUID NOT NULL REFERENCES songs(id) ON DELETE CASCADE,
+    recording_id UUID REFERENCES recordings(id) ON DELETE SET NULL,
+    source VARCHAR(100) NOT NULL,  -- e.g., 'jazzstandards.com', 'ted_gioia', 'allmusic'
+    recommendation_text TEXT,  -- The actual text from the source
+    source_url TEXT NOT NULL,  -- URL where we found this recommendation
+    artist_name VARCHAR(255),  -- Artist mentioned in the recommendation
+    album_title VARCHAR(255),  -- Album mentioned in the recommendation
+    recording_year INTEGER,  -- Year if mentioned
+    captured_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create indexes for common queries
+CREATE INDEX idx_authority_recs_song_id ON song_authority_recommendations(song_id);
+CREATE INDEX idx_authority_recs_recording_id ON song_authority_recommendations(recording_id);
+CREATE INDEX idx_authority_recs_source ON song_authority_recommendations(source);
+CREATE INDEX idx_authority_recs_captured_at ON song_authority_recommendations(captured_at);
+
+-- Add comments for documentation
+COMMENT ON TABLE song_authority_recommendations IS 'Expert recommendations for recordings of jazz standards from authoritative sources';
+COMMENT ON COLUMN song_authority_recommendations.song_id IS 'The song this recommendation is for';
+COMMENT ON COLUMN song_authority_recommendations.recording_id IS 'The recording in our database (NULL if not yet matched)';
+COMMENT ON COLUMN song_authority_recommendations.source IS 'Source of authority (e.g., jazzstandards.com, ted_gioia)';
+COMMENT ON COLUMN song_authority_recommendations.recommendation_text IS 'Raw recommendation text from the source';
+COMMENT ON COLUMN song_authority_recommendations.source_url IS 'URL where the recommendation was found';
+COMMENT ON COLUMN song_authority_recommendations.artist_name IS 'Artist name mentioned in the recommendation';
+COMMENT ON COLUMN song_authority_recommendations.album_title IS 'Album title mentioned in the recommendation';
+COMMENT ON COLUMN song_authority_recommendations.recording_year IS 'Recording year if mentioned';
+COMMENT ON COLUMN song_authority_recommendations.captured_at IS 'When we fetched this recommendation from the source';
+
+-- Create a view for songs with their authority recommendations count
+CREATE OR REPLACE VIEW songs_with_authority_recs AS
+SELECT
+    s.id as song_id,
+    s.title,
+    COUNT(sar.id) as recommendation_count,
+    COUNT(DISTINCT sar.source) as source_count,
+    array_agg(DISTINCT sar.source) FILTER (WHERE sar.source IS NOT NULL) as sources
+FROM songs s
+LEFT JOIN song_authority_recommendations sar ON s.id = sar.song_id
+GROUP BY s.id, s.title;
+
+COMMENT ON VIEW songs_with_authority_recs IS 'Songs with count of authority recommendations from various sources';
 
 
 -- ============================================================================
