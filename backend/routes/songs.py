@@ -477,3 +477,84 @@ def update_song_musicbrainz_id(song_id):
         }), 500
 
 
+# ============================================================================
+# 3. NEW ENDPOINT: GET /api/songs/<song_id>/authority_recommendations
+# ============================================================================
+
+@app.route('/api/songs/<song_id>/authority_recommendations', methods=['GET'])
+def get_song_authority_recommendations(song_id):
+    """Get all authority recommendations for a song (matched and unmatched)"""
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    # Verify song exists
+    cur.execute("SELECT id FROM songs WHERE id = %s", (song_id,))
+    if not cur.fetchone():
+        cur.close()
+        conn.close()
+        return jsonify({'error': 'Song not found'}), 404
+    
+    # Get all recommendations with optional recording details
+    cur.execute("""
+        SELECT sar.id, sar.source, sar.recommendation_text, sar.source_url,
+               sar.artist_name, sar.album_title, sar.recording_year,
+               sar.itunes_album_id, sar.itunes_track_id,
+               sar.recording_id,
+               r.album_title as matched_album_title,
+               r.recording_year as matched_year,
+               r.spotify_url as matched_spotify_url,
+               r.album_art_large as matched_album_art
+        FROM song_authority_recommendations sar
+        LEFT JOIN recordings r ON sar.recording_id = r.id
+        WHERE sar.song_id = %s
+        ORDER BY 
+            CASE WHEN sar.recording_id IS NOT NULL THEN 0 ELSE 1 END,
+            sar.source,
+            sar.artist_name
+    """, (song_id,))
+    
+    recommendations = cur.fetchall()
+    
+    cur.close()
+    conn.close()
+    
+    return jsonify({
+        'song_id': song_id,
+        'recommendations': recommendations,
+        'total_count': len(recommendations),
+        'matched_count': sum(1 for r in recommendations if r['recording_id']),
+        'unmatched_count': sum(1 for r in recommendations if not r['recording_id'])
+    })
+
+
+# ============================================================================
+# HELPER FUNCTION: Format External References
+# ============================================================================
+
+def format_external_references(external_refs):
+    """
+    Format external_references JSONB field for display
+    Returns list of {source, url, display_name} objects
+    """
+    if not external_refs:
+        return []
+    
+    # Mapping of source keys to display names
+    source_names = {
+        'wikipedia': 'Wikipedia',
+        'jazzstandards': 'JazzStandards.com',
+        'allmusic': 'AllMusic',
+        'discogs': 'Discogs',
+        'musicbrainz': 'MusicBrainz'
+    }
+    
+    formatted = []
+    for key, url in external_refs.items():
+        formatted.append({
+            'source': key,
+            'url': url,
+            'display_name': source_names.get(key, key.title())
+        })
+    
+    return formatted
+
