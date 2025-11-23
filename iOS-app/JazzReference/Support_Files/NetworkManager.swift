@@ -131,6 +131,7 @@ class NetworkManager: ObservableObject {
         }
     }
     
+/*
     func fetchSongDetail(id: String) async -> Song? {
         let startTime = Date()
         guard let url = URL(string: "\(NetworkManager.baseURL)/songs/\(id)") else {
@@ -156,6 +157,7 @@ class NetworkManager: ObservableObject {
         }
     }
     
+*/
     func fetchRecordingDetail(id: String) async -> Recording? {
         let startTime = Date()
         guard let url = URL(string: "\(NetworkManager.baseURL)/recordings/\(id)") else {
@@ -446,6 +448,71 @@ class NetworkManager: ObservableObject {
             return nil
         }
     }
+    
+    func fetchAuthorityRecommendations(songId: String) async -> AuthorityRecommendationsResponse? {
+        guard let url = URL(string: "\(Self.baseURL)/songs/\(songId)/authority_recommendations") else {
+            return nil
+        }
+        
+        do {
+            let (data, _) = try await URLSession.shared.data(from: url)
+            let response = try JSONDecoder().decode(AuthorityRecommendationsResponse.self, from: data)
+            return response
+        } catch {
+            print("Error fetching authority recommendations: \(error)")
+            return nil
+        }
+    }
+    
+    func fetchSongDetail(id: String, sortBy: RecordingSortOrder) async -> Song? {
+        // Build URL with sort parameter
+        guard let url = URL(string: "\(Self.baseURL)/songs/\(id)?sort=\(sortBy.rawValue)") else {
+            print("Invalid URL for song detail with sort parameter")
+            return nil
+        }
+        
+        do {
+            let (data, response) = try await URLSession.shared.data(from: url)
+            
+            // Check for HTTP errors
+            if let httpResponse = response as? HTTPURLResponse {
+                guard (200...299).contains(httpResponse.statusCode) else {
+                    print("HTTP error: \(httpResponse.statusCode)")
+                    return nil
+                }
+            }
+            
+            let decoder = JSONDecoder()
+            let song = try decoder.decode(Song.self, from: data)
+            return song
+        } catch {
+            print("Error fetching song detail with sort: \(error)")
+            if let decodingError = error as? DecodingError {
+                print("Decoding error details: \(decodingError)")
+            }
+            return nil
+        }
+    }
+    
+    /// Fetch song detail without sort parameter (uses backend default)
+    func fetchSongDetail(id: String) async -> Song? {
+        // Default to authority sort
+        return await fetchSongDetail(id: id, sortBy: .authority)
+    }
+
+    // USAGE IN SongDetailView:
+    //
+    // Task {
+    //     isLoading = true
+    //     if let updatedSong = await NetworkManager().fetchSongDetail(id: songId, sortBy: sortOrder) {
+    //         song = updatedSong
+    //     }
+    //     isLoading = false
+    // }
+    //
+    // This will hit the backend with: GET /api/songs/{id}?sort=authority
+    //                              or: GET /api/songs/{id}?sort=year
+    //                              or: GET /api/songs/{id}?sort=canonical
 }
 // MARK: - NetworkManager Extensions for Solo Transcriptions
 

@@ -3,6 +3,7 @@
 //  JazzReference
 //
 //  Collapsible section displaying filtered recordings with instrument and Spotify filtering
+//  UPDATED: Added sort functionality with binding to parent view
 //
 
 import SwiftUI
@@ -52,6 +53,10 @@ enum InstrumentFamily: String, CaseIterable, Hashable {
 // MARK: - Recordings Section
 struct RecordingsSection: View {
     let recordings: [Recording]
+    
+    // NEW: Bindings for sort functionality (passed from parent)
+    @Binding var recordingSortOrder: RecordingSortOrder
+    @Binding var showingSortOptions: Bool
     
     @State private var selectedFilter: SongRecordingFilter = .withSpotify
     @State private var selectedInstrument: InstrumentFamily? = nil
@@ -153,41 +158,44 @@ struct RecordingsSection: View {
                                             }
                                         }
                                     }
-                                    .padding()
+                                    .padding(.vertical, 12)
+                                    .padding(.horizontal)
                                 },
                                 label: {
-                                    HStack(spacing: 8) {
-                                        Image(systemName: "line.3.horizontal.decrease.circle")
+                                    HStack {
+                                        Image(systemName: isFiltersExpanded ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
                                             .foregroundColor(JazzTheme.brass)
-                                            .imageScale(.medium)
-                                        
                                         Text("Filters")
-                                            .font(.headline)
+                                            .font(.subheadline)
+                                            .fontWeight(.medium)
                                             .foregroundColor(JazzTheme.charcoal)
-                                            .fixedSize(horizontal: true, vertical: false)
+                                        
+                                        Spacer(minLength: 12)
                                         
                                         // Active filter indicators
-                                        HStack(spacing: 6) {
-                                            if selectedFilter == .withSpotify {
-                                                Text("Spotify")
-                                                    .font(.caption)
-                                                    .foregroundColor(JazzTheme.brass)
-                                                    .padding(.horizontal, 6)
-                                                    .padding(.vertical, 2)
-                                                    .background(JazzTheme.brass.opacity(0.2))
-                                                    .cornerRadius(4)
-                                                    .fixedSize(horizontal: true, vertical: false)
-                                            }
-                                            
-                                            if let family = selectedInstrument {
-                                                Text(family.rawValue)
-                                                    .font(.caption)
-                                                    .foregroundColor(JazzTheme.brass)
-                                                    .padding(.horizontal, 6)
-                                                    .padding(.vertical, 2)
-                                                    .background(JazzTheme.brass.opacity(0.2))
-                                                    .cornerRadius(4)
-                                                    .fixedSize(horizontal: true, vertical: false)
+                                        if selectedFilter != .withSpotify || selectedInstrument != nil {
+                                            HStack(spacing: 4) {
+                                                if selectedFilter != .withSpotify {
+                                                    Text(selectedFilter.rawValue)
+                                                        .font(.caption2)
+                                                        .foregroundColor(.white)
+                                                        .padding(.horizontal, 6)
+                                                        .padding(.vertical, 2)
+                                                        .background(JazzTheme.brass)
+                                                        .cornerRadius(4)
+                                                        .fixedSize(horizontal: true, vertical: false)
+                                                }
+                                                
+                                                if let instrument = selectedInstrument {
+                                                    Text(instrument.rawValue)
+                                                        .font(.caption2)
+                                                        .foregroundColor(.white)
+                                                        .padding(.horizontal, 6)
+                                                        .padding(.vertical, 2)
+                                                        .background(JazzTheme.brass)
+                                                        .cornerRadius(4)
+                                                        .fixedSize(horizontal: true, vertical: false)
+                                                }
                                             }
                                         }
                                         
@@ -253,6 +261,7 @@ struct RecordingsSection: View {
                     .padding(.top, 8)
                 },
                 label: {
+                    // MODIFIED: Added sort button to the label
                     HStack {
                         Image(systemName: "music.note.list")
                             .foregroundColor(JazzTheme.burgundy)
@@ -262,6 +271,24 @@ struct RecordingsSection: View {
                             .foregroundColor(JazzTheme.charcoal)
                         
                         Spacer()
+                        
+                        // NEW: Sort button
+                        Button(action: {
+                            showingSortOptions = true
+                        }) {
+                            HStack(spacing: 4) {
+                                Image(systemName: recordingSortOrder.icon)
+                                    .font(.caption)
+                                Text(recordingSortOrder.displayName)
+                                    .font(.caption)
+                            }
+                            .foregroundColor(JazzTheme.burgundy)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(JazzTheme.burgundy.opacity(0.1))
+                            .cornerRadius(8)
+                        }
+                        .buttonStyle(.plain) // Prevent disclosure group from toggling
                     }
                     .padding(.vertical, 12)
                 }

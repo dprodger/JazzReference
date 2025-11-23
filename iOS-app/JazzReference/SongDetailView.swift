@@ -38,6 +38,11 @@ struct SongDetailView: View {
     // NEW: Toast notification
     @State private var toast: ToastItem?
     
+    @State private var recordingSortOrder: RecordingSortOrder = .authority
+    @State private var showingSortOptions = false
+
+
+    
     // MARK: - Initializer
     init(songId: String, allSongs: [Song] = [], repertoireId: String = "all") {
         self.songId = songId
@@ -181,6 +186,26 @@ struct SongDetailView: View {
                     entityId: song.id,
                     entityName: song.title
                 )
+                
+                // External References Section
+                let externalRefs = song.externalReferencesList
+                if !externalRefs.isEmpty {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("References")
+                            .font(.headline)
+                            .foregroundColor(JazzTheme.charcoal)
+                            .padding(.horizontal)
+                        
+                        ForEach(externalRefs) { ref in
+                            ExternalReferenceRow(reference: ref)
+                        }
+                    }
+                    .padding(.vertical, 8)
+                    
+                    Divider()
+                }
+
+
             }
             .padding()
             
@@ -188,8 +213,11 @@ struct SongDetailView: View {
                 .padding(.horizontal)
             
             // MARK: - RECORDINGS SECTION
-            RecordingsSection(recordings: song.recordings ?? [])
-            
+                RecordingsSection(
+                    recordings: song.recordings ?? [],
+                    recordingSortOrder: $recordingSortOrder,
+                    showingSortOptions: $showingSortOptions
+                )
             // MARK: - TRANSCRIPTIONS SECTION
             TranscriptionsSection(transcriptions: transcriptions)
         }
@@ -250,6 +278,25 @@ struct SongDetailView: View {
             .overlay(alignment: .bottom) {
                 pageIndicatorView
             }
+            .confirmationDialog("Sort Recordings", isPresented: $showingSortOptions, titleVisibility: .visible) {
+                ForEach(RecordingSortOrder.allCases) { sortOrder in
+                    Button(sortOrder.displayName) {
+                        recordingSortOrder = sortOrder
+                        // Reload song with new sort order
+                        Task {
+                            isLoading = true
+                            if let updatedSong = await NetworkManager().fetchSongDetail(id: songId, sortBy: sortOrder) {
+                                song = updatedSong
+                            }
+                            isLoading = false
+                        }
+                    }
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("Choose how to sort recordings")
+            }
+
     }
     
     private var mainScrollView: some View {

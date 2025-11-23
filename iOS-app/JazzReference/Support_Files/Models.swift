@@ -26,7 +26,9 @@ struct Song: Identifiable, Codable {
     // NEW: Transcriptions data (now included in song response)
     let transcriptions: [SoloTranscription]?
     let transcriptionCount: Int?
-    
+
+    var authorityRecommendationCount: Int?
+
     enum CodingKeys: String, CodingKey {
         case id, title, composer, structure
         case songReference = "song_reference"
@@ -39,8 +41,22 @@ struct Song: Identifiable, Codable {
         case recordingCount = "recording_count"
         case transcriptions          // NEW
         case transcriptionCount = "transcription_count"  // NEW
+        case authorityRecommendationCount = "authority_recommendation_count"
+    }
+
+    var hasAuthorityRecommendations: Bool {
+        guard let count = authorityRecommendationCount else { return false }
+        return count > 0
+    }
+    
+    // Convert external_references JSONB to ExternalReference array
+    var externalReferencesList: [ExternalReference] {
+        guard let refs = externalReferences else { return [] }
+        return refs.map { ExternalReference(source: $0.key, url: $0.value) }
+            .sorted { $0.displayName < $1.displayName }
     }
 }
+
 struct Recording: Codable, Identifiable {
     let id: String
     let songId: String?
@@ -62,6 +78,11 @@ struct Recording: Codable, Identifiable {
     let performers: [Performer]?
     let composer: String?
     
+    var authorityCount: Int?
+    var authoritySources: [String]?
+    var authorityRecommendations: [AuthorityRecommendation]?
+    
+
     enum CodingKeys: String, CodingKey {
         case id, label, notes, composer, performers
         case songId = "song_id"
@@ -78,8 +99,59 @@ struct Recording: Codable, Identifiable {
         case appleMusicUrl = "apple_music_url"
         case isCanonical = "is_canonical"
         case musicbrainzId = "musicbrainz_id"
+        case authorityCount = "authority_count"
+        case authoritySources = "authority_sources"
+        case authorityRecommendations = "authority_recommendations"
+    }
+    // Helper computed properties
+    var hasAuthority: Bool {
+        guard let count = authorityCount else { return false }
+        return count > 0
+    }
+    
+    var authorityBadgeText: String? {
+        guard let count = authorityCount, count > 0 else { return nil }
+        if count == 1, let source = authoritySources?.first {
+            return authoritySourceDisplayName(source)
+        }
+        return "\(count) sources"
+    }
+    
+    var primaryAuthoritySource: String? {
+        authoritySources?.first
+    }
+    
+    private func authoritySourceDisplayName(_ source: String) -> String {
+        switch source.lowercased() {
+        case "jazzstandards.com":
+            return "JazzStandards.com"
+        case "allmusic":
+            return "AllMusic"
+        case "discogs":
+            return "Discogs"
+        default:
+            return source.capitalized
+        }
     }
 }
+
+struct AuthorityRecommendationsResponse: Codable {
+    let songId: String
+    let recommendations: [AuthorityRecommendation]
+    let totalCount: Int
+    let matchedCount: Int
+    let unmatchedCount: Int
+    
+    enum CodingKeys: String, CodingKey {
+        case songId = "song_id"
+        case recommendations
+        case totalCount = "total_count"
+        case matchedCount = "matched_count"
+        case unmatchedCount = "unmatched_count"
+    }
+}
+
+
 
 struct Performer: Codable, Identifiable {
     let id: String
@@ -238,6 +310,170 @@ struct SoloTranscription: Codable, Identifiable {
         case label
     }
 }
+
+
+// MARK: - Authority Recommendation Model
+
+struct AuthorityRecommendation: Codable, Identifiable {
+    let id: String
+    let source: String
+    let recommendationText: String?
+    let sourceUrl: String?
+    let artistName: String?
+    let albumTitle: String?
+    let recordingYear: Int?
+    let itunesAlbumId: Int?
+    let itunesTrackId: Int?
+    let recordingId: String?
+    
+    // Optional fields when matched to a recording
+    let matchedAlbumTitle: String?
+    let matchedYear: Int?
+    let matchedSpotifyUrl: String?
+    let matchedAlbumArt: String?
+    
+    enum CodingKeys: String, CodingKey {
+        case id, source
+        case recommendationText = "recommendation_text"
+        case sourceUrl = "source_url"
+        case artistName = "artist_name"
+        case albumTitle = "album_title"
+        case recordingYear = "recording_year"
+        case itunesAlbumId = "itunes_album_id"
+        case itunesTrackId = "itunes_track_id"
+        case recordingId = "recording_id"
+        case matchedAlbumTitle = "matched_album_title"
+        case matchedYear = "matched_year"
+        case matchedSpotifyUrl = "matched_spotify_url"
+        case matchedAlbumArt = "matched_album_art"
+    }
+    
+    // Helper properties
+    var isMatched: Bool {
+        recordingId != nil
+    }
+    
+    var displayName: String {
+        artistName ?? "Unknown Artist"
+    }
+    
+    var displayAlbum: String {
+        matchedAlbumTitle ?? albumTitle ?? "Unknown Album"
+    }
+    
+    var displayYear: String? {
+        if let year = matchedYear ?? recordingYear {
+            return "\(year)"
+        }
+        return nil
+    }
+    
+    var sourceDisplayName: String {
+        switch source.lowercased() {
+        case "jazzstandards.com":
+            return "JazzStandards.com"
+        case "allmusic":
+            return "AllMusic"
+        case "discogs":
+            return "Discogs"
+        default:
+            return source.capitalized
+        }
+    }
+}
+
+
+// MARK: - External Reference Model
+
+struct ExternalReference: Identifiable {
+    let id = UUID()
+    let source: String
+    let url: String
+    let displayName: String
+    
+    init(source: String, url: String) {
+        self.source = source
+        self.url = url
+        
+        // Map source keys to display names
+        switch source.lowercased() {
+        case "wikipedia":
+            self.displayName = "Wikipedia"
+        case "jazzstandards":
+            self.displayName = "JazzStandards.com"
+        case "allmusic":
+            self.displayName = "AllMusic"
+        case "discogs":
+            self.displayName = "Discogs"
+        case "musicbrainz":
+            self.displayName = "MusicBrainz"
+        default:
+            self.displayName = source.capitalized
+        }
+    }
+    
+    // Icon for the reference type
+    var iconName: String {
+        switch source.lowercased() {
+        case "wikipedia":
+            return "book.fill"
+        case "jazzstandards":
+            return "music.note.list"
+        case "allmusic":
+            return "music.quarternote.3"
+        case "discogs":
+            return "opticaldisc"
+        case "musicbrainz":
+            return "waveform"
+        default:
+            return "link"
+        }
+    }
+}
+
+// MARK: - Recording Sort Order
+
+enum RecordingSortOrder: String, CaseIterable, Identifiable {
+    case authority = "authority"
+    case year = "year"
+    case canonical = "canonical"
+    
+    var id: String { rawValue }
+    
+    var displayName: String {
+        switch self {
+        case .authority:
+            return "Authority"
+        case .year:
+            return "Year"
+        case .canonical:
+            return "Canonical"
+        }
+    }
+    
+    var description: String {
+        switch self {
+        case .authority:
+            return "Expert-recommended recordings first"
+        case .year:
+            return "Most recent recordings first"
+        case .canonical:
+            return "Canonical recordings first"
+        }
+    }
+    
+    var icon: String {
+        switch self {
+        case .authority:
+            return "checkmark.seal.fill"
+        case .year:
+            return "calendar"
+        case .canonical:
+            return "star.fill"
+        }
+    }
+}
+
 
 // MARK: - Preview Data for Solo Transcriptions
 
