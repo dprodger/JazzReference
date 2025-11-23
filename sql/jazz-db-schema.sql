@@ -422,7 +422,26 @@ COMMENT ON COLUMN users.failed_login_attempts IS 'Counter for rate limiting - re
 COMMENT ON COLUMN users.account_locked IS 'True if account locked due to excessive failed login attempts';
 
 
+-- Add iTunes ID columns
+ALTER TABLE song_authority_recommendations 
+ADD COLUMN itunes_album_id BIGINT,
+ADD COLUMN itunes_track_id BIGINT;
 
+-- Add indexes for iTunes ID lookups
+CREATE INDEX idx_song_authority_recs_itunes_album 
+ON song_authority_recommendations(itunes_album_id) 
+WHERE itunes_album_id IS NOT NULL;
+
+CREATE INDEX idx_song_authority_recs_itunes_track 
+ON song_authority_recommendations(itunes_track_id) 
+WHERE itunes_track_id IS NOT NULL;
+
+-- Add comment
+COMMENT ON COLUMN song_authority_recommendations.itunes_album_id IS 
+'iTunes/Apple Music album ID extracted from recommendation links';
+
+COMMENT ON COLUMN song_authority_recommendations.itunes_track_id IS 
+'iTunes/Apple Music track ID extracted from recommendation links (optional)';
 
 -- ============================================================================
 -- Migration: Add Content Error Reporting
