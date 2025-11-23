@@ -906,6 +906,151 @@ group.add_argument('--name', help='Search by name')
 group.add_argument('--id', help='Search by ID')
 ```
 
+# Standard Script Configuration Block
+
+Add this section to the script development guide for all new scripts in `backend/scripts/`.
+
+---
+
+## Path Configuration and Cache Location Standards
+
+### Required Path Setup
+
+**All scripts in `backend/scripts/` must include this at the top** (after standard library imports, before local imports):
+
+```python
+#!/usr/bin/env python3
+"""
+Script description
+"""
+
+# Standard library imports
+import sys
+import argparse
+import logging
+from pathlib import Path
+
+# Add parent directory to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+# Third-party imports
+import requests
+
+# Local imports (now these will work correctly)
+from db_utils import get_db_connection
+```
+
+**Why this is needed:**
+- Scripts are run from `backend/scripts/` directory
+- Utility modules (`db_utils.py`, `mb_utils.py`, etc.) are in `backend/`
+- Without this, Python can't find the utility modules
+
+### Cache Directory Standard
+
+**All caching scripts must use the standardized cache location:**
+
+```python
+# Cache configuration - peer to backend directory
+CACHE_DIR = Path(__file__).parent.parent.parent / 'cache' / 'subsystem_name'
+CACHE_DAYS = 30  # Default cache expiration
+
+# Examples:
+# For MusicBrainz: Path(__file__).parent.parent.parent / 'cache' / 'musicbrainz'
+# For Spotify: Path(__file__).parent.parent.parent / 'cache' / 'spotify'
+# For JazzStandards: Path(__file__).parent.parent.parent / 'cache' / 'jazzstandards'
+# For Wikipedia: Path(__file__).parent.parent.parent / 'cache' / 'wikipedia'
+```
+
+**Directory structure:**
+```
+JazzReference/
+├── backend/
+│   ├── scripts/
+│   │   ├── my_script.py          # Script runs from here
+│   │   └── ...
+│   ├── db_utils.py                # Imported via sys.path.insert
+│   └── ...
+└── cache/                         # Cache peer to backend
+    ├── musicbrainz/
+    ├── spotify/
+    ├── jazzstandards/
+    └── wikipedia/
+```
+
+**Path resolution:**
+- `Path(__file__)` → `/path/to/JazzReference/backend/scripts/my_script.py`
+- `.parent` → `/path/to/JazzReference/backend/scripts/`
+- `.parent.parent` → `/path/to/JazzReference/backend/`
+- `.parent.parent.parent` → `/path/to/JazzReference/`
+- `.parent.parent.parent / 'cache' / 'subsystem'` → `/path/to/JazzReference/cache/subsystem/`
+
+### Cache Directory Setup
+
+Ensure cache directory is created:
+
+```python
+# In __init__ or at module level
+CACHE_DIR.mkdir(parents=True, exist_ok=True)
+```
+
+### Complete Template Header
+
+```python
+#!/usr/bin/env python3
+"""
+Script Name
+Brief description of what the script does
+"""
+
+# Standard library imports
+import sys
+import argparse
+import logging
+import json
+import os
+from datetime import datetime, timedelta
+from pathlib import Path
+
+# Add parent directory to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+# Third-party imports
+import requests
+from bs4 import BeautifulSoup
+
+# Local imports
+from db_utils import get_db_connection
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(sys.stdout),
+        logging.FileHandler('log/script_name.log')
+    ]
+)
+logger = logging.getLogger(__name__)
+
+# Cache configuration (if needed)
+CACHE_DIR = Path(__file__).parent.parent.parent / 'cache' / 'subsystem_name'
+CACHE_DAYS = 30
+
+# Ensure cache directory exists
+CACHE_DIR.mkdir(parents=True, exist_ok=True)
+```
+
+---
+
+## Checklist for New Scripts
+
+- [ ] Add `sys.path.insert(0, str(Path(__file__).parent.parent))` before local imports
+- [ ] If caching: Use `Path(__file__).parent.parent.parent / 'cache' / 'subsystem_name'`
+- [ ] If caching: Create cache directory with `CACHE_DIR.mkdir(parents=True, exist_ok=True)`
+- [ ] Scripts run from `backend/scripts/` directory
+- [ ] Import `db_utils`, `mb_utils`, etc. work correctly
+- [ ] Cache files stored in `JazzReference/cache/` (peer to backend)
+
 ---
 
 ## Summary
