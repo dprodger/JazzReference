@@ -481,7 +481,7 @@ def update_song_musicbrainz_id(song_id):
 # 3. NEW ENDPOINT: GET /api/songs/<song_id>/authority_recommendations
 # ============================================================================
 
-@app.route('/api/songs/<song_id>/authority_recommendations', methods=['GET'])
+@songs_bp.route('/api/songs/<song_id>/authority_recommendations', methods=['GET'])
 def get_song_authority_recommendations(song_id):
     """Get all authority recommendations for a song (matched and unmatched)"""
     conn = get_db_connection()
