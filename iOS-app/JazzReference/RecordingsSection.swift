@@ -71,232 +71,232 @@ struct RecordingsSection: View {
             VStack(alignment: .leading, spacing: 0) {
                 DisclosureGroup(
                     isExpanded: $isSectionExpanded,
-                content: {
-                    VStack(alignment: .leading, spacing: 0) {
-                        
-                        // MARK: - FILTERS SECTION
+                    content: {
                         VStack(alignment: .leading, spacing: 0) {
-                            DisclosureGroup(
-                                isExpanded: $isFiltersExpanded,
-                                content: {
-                                    VStack(alignment: .leading, spacing: 16) {
-                                        // Spotify Filter
-                                        VStack(alignment: .leading, spacing: 8) {
-                                            Text("Recording Type")
-                                                .font(.subheadline)
-                                                .fontWeight(.medium)
-                                                .foregroundColor(JazzTheme.smokeGray)
-                                            
-                                            Picker("Recording Type", selection: $selectedFilter) {
-                                                ForEach(SongRecordingFilter.allCases, id: \.self) { filter in
-                                                    Text(filter.rawValue).tag(filter)
-                                                }
-                                            }
-                                            .pickerStyle(SegmentedPickerStyle())
-                                        }
-                                        
-                                        // Instrument Filter
-                                        if !availableInstruments.isEmpty {
+                            
+                            // MARK: - FILTERS SECTION
+                            VStack(alignment: .leading, spacing: 0) {
+                                DisclosureGroup(
+                                    isExpanded: $isFiltersExpanded,
+                                    content: {
+                                        VStack(alignment: .leading, spacing: 16) {
+                                            // Spotify Filter
                                             VStack(alignment: .leading, spacing: 8) {
-                                                HStack {
-                                                    Text("Instrument")
-                                                        .font(.subheadline)
-                                                        .fontWeight(.medium)
-                                                        .foregroundColor(JazzTheme.smokeGray)
-                                                    
-                                                    Spacer()
-                                                    
-                                                    if selectedInstrument != nil {
-                                                        Button(action: {
-                                                            selectedInstrument = nil
-                                                        }) {
-                                                            Text("Clear")
-                                                                .font(.caption)
-                                                                .foregroundColor(JazzTheme.burgundy)
-                                                        }
+                                                Text("Recording Type")
+                                                    .font(.subheadline)
+                                                    .fontWeight(.medium)
+                                                    .foregroundColor(JazzTheme.smokeGray)
+                                                
+                                                Picker("Recording Type", selection: $selectedFilter) {
+                                                    ForEach(SongRecordingFilter.allCases, id: \.self) { filter in
+                                                        Text(filter.rawValue).tag(filter)
                                                     }
                                                 }
-                                                
-                                                ScrollView(.horizontal, showsIndicators: false) {
-                                                    HStack(spacing: 8) {
-                                                        ForEach(availableInstruments, id: \.self) { family in
+                                                .pickerStyle(SegmentedPickerStyle())
+                                            }
+                                            
+                                            // Instrument Filter
+                                            if !availableInstruments.isEmpty {
+                                                VStack(alignment: .leading, spacing: 8) {
+                                                    HStack {
+                                                        Text("Instrument")
+                                                            .font(.subheadline)
+                                                            .fontWeight(.medium)
+                                                            .foregroundColor(JazzTheme.smokeGray)
+                                                        
+                                                        Spacer()
+                                                        
+                                                        if selectedInstrument != nil {
                                                             Button(action: {
-                                                                if selectedInstrument == family {
-                                                                    selectedInstrument = nil
-                                                                } else {
-                                                                    selectedInstrument = family
-                                                                }
+                                                                selectedInstrument = nil
                                                             }) {
-                                                                Text(family.rawValue)
-                                                                    .font(.subheadline)
-                                                                    .foregroundColor(
-                                                                        selectedInstrument == family
+                                                                Text("Clear")
+                                                                    .font(.caption)
+                                                                    .foregroundColor(JazzTheme.burgundy)
+                                                            }
+                                                        }
+                                                    }
+                                                    
+                                                    ScrollView(.horizontal, showsIndicators: false) {
+                                                        HStack(spacing: 8) {
+                                                            ForEach(availableInstruments, id: \.self) { family in
+                                                                Button(action: {
+                                                                    if selectedInstrument == family {
+                                                                        selectedInstrument = nil
+                                                                    } else {
+                                                                        selectedInstrument = family
+                                                                    }
+                                                                }) {
+                                                                    Text(family.rawValue)
+                                                                        .font(.subheadline)
+                                                                        .foregroundColor(
+                                                                            selectedInstrument == family
                                                                             ? .white
                                                                             : JazzTheme.charcoal
-                                                                    )
-                                                                    .padding(.horizontal, 12)
-                                                                    .padding(.vertical, 6)
-                                                                    .background(
-                                                                        selectedInstrument == family
+                                                                        )
+                                                                        .padding(.horizontal, 12)
+                                                                        .padding(.vertical, 6)
+                                                                        .background(
+                                                                            selectedInstrument == family
                                                                             ? JazzTheme.brass
                                                                             : JazzTheme.cardBackground
-                                                                    )
-                                                                    .cornerRadius(16)
-                                                                    .overlay(
-                                                                        RoundedRectangle(cornerRadius: 16)
-                                                                            .stroke(
-                                                                                selectedInstrument == family
+                                                                        )
+                                                                        .cornerRadius(16)
+                                                                        .overlay(
+                                                                            RoundedRectangle(cornerRadius: 16)
+                                                                                .stroke(
+                                                                                    selectedInstrument == family
                                                                                     ? Color.clear
                                                                                     : JazzTheme.smokeGray.opacity(0.3),
-                                                                                lineWidth: 1
-                                                                            )
-                                                                    )
+                                                                                    lineWidth: 1
+                                                                                )
+                                                                        )
+                                                                }
                                                             }
                                                         }
                                                     }
                                                 }
                                             }
                                         }
-                                    }
-                                    .padding(.vertical, 12)
-                                    .padding(.horizontal)
-                                },
-                                label: {
-                                    HStack {
-                                        Image(systemName: isFiltersExpanded ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
-                                            .foregroundColor(JazzTheme.brass)
-                                        Text("Filters")
-                                            .font(.subheadline)
-                                            .fontWeight(.medium)
-                                            .foregroundColor(JazzTheme.charcoal)
-                                        
-                                        Spacer(minLength: 12)
-                                        
-                                        // Active filter indicators
-                                        if selectedFilter != .withSpotify || selectedInstrument != nil {
-                                            HStack(spacing: 4) {
-                                                if selectedFilter != .withSpotify {
-                                                    Text(selectedFilter.rawValue)
-                                                        .font(.caption2)
-                                                        .foregroundColor(.white)
-                                                        .padding(.horizontal, 6)
-                                                        .padding(.vertical, 2)
-                                                        .background(JazzTheme.brass)
-                                                        .cornerRadius(4)
-                                                        .fixedSize(horizontal: true, vertical: false)
-                                                }
-                                                
-                                                if let instrument = selectedInstrument {
-                                                    Text(instrument.rawValue)
-                                                        .font(.caption2)
-                                                        .foregroundColor(.white)
-                                                        .padding(.horizontal, 6)
-                                                        .padding(.vertical, 2)
-                                                        .background(JazzTheme.brass)
-                                                        .cornerRadius(4)
-                                                        .fixedSize(horizontal: true, vertical: false)
+                                        .padding(.vertical, 12)
+                                        .padding(.horizontal)
+                                    },
+                                    label: {
+                                        HStack {
+                                            Image(systemName: isFiltersExpanded ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
+                                                .foregroundColor(JazzTheme.brass)
+                                            Text("Filters")
+                                                .font(.subheadline)
+                                                .fontWeight(.medium)
+                                                .foregroundColor(JazzTheme.charcoal)
+                                            
+                                            Spacer(minLength: 12)
+                                            
+                                            // Active filter indicators
+                                            if selectedFilter != .withSpotify || selectedInstrument != nil {
+                                                HStack(spacing: 4) {
+                                                    if selectedFilter != .withSpotify {
+                                                        Text(selectedFilter.rawValue)
+                                                            .font(.caption2)
+                                                            .foregroundColor(.white)
+                                                            .padding(.horizontal, 6)
+                                                            .padding(.vertical, 2)
+                                                            .background(JazzTheme.brass)
+                                                            .cornerRadius(4)
+                                                            .fixedSize(horizontal: true, vertical: false)
+                                                    }
+                                                    
+                                                    if let instrument = selectedInstrument {
+                                                        Text(instrument.rawValue)
+                                                            .font(.caption2)
+                                                            .foregroundColor(.white)
+                                                            .padding(.horizontal, 6)
+                                                            .padding(.vertical, 2)
+                                                            .background(JazzTheme.brass)
+                                                            .cornerRadius(4)
+                                                            .fixedSize(horizontal: true, vertical: false)
+                                                    }
                                                 }
                                             }
+                                            
+                                            Spacer(minLength: 8)
+                                            
+                                            // Recording count on same line
+                                            Text("\(filteredRecordings.count) Recording\(filteredRecordings.count == 1 ? "" : "s")")
+                                                .font(.subheadline)
+                                                .foregroundColor(JazzTheme.smokeGray)
+                                                .fixedSize(horizontal: true, vertical: false)
                                         }
-                                        
-                                        Spacer(minLength: 8)
-                                        
-                                        // Recording count on same line
-                                        Text("\(filteredRecordings.count) Recording\(filteredRecordings.count == 1 ? "" : "s")")
+                                        .padding(.vertical, 8)
+                                    }
+                                )
+                                .tint(JazzTheme.brass)
+                                .padding(.vertical, 8)
+                            }
+                            .background(JazzTheme.cardBackground)
+                            .cornerRadius(10)
+                            .padding(.horizontal)
+                            .padding(.top, 8)
+                            
+                            // Recordings List
+                            VStack(alignment: .leading, spacing: 12) {
+                                if !filteredRecordings.isEmpty {
+                                    ForEach(groupedRecordings, id: \.leader) { group in
+                                        VStack(alignment: .leading, spacing: 8) {
+                                            Text("\(group.leader) (\(group.recordings.count))")
+                                                .font(.headline)
+                                                .foregroundColor(JazzTheme.burgundy)
+                                                .padding(.horizontal)
+                                                .padding(.top, 8)
+                                            
+                                            ScrollView(.horizontal, showsIndicators: false) {
+                                                HStack(spacing: 16) {
+                                                    ForEach(group.recordings) { recording in
+                                                        NavigationLink(destination: RecordingDetailView(recordingId: recording.id)) {
+                                                            RecordingRowView(recording: recording)
+                                                        }
+                                                        .buttonStyle(.plain)
+                                                    }
+                                                }
+                                                .padding(.horizontal)
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    VStack(spacing: 12) {
+                                        Image(systemName: "music.note.slash")
+                                            .font(.system(size: 48))
+                                            .foregroundColor(JazzTheme.smokeGray.opacity(0.5))
+                                        Text("No recordings match the current filters")
                                             .font(.subheadline)
                                             .foregroundColor(JazzTheme.smokeGray)
-                                            .fixedSize(horizontal: true, vertical: false)
+                                            .multilineTextAlignment(.center)
                                     }
-                                    .padding(.vertical, 8)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 40)
                                 }
-                            )
-                            .tint(JazzTheme.brass)
-                            .padding(.vertical, 8)
+                            }
+                            .padding(.top)
                         }
-                        .background(JazzTheme.cardBackground)
-                        .cornerRadius(10)
-                        .padding(.horizontal)
                         .padding(.top, 8)
-                        
-                        // Recordings List
-                        VStack(alignment: .leading, spacing: 12) {
-                            if !filteredRecordings.isEmpty {
-                                ForEach(groupedRecordings, id: \.leader) { group in
-                                    VStack(alignment: .leading, spacing: 8) {
-                                        Text("\(group.leader) (\(group.recordings.count))")
-                                            .font(.headline)
-                                            .foregroundColor(JazzTheme.burgundy)
-                                            .padding(.horizontal)
-                                            .padding(.top, 8)
-                                        
-                                        ScrollView(.horizontal, showsIndicators: false) {
-                                            HStack(spacing: 16) {
-                                                ForEach(group.recordings) { recording in
-                                                    NavigationLink(destination: RecordingDetailView(recordingId: recording.id)) {
-                                                        RecordingRowView(recording: recording)
-                                                    }
-                                                    .buttonStyle(.plain)
-                                                }
-                                            }
-                                            .padding(.horizontal)
-                                        }
-                                    }
+                    },
+                    label: {
+                        // MODIFIED: Added sort button to the label
+                        HStack {
+                            Image(systemName: "music.note.list")
+                                .foregroundColor(JazzTheme.burgundy)
+                            Text("Recordings")
+                                .font(.title2)
+                                .bold()
+                                .foregroundColor(JazzTheme.charcoal)
+                            
+                            Spacer()
+                            
+                            // NEW: Sort button
+                            Button(action: {
+                                showingSortOptions = true
+                            }) {
+                                HStack(spacing: 4) {
+                                    Image(systemName: recordingSortOrder.icon)
+                                        .font(.caption)
+                                    Text(recordingSortOrder.displayName)
+                                        .font(.caption)
                                 }
-                            } else {
-                                VStack(spacing: 12) {
-                                    Image(systemName: "music.note.slash")
-                                        .font(.system(size: 48))
-                                        .foregroundColor(JazzTheme.smokeGray.opacity(0.5))
-                                    Text("No recordings match the current filters")
-                                        .font(.subheadline)
-                                        .foregroundColor(JazzTheme.smokeGray)
-                                        .multilineTextAlignment(.center)
-                                }
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 40)
+                                .foregroundColor(JazzTheme.burgundy)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background(JazzTheme.burgundy.opacity(0.1))
+                                .cornerRadius(8)
                             }
+                            .buttonStyle(.plain) // Prevent disclosure group from toggling
                         }
-                        .padding(.top)
+                        .padding(.vertical, 12)
                     }
-                    .padding(.top, 8)
-                },
-                label: {
-                    // MODIFIED: Added sort button to the label
-                    HStack {
-                        Image(systemName: "music.note.list")
-                            .foregroundColor(JazzTheme.burgundy)
-                        Text("Recordings")
-                            .font(.title2)
-                            .bold()
-                            .foregroundColor(JazzTheme.charcoal)
-                        
-                        Spacer()
-                        
-                        // NEW: Sort button
-                        Button(action: {
-                            showingSortOptions = true
-                        }) {
-                            HStack(spacing: 4) {
-                                Image(systemName: recordingSortOrder.icon)
-                                    .font(.caption)
-                                Text(recordingSortOrder.displayName)
-                                    .font(.caption)
-                            }
-                            .foregroundColor(JazzTheme.burgundy)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
-                            .background(JazzTheme.burgundy.opacity(0.1))
-                            .cornerRadius(8)
-                        }
-                        .buttonStyle(.plain) // Prevent disclosure group from toggling
-                    }
-                    .padding(.vertical, 12)
-                }
-            )
-            .tint(JazzTheme.burgundy)
-        }
-        
-        Spacer().frame(width: 16)
+                )
+                .tint(JazzTheme.burgundy)
+            }
+            
+            Spacer().frame(width: 16)
         }
         .background(JazzTheme.backgroundLight)
     }
@@ -346,21 +346,27 @@ struct RecordingsSection: View {
         return result
     }
     
-    // Group recordings by leader, sorted by leader's last name
+    // Group recordings by leader, preserving backend sort order
     private var groupedRecordings: [(leader: String, recordings: [Recording])] {
-        // Group by leader name
+        // Track the order in which we first see each leader
+        var leaderOrder: [String] = []
         var groups: [String: [Recording]] = [:]
+        
         for recording in filteredRecordings {
             let leaderName = recording.performers?.first { $0.role == "leader" }?.name ?? "Unknown"
+            
+            // Track first appearance order
+            if groups[leaderName] == nil {
+                leaderOrder.append(leaderName)
+            }
+            
             groups[leaderName, default: []].append(recording)
         }
         
-        // Sort by last name
-        return groups.map { (leader: $0.key, recordings: $0.value) }
-            .sorted { (group1, group2) in
-                let lastName1 = group1.leader.components(separatedBy: " ").last ?? group1.leader
-                let lastName2 = group2.leader.components(separatedBy: " ").last ?? group2.leader
-                return lastName1.localizedCaseInsensitiveCompare(lastName2) == .orderedAscending
-            }
+        // Return groups in the order they first appeared (preserves backend sort)
+        return leaderOrder.compactMap { leader in
+            guard let recordings = groups[leader] else { return nil }
+            return (leader: leader, recordings: recordings)
+        }
     }
 }
