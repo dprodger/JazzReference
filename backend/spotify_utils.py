@@ -52,7 +52,7 @@ class SpotifyMatcher:
     
     def __init__(self, dry_run=False, strict_mode=False, force_refresh=False, 
                  artist_filter=False, cache_days=30, logger=None, 
-                 rate_limit_delay=1.0, max_retries=3):
+                 rate_limit_delay=0.2, max_retries=3):
         """
         Initialize Spotify Matcher
         
