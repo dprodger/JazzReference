@@ -5,6 +5,7 @@
 //  UPDATED: Added visual swipe navigation cues with parallax and arrows
 //  UPDATED: Replaced alert with toast notification for song queue confirmation
 //  FIXED: Broken up body to avoid type-checker timeout
+//  UPDATED: Grouped Structure, Learn More, and References into collapsible Summary Information section
 //
 
 import SwiftUI
@@ -40,7 +41,9 @@ struct SongDetailView: View {
     
     @State private var recordingSortOrder: RecordingSortOrder = .authority
     @State private var showingSortOptions = false
-
+    
+    // NEW: Summary Information section expansion state (starts collapsed)
+    @State private var isSummaryInfoExpanded = false
 
     
     // MARK: - Initializer
@@ -123,6 +126,18 @@ struct SongDetailView: View {
         }
     }
     
+    // MARK: - Check if Summary Information has content
+    
+    private func hasSummaryContent(for song: Song) -> Bool {
+        let hasStructure = song.structure != nil
+        let hasWikipedia = song.wikipediaUrl != nil
+        let hasMusicbrainz = song.musicbrainzId != nil
+        let hasJazzStandards = song.externalReferences?["jazzstandards"] != nil
+        let hasExternalRefs = !song.externalReferencesList.isEmpty
+        
+        return hasStructure || hasWikipedia || hasMusicbrainz || hasJazzStandards || hasExternalRefs
+    }
+    
     // MARK: - Song Content View
     
     @ViewBuilder
@@ -163,49 +178,10 @@ struct SongDetailView: View {
                     .padding(.top, 4)
                 }
                 
-                if let structure = song.structure {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Structure")
-                            .font(.headline)
-                            .foregroundColor(JazzTheme.charcoal)
-                        Text(structure)
-                            .font(.body)
-                            .foregroundColor(JazzTheme.smokeGray)
-                    }
-                    .padding()
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(JazzTheme.cardBackground)
-                    .cornerRadius(10)
+                // MARK: - Summary Information Section (Collapsible)
+                if hasSummaryContent(for: song) {
+                    summaryInfoSection(for: song)
                 }
-                
-                // External References Panel
-                ExternalReferencesPanel(
-                    wikipediaUrl: song.wikipediaUrl,
-                    musicbrainzId: song.musicbrainzId,
-                    externalReferences: song.externalReferences,
-                    entityId: song.id,
-                    entityName: song.title
-                )
-                
-                // External References Section
-                let externalRefs = song.externalReferencesList
-                if !externalRefs.isEmpty {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("References")
-                            .font(.headline)
-                            .foregroundColor(JazzTheme.charcoal)
-                            .padding(.horizontal)
-                        
-                        ForEach(externalRefs) { ref in
-                            ExternalReferenceRow(reference: ref)
-                        }
-                    }
-                    .padding(.vertical, 8)
-                    
-                    Divider()
-                }
-
-
             }
             .padding()
             
@@ -223,6 +199,81 @@ struct SongDetailView: View {
         }
         .padding(.bottom)
         }
+    }
+    
+    // MARK: - Summary Information Section
+    
+    @ViewBuilder
+    private func summaryInfoSection(for song: Song) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // Collapsible Header
+            Button(action: {
+                withAnimation {
+                    isSummaryInfoExpanded.toggle()
+                }
+            }) {
+                HStack {
+                    Text("Summary Information")
+                        .font(.title3)
+                        .bold()
+                        .foregroundColor(JazzTheme.charcoal)
+                    Spacer()
+                    Image(systemName: isSummaryInfoExpanded ? "chevron.up" : "chevron.down")
+                        .foregroundColor(JazzTheme.brass)
+                }
+                .padding()
+                .background(JazzTheme.cardBackground)
+            }
+            .buttonStyle(.plain)
+            
+            // Expandable Content
+            if isSummaryInfoExpanded {
+                VStack(alignment: .leading, spacing: 16) {
+                    // Structure
+                    if let structure = song.structure {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Structure")
+                                .font(.headline)
+                                .foregroundColor(JazzTheme.charcoal)
+                            Text(structure)
+                                .font(.body)
+                                .foregroundColor(JazzTheme.smokeGray)
+                        }
+                        .padding()
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Color(.systemBackground))
+                        .cornerRadius(8)
+                    }
+                    
+                    // External References Panel (Learn More)
+                    ExternalReferencesPanel(
+                        wikipediaUrl: song.wikipediaUrl,
+                        musicbrainzId: song.musicbrainzId,
+                        externalReferences: song.externalReferences,
+                        entityId: song.id,
+                        entityName: song.title
+                    )
+                    
+                    // External References Section
+                    let externalRefs = song.externalReferencesList
+                    if !externalRefs.isEmpty {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("References")
+                                .font(.headline)
+                                .foregroundColor(JazzTheme.charcoal)
+                            
+                            ForEach(externalRefs) { ref in
+                                ExternalReferenceRow(reference: ref)
+                            }
+                        }
+                    }
+                }
+                .padding()
+                .background(JazzTheme.cardBackground)
+            }
+        }
+        .cornerRadius(10)
+        .padding(.top, 8)
     }
     
     // MARK: - Body (broken into smaller chunks to avoid type-checker timeout)
