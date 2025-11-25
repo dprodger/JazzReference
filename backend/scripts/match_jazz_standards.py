@@ -40,9 +40,10 @@ JAZZSTANDARDS_BASE_URL = 'https://www.jazzstandards.com'
 class JazzStandardsMatcher:
     """Matches database songs to JazzStandards.com pages"""
     
-    def __init__(self, dry_run: bool = False, force_refresh: bool = False):
+    def __init__(self, dry_run: bool = False, force_refresh: bool = False, show_unmatched: bool = False):
         self.dry_run = dry_run
         self.force_refresh = force_refresh
+        self.show_unmatched = show_unmatched
         self.stats = {
             'songs_in_db': 0,
             'jazzstandards_songs': 0,
@@ -53,6 +54,7 @@ class JazzStandardsMatcher:
             'updated': 0,
             'errors': 0
         }
+        self.unmatched_songs = []
         
         # Setup session for HTTP requests
         self.session = requests.Session()
@@ -60,21 +62,34 @@ class JazzStandardsMatcher:
             'User-Agent': 'JazzReferenceApp/1.0 (Educational Research; dave@example.com)'
         })
     
-    def normalize_title(self, title: str) -> str:
+    def normalize_title(self, title: str, strip_parentheses: bool = False) -> str:
         """
         Normalize song title for matching.
         Handles apostrophes, quotes, articles, and punctuation.
+        
+        Args:
+            title: The title to normalize
+            strip_parentheses: If True, remove content in parentheses (for alternate titles)
         
         Examples:
             "'Round Midnight" -> "round midnight"
             "Take the 'A' Train" -> "take a train"
             "Body and Soul" -> "body and soul"
+            "Autumn Leaves (Les Feuilles Mortes)" -> "autumn leaves" (if strip_parentheses=True)
         """
         if not title:
             return ""
         
+        normalized = title
+        
+        # Strip parenthetical content if requested
+        if strip_parentheses:
+            # Remove content in parentheses/brackets
+            normalized = re.sub(r'\([^)]*\)', '', normalized)
+            normalized = re.sub(r'\[[^\]]*\]', '', normalized)
+        
         # Convert to lowercase
-        normalized = title.lower()
+        normalized = normalized.lower()
         
         # Remove various quote styles and apostrophes at word boundaries
         normalized = re.sub(r"[''`']", "", normalized)
@@ -90,6 +105,44 @@ class JazzStandardsMatcher:
         normalized = re.sub(r'\s+', ' ', normalized)
         
         return normalized.strip()
+    
+    def get_title_variations(self, title: str) -> List[str]:
+        """
+        Generate multiple normalized variations of a title for matching.
+        
+        Returns list of normalized variations to try, in order of preference:
+        1. Full title normalized
+        2. Title with parenthetical content stripped
+        3. Title before first comma (if present)
+        4. Title with all spaces removed (for compound words like Stardust/Star Dust)
+        """
+        variations = []
+        
+        # Full title
+        full_normalized = self.normalize_title(title)
+        if full_normalized:
+            variations.append(full_normalized)
+        
+        # Without parentheses (for alternate titles like "Autumn Leaves (Les Feuilles Mortes)")
+        no_parens = self.normalize_title(title, strip_parentheses=True)
+        if no_parens and no_parens != full_normalized:
+            variations.append(no_parens)
+        
+        # Before first comma (for titles like "All of Me, or...")
+        if ',' in title:
+            before_comma = title.split(',')[0].strip()
+            comma_normalized = self.normalize_title(before_comma)
+            if comma_normalized and comma_normalized not in variations:
+                variations.append(comma_normalized)
+        
+        # Without spaces (for compound words like "Stardust" vs "Star Dust")
+        # Only add if the title has spaces or could benefit from this
+        if full_normalized:
+            no_spaces = full_normalized.replace(' ', '')
+            if no_spaces and no_spaces != full_normalized and no_spaces not in variations:
+                variations.append(no_spaces)
+        
+        return variations
     
     def fetch_jazzstandards_index(self) -> List[Dict[str, str]]:
         """
@@ -139,10 +192,14 @@ class JazzStandardsMatcher:
                         else:
                             url = f"{JAZZSTANDARDS_BASE_URL}{href}" if href.startswith('/') else f"{JAZZSTANDARDS_BASE_URL}/{href}"
                         
+                        # Store multiple normalized variations for matching
+                        variations = self.get_title_variations(title)
+                        
                         page_songs.append({
                             'title': title,
                             'url': url,
-                            'normalized': self.normalize_title(title)
+                            'normalized': variations[0] if variations else '',
+                            'variations': variations  # All possible normalized forms
                         })
                 
                 logger.info(f"    Found {len(page_songs)} songs on page {page_num}")
@@ -184,10 +241,12 @@ class JazzStandardsMatcher:
                     
                     songs = []
                     for row in cur.fetchall():
+                        variations = self.get_title_variations(row['title'])
                         songs.append({
                             'id': row['id'],
                             'title': row['title'],
-                            'normalized': self.normalize_title(row['title']),
+                            'normalized': variations[0] if variations else '',
+                            'variations': variations,
                             'external_references': row['external_references'] or {}
                         })
                     
@@ -210,8 +269,6 @@ class JazzStandardsMatcher:
             best_score = 0
             match_type = 'none'
             
-            db_normalized = db_song['normalized']
-            
             # Check if already has jazzstandards URL
             ext_refs = db_song['external_references']
             if 'jazzstandards' in ext_refs and not self.force_refresh:
@@ -219,23 +276,31 @@ class JazzStandardsMatcher:
                 self.stats['already_had_url'] += 1
                 continue
             
-            # Try exact match first
-            for js_song in js_songs:
-                if db_normalized == js_song['normalized']:
-                    best_match = js_song
-                    best_score = 100
-                    match_type = 'exact'
+            # Try exact match with all variations
+            for db_var in db_song['variations']:
+                for js_song in js_songs:
+                    for js_var in js_song['variations']:
+                        if db_var == js_var:
+                            best_match = js_song
+                            best_score = 100
+                            match_type = 'exact'
+                            break
+                    if best_match:
+                        break
+                if best_match:
                     break
             
-            # If no exact match, try fuzzy matching
+            # If no exact match, try fuzzy matching with all variations
             if not best_match:
-                for js_song in js_songs:
-                    # Use token_sort_ratio for better matching with word order variations
-                    score = fuzz.token_sort_ratio(db_normalized, js_song['normalized'])
-                    
-                    if score > best_score:
-                        best_score = score
-                        best_match = js_song
+                for db_var in db_song['variations']:
+                    for js_song in js_songs:
+                        for js_var in js_song['variations']:
+                            # Use token_sort_ratio for better matching with word order variations
+                            score = fuzz.token_sort_ratio(db_var, js_var)
+                            
+                            if score > best_score:
+                                best_score = score
+                                best_match = js_song
                 
                 # Only accept fuzzy matches above 85% similarity
                 if best_score >= 85:
@@ -252,6 +317,7 @@ class JazzStandardsMatcher:
                     self.stats['fuzzy_matches'] += 1
             else:
                 self.stats['no_match'] += 1
+                self.unmatched_songs.append((db_song, best_score))
                 logger.debug(f"  {db_song['title']} - no match found (best score: {best_score})")
         
         return matches
@@ -280,6 +346,7 @@ class JazzStandardsMatcher:
                         
                         if self.dry_run:
                             logger.info(f"  [{match_type.upper()} {score}%] {db_song['title']}")
+                            logger.info(f"    -> {js_song['title']}")
                             logger.info(f"    -> {js_song['url']}")
                         else:
                             # Update the database
@@ -291,7 +358,7 @@ class JazzStandardsMatcher:
                             """, (json.dumps(ext_refs), db_song['id']))
                             
                             updated_count += 1
-                            logger.info(f"  ✓ [{match_type.upper()} {score}%] {db_song['title']}")
+                            logger.info(f"  ✓ [{match_type.upper()} {score}%] {db_song['title']} -> {js_song['title']}")
                             logger.debug(f"    -> {js_song['url']}")
                     
                     if not self.dry_run:
@@ -304,6 +371,28 @@ class JazzStandardsMatcher:
         
         return updated_count
     
+    def print_unmatched_songs(self):
+        """Print list of songs that couldn't be matched"""
+        if not self.unmatched_songs:
+            return
+        
+        logger.info("\n" + "="*80)
+        logger.info("UNMATCHED SONGS")
+        logger.info("="*80)
+        logger.info(f"The following {len(self.unmatched_songs)} songs could not be matched:")
+        logger.info("")
+        
+        # Sort by title for easier reading
+        sorted_unmatched = sorted(self.unmatched_songs, key=lambda x: x[0]['title'])
+        
+        for db_song, best_score in sorted_unmatched:
+            logger.info(f"  • {db_song['title']}")
+            logger.info(f"    Best match score: {best_score}%")
+            if db_song['variations']:
+                logger.info(f"    Normalized: {db_song['variations'][0]}")
+        
+        logger.info("="*80)
+    
     def run(self) -> bool:
         """Main execution method"""
         logger.info("="*80)
@@ -311,6 +400,7 @@ class JazzStandardsMatcher:
         logger.info("="*80)
         logger.info(f"Mode: {'DRY RUN' if self.dry_run else 'LIVE'}")
         logger.info(f"Force refresh: {self.force_refresh}")
+        logger.info(f"Show unmatched: {self.show_unmatched}")
         logger.info("")
         
         # Fetch JazzStandards index
@@ -343,6 +433,10 @@ class JazzStandardsMatcher:
         # Print summary
         self.print_summary()
         
+        # Show unmatched songs if requested
+        if self.show_unmatched and self.unmatched_songs:
+            self.print_unmatched_songs()
+        
         return True
     
     def print_summary(self):
@@ -368,16 +462,19 @@ def main():
         epilog="""
 Examples:
   # Preview matches without updating database
-  python match_jazzstandards_songs.py --dry-run
+  python match_jazz_standards.py --dry-run
   
   # Update database with matches
-  python match_jazzstandards_songs.py
+  python match_jazz_standards.py
+  
+  # Show list of unmatched songs
+  python match_jazz_standards.py --show-unmatched
   
   # Force refresh existing JazzStandards URLs
-  python match_jazzstandards_songs.py --force-refresh
+  python match_jazz_standards.py --force-refresh
   
   # With debug logging
-  python match_jazzstandards_songs.py --debug
+  python match_jazz_standards.py --debug
         """
     )
     
@@ -399,6 +496,12 @@ Examples:
         help='Update songs even if they already have a JazzStandards URL'
     )
     
+    parser.add_argument(
+        '--show-unmatched',
+        action='store_true',
+        help='Display list of songs that could not be matched'
+    )
+    
     args = parser.parse_args()
     
     # Set logging level
@@ -408,7 +511,8 @@ Examples:
     # Create matcher and run
     matcher = JazzStandardsMatcher(
         dry_run=args.dry_run,
-        force_refresh=args.force_refresh
+        force_refresh=args.force_refresh,
+        show_unmatched=args.show_unmatched
     )
     
     try:

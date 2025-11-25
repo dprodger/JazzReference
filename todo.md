@@ -66,7 +66,8 @@ Done:
 	Use that as an exclusion, but also as possible training data for the future.
 * implement the 'bad link' code
 * if solo_transcriptions appears, show and allow access to it
-
+* chet (mono) not found on spotify matching (how high the moon)
+* Dellington Indigos not matched for spotify
 
 
 
