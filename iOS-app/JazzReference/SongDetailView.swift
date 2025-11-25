@@ -138,6 +138,22 @@ struct SongDetailView: View {
         return hasStructure || hasWikipedia || hasMusicbrainz || hasJazzStandards || hasExternalRefs
     }
     
+    // MARK: - Check if song has authoritative recordings
+    
+    private func hasAuthoritativeRecordings(for song: Song) -> Bool {
+        guard let recordings = song.recordings else { return false }
+        return recordings.contains { hasAuthoritativeReference($0) }
+    }
+    
+    // MARK: - Check if recording has authoritative reference
+    // A recording has an authoritative reference if it has any entries
+    // in the song_authority_recommendations table (returned as authority_count)
+    private func hasAuthoritativeReference(_ recording: Recording) -> Bool {
+        // Use the Recording model's built-in hasAuthority computed property
+        // which checks if authorityCount > 0
+        return recording.hasAuthority
+    }
+    
     // MARK: - Song Content View
     
     @ViewBuilder
@@ -181,6 +197,11 @@ struct SongDetailView: View {
                 // MARK: - Summary Information Section (Collapsible)
                 if hasSummaryContent(for: song) {
                     summaryInfoSection(for: song)
+                }
+                
+                // MARK: - Authoritative Recordings Carousel
+                if hasAuthoritativeRecordings(for: song) {
+                    authoritativeRecordingsSection(for: song)
                 }
             }
             .padding()
@@ -274,6 +295,38 @@ struct SongDetailView: View {
         }
         .cornerRadius(10)
         .padding(.top, 8)
+    }
+    
+    // MARK: - Authoritative Recordings Carousel Section
+    
+    @ViewBuilder
+    private func authoritativeRecordingsSection(for song: Song) -> some View {
+        VStack(alignment: .leading, spacing: 16) {
+            // Header
+            Text("Featured Recordings")
+                .font(.title2)
+                .bold()
+                .foregroundColor(JazzTheme.charcoal)
+            
+            // Introductory text
+            Text("Take a look at these important recordings for this song.")
+                .font(.subheadline)
+                .foregroundColor(JazzTheme.smokeGray)
+            
+            // Horizontal scrolling carousel
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 20) {
+                    ForEach(song.recordings?.filter { hasAuthoritativeReference($0) } ?? []) { recording in
+                        NavigationLink(destination: RecordingDetailView(recordingId: recording.id)) {
+                            AuthoritativeRecordingCard(recording: recording)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 4)
+            }
+        }
+        .padding(.vertical, 12)
     }
     
     // MARK: - Body (broken into smaller chunks to avoid type-checker timeout)
@@ -543,6 +596,100 @@ struct SongDetailView: View {
         start = max(0, start)
         
         return start..<end
+    }
+}
+
+// MARK: - Authoritative Recording Card
+struct AuthoritativeRecordingCard: View {
+    let recording: Recording
+    
+    // Extract lead artist from performers
+    private var leadArtist: String {
+        if let performers = recording.performers {
+            // First try to find a performer with "leader" role
+            if let leader = performers.first(where: { $0.role?.lowercased() == "leader" }) {
+                return leader.name
+            }
+            // Fall back to first performer if no leader
+            if let first = performers.first {
+                return first.name
+            }
+        }
+        return "Various Artists"
+    }
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // Album Art - larger size
+            Group {
+                if let albumArtUrl = recording.albumArtLarge ?? recording.albumArtMedium {
+                    AsyncImage(url: URL(string: albumArtUrl)) { phase in
+                        switch phase {
+                        case .empty:
+                            Rectangle()
+                                .fill(JazzTheme.smokeGray.opacity(0.2))
+                                .overlay {
+                                    ProgressView()
+                                        .tint(JazzTheme.burgundy)
+                                }
+                        case .success(let image):
+                            image
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                        case .failure:
+                            Rectangle()
+                                .fill(JazzTheme.smokeGray.opacity(0.2))
+                                .overlay {
+                                    Image(systemName: "music.note")
+                                        .font(.system(size: 40))
+                                        .foregroundColor(JazzTheme.smokeGray)
+                                }
+                        @unknown default:
+                            EmptyView()
+                        }
+                    }
+                } else {
+                    Rectangle()
+                        .fill(JazzTheme.smokeGray.opacity(0.2))
+                        .overlay {
+                            Image(systemName: "music.note")
+                                .font(.system(size: 40))
+                                .foregroundColor(JazzTheme.smokeGray)
+                        }
+                }
+            }
+            .frame(width: 180, height: 180)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .shadow(color: .black.opacity(0.15), radius: 8, x: 0, y: 4)
+            
+            // Recording Info
+            VStack(alignment: .leading, spacing: 4) {
+                // Lead Artist
+                Text(leadArtist)
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(JazzTheme.brass)
+                    .lineLimit(1)
+                
+                // Album Title
+                Text(recording.albumTitle ?? "Unknown Album")
+                    .font(.body)
+                    .fontWeight(.medium)
+                    .foregroundColor(JazzTheme.charcoal)
+                    .lineLimit(2)
+                
+                // Year
+                if let year = recording.recordingYear {
+                    Text(String(year))
+                        .font(.caption)
+                        .foregroundColor(JazzTheme.smokeGray)
+                }
+            }
+            .frame(width: 180, alignment: .leading)
+        }
+        .padding(12)
+        .background(JazzTheme.cardBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 }
 
