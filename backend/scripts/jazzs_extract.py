@@ -182,32 +182,27 @@ class JazzStandardsRecommendationExtractor:
         if rec_tables:
             logger.debug(f"  Found {len(rec_tables)} JSRecommendationInset tables")
             
-            # Check if this is an iTunes panel format (different structure)
-            # iTunes panel format: Single table with JSiTunesPanelColumn cells
-            # Standard format: Multiple tables, each is one recommendation
-            is_itunes_panel = False
+            # Process each table - check if it's iTunes panel format or standard format
+            # iTunes panel format: Table with JSiTunesPanelColumn cells
+            # Standard format: Each table is one recommendation
             
-            if len(rec_tables) == 1:
-                # Only 1 table - check if it's iTunes panel format
-                first_table = rec_tables[0]
-                itunes_columns = first_table.find_all('td', class_='JSiTunesPanelColumn')
+            for table_idx, table in enumerate(rec_tables, 1):
+                itunes_columns = table.find_all('td', class_='JSiTunesPanelColumn')
                 
                 if len(itunes_columns) > 0:
-                    # Has iTunes panel columns - this is iTunes panel format
-                    is_itunes_panel = True
-                    logger.debug(f"  Detected iTunes panel format (1 table with {len(itunes_columns)} columns)")
-            
-            if is_itunes_panel:
-                recommendations = self.parse_itunes_panel(rec_tables[0])
-                if recommendations:
-                    logger.debug(f"  iTunes panel result: {len(recommendations)} recommendations extracted")
+                    # This is an iTunes panel format table
+                    logger.debug(f"  Table {table_idx}: iTunes panel format ({len(itunes_columns)} columns)")
+                    itunes_recs = self.parse_itunes_panel(table)
+                    if itunes_recs:
+                        recommendations.extend(itunes_recs)
+                        logger.debug(f"    ✓ Extracted {len(itunes_recs)} recommendations from iTunes panel")
+                    else:
+                        logger.debug("    iTunes panel parsing failed")
                 else:
-                    logger.debug("  iTunes panel parsing failed, continuing with standard parsing")
-            
-            # Standard parsing if not iTunes panel or iTunes panel failed
-            if not recommendations:
-                # Parse each recommendation table
-                for i, table in enumerate(rec_tables, 1):
+                    # This is a standard recommendation table
+                    logger.debug(f"  Table {table_idx}: Standard format")
+                    # Parse each recommendation table
+                    i = len(recommendations) + 1
                     # Get the first <td> which contains all the metadata
                     first_td = table.find('td')
                     if not first_td:
@@ -269,8 +264,110 @@ class JazzStandardsRecommendationExtractor:
             
             logger.debug(f"  Pattern 2 result: {len(recommendations)} recommendations from {min(20, len(album_links))} links")
         
+        # Deduplicate recommendations (same track may appear in multiple sections)
+        if len(recommendations) > 1:
+            deduplicated = self.deduplicate_recommendations(recommendations)
+            if len(deduplicated) < len(recommendations):
+                logger.debug(f"  Removed {len(recommendations) - len(deduplicated)} duplicate(s)")
+                recommendations = deduplicated
+        
         logger.debug(f"  Total extracted: {len(recommendations)} recommendations")
         return recommendations
+    
+    def deduplicate_recommendations(self, recommendations: List[Dict]) -> List[Dict]:
+        """
+        Deduplicate recommendations using multiple matching strategies.
+        
+        A recommendation is considered a duplicate if it matches on ANY of:
+        1. iTunes track ID (most specific)
+        2. iTunes album ID + artist name (same album by same artist)
+        3. Artist name + album title + year (for non-iTunes entries)
+        
+        When duplicates are found, prefer the one with more complete metadata.
+        """
+        seen_keys = {}  # Maps keys to list index in deduplicated
+        deduplicated = []
+        
+        for rec in recommendations:
+            # Generate all possible matching keys for this recommendation
+            matching_keys = []
+            
+            # Key 1: iTunes track ID (most specific)
+            if rec.get('itunes_track_id'):
+                matching_keys.append(f"track_{rec['itunes_track_id']}")
+            
+            # Key 2: iTunes album ID + artist (same album by same artist)
+            if rec.get('itunes_album_id') and rec.get('artist_name'):
+                key = f"album_{rec['itunes_album_id']}_{rec['artist_name'].lower().strip()}"
+                matching_keys.append(key)
+            
+            # Key 3: Artist + album + year (for matching non-iTunes entries)
+            if rec.get('artist_name') and rec.get('album_title') and rec.get('recording_year'):
+                key = f"artist_album_year_{rec['artist_name'].lower().strip()}_{rec['album_title'].lower().strip()}_{rec['recording_year']}"
+                matching_keys.append(key)
+            
+            # Key 4: Artist + album (weaker match, no year)
+            if rec.get('artist_name') and rec.get('album_title'):
+                key = f"artist_album_{rec['artist_name'].lower().strip()}_{rec['album_title'].lower().strip()}"
+                matching_keys.append(key)
+            
+            logger.debug(f"    Checking: {rec.get('artist_name')} - {rec.get('album_title')}")
+            logger.debug(f"      Keys: {matching_keys}")
+            
+            # Check if any of these keys match an existing recommendation
+            matched_key = None
+            for key in matching_keys:
+                if key in seen_keys:
+                    matched_key = key
+                    break
+            
+            if matched_key:
+                # Found a duplicate
+                existing_idx = seen_keys[matched_key]
+                existing_rec = deduplicated[existing_idx]
+                
+                # Prefer the one with more metadata
+                existing_score = self._recommendation_completeness_score(existing_rec)
+                new_score = self._recommendation_completeness_score(rec)
+                
+                logger.debug(f"      Duplicate found (key: {matched_key})")
+                logger.debug(f"        Existing score: {existing_score}, New score: {new_score}")
+                
+                if new_score > existing_score:
+                    # Replace with the more complete version
+                    deduplicated[existing_idx] = rec
+                    # Update all keys to point to this index
+                    for key in matching_keys:
+                        seen_keys[key] = existing_idx
+                    logger.debug(f"        → Replaced with better metadata")
+                else:
+                    # Keep existing, skip this one
+                    logger.debug(f"        → Keeping existing")
+            else:
+                # New recommendation - add it
+                idx = len(deduplicated)
+                deduplicated.append(rec)
+                # Register all keys for this recommendation
+                for key in matching_keys:
+                    seen_keys[key] = idx
+                logger.debug(f"      → Added as new recommendation")
+        
+        return deduplicated
+    
+    def _recommendation_completeness_score(self, rec: Dict) -> int:
+        """Calculate a score based on how complete the recommendation metadata is"""
+        score = 0
+        if rec.get('artist_name'):
+            score += 1
+        if rec.get('album_title'):
+            score += 1
+        if rec.get('recording_year'):
+            score += 1
+        if rec.get('itunes_album_id'):
+            score += 2
+        if rec.get('itunes_track_id'):
+            score += 2
+        return score
     
     def extract_itunes_ids(self, table_elem) -> Dict[str, Optional[int]]:
         """
