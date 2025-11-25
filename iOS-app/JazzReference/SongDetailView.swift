@@ -297,8 +297,8 @@ struct SongDetailView: View {
             .overlay(alignment: .trailing) {
                 navigationArrow(direction: .right, isVisible: dragOffset < -50 && canNavigateNext)
             }
-            .navigationTitle(song?.title ?? "Song Detail")
-            .navigationBarTitleDisplayMode(.large)
+            .navigationTitle(song?.title ?? "")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(JazzTheme.burgundy, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbarColorScheme(.dark, for: .navigationBar)
