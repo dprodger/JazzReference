@@ -497,7 +497,7 @@ class NetworkManager: ObservableObject {
     /// Fetch song detail without sort parameter (uses backend default)
     func fetchSongDetail(id: String) async -> Song? {
         // Default to authority sort
-        return await fetchSongDetail(id: id, sortBy: .authority)
+        return await fetchSongDetail(id: id, sortBy: .year)
     }
 
     // USAGE IN SongDetailView:

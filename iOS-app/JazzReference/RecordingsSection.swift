@@ -4,32 +4,10 @@
 //
 //  Collapsible section displaying filtered recordings with instrument and Spotify filtering
 //  UPDATED: Sort options changed from Authority/Year/Canonical to Name/Year
+//  UPDATED: Grouping changes based on sort order (by year or by artist name)
 //
 
 import SwiftUI
-
-// MARK: - Recording Sort Order Enum
-// UPDATED: Changed from authority/year/canonical to name/year
-enum RecordingSortOrder: String, CaseIterable, Identifiable {
-    case year = "year"
-    case name = "name"
-    
-    var id: String { rawValue }
-    
-    var displayName: String {
-        switch self {
-        case .year: return "Year"
-        case .name: return "Name"
-        }
-    }
-    
-    var icon: String {
-        switch self {
-        case .year: return "calendar"
-        case .name: return "person.text.rectangle"
-        }
-    }
-}
 
 // MARK: - Song Recording Filter Enum
 enum SongRecordingFilter: String, CaseIterable {
@@ -244,19 +222,22 @@ struct RecordingsSection: View {
                             // Recordings List
                             VStack(alignment: .leading, spacing: 12) {
                                 if !filteredRecordings.isEmpty {
-                                    ForEach(groupedRecordings, id: \.leader) { group in
+                                    ForEach(groupedRecordings, id: \.groupKey) { group in
                                         VStack(alignment: .leading, spacing: 8) {
-                                            Text("\(group.leader) (\(group.recordings.count))")
+                                            Text("\(group.groupKey) (\(group.recordings.count))")
                                                 .font(.headline)
                                                 .foregroundColor(JazzTheme.burgundy)
                                                 .padding(.horizontal)
                                                 .padding(.top, 8)
                                             
                                             ScrollView(.horizontal, showsIndicators: false) {
-                                                HStack(spacing: 16) {
+                                                HStack(alignment: .top, spacing: 16) {
                                                     ForEach(group.recordings) { recording in
                                                         NavigationLink(destination: RecordingDetailView(recordingId: recording.id)) {
-                                                            RecordingRowView(recording: recording)
+                                                            RecordingRowView(
+                                                                recording: recording,
+                                                                showArtistName: recordingSortOrder == .year
+                                                            )
                                                         }
                                                         .buttonStyle(.plain)
                                                     }
@@ -369,27 +350,41 @@ struct RecordingsSection: View {
         return result
     }
     
-    // Group recordings by leader, preserving backend sort order
-    private var groupedRecordings: [(leader: String, recordings: [Recording])] {
-        // Track the order in which we first see each leader
-        var leaderOrder: [String] = []
+    // Group recordings based on sort order, preserving backend sort order
+    // - Year sort: Group by recording year
+    // - Name sort: Group by leader/artist name
+    private var groupedRecordings: [(groupKey: String, recordings: [Recording])] {
+        var keyOrder: [String] = []
         var groups: [String: [Recording]] = [:]
         
         for recording in filteredRecordings {
-            let leaderName = recording.performers?.first { $0.role == "leader" }?.name ?? "Unknown"
+            let groupKey: String
             
-            // Track first appearance order
-            if groups[leaderName] == nil {
-                leaderOrder.append(leaderName)
+            switch recordingSortOrder {
+            case .year:
+                // Group by year
+                if let year = recording.recordingYear {
+                    groupKey = String(year)
+                } else {
+                    groupKey = "Unknown Year"
+                }
+            case .name:
+                // Group by leader name
+                groupKey = recording.performers?.first { $0.role == "leader" }?.name ?? "Unknown"
             }
             
-            groups[leaderName, default: []].append(recording)
+            // Track first appearance order
+            if groups[groupKey] == nil {
+                keyOrder.append(groupKey)
+            }
+            
+            groups[groupKey, default: []].append(recording)
         }
         
         // Return groups in the order they first appeared (preserves backend sort)
-        return leaderOrder.compactMap { leader in
-            guard let recordings = groups[leader] else { return nil }
-            return (leader: leader, recordings: recordings)
+        return keyOrder.compactMap { key in
+            guard let recordings = groups[key] else { return nil }
+            return (groupKey: key, recordings: recordings)
         }
     }
 }

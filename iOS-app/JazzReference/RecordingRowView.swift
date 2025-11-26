@@ -3,12 +3,29 @@
 //  JazzReference
 //
 //  Updated with album artwork and authority badge support
+//  UPDATED: Added optional artist name display for year-based sorting
 //
 
 import SwiftUI
 
 struct RecordingRowView: View {
     let recording: Recording
+    var showArtistName: Bool = false
+    
+    // Extract lead artist from performers
+    private var leadArtist: String {
+        if let performers = recording.performers {
+            // First try to find a performer with "leader" role
+            if let leader = performers.first(where: { $0.role?.lowercased() == "leader" }) {
+                return leader.name
+            }
+            // Fall back to first performer if no leader
+            if let first = performers.first {
+                return first.name
+            }
+        }
+        return "Unknown Artist"
+    }
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -65,6 +82,16 @@ struct RecordingRowView: View {
             }
             .cornerRadius(8)
             .frame(width: 150)
+            
+            // Artist name (shown when grouping by year)
+            if showArtistName {
+                Text(leadArtist)
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(JazzTheme.brass)
+                    .lineLimit(1)
+                    .frame(width: 150, alignment: .leading)
+            }
             
             // Album title
             Text(recording.albumTitle ?? "Unknown Album")

@@ -431,48 +431,29 @@ struct ExternalReference: Identifiable {
     }
 }
 
-// MARK: - Recording Sort Order
-
+// MARK: - Recording Sort Order Enum
+// UPDATED: Changed from authority/year/canonical to name/year
 enum RecordingSortOrder: String, CaseIterable, Identifiable {
-    case authority = "authority"
     case year = "year"
-    case canonical = "canonical"
+    case name = "name"
     
     var id: String { rawValue }
     
     var displayName: String {
         switch self {
-        case .authority:
-            return "Authority"
-        case .year:
-            return "Year"
-        case .canonical:
-            return "Canonical"
-        }
-    }
-    
-    var description: String {
-        switch self {
-        case .authority:
-            return "Expert-recommended recordings first"
-        case .year:
-            return "Most recent recordings first"
-        case .canonical:
-            return "Canonical recordings first"
+        case .year: return "Year"
+        case .name: return "Name"
         }
     }
     
     var icon: String {
         switch self {
-        case .authority:
-            return "checkmark.seal.fill"
-        case .year:
-            return "calendar"
-        case .canonical:
-            return "star.fill"
+        case .year: return "calendar"
+        case .name: return "person.text.rectangle"
         }
     }
 }
+
 
 
 // MARK: - Preview Data for Solo Transcriptions
