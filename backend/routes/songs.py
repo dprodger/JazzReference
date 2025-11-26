@@ -59,22 +59,30 @@ def get_song_detail(song_id):
     NEW: Includes authority recommendation counts and sort parameter support.
     """
     try:
-        # Get sort preference from query parameter (default: 'authority')
-        sort_by = request.args.get('sort', 'authority')
+        # Get sort preference from query parameter (default: 'year')
+        # UPDATED: Changed from authority/year/canonical to name/year
+        sort_by = request.args.get('sort', 'year')
         
         # Build ORDER BY clause based on sort preference
-        if sort_by == 'year':
-            recordings_order = "r.recording_year DESC NULLS LAST"
-        elif sort_by == 'canonical':
-            recordings_order = "r.is_canonical DESC, r.recording_year DESC"
-        else:  # 'authority' - default
-            # Authority recordings first (those with recommendations), then by year
+        if sort_by == 'name':
+            # Sort alphabetically by leader's last name (extract last word of name)
             recordings_order = """
-                CASE WHEN COUNT(DISTINCT sar.id) > 0 THEN 0 ELSE 1 END,
-                COUNT(DISTINCT sar.id) DESC,
-                r.is_canonical DESC,
-                r.recording_year DESC
+                (
+                    SELECT COALESCE(
+                        SUBSTRING(p2.name FROM '([^ ]+)$'),
+                        p2.name,
+                        'ZZZ'
+                    )
+                    FROM recording_performers rp2
+                    JOIN performers p2 ON rp2.performer_id = p2.id
+                    WHERE rp2.recording_id = r.id AND rp2.role = 'leader'
+                    LIMIT 1
+                ) ASC NULLS LAST,
+                r.recording_year ASC NULLS LAST
             """
+        else:  # 'year' - default
+            # Sort by recording year, oldest first
+            recordings_order = "r.recording_year ASC NULLS LAST"
         
         # ONE QUERY to get everything - song, recordings+performers+authority, transcriptions
         combined_query = f"""
@@ -557,4 +565,3 @@ def format_external_references(external_refs):
         })
     
     return formatted
-
