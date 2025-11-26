@@ -39,7 +39,7 @@ struct SongDetailView: View {
     // NEW: Toast notification
     @State private var toast: ToastItem?
     
-    @State private var recordingSortOrder: RecordingSortOrder = .authority
+    @State private var recordingSortOrder: RecordingSortOrder = .year
     @State private var showingSortOptions = false
     
     // NEW: Summary Information section expansion state (starts collapsed)

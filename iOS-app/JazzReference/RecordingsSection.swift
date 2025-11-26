@@ -3,10 +3,33 @@
 //  JazzReference
 //
 //  Collapsible section displaying filtered recordings with instrument and Spotify filtering
-//  UPDATED: Added sort functionality with binding to parent view
+//  UPDATED: Sort options changed from Authority/Year/Canonical to Name/Year
 //
 
 import SwiftUI
+
+// MARK: - Recording Sort Order Enum
+// UPDATED: Changed from authority/year/canonical to name/year
+enum RecordingSortOrder: String, CaseIterable, Identifiable {
+    case year = "year"
+    case name = "name"
+    
+    var id: String { rawValue }
+    
+    var displayName: String {
+        switch self {
+        case .year: return "Year"
+        case .name: return "Name"
+        }
+    }
+    
+    var icon: String {
+        switch self {
+        case .year: return "calendar"
+        case .name: return "person.text.rectangle"
+        }
+    }
+}
 
 // MARK: - Song Recording Filter Enum
 enum SongRecordingFilter: String, CaseIterable {
@@ -54,7 +77,7 @@ enum InstrumentFamily: String, CaseIterable, Hashable {
 struct RecordingsSection: View {
     let recordings: [Recording]
     
-    // NEW: Bindings for sort functionality (passed from parent)
+    // Bindings for sort functionality (passed from parent)
     @Binding var recordingSortOrder: RecordingSortOrder
     @Binding var showingSortOptions: Bool
     
@@ -272,7 +295,7 @@ struct RecordingsSection: View {
                             
                             Spacer()
                             
-                            // NEW: Sort button
+                            // Sort button
                             Button(action: {
                                 showingSortOptions = true
                             }) {
