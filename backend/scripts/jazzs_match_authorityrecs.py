@@ -48,9 +48,11 @@ logger = logging.getLogger(__name__)
 class AuthorityRecommendationMatcher:
     """Matches authority recommendations to recordings in the database"""
     
-    def __init__(self, dry_run: bool = True, min_confidence: str = 'medium'):
+    def __init__(self, dry_run: bool = True, min_confidence: str = 'medium',
+                 song_name: Optional[str] = None):
         self.dry_run = dry_run
         self.min_confidence = min_confidence
+        self.song_name = song_name
         self.stats = {
             'recommendations_processed': 0,
             'high_confidence_matches': 0,
@@ -379,7 +381,10 @@ class AuthorityRecommendationMatcher:
     
     def get_unmatched_recommendations(self, limit: Optional[int] = None) -> List[Dict]:
         """Fetch recommendations that don't have recording_id set"""
-        logger.info("Fetching unmatched recommendations...")
+        if self.song_name:
+            logger.info(f"Fetching unmatched recommendations for song: '{self.song_name}'...")
+        else:
+            logger.info("Fetching unmatched recommendations...")
         
         try:
             with get_db_connection() as db:
@@ -398,14 +403,37 @@ class AuthorityRecommendationMatcher:
                         FROM song_authority_recommendations sar
                         JOIN songs s ON sar.song_id = s.id
                         WHERE sar.recording_id IS NULL
-                        ORDER BY s.title, sar.artist_name
                     """
+                    params = []
+                    
+                    # Filter by song name if provided
+                    if self.song_name:
+                        query += " AND LOWER(s.title) = LOWER(%s)"
+                        params.append(self.song_name)
+                    
+                    query += " ORDER BY s.title, sar.artist_name"
                     
                     if limit:
                         query += f" LIMIT {limit}"
                     
-                    cur.execute(query)
+                    cur.execute(query, params)
                     recommendations = cur.fetchall()
+                    
+                    if self.song_name and not recommendations:
+                        # Check if song exists at all
+                        cur.execute("""
+                            SELECT s.title, COUNT(sar.id) as total_recs
+                            FROM songs s
+                            LEFT JOIN song_authority_recommendations sar ON s.id = sar.song_id
+                            WHERE LOWER(s.title) = LOWER(%s)
+                            GROUP BY s.id
+                        """, (self.song_name,))
+                        song_info = cur.fetchone()
+                        
+                        if song_info:
+                            logger.info(f"✓ Song '{song_info['title']}' exists with {song_info['total_recs']} total recommendations (all may be matched)")
+                        else:
+                            logger.warning(f"⚠ No song found with title: '{self.song_name}'")
                     
                     logger.info(f"✓ Found {len(recommendations)} unmatched recommendations")
                     return recommendations
@@ -421,6 +449,8 @@ class AuthorityRecommendationMatcher:
         logger.info("="*80)
         logger.info(f"Mode: {'DRY RUN' if self.dry_run else 'LIVE'}")
         logger.info(f"Minimum confidence: {self.min_confidence}")
+        if self.song_name:
+            logger.info(f"Song filter: '{self.song_name}'")
         logger.info("")
         
         # Get unmatched recommendations
@@ -477,6 +507,9 @@ Examples:
   # Process only first 10 recommendations
   python match_authority_recommendations.py --limit 10
   
+  # Process recommendations for a specific song only
+  python match_authority_recommendations.py --name "Body and Soul" --debug
+  
   # With debug logging
   python match_authority_recommendations.py --debug
 
@@ -519,6 +552,13 @@ Confidence Levels:
         help='Maximum number of recommendations to process'
     )
     
+    parser.add_argument(
+        '--name',
+        type=str,
+        metavar='SONG_NAME',
+        help='Limit to recommendations for a specific song title (case-insensitive)'
+    )
+    
     args = parser.parse_args()
     
     # Set logging level
@@ -531,7 +571,8 @@ Confidence Levels:
     # Create matcher and run
     matcher = AuthorityRecommendationMatcher(
         dry_run=dry_run,
-        min_confidence=args.min_confidence
+        min_confidence=args.min_confidence,
+        song_name=args.name
     )
     
     try:
