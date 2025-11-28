@@ -16,9 +16,8 @@ def register_blueprints(app):
     from routes.repertoires import repertoires_bp
     from routes.transcriptions import transcriptions_bp
     from routes.reports import reports_bp
-    
-    
-    
+    from routes.authority_routes import authorities_bp
+
     app.register_blueprint(health_bp)
     app.register_blueprint(research_bp)
     app.register_blueprint(songs_bp)
@@ -28,3 +27,4 @@ def register_blueprints(app):
     app.register_blueprint(repertoires_bp)
     app.register_blueprint(transcriptions_bp)
     app.register_blueprint(reports_bp)
+    app.register_blueprint(authorities_bp)
