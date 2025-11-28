@@ -3,93 +3,10 @@
 //  JazzReference
 //
 //  Created by Dave Rodger on 11/28/25.
-//
-
-
-//
-//  AuthorityRecommendationsView.swift
-//  JazzReference
-//
 //  View and manage authority recommendations for a recording
 //
 
 import SwiftUI
-
-// MARK: - Authority Recommendation Model
-
-struct AuthorityRecommendation: Codable, Identifiable {
-    let id: String
-    let songId: String
-    let recordingId: String?
-    let source: String
-    let recommendationText: String?
-    let sourceUrl: String?
-    let artistName: String?
-    let albumTitle: String?
-    let recordingYear: Int?
-    let itunesAlbumId: Int?
-    let itunesTrackId: Int?
-    let capturedAt: String?
-    let createdAt: String?
-    let updatedAt: String?
-    
-    enum CodingKeys: String, CodingKey {
-        case id
-        case songId = "song_id"
-        case recordingId = "recording_id"
-        case source
-        case recommendationText = "recommendation_text"
-        case sourceUrl = "source_url"
-        case artistName = "artist_name"
-        case albumTitle = "album_title"
-        case recordingYear = "recording_year"
-        case itunesAlbumId = "itunes_album_id"
-        case itunesTrackId = "itunes_track_id"
-        case capturedAt = "captured_at"
-        case createdAt = "created_at"
-        case updatedAt = "updated_at"
-    }
-    
-    var displayName: String {
-        switch source.lowercased() {
-        case "jazzstandards.com", "jazzstandards":
-            return "JazzStandards.com"
-        case "ted_gioia":
-            return "Ted Gioia"
-        case "allmusic":
-            return "AllMusic"
-        default:
-            return source
-        }
-    }
-    
-    var sourceColor: Color {
-        switch source.lowercased() {
-        case "jazzstandards.com", "jazzstandards":
-            return .blue
-        case "ted_gioia":
-            return .purple
-        case "allmusic":
-            return .orange
-        default:
-            return JazzTheme.brass
-        }
-    }
-}
-
-struct AuthoritiesResponse: Codable {
-    let recordingId: String
-    let songId: String
-    let authorities: [AuthorityRecommendation]
-    let count: Int
-    
-    enum CodingKeys: String, CodingKey {
-        case recordingId = "recording_id"
-        case songId = "song_id"
-        case authorities
-        case count
-    }
-}
 
 // MARK: - Authority Recommendations View
 

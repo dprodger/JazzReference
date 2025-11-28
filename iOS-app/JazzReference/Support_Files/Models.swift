@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import SwiftUI
 
 struct Song: Identifiable, Codable {
     let id: String
@@ -18,11 +19,11 @@ struct Song: Identifiable, Codable {
     let externalReferences: [String: String]?
     let createdAt: String?
     let updatedAt: String?
-    
+
     // Recordings data (included in detail view)
     let recordings: [Recording]?
     let recordingCount: Int?
-    
+
     // NEW: Transcriptions data (now included in song response)
     let transcriptions: [SoloTranscription]?
     let transcriptionCount: Int?
@@ -39,7 +40,7 @@ struct Song: Identifiable, Codable {
         case updatedAt = "updated_at"
         case recordings
         case recordingCount = "recording_count"
-        case transcriptions          // NEW
+        case transcriptions  // NEW
         case transcriptionCount = "transcription_count"  // NEW
         case authorityRecommendationCount = "authority_recommendation_count"
     }
@@ -48,7 +49,7 @@ struct Song: Identifiable, Codable {
         guard let count = authorityRecommendationCount else { return false }
         return count > 0
     }
-    
+
     // Convert external_references JSONB to ExternalReference array
     var externalReferencesList: [ExternalReference] {
         guard let refs = externalReferences else { return [] }
@@ -77,11 +78,10 @@ struct Recording: Codable, Identifiable {
     let notes: String?
     let performers: [Performer]?
     let composer: String?
-    
+
     var authorityCount: Int?
     var authoritySources: [String]?
     var authorityRecommendations: [AuthorityRecommendation]?
-    
 
     enum CodingKeys: String, CodingKey {
         case id, label, notes, composer, performers
@@ -108,7 +108,7 @@ struct Recording: Codable, Identifiable {
         guard let count = authorityCount else { return false }
         return count > 0
     }
-    
+
     var authorityBadgeText: String? {
         guard let count = authorityCount, count > 0 else { return nil }
         if count == 1, let source = authoritySources?.first {
@@ -116,11 +116,11 @@ struct Recording: Codable, Identifiable {
         }
         return "\(count) sources"
     }
-    
+
     var primaryAuthoritySource: String? {
         authoritySources?.first
     }
-    
+
     private func authoritySourceDisplayName(_ source: String) -> String {
         switch source.lowercased() {
         case "jazzstandards.com":
@@ -141,7 +141,7 @@ struct AuthorityRecommendationsResponse: Codable {
     let totalCount: Int
     let matchedCount: Int
     let unmatchedCount: Int
-    
+
     enum CodingKeys: String, CodingKey {
         case songId = "song_id"
         case recommendations
@@ -151,8 +151,6 @@ struct AuthorityRecommendationsResponse: Codable {
     }
 }
 
-
-
 struct Performer: Codable, Identifiable {
     let id: String
     let name: String
@@ -161,7 +159,7 @@ struct Performer: Codable, Identifiable {
     let biography: String?
     let birthDate: String?
     let deathDate: String?
-    
+
     enum CodingKeys: String, CodingKey {
         case id, name, instrument, role, biography
         case birthDate = "birth_date"
@@ -195,7 +193,7 @@ struct PerformerDetail: Codable, Identifiable {
 struct PerformerInstrument: Codable {
     let name: String
     let isPrimary: Bool?
-    
+
     enum CodingKeys: String, CodingKey {
         case name
         case isPrimary = "is_primary"
@@ -210,9 +208,9 @@ struct PerformerRecording: Codable, Identifiable {
     let recordingYear: Int?
     let isCanonical: Bool?
     let role: String?
-    
+
     var id: String { recordingId }
-    
+
     enum CodingKeys: String, CodingKey {
         case songId = "song_id"
         case songTitle = "song_title"
@@ -236,7 +234,7 @@ struct ArtistImage: Codable, Identifiable {
     let height: Int?
     let thumbnailUrl: String?
     let sourcePageUrl: String?
-    
+
     enum CodingKeys: String, CodingKey {
         case id, url, source, width, height, attribution
         case sourceIdentifier = "source_identifier"
@@ -257,24 +255,23 @@ struct Repertoire: Codable, Identifiable, Hashable {
     let songCount: Int
     let createdAt: String?
     let updatedAt: String?
-    
+
     enum CodingKeys: String, CodingKey {
         case id, name, description
         case songCount = "song_count"
         case createdAt = "created_at"
         case updatedAt = "updated_at"
     }
-    
+
     // Hashable conformance for use in Picker
     func hash(into hasher: inout Hasher) {
         hasher.combine(id)
     }
-    
+
     static func == (lhs: Repertoire, rhs: Repertoire) -> Bool {
         lhs.id == rhs.id
     }
 }
-
 
 // Solo Transcriptions - iOS Models and API Methods
 // Add these to iOS-app/JazzReference/JazzReferenceApp.swift
@@ -288,14 +285,14 @@ struct SoloTranscription: Codable, Identifiable {
     let youtubeUrl: String?
     let createdAt: String?
     let updatedAt: String?
-    
+
     // Optional joined data from API
     let songTitle: String?
     let albumTitle: String?
     let recordingYear: Int?
     let composer: String?
     let label: String?
-    
+
     enum CodingKeys: String, CodingKey {
         case id
         case songId = "song_id"
@@ -311,7 +308,6 @@ struct SoloTranscription: Codable, Identifiable {
     }
 }
 
-
 // MARK: - Authority Recommendation Model
 
 struct AuthorityRecommendation: Codable, Identifiable {
@@ -325,13 +321,13 @@ struct AuthorityRecommendation: Codable, Identifiable {
     let itunesAlbumId: Int?
     let itunesTrackId: Int?
     let recordingId: String?
-    
+
     // Optional fields when matched to a recording
     let matchedAlbumTitle: String?
     let matchedYear: Int?
     let matchedSpotifyUrl: String?
     let matchedAlbumArt: String?
-    
+
     enum CodingKeys: String, CodingKey {
         case id, source
         case recommendationText = "recommendation_text"
@@ -347,27 +343,27 @@ struct AuthorityRecommendation: Codable, Identifiable {
         case matchedSpotifyUrl = "matched_spotify_url"
         case matchedAlbumArt = "matched_album_art"
     }
-    
+
     // Helper properties
     var isMatched: Bool {
         recordingId != nil
     }
-    
+
     var displayName: String {
         artistName ?? "Unknown Artist"
     }
-    
+
     var displayAlbum: String {
         matchedAlbumTitle ?? albumTitle ?? "Unknown Album"
     }
-    
+
     var displayYear: String? {
         if let year = matchedYear ?? recordingYear {
             return "\(year)"
         }
         return nil
     }
-    
+
     var sourceDisplayName: String {
         switch source.lowercased() {
         case "jazzstandards.com":
@@ -380,8 +376,34 @@ struct AuthorityRecommendation: Codable, Identifiable {
             return source.capitalized
         }
     }
+
+    var sourceColor: Color {
+        switch source.lowercased() {
+        case "jazzstandards.com", "jazzstandards":
+            return .blue
+        case "ted_gioia":
+            return .purple
+        case "allmusic":
+            return .orange
+        default:
+            return JazzTheme.brass
+        }
+    }
 }
 
+struct AuthoritiesResponse: Codable {
+    let recordingId: String
+    let songId: String
+    let authorities: [AuthorityRecommendation]
+    let count: Int
+
+    enum CodingKeys: String, CodingKey {
+        case recordingId = "recording_id"
+        case songId = "song_id"
+        case authorities
+        case count
+    }
+}
 
 // MARK: - External Reference Model
 
@@ -390,11 +412,11 @@ struct ExternalReference: Identifiable {
     let source: String
     let url: String
     let displayName: String
-    
+
     init(source: String, url: String) {
         self.source = source
         self.url = url
-        
+
         // Map source keys to display names
         switch source.lowercased() {
         case "wikipedia":
@@ -411,7 +433,7 @@ struct ExternalReference: Identifiable {
             self.displayName = source.capitalized
         }
     }
-    
+
     // Icon for the reference type
     var iconName: String {
         switch source.lowercased() {
@@ -436,16 +458,16 @@ struct ExternalReference: Identifiable {
 enum RecordingSortOrder: String, CaseIterable, Identifiable {
     case year = "year"
     case name = "name"
-    
+
     var id: String { rawValue }
-    
+
     var displayName: String {
         switch self {
         case .year: return "Year"
         case .name: return "Name"
         }
     }
-    
+
     var icon: String {
         switch self {
         case .year: return "calendar"
@@ -454,62 +476,59 @@ enum RecordingSortOrder: String, CaseIterable, Identifiable {
     }
 }
 
-
-
 // MARK: - Preview Data for Solo Transcriptions
 
 #if DEBUG
-extension SoloTranscription {
-    static var preview1: SoloTranscription {
-        SoloTranscription(
-            id: "preview-transcription-1",
-            songId: "preview-song-1",
-            recordingId: "preview-recording-1",
-            youtubeUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-            createdAt: "2024-01-15T10:30:00Z",
-            updatedAt: "2024-01-15T10:30:00Z",
-            songTitle: "Autumn Leaves",
-            albumTitle: "Kind of Blue",
-            recordingYear: 1959,
-            composer: "Joseph Kosma",
-            label: "Columbia"
-        )
-    }
-    
-    static var preview2: SoloTranscription {
-        SoloTranscription(
-            id: "preview-transcription-2",
-            songId: "preview-song-1",
-            recordingId: "preview-recording-2",
-            youtubeUrl: "https://www.youtube.com/watch?v=abc123xyz",
-            createdAt: "2024-02-20T14:15:00Z",
-            updatedAt: "2024-02-20T14:15:00Z",
-            songTitle: "Autumn Leaves",
-            albumTitle: "Waltz for Debby",
-            recordingYear: 1961,
-            composer: "Joseph Kosma",
-            label: "Riverside"
-        )
-    }
-    
-    static var previewMinimal: SoloTranscription {
-        SoloTranscription(
-            id: "preview-transcription-3",
-            songId: "preview-song-2",
-            recordingId: "preview-recording-3",
-            youtubeUrl: "https://www.youtube.com/watch?v=xyz789abc",
-            createdAt: "2024-03-10T09:00:00Z",
-            updatedAt: "2024-03-10T09:00:00Z",
-            songTitle: "Blue in Green",
-            albumTitle: nil,
-            recordingYear: nil,
-            composer: nil,
-            label: nil
-        )
-    }
-}
-#endif
+    extension SoloTranscription {
+        static var preview1: SoloTranscription {
+            SoloTranscription(
+                id: "preview-transcription-1",
+                songId: "preview-song-1",
+                recordingId: "preview-recording-1",
+                youtubeUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+                createdAt: "2024-01-15T10:30:00Z",
+                updatedAt: "2024-01-15T10:30:00Z",
+                songTitle: "Autumn Leaves",
+                albumTitle: "Kind of Blue",
+                recordingYear: 1959,
+                composer: "Joseph Kosma",
+                label: "Columbia"
+            )
+        }
 
+        static var preview2: SoloTranscription {
+            SoloTranscription(
+                id: "preview-transcription-2",
+                songId: "preview-song-1",
+                recordingId: "preview-recording-2",
+                youtubeUrl: "https://www.youtube.com/watch?v=abc123xyz",
+                createdAt: "2024-02-20T14:15:00Z",
+                updatedAt: "2024-02-20T14:15:00Z",
+                songTitle: "Autumn Leaves",
+                albumTitle: "Waltz for Debby",
+                recordingYear: 1961,
+                composer: "Joseph Kosma",
+                label: "Riverside"
+            )
+        }
+
+        static var previewMinimal: SoloTranscription {
+            SoloTranscription(
+                id: "preview-transcription-3",
+                songId: "preview-song-2",
+                recordingId: "preview-recording-3",
+                youtubeUrl: "https://www.youtube.com/watch?v=xyz789abc",
+                createdAt: "2024-03-10T09:00:00Z",
+                updatedAt: "2024-03-10T09:00:00Z",
+                songTitle: "Blue in Green",
+                albumTitle: nil,
+                recordingYear: nil,
+                composer: nil,
+                label: nil
+            )
+        }
+    }
+#endif
 
 /// Special repertoire option for "All Songs"
 extension Repertoire {
@@ -524,4 +543,3 @@ extension Repertoire {
         )
     }
 }
-

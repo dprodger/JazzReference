@@ -19,18 +19,32 @@ struct PerformerDetailView: View {
     @State private var isLoading = true
     @State private var selectedFilter: RecordingFilter = .all
     @State private var isBiographicalInfoExpanded = false
+    @State private var searchText = ""
     
     private var filteredRecordings: [PerformerRecording] {
         guard let recordings = performer?.recordings else { return [] }
         
+        var result: [PerformerRecording]
+        
         switch selectedFilter {
         case .all:
-            return recordings
+            result = recordings
         case .leader:
-            return recordings.filter { $0.role?.lowercased() == "leader" }
+            result = recordings.filter { $0.role?.lowercased() == "leader" }
         case .sideman:
-            return recordings.filter { $0.role?.lowercased() == "sideman" }
+            result = recordings.filter { $0.role?.lowercased() == "sideman" }
         }
+        
+        // Apply search filter
+        if !searchText.isEmpty {
+            let query = searchText.lowercased()
+            result = result.filter { recording in
+                recording.songTitle.lowercased().contains(query) ||
+                (recording.albumTitle?.lowercased().contains(query) ?? false)
+            }
+        }
+        
+        return result
     }
     
     var body: some View {
@@ -189,6 +203,28 @@ struct PerformerDetailView: View {
                                 .foregroundColor(JazzTheme.charcoal)
                                 .padding(.horizontal)
                             
+                            // Search Field
+                            HStack {
+                                Image(systemName: "magnifyingglass")
+                                    .foregroundColor(JazzTheme.smokeGray)
+                                TextField("Search recordings...", text: $searchText)
+                                    .textFieldStyle(.plain)
+                                if !searchText.isEmpty {
+                                    Button(action: { searchText = "" }) {
+                                        Image(systemName: "xmark.circle.fill")
+                                            .foregroundColor(JazzTheme.smokeGray)
+                                    }
+                                }
+                            }
+                            .padding(10)
+                            .background(JazzTheme.cardBackground)
+                            .cornerRadius(8)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .stroke(JazzTheme.smokeGray.opacity(0.3), lineWidth: 1)
+                            )
+                            .padding(.horizontal)
+                            
                             // Filter Picker - styled with Jazz Theme
                             Picker("Filter", selection: $selectedFilter) {
                                 ForEach(RecordingFilter.allCases, id: \.self) { filter in
@@ -315,4 +351,3 @@ struct PerformerRecordingRowView: View {
         PerformerDetailView(performerId: "preview-performer-detail-2")
     }
 }
-

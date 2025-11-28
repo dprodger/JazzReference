@@ -2,11 +2,13 @@
 //  RecordingDetailView.swift
 //  JazzReference
 //
-//  Updated with JazzTheme color palette
+//  Updated with authority recommendations management button in header
 //
 
 import SwiftUI
 import Combine
+
+// MARK: - Recording Detail View
 
 struct RecordingDetailView: View {
     let recordingId: String
@@ -16,6 +18,7 @@ struct RecordingDetailView: View {
     @State private var longPressOccurred = false
     @State private var showingSubmissionAlert = false
     @State private var submissionAlertMessage = ""
+    @State private var showingAuthoritySheet = false  // NEW: Authority sheet state
     @Environment(\.openURL) var openURL
     
     struct ReportingInfo: Identifiable {
@@ -37,7 +40,7 @@ struct RecordingDetailView: View {
                 .background(JazzTheme.backgroundLight)
             } else if let recording = recording {
                 VStack(alignment: .leading, spacing: 0) {
-                    // Styled Header with Jazz Theme
+                    // Styled Header with Jazz Theme - NOW WITH AUTHORITY BUTTON
                     HStack {
                         Image(systemName: "opticaldisc")
                             .font(.title2)
@@ -47,6 +50,22 @@ struct RecordingDetailView: View {
                             .fontWeight(.semibold)
                             .foregroundColor(JazzTheme.cream)
                         Spacer()
+                        
+                        // NEW: Authority recommendations button
+                        Button {
+                            showingAuthoritySheet = true
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: "checkmark.seal")
+                                Text("Authority")
+                                    .font(.caption)
+                            }
+                            .foregroundColor(JazzTheme.cream)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(JazzTheme.cream.opacity(0.2))
+                            .cornerRadius(8)
+                        }
                     }
                     .padding()
                     .background(JazzTheme.brassGradient)
@@ -294,6 +313,13 @@ struct RecordingDetailView: View {
                 onCancel: {
                     reportingInfo = nil
                 }
+            )
+        }
+        // NEW: Authority recommendations sheet
+        .sheet(isPresented: $showingAuthoritySheet) {
+            AuthorityRecommendationsView(
+                recordingId: recordingId,
+                albumTitle: recording?.albumTitle ?? "Unknown Album"
             )
         }
         .alert("Report Submitted", isPresented: $showingSubmissionAlert) {
