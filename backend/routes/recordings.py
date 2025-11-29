@@ -99,51 +99,218 @@ def get_recording_detail(recording_id):
         return jsonify({'error': 'Failed to fetch recording details', 'detail': str(e)}), 500
 
 
-# NOTES ON CHANGES:
-#
-# 1. RECORDING DATA CTE - Added external_references from parent song
-#    - Includes s.external_references so frontend can show song references
-#    - No performance impact, already joining to songs table
-#
-# 2. PERFORMERS CTE - Unchanged
-#    - Kept existing structure and ordering
-#
-# 3. AUTHORITY DATA CTE - New CTE for authority recommendations
-#    - Fetches all recommendations that reference this recording
-#    - Ordered by source name for consistent display
-#
-# 4. PERFORMANCE CHARACTERISTICS:
-#    - Still ONE database query (single network round trip)
-#    - Uses index on song_authority_recommendations(recording_id)
-#    - All CTEs execute in parallel
-#
-# 5. RESPONSE FORMAT:
-#    Recording object now includes:
-#    - authority_recommendations: array of recommendation objects
-#    - external_references: from parent song (for showing song links)
-#    - performers: array (unchanged)
-#
-# EXAMPLE RESPONSE:
-# {
-#   "id": "...",
-#   "album_title": "Time Out",
-#   "song_title": "Take Five",
-#   "external_references": {
-#     "wikipedia": "https://en.wikipedia.org/wiki/Take_Five",
-#     "jazzstandards": "https://..."
-#   },
-#   "performers": [
-#     {"id": "...", "name": "Dave Brubeck", "instrument": "Piano", "role": "leader"}
-#   ],
-#   "authority_recommendations": [
-#     {
-#       "id": "...",
-#       "source": "jazzstandards.com",
-#       "recommendation_text": "This is the definitive recording...",
-#       "source_url": "https://...",
-#       "artist_name": "Dave Brubeck Quartet",
-#       "recommended_album": "Time Out",
-#       "recommended_year": 1959
-#     }
-#   ]
-# }
+# routes/recordings.py
+"""
+Recording API Routes
+Provides endpoints for listing and searching recordings
+"""
+from flask import Blueprint, jsonify, request
+import logging
+import db_utils as db_tools
+
+logger = logging.getLogger(__name__)
+recordings_bp = Blueprint('recordings', __name__)
+
+# Recording endpoints:
+# - GET /api/recordings - List all recordings with optional search
+# - GET /api/recordings/<recording_id> - Get recording detail
+
+
+@recordings_bp.route('/api/recordings', methods=['GET'])
+def get_recordings():
+    """
+    Get all recordings with optional search
+    
+    Query Parameters:
+        search: Search query to filter recordings by album title, artist name, or song title
+        limit: Maximum number of results (default: 100, max: 500)
+        
+    Returns:
+        List of recordings with basic info including performers
+    """
+    search_query = request.args.get('search', '').strip()
+    limit = min(int(request.args.get('limit', 100)), 500)
+    
+    try:
+        if search_query:
+            # Search across album title, performer names, and song title
+            query = """
+                SELECT DISTINCT ON (r.id)
+                    r.id,
+                    r.song_id,
+                    r.album_title,
+                    r.recording_date,
+                    r.recording_year,
+                    r.label,
+                    r.spotify_url,
+                    r.spotify_track_id,
+                    r.album_art_small,
+                    r.album_art_medium,
+                    r.album_art_large,
+                    r.youtube_url,
+                    r.apple_music_url,
+                    r.musicbrainz_id,
+                    r.is_canonical,
+                    r.notes,
+                    s.title as song_title,
+                    s.composer,
+                    COALESCE(
+                        json_agg(
+                            DISTINCT jsonb_build_object(
+                                'id', p.id,
+                                'name', p.name,
+                                'instrument', i.name,
+                                'role', rp.role
+                            )
+                        ) FILTER (WHERE p.id IS NOT NULL),
+                        '[]'::json
+                    ) as performers
+                FROM recordings r
+                JOIN songs s ON r.song_id = s.id
+                LEFT JOIN recording_performers rp ON r.id = rp.recording_id
+                LEFT JOIN performers p ON rp.performer_id = p.id
+                LEFT JOIN instruments i ON rp.instrument_id = i.id
+                WHERE 
+                    r.album_title ILIKE %s
+                    OR s.title ILIKE %s
+                    OR p.name ILIKE %s
+                GROUP BY r.id, r.song_id, r.album_title, r.recording_date, 
+                         r.recording_year, r.label, r.spotify_url, r.spotify_track_id,
+                         r.album_art_small, r.album_art_medium, r.album_art_large,
+                         r.youtube_url, r.apple_music_url, r.musicbrainz_id,
+                         r.is_canonical, r.notes, s.title, s.composer
+                ORDER BY r.id, r.is_canonical DESC, r.recording_year DESC NULLS LAST
+                LIMIT %s
+            """
+            search_pattern = f'%{search_query}%'
+            result = db_tools.execute_query(
+                query, 
+                (search_pattern, search_pattern, search_pattern, limit),
+                fetch_one=False
+            )
+        else:
+            # Get all recordings without search filter
+            query = """
+                SELECT 
+                    r.id,
+                    r.song_id,
+                    r.album_title,
+                    r.recording_date,
+                    r.recording_year,
+                    r.label,
+                    r.spotify_url,
+                    r.spotify_track_id,
+                    r.album_art_small,
+                    r.album_art_medium,
+                    r.album_art_large,
+                    r.youtube_url,
+                    r.apple_music_url,
+                    r.musicbrainz_id,
+                    r.is_canonical,
+                    r.notes,
+                    s.title as song_title,
+                    s.composer,
+                    COALESCE(
+                        json_agg(
+                            DISTINCT jsonb_build_object(
+                                'id', p.id,
+                                'name', p.name,
+                                'instrument', i.name,
+                                'role', rp.role
+                            )
+                        ) FILTER (WHERE p.id IS NOT NULL),
+                        '[]'::json
+                    ) as performers
+                FROM recordings r
+                JOIN songs s ON r.song_id = s.id
+                LEFT JOIN recording_performers rp ON r.id = rp.recording_id
+                LEFT JOIN performers p ON rp.performer_id = p.id
+                LEFT JOIN instruments i ON rp.instrument_id = i.id
+                GROUP BY r.id, r.song_id, r.album_title, r.recording_date, 
+                         r.recording_year, r.label, r.spotify_url, r.spotify_track_id,
+                         r.album_art_small, r.album_art_medium, r.album_art_large,
+                         r.youtube_url, r.apple_music_url, r.musicbrainz_id,
+                         r.is_canonical, r.notes, s.title, s.composer
+                ORDER BY r.is_canonical DESC, r.album_title, r.recording_year DESC NULLS LAST
+                LIMIT %s
+            """
+            result = db_tools.execute_query(query, (limit,), fetch_one=False)
+        
+        if result is None:
+            result = []
+            
+        return jsonify(result)
+        
+    except Exception as e:
+        logger.error(f"Error fetching recordings: {e}", exc_info=True)
+        return jsonify({'error': 'Failed to fetch recordings', 'detail': str(e)}), 500
+
+
+@recordings_bp.route('/api/recordings/<recording_id>', methods=['GET'])
+def get_recording_detail(recording_id):
+    """
+    Get detailed information about a specific recording
+    
+    Path Parameters:
+        recording_id: UUID of the recording
+        
+    Returns:
+        Recording details with full performer lineup
+    """
+    try:
+        query = """
+            SELECT 
+                r.id,
+                r.song_id,
+                r.album_title,
+                r.recording_date,
+                r.recording_year,
+                r.label,
+                r.spotify_url,
+                r.spotify_track_id,
+                r.album_art_small,
+                r.album_art_medium,
+                r.album_art_large,
+                r.youtube_url,
+                r.apple_music_url,
+                r.musicbrainz_id,
+                r.is_canonical,
+                r.notes,
+                s.title as song_title,
+                s.composer,
+                COALESCE(
+                    json_agg(
+                        DISTINCT jsonb_build_object(
+                            'id', p.id,
+                            'name', p.name,
+                            'instrument', i.name,
+                            'role', rp.role,
+                            'birth_date', p.birth_date,
+                            'death_date', p.death_date
+                        )
+                    ) FILTER (WHERE p.id IS NOT NULL),
+                    '[]'::json
+                ) as performers
+            FROM recordings r
+            JOIN songs s ON r.song_id = s.id
+            LEFT JOIN recording_performers rp ON r.id = rp.recording_id
+            LEFT JOIN performers p ON rp.performer_id = p.id
+            LEFT JOIN instruments i ON rp.instrument_id = i.id
+            WHERE r.id = %s
+            GROUP BY r.id, r.song_id, r.album_title, r.recording_date, 
+                     r.recording_year, r.label, r.spotify_url, r.spotify_track_id,
+                     r.album_art_small, r.album_art_medium, r.album_art_large,
+                     r.youtube_url, r.apple_music_url, r.musicbrainz_id,
+                     r.is_canonical, r.notes, s.title, s.composer
+        """
+        
+        recording = db_tools.execute_query(query, (recording_id,), fetch_one=True)
+        
+        if not recording:
+            return jsonify({'error': 'Recording not found'}), 404
+        
+        return jsonify(recording)
+        
+    except Exception as e:
+        logger.error(f"Error fetching recording detail: {e}", exc_info=True)
+        return jsonify({'error': 'Failed to fetch recording detail', 'detail': str(e)}), 500
