@@ -31,6 +31,7 @@ class NetworkManager: ObservableObject {
     @Published var performers: [Performer] = []
     @Published var isLoading = false
     @Published var errorMessage: String?
+    @Published var recordings: [Recording] = []
     
     // MARK: - Diagnostics
     private static var requestCounter = 0
@@ -623,6 +624,59 @@ extension NetworkManager {
             }
         }
         return nil
+    }
+    
+    
+    // MARK: - NetworkManager Extension for Recordings
+    // Add this to the NetworkManager class in Support_Files/NetworkManager.swift
+
+    // Add this property to NetworkManager class:
+    // @Published var recordings: [Recording] = []
+
+    // Add this method to NetworkManager class:
+
+    /// Fetch recordings with optional search query
+    /// Search matches against artist name, album title, or song title
+    /// - Parameter searchQuery: Optional search string
+    func fetchRecordings(searchQuery: String = "") async {
+        let startTime = Date()
+        await MainActor.run {
+            isLoading = true
+            errorMessage = nil
+        }
+        
+        var urlString = "\(NetworkManager.baseURL)/recordings"
+        if !searchQuery.isEmpty {
+            urlString += "?search=\(searchQuery.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")"
+        }
+        
+        guard let url = URL(string: urlString) else {
+            await MainActor.run {
+                errorMessage = "Invalid URL"
+                isLoading = false
+            }
+            return
+        }
+        
+        do {
+            let (data, _) = try await URLSession.shared.data(from: url)
+            let decodedRecordings = try JSONDecoder().decode([Recording].self, from: data)
+            
+            await MainActor.run {
+                self.recordings = decodedRecordings
+                self.isLoading = false
+            }
+            NetworkManager.logRequest("GET /recordings\(searchQuery.isEmpty ? "" : "?search=...")", startTime: startTime)
+            
+            if NetworkManager.diagnosticsEnabled {
+                print("   ↳ Returned \(decodedRecordings.count) recordings")
+            }
+        } catch {
+            await MainActor.run {
+                self.errorMessage = "Failed to fetch recordings: \(error.localizedDescription)"
+                self.isLoading = false
+            }
+        }
     }
 }
 #endif

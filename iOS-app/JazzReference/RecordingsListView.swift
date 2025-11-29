@@ -2,6 +2,7 @@
 //  RecordingsListView.swift
 //  JazzReference
 //
+//  Created by Dave Rodger on 11/29/25.
 //  Recording list view with search by artist, recording name, or album/release name
 //
 

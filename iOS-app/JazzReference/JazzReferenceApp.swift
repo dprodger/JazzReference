@@ -10,6 +10,9 @@ import GoogleSignIn
 
 // MARK: - Main View
 
+// MARK: - Main View
+// Updated ContentView with Recordings tab
+
 struct ContentView: View {
     @EnvironmentObject var authManager: AuthenticationManager
     
@@ -23,6 +26,11 @@ struct ContentView: View {
             ArtistsListView()
                 .tabItem {
                     Label("Artists", systemImage: "person.2.fill")
+                }
+            
+            RecordingsListView()
+                .tabItem {
+                    Label("Recordings", systemImage: "opticaldisc")
                 }
             
             // Settings Tab (protected)
