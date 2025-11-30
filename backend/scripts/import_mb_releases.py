@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """
 MusicBrainz Release Importer - Command Line Interface
-Fetches releases for songs with MusicBrainz IDs and imports them into the database
+
+Fetches recordings and releases for songs with MusicBrainz IDs and imports them 
+into the database. Creates recordings, releases, and links performers to releases.
 
 This script provides a command-line interface to the MBReleaseImporter module.
 It handles argument parsing, logging configuration, and result presentation.
@@ -12,21 +14,23 @@ import argparse
 import logging
 from pathlib import Path
 
-import sys
-from pathlib import Path
+# Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # Import the core business logic
 from mb_release_importer import MBReleaseImporter
 from db_utils import find_song_by_name_or_id
 
-# Configure logging for CLI
+# Configure logging
+LOG_DIR = Path(__file__).parent / 'log'
+LOG_DIR.mkdir(exist_ok=True)
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
         logging.StreamHandler(sys.stdout),
-        logging.FileHandler('log/mb_import.log')
+        logging.FileHandler(LOG_DIR / 'import_mb_releases.log')
     ]
 )
 logger = logging.getLogger(__name__)
@@ -35,7 +39,7 @@ logger = logging.getLogger(__name__)
 def print_header(dry_run: bool):
     """Print CLI header"""
     logger.info("="*80)
-    logger.info("MusicBrainz Release Import")
+    logger.info("MusicBrainz Recording & Release Import")
     logger.info("="*80)
     if dry_run:
         logger.info("*** DRY RUN MODE - No database changes will be made ***")
@@ -61,9 +65,21 @@ def print_summary(result: dict):
         logger.info(f"Song: {song['title']}")
         logger.info(f"Composer: {song['composer']}")
         logger.info("")
-        logger.info(f"Recordings found:    {stats['releases_found'] + stats['releases_imported']}")
-        logger.info(f"Recordings imported: {stats['releases_imported']}")
-        logger.info(f"Errors:              {stats['errors']}")
+        logger.info("Recordings:")
+        logger.info(f"  Found:     {stats['recordings_found']}")
+        logger.info(f"  Created:   {stats['recordings_created']}")
+        logger.info(f"  Existing:  {stats['recordings_existing']}")
+        logger.info("")
+        logger.info("Releases:")
+        logger.info(f"  Found (new):    {stats['releases_found']}")
+        logger.info(f"  Created:        {stats['releases_created']}")
+        logger.info(f"  Already exist:  {stats['releases_existing']}")
+        if stats.get('releases_skipped_api', 0) > 0:
+            logger.info(f"  API calls skipped: {stats['releases_skipped_api']}")
+        logger.info("")
+        logger.info(f"Links created:      {stats['links_created']}")
+        logger.info(f"Performers linked:  {stats['performers_linked']}")
+        logger.info(f"Errors:             {stats['errors']}")
     else:
         logger.error(f"Import failed: {result.get('error', 'Unknown error')}")
         if 'song' in result:
@@ -75,7 +91,7 @@ def print_summary(result: dict):
 def main():
     """Main CLI entry point"""
     parser = argparse.ArgumentParser(
-        description='Import MusicBrainz releases for a jazz song',
+        description='Import MusicBrainz recordings and releases for a jazz song',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -90,6 +106,24 @@ Examples:
   
   # Enable debug logging
   python import_mb_releases.py --name "Autumn Leaves" --debug
+  
+  # Limit recordings to process
+  python import_mb_releases.py --name "Body and Soul" --limit 10
+
+What this script does:
+  1. Finds the song by name or ID
+  2. Fetches recordings from MusicBrainz (via the song's MusicBrainz Work ID)
+  3. For each recording:
+     - Creates the recording if it doesn't exist
+     - Fetches all releases containing that recording
+     - Creates releases if they don't exist
+     - Links recordings to releases
+     - Associates performers with releases
+
+Performance optimizations:
+  - Checks if releases exist BEFORE making API calls
+  - Uses single database connection per recording (not per release)
+  - Skips API calls for releases already in database
         """
     )
     
@@ -129,9 +163,6 @@ Examples:
     if args.debug:
         logging.getLogger().setLevel(logging.DEBUG)
     
-    # Create log directory
-    Path('log').mkdir(exist_ok=True)
-    
     # Print header
     print_header(args.dry_run)
     
@@ -161,7 +192,12 @@ Examples:
         print_summary(result)
         
         # Exit with appropriate code
-        sys.exit(0 if result['success'] else 1)
+        if result['success']:
+            logger.info("✓ Import completed successfully")
+            sys.exit(0)
+        else:
+            logger.error("✗ Import failed")
+            sys.exit(1)
         
     except KeyboardInterrupt:
         logger.info("\nImport cancelled by user")

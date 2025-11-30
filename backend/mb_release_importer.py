@@ -1,17 +1,23 @@
 """
-MusicBrainz Release Import Module - FIXED VERSION
-Core business logic for importing releases - optimized for connection pooling
+MusicBrainz Release Import Module - OPTIMIZED VERSION
+Core business logic for importing recordings AND releases
 
-KEY FIXES:
-1. Don't hold connections during MusicBrainz API calls
-2. Use shorter transactions - one per recording
-3. Minimize connection hold time
-4. Properly release connections between operations
+PERFORMANCE OPTIMIZATIONS:
+1. Single database connection per recording (not per release)
+2. Pre-check if releases exist BEFORE fetching from MusicBrainz API
+3. Only fetch release details for releases that don't exist in DB
+4. Batch all release operations for a recording in one transaction
+
+KEY ARCHITECTURE:
+- Recording = a specific sound recording (same audio across all releases)
+- Release = a product (album, CD, digital release, etc.)
+- A recording can appear on multiple releases
+- Performers are now associated with releases, not recordings
 """
 
 import logging
 from datetime import datetime
-from typing import Optional, Dict, List, Any
+from typing import Optional, Dict, List, Any, Set
 
 from db_utils import get_db_connection
 from mb_performer_importer import PerformerImporter
@@ -20,12 +26,12 @@ from mb_utils import MusicBrainzSearcher
 
 class MBReleaseImporter:
     """
-    Handles MusicBrainz release import operations
+    Handles MusicBrainz recording and release import operations
     
-    OPTIMIZED FOR CONNECTION POOLING:
-    - Opens connections only when needed
-    - Closes connections quickly
-    - No connections held during API calls
+    OPTIMIZED FOR:
+    - Minimal database connections (one per recording batch)
+    - Skip API calls for existing releases
+    - Efficient lookup table caching
     """
     
     def __init__(self, dry_run: bool = False, logger: Optional[logging.Logger] = None):
@@ -41,13 +47,24 @@ class MBReleaseImporter:
         self.mb_searcher = MusicBrainzSearcher()
         self.performer_importer = PerformerImporter(dry_run=dry_run)
         self.stats = {
+            'recordings_found': 0,
+            'recordings_created': 0,
+            'recordings_existing': 0,
             'releases_found': 0,
-            'releases_imported': 0,
-            'releases_skipped': 0,
-            'credits_added': 0,
+            'releases_created': 0,
+            'releases_existing': 0,
+            'releases_skipped_api': 0,  # NEW: Count of API calls skipped
+            'links_created': 0,
+            'performers_linked': 0,
             'errors': 0
         }
-        self.logger.info("MBReleaseImport::init completed")
+        
+        # Cache for lookup table IDs (populated once per import)
+        self._format_cache = {}
+        self._status_cache = {}
+        self._packaging_cache = {}
+        
+        self.logger.info("MBReleaseImporter initialized (optimized version)")
     
     def find_song(self, song_identifier: str) -> Optional[Dict[str, Any]]:
         """
@@ -63,21 +80,27 @@ class MBReleaseImporter:
         song_identifier = str(song_identifier)
         
         # Check if it looks like a UUID
-        if song_identifier.startswith('song-') or len(song_identifier) == 36:
+        if len(song_identifier) == 36 and '-' in song_identifier:
             return self._find_song_by_id(song_identifier)
         else:
             return self._find_song_by_name(song_identifier)
     
     def import_releases(self, song_identifier: str, limit: int = 200) -> Dict[str, Any]:
         """
-        Main method to import releases for a song
+        Main method to import recordings and releases for a song
         
-        CRITICAL FIX: No longer holds a connection open for the entire operation.
-        Instead, uses short-lived connections for each step.
+        This method:
+        1. Finds the song by name or ID
+        2. Fetches recordings from MusicBrainz (via the work)
+        3. For each recording:
+           - Creates the recording if it doesn't exist
+           - Checks which releases already exist (OPTIMIZATION)
+           - Only fetches details for NEW releases
+           - Creates releases and links performers
         
         Args:
             song_identifier: Song name or database ID
-            limit: Max recordings to fetch (default: 100)
+            limit: Max recordings to fetch (default: 200)
             
         Returns:
             dict: {
@@ -90,7 +113,7 @@ class MBReleaseImporter:
         """
         self.logger.info(f"Starting release import for: {song_identifier}")
         
-        # STEP 1: Find the song (opens and closes connection)
+        # STEP 1: Find the song
         song = self.find_song(song_identifier)
         if not song:
             self.logger.error("Song not found")
@@ -115,13 +138,12 @@ class MBReleaseImporter:
             }
         
         # STEP 2: Fetch recordings from MusicBrainz (NO DATABASE CONNECTION)
-        # This is a potentially slow operation, so we don't hold any DB connections
-        recordings = self._fetch_musicbrainz_recordings(
+        mb_recordings = self._fetch_musicbrainz_recordings(
             song['musicbrainz_id'], 
             limit
         )
         
-        if not recordings:
+        if not mb_recordings:
             self.logger.warning("No recordings found in MusicBrainz for this work")
             return {
                 'success': False,
@@ -130,49 +152,33 @@ class MBReleaseImporter:
                 'stats': self.stats
             }
         
-        self.logger.info(f"Processing {len(recordings)} recordings...")
-        
-        # OPTIMIZATION: Batch-check which recordings already exist
-        # This replaces 200+ individual queries with a single query
-        self.logger.info("Checking database for existing recordings...")
-        existing_map = self._batch_check_existing_recordings(song['id'], recordings)
-        
-        existing_count = sum(1 for info in existing_map.values() if info['exists'])
-        existing_with_credits = sum(1 for info in existing_map.values() 
-                                   if info['exists'] and info['has_credits'])
-        
-        self.logger.info(f"Found {existing_count} recordings in database")
-        self.logger.info(f"  - {existing_with_credits} have performer credits (will skip)")
-        self.logger.info(f"  - {existing_count - existing_with_credits} need credits added")
+        self.stats['recordings_found'] = len(mb_recordings)
+        self.logger.info(f"Found {len(mb_recordings)} recordings in MusicBrainz")
         self.logger.info("")
         
-        # STEP 3: Process each recording with its own short transaction
-        # CRITICAL FIX: Each recording gets its own connection that is quickly released
+        # STEP 3: Process all recordings with a SINGLE database connection
         errors = []
-        for i, recording in enumerate(recordings, 1):
-            releases = recording.get('releases', [])
-            if not releases:
-                self.logger.debug(f"[{i}/{len(recordings)}] Skipping - no releases")
-                continue
+        with get_db_connection() as conn:
+            # Pre-populate lookup table caches (uses existing connection)
+            self._preload_lookup_caches(conn)
             
-            album_title = releases[0].get('title', 'Unknown Album')
-            self.logger.info(f"[{i}/{len(recordings)}] {album_title[:60]}")
-            
-            # Use pre-checked existence info from batch query
-            existing_info = existing_map.get(album_title)
-            
-            try:
-                # Open connection ONLY for this one recording
-                with get_db_connection() as conn:
-                    self._import_recording(conn, song['id'], recording, existing_info)
-                    # Connection is automatically committed and closed here
-                    
-            except Exception as e:
-                error_msg = f"Error importing recording: {e}"
-                self.logger.error(error_msg)
-                self.stats['errors'] += 1
-                errors.append(error_msg)
-                # Connection was already rolled back automatically
+            for i, mb_recording in enumerate(mb_recordings, 1):
+                mb_recording_id = mb_recording.get('id')
+                mb_recording_title = mb_recording.get('title', 'Unknown')
+                
+                self.logger.info(f"[{i}/{len(mb_recordings)}] Recording: {mb_recording_title[:60]}")
+                
+                try:
+                    self._process_recording(conn, song['id'], mb_recording)
+                    # Commit after each recording to avoid holding locks too long
+                    conn.commit()
+                except Exception as e:
+                    error_msg = f"Error processing recording {mb_recording_title}: {e}"
+                    self.logger.error(error_msg)
+                    self.stats['errors'] += 1
+                    errors.append(error_msg)
+                    # Rollback this recording's changes, continue with next
+                    conn.rollback()
         
         return {
             'success': True,
@@ -181,15 +187,585 @@ class MBReleaseImporter:
             'errors': errors if errors else None
         }
     
+    def _preload_lookup_caches(self, conn) -> None:
+        """
+        Pre-load lookup table caches to avoid repeated queries
+        
+        OPTIMIZATION: Load all lookup values once at start
+        
+        Args:
+            conn: Database connection to use
+        """
+        self.logger.debug("Pre-loading lookup table caches...")
+        
+        with conn.cursor() as cur:
+            # Load formats
+            cur.execute("SELECT id, name FROM release_formats")
+            for row in cur.fetchall():
+                self._format_cache[row['name']] = row['id']
+            
+            # Load statuses (by lowercase name)
+            cur.execute("SELECT id, LOWER(name) as name FROM release_statuses")
+            for row in cur.fetchall():
+                self._status_cache[row['name']] = row['id']
+            
+            # Load packaging
+            cur.execute("SELECT id, name FROM release_packaging")
+            for row in cur.fetchall():
+                self._packaging_cache[row['name']] = row['id']
+        
+        self.logger.debug(f"  Loaded {len(self._format_cache)} formats, "
+                         f"{len(self._status_cache)} statuses, "
+                         f"{len(self._packaging_cache)} packaging types")
+    
+    def _process_recording(self, conn, song_id: str, mb_recording: Dict[str, Any]) -> None:
+        """
+        Process a single MusicBrainz recording
+        
+        OPTIMIZED: Uses the provided database connection (no new connections)
+        
+        1. Create/find the recording in our database
+        2. Check which releases already exist (batch query)
+        3. Only fetch details for NEW releases
+        4. Create releases and link performers
+        
+        Args:
+            conn: Database connection (reused from caller)
+            song_id: Our database song ID
+            mb_recording: MusicBrainz recording data
+        """
+        mb_recording_id = mb_recording.get('id')
+        
+        # Get the releases from the recording data
+        mb_releases = mb_recording.get('releases', [])
+        if not mb_releases:
+            self.logger.info("  No releases found for this recording")
+            return
+        
+        # Use the first release for album title (for the recording)
+        first_release = mb_releases[0]
+        album_title = first_release.get('title', 'Unknown Album')
+        
+        # Extract recording date/year from first release
+        release_date = first_release.get('date', '')
+        release_year = None
+        formatted_date = None
+        
+        if release_date:
+            try:
+                if len(release_date) >= 4:
+                    release_year = int(release_date[:4])
+                if len(release_date) >= 10:
+                    formatted_date = release_date[:10]
+            except (ValueError, TypeError):
+                pass
+        
+        # STEP 1: Create or find the recording
+        recording_id = self._get_or_create_recording(
+            conn, song_id, mb_recording_id, album_title, release_year, formatted_date
+        )
+        
+        if not recording_id and not self.dry_run:
+            self.logger.error("  Failed to get/create recording")
+            return
+        
+        # STEP 2: Get list of MusicBrainz release IDs that already exist
+        existing_release_ids = self._get_existing_release_ids(
+            conn, [r.get('id') for r in mb_releases if r.get('id')]
+        )
+        
+        self.logger.info(f"  Processing {len(mb_releases)} releases "
+                       f"({len(existing_release_ids)} already in database)...")
+        
+        # STEP 3: Process each release
+        for mb_release in mb_releases:
+            self._process_release_in_transaction(
+                conn, recording_id, mb_recording_id, mb_recording, 
+                mb_release, existing_release_ids
+            )
+    
+    def _get_existing_release_ids(self, conn, mb_release_ids: List[str]) -> Set[str]:
+        """
+        Check which MusicBrainz release IDs already exist in the database
+        
+        OPTIMIZATION: Single batch query instead of one per release
+        
+        Args:
+            conn: Database connection
+            mb_release_ids: List of MusicBrainz release IDs to check
+            
+        Returns:
+            Set of MusicBrainz release IDs that already exist
+        """
+        if not mb_release_ids:
+            return set()
+        
+        with conn.cursor() as cur:
+            # Use ANY() for efficient batch lookup
+            cur.execute("""
+                SELECT musicbrainz_release_id 
+                FROM releases 
+                WHERE musicbrainz_release_id = ANY(%s)
+            """, (mb_release_ids,))
+            
+            return {row['musicbrainz_release_id'] for row in cur.fetchall()}
+    
+    def _process_release_in_transaction(
+        self, conn, recording_id: Optional[str], mb_recording_id: str,
+        mb_recording: Dict[str, Any], mb_release: Dict[str, Any],
+        existing_release_ids: Set[str]
+    ) -> None:
+        """
+        Process a single release within an existing transaction
+        
+        OPTIMIZED:
+        - Checks if release exists BEFORE making API call
+        - Skips API call for existing releases
+        - Uses existing connection (no new connections)
+        
+        Args:
+            conn: Database connection (reused)
+            recording_id: Our database recording ID (may be None in dry-run)
+            mb_recording_id: MusicBrainz recording ID
+            mb_recording: MusicBrainz recording data
+            mb_release: Basic MusicBrainz release data
+            existing_release_ids: Set of MB release IDs already in database
+        """
+        mb_release_id = mb_release.get('id')
+        release_title = mb_release.get('title', 'Unknown')
+        
+        # OPTIMIZATION: Check if release already exists BEFORE API call
+        if mb_release_id in existing_release_ids:
+            self.logger.debug(f"    Skipping API call for existing release: {release_title[:40]}")
+            self.stats['releases_existing'] += 1
+            self.stats['releases_skipped_api'] += 1
+            
+            # Still need to link recording to release if not already linked
+            release_id = self._get_release_id_by_mb_id(conn, mb_release_id)
+            if release_id and recording_id:
+                self._link_recording_to_release(
+                    conn, recording_id, release_id, mb_recording_id, mb_release
+                )
+            return
+        
+        # Release doesn't exist - fetch full details from MusicBrainz
+        release_details = self.mb_searcher.get_release_details(mb_release_id)
+        
+        if not release_details:
+            self.logger.warning(f"    Could not fetch details for release: {release_title[:40]}")
+            return
+        
+        self.stats['releases_found'] += 1
+        
+        # Extract release data
+        release_data = self._extract_release_data(release_details)
+        
+        if self.dry_run:
+            self.logger.info(f"    [DRY RUN] Would create release: {release_title[:50]}")
+            self._log_release_info(release_data)
+            # Show performers that would be linked
+            self.performer_importer.link_performers_to_release(
+                None, None, mb_recording, release_details
+            )
+            return
+        
+        # Create the release (it's new)
+        release_id = self._create_release(conn, release_data)
+        
+        if release_id:
+            self.stats['releases_created'] += 1
+            
+            # Link recording to release
+            link_created = self._link_recording_to_release(
+                conn, recording_id, release_id, mb_recording_id, release_details
+            )
+            
+            if link_created:
+                self.stats['links_created'] += 1
+            
+            # Link performers to the release
+            performers_linked = self.performer_importer.link_performers_to_release(
+                conn, release_id, mb_recording, release_details
+            )
+            self.stats['performers_linked'] += performers_linked
+    
+    def _get_release_id_by_mb_id(self, conn, mb_release_id: str) -> Optional[str]:
+        """Get our database release ID by MusicBrainz release ID"""
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT id FROM releases WHERE musicbrainz_release_id = %s
+            """, (mb_release_id,))
+            result = cur.fetchone()
+            return result['id'] if result else None
+    
+    def _get_or_create_recording(self, conn, song_id: str, mb_recording_id: str,
+                                  album_title: str, release_year: Optional[int],
+                                  formatted_date: Optional[str]) -> Optional[str]:
+        """
+        Get existing recording or create new one
+        
+        Args:
+            conn: Database connection
+            song_id: Song ID
+            mb_recording_id: MusicBrainz recording ID
+            album_title: Album title
+            release_year: Year of release
+            formatted_date: Formatted date string
+            
+        Returns:
+            Recording ID or None
+        """
+        with conn.cursor() as cur:
+            # Try to find by MusicBrainz ID first
+            cur.execute("""
+                SELECT id FROM recordings
+                WHERE musicbrainz_id = %s
+            """, (mb_recording_id,))
+            result = cur.fetchone()
+            
+            if result:
+                self.logger.debug(f"  Recording exists (by MB ID)")
+                self.stats['recordings_existing'] += 1
+                return result['id']
+            
+            # Try to find by song_id + album_title
+            cur.execute("""
+                SELECT id FROM recordings
+                WHERE song_id = %s AND album_title = %s
+            """, (song_id, album_title))
+            result = cur.fetchone()
+            
+            if result:
+                self.logger.debug(f"  Recording exists (by album title)")
+                self.stats['recordings_existing'] += 1
+                # Update with MusicBrainz ID if missing
+                cur.execute("""
+                    UPDATE recordings
+                    SET musicbrainz_id = %s, updated_at = CURRENT_TIMESTAMP
+                    WHERE id = %s AND musicbrainz_id IS NULL
+                """, (mb_recording_id, result['id']))
+                return result['id']
+            
+            # Create new recording
+            if self.dry_run:
+                self.logger.info(f"  [DRY RUN] Would create recording: {album_title}")
+                return None
+            
+            cur.execute("""
+                INSERT INTO recordings (
+                    song_id, album_title, recording_year, recording_date,
+                    is_canonical, musicbrainz_id
+                )
+                VALUES (%s, %s, %s, %s, %s, %s)
+                RETURNING id
+            """, (
+                song_id,
+                album_title,
+                release_year,
+                formatted_date,
+                False,
+                mb_recording_id
+            ))
+            
+            recording_id = cur.fetchone()['id']
+            self.logger.info(f"  ✓ Created recording: {album_title[:50]}")
+            self.stats['recordings_created'] += 1
+            
+            return recording_id
+    
+    def _create_release(self, conn, release_data: Dict[str, Any]) -> Optional[str]:
+        """
+        Create a new release (assumes it doesn't exist)
+        
+        Args:
+            conn: Database connection
+            release_data: Extracted release data
+            
+        Returns:
+            Release ID or None
+        """
+        # Get lookup table IDs
+        format_id = self._get_or_create_format(conn, release_data.get('format_name'))
+        status_id = self._get_status_id(release_data.get('status_name'))
+        packaging_id = self._get_or_create_packaging(conn, release_data.get('packaging_name'))
+        
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO releases (
+                    musicbrainz_release_id,
+                    musicbrainz_release_group_id,
+                    title,
+                    artist_credit,
+                    disambiguation,
+                    release_date,
+                    release_year,
+                    country,
+                    label,
+                    catalog_number,
+                    barcode,
+                    format_id,
+                    packaging_id,
+                    status_id,
+                    language,
+                    script,
+                    total_tracks,
+                    total_discs,
+                    data_quality
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                RETURNING id
+            """, (
+                release_data['musicbrainz_release_id'],
+                release_data.get('musicbrainz_release_group_id'),
+                release_data['title'],
+                release_data.get('artist_credit'),
+                release_data.get('disambiguation'),
+                release_data.get('release_date'),
+                release_data.get('release_year'),
+                release_data.get('country'),
+                release_data.get('label'),
+                release_data.get('catalog_number'),
+                release_data.get('barcode'),
+                format_id,
+                packaging_id,
+                status_id,
+                release_data.get('language'),
+                release_data.get('script'),
+                release_data.get('total_tracks'),
+                release_data.get('total_discs'),
+                release_data.get('data_quality')
+            ))
+            
+            release_id = cur.fetchone()['id']
+            self.logger.info(f"    ✓ Created release: {release_data['title'][:50]}")
+            
+            return release_id
+    
+    def _link_recording_to_release(self, conn, recording_id: str, release_id: str,
+                                   mb_recording_id: str, release_data: Dict[str, Any]) -> bool:
+        """
+        Link a recording to a release via the recording_releases junction table
+        
+        Args:
+            conn: Database connection
+            recording_id: Our recording ID
+            release_id: Our release ID
+            mb_recording_id: MusicBrainz recording ID
+            release_data: MusicBrainz release data (for track position)
+            
+        Returns:
+            True if link was created, False if already exists
+        """
+        # Find track position for this recording in the release
+        disc_number, track_number, track_position = self._find_track_position(
+            release_data, mb_recording_id
+        )
+        
+        with conn.cursor() as cur:
+            # Check if link already exists
+            cur.execute("""
+                SELECT 1 FROM recording_releases
+                WHERE recording_id = %s AND release_id = %s
+            """, (recording_id, release_id))
+            
+            if cur.fetchone():
+                self.logger.debug(f"    Link already exists")
+                return False
+            
+            # Create the link
+            cur.execute("""
+                INSERT INTO recording_releases (
+                    recording_id, release_id, disc_number, track_number, track_position
+                )
+                VALUES (%s, %s, %s, %s, %s)
+                ON CONFLICT DO NOTHING
+            """, (recording_id, release_id, disc_number, track_number, track_position))
+            
+            self.logger.debug(f"    Linked recording to release (disc {disc_number}, track {track_number})")
+            return True
+    
+    def _find_track_position(self, release_data: Dict[str, Any], 
+                            target_recording_id: str) -> tuple:
+        """
+        Find the disc and track position of a recording within a release
+        
+        Args:
+            release_data: MusicBrainz release data
+            target_recording_id: Recording ID to find
+            
+        Returns:
+            Tuple of (disc_number, track_number, track_position)
+        """
+        media = release_data.get('media', [])
+        
+        for disc_idx, medium in enumerate(media, 1):
+            tracks = medium.get('tracks', [])
+            for track_idx, track in enumerate(tracks, 1):
+                recording = track.get('recording', {})
+                if recording.get('id') == target_recording_id:
+                    position = track.get('position', track_idx)
+                    return (disc_idx, position, str(position))
+        
+        # Default: disc 1, track 1
+        return (1, 1, '1')
+    
+    def _extract_release_data(self, mb_release: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Extract normalized release data from MusicBrainz response
+        
+        Args:
+            mb_release: MusicBrainz release data
+            
+        Returns:
+            Dict with normalized release fields
+        """
+        # Extract artist credit
+        artist_credit = ''
+        artist_credit_list = mb_release.get('artist-credit', [])
+        for credit in artist_credit_list:
+            if 'artist' in credit:
+                artist_credit += credit['artist'].get('name', '')
+            if 'joinphrase' in credit:
+                artist_credit += credit['joinphrase']
+        
+        # Extract release date and year
+        release_date = mb_release.get('date', '')
+        release_year = None
+        
+        if release_date:
+            try:
+                if len(release_date) >= 4:
+                    release_year = int(release_date[:4])
+                if len(release_date) == 10:
+                    release_date = release_date  # Keep full date
+                elif len(release_date) < 10:
+                    release_date = None  # Only keep complete dates
+            except (ValueError, TypeError):
+                release_date = None
+        
+        # Extract country
+        country = mb_release.get('country')
+        if not country:
+            release_events = mb_release.get('release-events', [])
+            if release_events:
+                area = release_events[0].get('area', {})
+                country = area.get('iso-3166-1-codes', [None])[0] if 'iso-3166-1-codes' in area else None
+        
+        # Extract label info
+        label = None
+        catalog_number = None
+        label_info = mb_release.get('label-info', [])
+        if label_info:
+            first_label = label_info[0]
+            label_obj = first_label.get('label', {})
+            label = label_obj.get('name') if label_obj else None
+            catalog_number = first_label.get('catalog-number')
+        
+        # Extract format from media
+        format_name = None
+        total_tracks = 0
+        total_discs = 0
+        media = mb_release.get('media', [])
+        if media:
+            format_name = media[0].get('format')
+            total_discs = len(media)
+            for medium in media:
+                total_tracks += medium.get('track-count', 0)
+        
+        return {
+            'musicbrainz_release_id': mb_release.get('id'),
+            'musicbrainz_release_group_id': mb_release.get('release-group', {}).get('id'),
+            'title': mb_release.get('title'),
+            'artist_credit': artist_credit.strip() or None,
+            'disambiguation': mb_release.get('disambiguation'),
+            'release_date': release_date,
+            'release_year': release_year,
+            'country': country,
+            'label': label,
+            'catalog_number': catalog_number,
+            'barcode': mb_release.get('barcode'),
+            'format_name': format_name,
+            'packaging_name': mb_release.get('packaging'),
+            'status_name': mb_release.get('status'),
+            'language': mb_release.get('text-representation', {}).get('language'),
+            'script': mb_release.get('text-representation', {}).get('script'),
+            'total_tracks': total_tracks or None,
+            'total_discs': total_discs or None,
+            'data_quality': mb_release.get('quality'),
+        }
+    
+    def _log_release_info(self, release_data: Dict[str, Any]) -> None:
+        """Log release info for dry-run mode"""
+        self.logger.info(f"    [DRY RUN] Release details:")
+        self.logger.info(f"      Title: {release_data['title']}")
+        self.logger.info(f"      Artist: {release_data.get('artist_credit', 'Unknown')}")
+        self.logger.info(f"      Year: {release_data.get('release_year', 'Unknown')}")
+        self.logger.info(f"      Country: {release_data.get('country', 'Unknown')}")
+        self.logger.info(f"      Format: {release_data.get('format_name', 'Unknown')}")
+        self.logger.info(f"      Label: {release_data.get('label', 'Unknown')}")
+    
     # ========================================================================
-    # Private methods - implementation details
+    # Lookup table helpers
+    # ========================================================================
+    
+    def _get_or_create_format(self, conn, format_name: str) -> Optional[int]:
+        """Get format ID, creating if needed"""
+        if not format_name:
+            return None
+        
+        # Check cache first
+        if format_name in self._format_cache:
+            return self._format_cache[format_name]
+        
+        # Not in cache - need to create it
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO release_formats (name, category)
+                VALUES (%s, 'other')
+                ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
+                RETURNING id
+            """, (format_name,))
+            result = cur.fetchone()
+            self._format_cache[format_name] = result['id']
+            return result['id']
+    
+    def _get_status_id(self, status_name: str) -> Optional[int]:
+        """Get status ID (don't create - use predefined values only)"""
+        if not status_name:
+            return None
+        
+        status_name = status_name.lower()
+        return self._status_cache.get(status_name)
+    
+    def _get_or_create_packaging(self, conn, packaging_name: str) -> Optional[int]:
+        """Get packaging ID, creating if needed"""
+        if not packaging_name:
+            return None
+        
+        # Check cache first
+        if packaging_name in self._packaging_cache:
+            return self._packaging_cache[packaging_name]
+        
+        # Not in cache - need to create it
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO release_packaging (name)
+                VALUES (%s)
+                ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
+                RETURNING id
+            """, (packaging_name,))
+            result = cur.fetchone()
+            self._packaging_cache[packaging_name] = result['id']
+            return result['id']
+    
+    # ========================================================================
+    # Private methods - Database queries
     # ========================================================================
     
     def _find_song_by_name(self, song_name: str) -> Optional[Dict[str, Any]]:
         """Find a song in the database by name"""
         self.logger.info(f"Searching for song: {song_name}")
         
-        # Open connection only for this query
         with get_db_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute("""
@@ -206,28 +782,17 @@ class MBReleaseImporter:
                     return None
                 
                 if len(results) > 1:
-                    self.logger.info(f"Found {len(results)} matching songs:")
-                    for i, song in enumerate(results, 1):
-                        mb_status = "✓ Has MusicBrainz ID" if song['musicbrainz_id'] else "✗ No MusicBrainz ID"
-                        self.logger.info(f"  {i}. {song['title']} by {song['composer']} - {mb_status}")
-                        self.logger.info(f"     ID: {song['id']}")
-                    
-                    # Return first one with MusicBrainz ID, or first result
-                    for song in results:
-                        if song['musicbrainz_id']:
-                            self.logger.info(f"Using: {song['title']} (has MusicBrainz ID)")
-                            return song
-                    
-                    self.logger.info(f"Using first result: {results[0]['title']} (no MusicBrainz ID)")
-                    return results[0]
+                    self.logger.info(f"Found {len(results)} songs, using first match:")
+                    for r in results[:5]:
+                        self.logger.info(f"  - {r['title']}")
                 
-                return results[0]
+                song = results[0]
+                return dict(song)
     
     def _find_song_by_id(self, song_id: str) -> Optional[Dict[str, Any]]:
         """Find a song in the database by ID"""
-        self.logger.info(f"Looking up song ID: {song_id}")
+        self.logger.info(f"Looking up song by ID: {song_id}")
         
-        # Open connection only for this query
         with get_db_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute("""
@@ -237,317 +802,53 @@ class MBReleaseImporter:
                 """, (song_id,))
                 
                 result = cur.fetchone()
-                
-                if not result:
-                    self.logger.error(f"Song not found with ID: {song_id}")
-                    return None
-                
-                return result
+                return dict(result) if result else None
     
-    def _fetch_musicbrainz_recordings(self, work_id: str, limit: int = 100) -> List[Dict[str, Any]]:
+    def _fetch_musicbrainz_recordings(self, work_id: str, limit: int) -> List[Dict[str, Any]]:
         """
-        Fetch recordings for a MusicBrainz work ID
+        Fetch recordings for a MusicBrainz work
         
-        IMPORTANT: This method does NOT use any database connections.
-        It only makes API calls to MusicBrainz.
+        Args:
+            work_id: MusicBrainz work ID
+            limit: Maximum recordings to fetch
+            
+        Returns:
+            List of recording data dicts
         """
         self.logger.info(f"Fetching recordings for MusicBrainz work: {work_id}")
         
         try:
-            # Use cached method from mb_utils
+            # Get work with recording relationships
             data = self.mb_searcher.get_work_recordings(work_id)
             
             if not data:
                 self.logger.error("Could not fetch work from MusicBrainz")
-                self.stats['errors'] += 1
                 return []
             
             # Extract recordings from relations
             recordings = []
             relations = data.get('relations', [])
             
-            self.logger.info(f"Found {len(relations)} related recordings in work")
+            self.logger.info(f"Found {len(relations)} related items in work")
             
-            for i, relation in enumerate(relations, 1):
+            for relation in relations:
                 if relation.get('type') == 'performance' and 'recording' in relation:
                     recording = relation['recording']
                     recording_id = recording.get('id')
-                    recording_title = recording.get('title', 'Unknown')
-
-                    # Fetch detailed recording information (API call, no DB)
-                    self.logger.debug(f"[{i}/{len(relations)}] Fetching details for: {recording_title}")
+                    
+                    # Fetch detailed recording information (CACHED by mb_utils)
                     recording_details = self.mb_searcher.get_recording_details(recording_id)
                     
                     if recording_details:
-                        # Log recording name and album/release name
-                        releases = recording_details.get('releases', [])
-                        release_info = releases[0].get('title', 'Unknown Release') if releases else 'No releases'
-                        self.logger.info(f"[{i}/{len(relations)}] Recording: {recording_title[:50]} | Album: {release_info[:50]}")
-                        
                         recordings.append(recording_details)
                         
                         if len(recordings) >= limit:
                             self.logger.info(f"Reached limit of {limit} recordings")
                             break
-                else:
-                    # Log skipped relations for debugging
-                    rel_type = relation.get('type', 'unknown')
-                    has_recording = 'recording' in relation
-                    self.logger.debug(f"[{i}/{len(relations)}] Skipping relation: type={rel_type}, has_recording={has_recording}")
             
             self.logger.info(f"Successfully fetched {len(recordings)} recording details")
             return recordings
             
         except Exception as e:
             self.logger.error(f"Error fetching recordings: {e}", exc_info=True)
-            self.stats['errors'] += 1
             return []
-    
-    def _import_recording(self, conn, song_id: str, recording_data: Dict[str, Any],
-                         existing_info: Optional[Dict[str, Any]] = None) -> bool:
-        """
-        Import a single recording
-        
-        IMPORTANT: This method expects an active connection to be passed in.
-        The connection is managed by the caller and should be committed by the caller.
-        
-        Args:
-            conn: Database connection (must be managed by caller)
-            song_id: ID of the song this recording belongs to
-            recording_data: MusicBrainz recording data dict
-            existing_info: Optional pre-checked existence info from batch query
-                          Format: {'exists': bool, 'id': str, 'has_credits': bool}
-            
-        Returns:
-            True if imported, False if skipped
-        """
-        # Extract release information
-        releases = recording_data.get('releases', [])
-        if not releases:
-            self.logger.debug("  No releases found for this recording")
-            return False
-        
-        # Use the first release
-        release = releases[0]
-        album_title = release.get('title', 'Unknown Album')
-        release_date = release.get('date')
-        
-        # Parse date
-        release_year = None
-        formatted_date = None
-        
-        if release_date:
-            try:
-                # Try to parse as full date YYYY-MM-DD
-                date_parts = release_date.split('-')
-                if len(date_parts) >= 1:
-                    release_year = int(date_parts[0])
-                if len(date_parts) == 3:
-                    formatted_date = datetime.strptime(release_date, '%Y-%m-%d').date()
-                elif len(date_parts) == 2:
-                    formatted_date = datetime.strptime(f"{release_date}-01", '%Y-%m-%d').date()
-            except (ValueError, IndexError):
-                self.logger.debug(f"Could not parse date: {release_date}")
-                pass
-        
-        # Extract MusicBrainz recording ID
-        mb_recording_id = recording_data.get('id')
-        
-        if self.dry_run:
-            self.logger.info(f"[DRY RUN] Would import: {album_title} ({release_year or 'unknown year'})")
-            self.logger.info(f"[DRY RUN]   Date: {formatted_date or 'None'}")
-            # Show performer info that would be imported
-            self.performer_importer.link_performers_to_recording(conn, None, recording_data)
-            self.stats['releases_found'] += 1
-            return True
-        
-        # Check if recording already exists
-        # Use pre-checked info from batch query if available, otherwise do individual query
-        if existing_info:
-            # Use batch-checked existence info (FAST)
-            recording_exists = existing_info['exists']
-            recording_id = existing_info['id']
-            has_credits = existing_info['has_credits']
-        else:
-            # Fall back to individual queries (SLOW - only happens if batch check wasn't done)
-            existing_recording = self._find_existing_recording(conn, song_id, mb_recording_id, album_title)
-            if existing_recording:
-                recording_exists = True
-                recording_id = existing_recording['id']
-                has_credits = self._recording_has_credits(conn, recording_id)
-            else:
-                recording_exists = False
-                recording_id = None
-                has_credits = False
-        
-        if recording_exists:
-            if has_credits:
-                self.logger.info(f"⊘ Skipped: already exists with credits")
-                self.stats['releases_skipped'] += 1
-                return False
-            else:
-                self.logger.info(f"+ Adding credits to existing recording")
-                # Add performer credits to existing recording
-                self.performer_importer.link_performers_to_recording(conn, recording_id, recording_data)
-                # Caller will commit
-                self.stats['credits_added'] += 1
-                return True
-        
-        # Insert new recording
-        with conn.cursor() as cur:
-            cur.execute("""
-                INSERT INTO recordings (
-                    song_id, album_title, recording_year, recording_date,
-                    is_canonical, musicbrainz_id
-                )
-                VALUES (%s, %s, %s, %s, %s, %s)
-                RETURNING id
-            """, (
-                song_id,
-                album_title,
-                release_year,
-                formatted_date,
-                False,  # Not canonical by default
-                mb_recording_id
-            ))
-            
-            recording_id = cur.fetchone()['id']
-            self.logger.info(f"✓ Imported new recording (ID: {recording_id})")
-            
-            # Link performers using shared importer
-            self.performer_importer.link_performers_to_recording(conn, recording_id, recording_data)
-            
-            # Caller will commit
-            self.stats['releases_imported'] += 1
-            return True
-    
-    def _find_existing_recording(self, conn, song_id: str, mb_recording_id: Optional[str], 
-                                 album_title: str) -> Optional[Dict[str, Any]]:
-        """
-        Check if a recording already exists
-        
-        Args:
-            conn: Database connection
-            song_id: Song ID to search within
-            mb_recording_id: MusicBrainz recording ID (preferred)
-            album_title: Album title (fallback)
-            
-        Returns:
-            Recording dict with 'id' key, or None if not found
-        """
-        with conn.cursor() as cur:
-            # First try to find by MusicBrainz ID (most reliable)
-            if mb_recording_id:
-                cur.execute("""
-                    SELECT id
-                    FROM recordings
-                    WHERE song_id = %s AND musicbrainz_id = %s
-                """, (song_id, mb_recording_id))
-                
-                result = cur.fetchone()
-                if result:
-                    return result
-            
-            # Fallback: find by song_id + album_title
-            cur.execute("""
-                SELECT id
-                FROM recordings
-                WHERE song_id = %s AND album_title = %s
-            """, (song_id, album_title))
-            
-            return cur.fetchone()
-    
-    def _recording_has_credits(self, conn, recording_id: str) -> bool:
-        """
-        Check if a recording has any performer credits
-        
-        Args:
-            conn: Database connection
-            recording_id: Recording ID to check
-            
-        Returns:
-            True if recording has performer credits, False otherwise
-        """
-        with conn.cursor() as cur:
-            cur.execute("""
-                SELECT EXISTS(
-                    SELECT 1 
-                    FROM recording_performers
-                    WHERE recording_id = %s
-                )
-            """, (recording_id,))
-            
-            return cur.fetchone()['exists']
-    
-    def _batch_check_existing_recordings(self, song_id: str, 
-                                         recording_data_list: List[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
-        """
-        Batch check which recordings already exist in database
-        
-        This replaces 200+ individual queries with a single batch query,
-        significantly improving performance on repeat runs.
-        
-        Args:
-            song_id: Song ID to check recordings for
-            recording_data_list: List of MusicBrainz recording data dicts
-            
-        Returns:
-            Dict mapping album_title -> {
-                'exists': bool,
-                'id': str (UUID),
-                'has_credits': bool,
-                'mb_id': str (MusicBrainz ID)
-            }
-        """
-        # Extract album titles and MusicBrainz IDs
-        album_data = {}
-        for rec_data in recording_data_list:
-            releases = rec_data.get('releases', [])
-            if releases:
-                album_title = releases[0].get('title', 'Unknown Album')
-                mb_recording_id = rec_data.get('id')
-                album_data[album_title] = mb_recording_id
-        
-        if not album_data:
-            return {}
-        
-        album_titles = list(album_data.keys())
-        
-        # Single batch query to check all recordings at once
-        with get_db_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    SELECT 
-                        r.album_title,
-                        r.id,
-                        r.musicbrainz_id,
-                        (
-                            SELECT COUNT(*) 
-                            FROM recording_performers rp 
-                            WHERE rp.recording_id = r.id
-                        ) as credit_count
-                    FROM recordings r
-                    WHERE r.song_id = %s
-                    AND r.album_title = ANY(%s)
-                """, (song_id, album_titles))
-                
-                results = {}
-                for row in cur.fetchall():
-                    results[row['album_title']] = {
-                        'exists': True,
-                        'id': row['id'],
-                        'has_credits': row['credit_count'] > 0,
-                        'mb_id': row['musicbrainz_id']
-                    }
-                
-                # Add entries for albums that don't exist
-                for title, mb_id in album_data.items():
-                    if title not in results:
-                        results[title] = {
-                            'exists': False,
-                            'id': None,
-                            'has_credits': False,
-                            'mb_id': mb_id
-                        }
-                
-                return results

@@ -443,6 +443,387 @@ COMMENT ON COLUMN song_authority_recommendations.itunes_album_id IS
 COMMENT ON COLUMN song_authority_recommendations.itunes_track_id IS 
 'iTunes/Apple Music track ID extracted from recommendation links (optional)';
 
+
+-- ============================================================================
+-- Migration: Add Releases Table
+-- Description: Adds support for MusicBrainz Release entities, capturing different
+--              physical/digital releases of the same recording (original albums,
+--              reissues, compilations, remasters, etc.)
+-- ============================================================================
+
+-- ============================================================================
+-- LOOKUP TABLES
+-- ============================================================================
+
+-- Release status lookup (mirrors MusicBrainz release status)
+CREATE TABLE IF NOT EXISTS release_statuses (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(50) NOT NULL UNIQUE,
+    description TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Seed release status values from MusicBrainz
+INSERT INTO release_statuses (name, description) VALUES
+    ('official', 'Any release officially sanctioned by the artist and/or their record company'),
+    ('promotional', 'A give-away release or a release intended to promote an upcoming official release'),
+    ('bootleg', 'An unofficial/underground release that was not sanctioned by the artist or record company'),
+    ('pseudo-release', 'A pseudo-release (e.g., a duplicate release in another language)')
+ON CONFLICT (name) DO NOTHING;
+
+
+-- Release format lookup (medium format from MusicBrainz)
+CREATE TABLE IF NOT EXISTS release_formats (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL UNIQUE,
+    category VARCHAR(50), -- 'physical', 'digital', 'other'
+    description TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Seed common release formats from MusicBrainz
+INSERT INTO release_formats (name, category, description) VALUES
+    ('CD', 'physical', 'Compact Disc'),
+    ('Vinyl', 'physical', 'Vinyl record (any size)'),
+    ('12" Vinyl', 'physical', '12-inch vinyl record'),
+    ('10" Vinyl', 'physical', '10-inch vinyl record'),
+    ('7" Vinyl', 'physical', '7-inch vinyl single'),
+    ('Cassette', 'physical', 'Cassette tape'),
+    ('Digital Media', 'digital', 'Digital download or streaming'),
+    ('SACD', 'physical', 'Super Audio CD'),
+    ('DVD', 'physical', 'DVD (audio or video)'),
+    ('DVD-Audio', 'physical', 'DVD-Audio'),
+    ('Blu-ray', 'physical', 'Blu-ray disc'),
+    ('HD-DVD', 'physical', 'HD-DVD'),
+    ('Enhanced CD', 'physical', 'CD with additional data content'),
+    ('HDCD', 'physical', 'High Definition Compatible Digital'),
+    ('DualDisc', 'physical', 'Dual-sided disc with CD and DVD'),
+    ('Hybrid SACD', 'physical', 'SACD with CD-compatible layer'),
+    ('USB Flash Drive', 'physical', 'USB storage device'),
+    ('Other', 'other', 'Other format not listed')
+ON CONFLICT (name) DO NOTHING;
+
+
+-- Release packaging lookup (from MusicBrainz)
+CREATE TABLE IF NOT EXISTS release_packaging (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL UNIQUE,
+    description TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Seed common packaging types from MusicBrainz
+INSERT INTO release_packaging (name, description) VALUES
+    ('Jewel Case', 'Standard CD jewel case'),
+    ('Slim Jewel Case', 'Slim-line jewel case'),
+    ('Digipak', 'Cardboard/paper folding case'),
+    ('Cardboard/Paper Sleeve', 'Simple paper or cardboard sleeve'),
+    ('Keep Case', 'Standard DVD/Blu-ray case'),
+    ('None', 'No packaging (digital releases)'),
+    ('Gatefold Cover', 'Folding cover, typically for vinyl'),
+    ('Box', 'Box set packaging'),
+    ('Book', 'Book-style packaging'),
+    ('Plastic Sleeve', 'Plastic protective sleeve'),
+    ('Digibook', 'Book-style digipak'),
+    ('Super Jewel Box', 'Oversized jewel case'),
+    ('Snap Case', 'Plastic case with snap closure'),
+    ('Slidepak', 'Sliding cardboard case'),
+    ('Other', 'Other packaging type')
+ON CONFLICT (name) DO NOTHING;
+
+
+-- ============================================================================
+-- MAIN RELEASES TABLE
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS releases (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    
+    -- MusicBrainz identification
+    musicbrainz_release_id VARCHAR(36) UNIQUE,  -- MusicBrainz Release MBID
+    musicbrainz_release_group_id VARCHAR(36),   -- Release Group MBID (groups editions together)
+    
+    -- Release information
+    title VARCHAR(500) NOT NULL,
+    artist_credit VARCHAR(500),                  -- Artist as credited on this release
+    disambiguation VARCHAR(500),                 -- To differentiate similar releases
+    
+    -- Release event information
+    release_date DATE,
+    release_year INTEGER,                        -- For partial dates (year only)
+    country VARCHAR(2),                          -- ISO 3166-1 alpha-2 country code
+    
+    -- Label and catalog information
+    label VARCHAR(255),
+    catalog_number VARCHAR(100),
+    barcode VARCHAR(50),
+    
+    -- Format and packaging
+    format_id INTEGER REFERENCES release_formats(id),
+    packaging_id INTEGER REFERENCES release_packaging(id),
+    status_id INTEGER REFERENCES release_statuses(id),
+    
+    -- Additional metadata
+    language VARCHAR(10),                        -- ISO 639-3 language code
+    script VARCHAR(10),                          -- ISO 15924 script code
+    total_tracks INTEGER,
+    total_discs INTEGER DEFAULT 1,
+    
+    -- Cover art (different releases may have different covers)
+    cover_art_url VARCHAR(500),
+    cover_art_small VARCHAR(500),
+    cover_art_medium VARCHAR(500),
+    cover_art_large VARCHAR(500),
+    
+    -- External links
+    spotify_album_id VARCHAR(50),
+    spotify_album_url VARCHAR(500),
+    apple_music_url VARCHAR(500),
+    amazon_url VARCHAR(500),
+    discogs_url VARCHAR(500),
+    
+    -- Quality/annotation
+    data_quality VARCHAR(50),                    -- MusicBrainz data quality rating
+    annotation TEXT,                             -- Notes about this release
+    
+    -- Audit fields
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    created_by VARCHAR(100),
+    updated_by VARCHAR(100)
+);
+
+
+-- ============================================================================
+-- JUNCTION TABLE: RECORDING <-> RELEASE (Many-to-Many)
+-- ============================================================================
+
+-- A recording can appear on multiple releases (original album, greatest hits, etc.)
+-- A release contains multiple recordings (tracks)
+CREATE TABLE IF NOT EXISTS recording_releases (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    recording_id UUID NOT NULL REFERENCES recordings(id) ON DELETE CASCADE,
+    release_id UUID NOT NULL REFERENCES releases(id) ON DELETE CASCADE,
+    
+    -- Track position on the release
+    disc_number INTEGER DEFAULT 1,
+    track_number INTEGER,
+    track_position VARCHAR(20),                  -- For complex numbering like "A1", "B2"
+    
+    -- Track-specific information (may differ from recording)
+    track_title VARCHAR(500),                    -- Title as shown on this release (may differ)
+    track_artist_credit VARCHAR(500),            -- Artist credit on this specific track
+    track_length_ms INTEGER,                     -- Duration in milliseconds
+    
+    -- Audit
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    
+    -- Prevent duplicate track entries
+    UNIQUE (recording_id, release_id, disc_number, track_number)
+);
+
+
+-- ============================================================================
+-- RELEASE LABELS (Multiple labels can be associated with a release)
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS release_labels (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    release_id UUID NOT NULL REFERENCES releases(id) ON DELETE CASCADE,
+    label_name VARCHAR(255) NOT NULL,
+    catalog_number VARCHAR(100),
+    musicbrainz_label_id VARCHAR(36),            -- MusicBrainz Label MBID
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    
+    UNIQUE (release_id, label_name, catalog_number)
+);
+
+
+-- ============================================================================
+-- RELEASE EVENTS (A release can have multiple release events in different countries)
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS release_events (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    release_id UUID NOT NULL REFERENCES releases(id) ON DELETE CASCADE,
+    country VARCHAR(2),                          -- ISO 3166-1 alpha-2
+    release_date DATE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    
+    UNIQUE (release_id, country, release_date)
+);
+
+
+-- ============================================================================
+-- INDEXES
+-- ============================================================================
+
+-- Releases table indexes
+CREATE INDEX IF NOT EXISTS idx_releases_musicbrainz_release_id 
+    ON releases(musicbrainz_release_id);
+CREATE INDEX IF NOT EXISTS idx_releases_musicbrainz_release_group_id 
+    ON releases(musicbrainz_release_group_id);
+CREATE INDEX IF NOT EXISTS idx_releases_title 
+    ON releases(title);
+CREATE INDEX IF NOT EXISTS idx_releases_artist_credit 
+    ON releases(artist_credit);
+CREATE INDEX IF NOT EXISTS idx_releases_release_date 
+    ON releases(release_date);
+CREATE INDEX IF NOT EXISTS idx_releases_release_year 
+    ON releases(release_year);
+CREATE INDEX IF NOT EXISTS idx_releases_label 
+    ON releases(label);
+CREATE INDEX IF NOT EXISTS idx_releases_barcode 
+    ON releases(barcode);
+CREATE INDEX IF NOT EXISTS idx_releases_spotify_album_id 
+    ON releases(spotify_album_id);
+
+-- Recording-releases junction table indexes
+CREATE INDEX IF NOT EXISTS idx_recording_releases_recording_id 
+    ON recording_releases(recording_id);
+CREATE INDEX IF NOT EXISTS idx_recording_releases_release_id 
+    ON recording_releases(release_id);
+CREATE INDEX IF NOT EXISTS idx_recording_releases_disc_track 
+    ON recording_releases(release_id, disc_number, track_number);
+
+-- Release labels indexes
+CREATE INDEX IF NOT EXISTS idx_release_labels_release_id 
+    ON release_labels(release_id);
+CREATE INDEX IF NOT EXISTS idx_release_labels_label_name 
+    ON release_labels(label_name);
+
+-- Release events indexes
+CREATE INDEX IF NOT EXISTS idx_release_events_release_id 
+    ON release_events(release_id);
+CREATE INDEX IF NOT EXISTS idx_release_events_country 
+    ON release_events(country);
+
+
+-- ============================================================================
+-- COMMENTS FOR DOCUMENTATION
+-- ============================================================================
+
+COMMENT ON TABLE releases IS 
+    'MusicBrainz Release entities - specific product releases (albums, CDs, digital releases). A recording can appear on multiple releases.';
+
+COMMENT ON TABLE recording_releases IS 
+    'Junction table linking recordings to releases. Captures track position and any release-specific track information.';
+
+COMMENT ON TABLE release_labels IS 
+    'Labels associated with a release. A release can have multiple labels each with their own catalog number.';
+
+COMMENT ON TABLE release_events IS 
+    'Release events for different countries. A release can have different release dates in different regions.';
+
+COMMENT ON TABLE release_statuses IS 
+    'Lookup table for release status (official, promotional, bootleg, pseudo-release).';
+
+COMMENT ON TABLE release_formats IS 
+    'Lookup table for medium formats (CD, vinyl, digital, etc.).';
+
+COMMENT ON TABLE release_packaging IS 
+    'Lookup table for physical packaging types (jewel case, digipak, etc.).';
+
+COMMENT ON COLUMN releases.musicbrainz_release_id IS 
+    'MusicBrainz Release MBID - unique identifier for this specific release.';
+
+COMMENT ON COLUMN releases.musicbrainz_release_group_id IS 
+    'MusicBrainz Release Group MBID - groups together different editions of the same album.';
+
+COMMENT ON COLUMN releases.disambiguation IS 
+    'Text to help distinguish this release from similar ones (e.g., "Deluxe Edition", "Japanese pressing").';
+
+COMMENT ON COLUMN recording_releases.track_title IS 
+    'Track title as shown on this specific release, which may differ from the canonical recording title.';
+
+
+-- ============================================================================
+-- VIEWS
+-- ============================================================================
+
+-- View to show recordings with their releases
+CREATE OR REPLACE VIEW recordings_with_releases AS
+SELECT
+    r.id as recording_id,
+    r.album_title as recording_album_title,
+    r.musicbrainz_id as recording_musicbrainz_id,
+    s.id as song_id,
+    s.title as song_title,
+    rel.id as release_id,
+    rel.title as release_title,
+    rel.musicbrainz_release_id,
+    rel.release_date,
+    rel.release_year,
+    rel.label,
+    rel.country,
+    rf.name as format,
+    rs.name as status,
+    rr.disc_number,
+    rr.track_number
+FROM recordings r
+JOIN songs s ON r.song_id = s.id
+LEFT JOIN recording_releases rr ON r.id = rr.recording_id
+LEFT JOIN releases rel ON rr.release_id = rel.id
+LEFT JOIN release_formats rf ON rel.format_id = rf.id
+LEFT JOIN release_statuses rs ON rel.status_id = rs.id
+ORDER BY s.title, rel.release_date;
+
+
+-- View to show release details with track listing
+CREATE OR REPLACE VIEW release_tracklist AS
+SELECT
+    rel.id as release_id,
+    rel.title as release_title,
+    rel.artist_credit,
+    rel.release_date,
+    rel.label,
+    rf.name as format,
+    rr.disc_number,
+    rr.track_number,
+    COALESCE(rr.track_title, r.album_title) as track_title,
+    r.id as recording_id,
+    r.musicbrainz_id as recording_musicbrainz_id,
+    s.title as song_title,
+    s.composer
+FROM releases rel
+LEFT JOIN recording_releases rr ON rel.id = rr.release_id
+LEFT JOIN recordings r ON rr.recording_id = r.id
+LEFT JOIN songs s ON r.song_id = s.id
+LEFT JOIN release_formats rf ON rel.format_id = rf.id
+ORDER BY rel.title, rr.disc_number, rr.track_number;
+
+
+-- ============================================================================
+-- TRIGGERS
+-- ============================================================================
+
+-- Trigger to update updated_at timestamp on releases
+CREATE OR REPLACE FUNCTION update_releases_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = CURRENT_TIMESTAMP;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trigger_releases_updated_at ON releases;
+CREATE TRIGGER trigger_releases_updated_at
+    BEFORE UPDATE ON releases
+    FOR EACH ROW
+    EXECUTE FUNCTION update_releases_updated_at();
+
+
+-- ============================================================================
+-- VERIFICATION QUERY (run after migration to verify success)
+-- ============================================================================
+
+-- Uncomment and run to verify:
+-- SELECT 
+--     (SELECT COUNT(*) FROM release_statuses) as status_count,
+--     (SELECT COUNT(*) FROM release_formats) as format_count,
+--     (SELECT COUNT(*) FROM release_packaging) as packaging_count,
+--     (SELECT COUNT(*) FROM information_schema.tables 
+--      WHERE table_name IN ('releases', 'recording_releases', 'release_labels', 'release_events')) as table_count;
 -- ============================================================================
 -- Migration: Add Content Error Reporting
 -- Run this on your Supabase database
@@ -709,4 +1090,280 @@ COMMENT ON COLUMN artist_images.is_primary IS 'Marks the primary/profile image f
 COMMENT ON COLUMN artist_images.display_order IS 'Order for displaying images in carousel (lower numbers first)';
 COMMENT ON TABLE solo_transcriptions IS 'Specific solo transcriptions for a song and recording';
 
+
+-- ============================================================================
+-- Migration: Add Releases Tables
+-- Description: Adds support for MusicBrainz Release entities
+-- Run this migration BEFORE using the updated import_mb_releases.py script
+-- ============================================================================
+
+-- ============================================================================
+-- LOOKUP TABLES
+-- ============================================================================
+
+-- Release status lookup (mirrors MusicBrainz release status)
+CREATE TABLE IF NOT EXISTS release_statuses (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(50) NOT NULL UNIQUE,
+    description TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Seed release status values from MusicBrainz
+INSERT INTO release_statuses (name, description) VALUES
+    ('official', 'Any release officially sanctioned by the artist and/or their record company'),
+    ('promotional', 'A give-away release or a release intended to promote an upcoming official release'),
+    ('bootleg', 'An unofficial/underground release that was not sanctioned by the artist or record company'),
+    ('pseudo-release', 'A pseudo-release (e.g., a duplicate release in another language)')
+ON CONFLICT (name) DO NOTHING;
+
+
+-- Release format lookup (medium format from MusicBrainz)
+CREATE TABLE IF NOT EXISTS release_formats (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL UNIQUE,
+    category VARCHAR(50),
+    description TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Seed common release formats from MusicBrainz
+INSERT INTO release_formats (name, category, description) VALUES
+    ('CD', 'physical', 'Compact Disc'),
+    ('Vinyl', 'physical', 'Vinyl record (any size)'),
+    ('12" Vinyl', 'physical', '12-inch vinyl record'),
+    ('10" Vinyl', 'physical', '10-inch vinyl record'),
+    ('7" Vinyl', 'physical', '7-inch vinyl single'),
+    ('Cassette', 'physical', 'Cassette tape'),
+    ('Digital Media', 'digital', 'Digital download or streaming'),
+    ('SACD', 'physical', 'Super Audio CD'),
+    ('DVD', 'physical', 'DVD (audio or video)'),
+    ('DVD-Audio', 'physical', 'DVD-Audio'),
+    ('Blu-ray', 'physical', 'Blu-ray disc'),
+    ('Enhanced CD', 'physical', 'CD with additional data content'),
+    ('HDCD', 'physical', 'High Definition Compatible Digital'),
+    ('Hybrid SACD', 'physical', 'SACD with CD-compatible layer'),
+    ('Other', 'other', 'Other format not listed')
+ON CONFLICT (name) DO NOTHING;
+
+
+-- Release packaging lookup (from MusicBrainz)
+CREATE TABLE IF NOT EXISTS release_packaging (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL UNIQUE,
+    description TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Seed common packaging types from MusicBrainz
+INSERT INTO release_packaging (name, description) VALUES
+    ('Jewel Case', 'Standard CD jewel case'),
+    ('Slim Jewel Case', 'Slim-line jewel case'),
+    ('Digipak', 'Cardboard/paper folding case'),
+    ('Cardboard/Paper Sleeve', 'Simple paper or cardboard sleeve'),
+    ('Keep Case', 'Standard DVD/Blu-ray case'),
+    ('None', 'No packaging (digital releases)'),
+    ('Gatefold Cover', 'Folding cover, typically for vinyl'),
+    ('Box', 'Box set packaging'),
+    ('Book', 'Book-style packaging'),
+    ('Plastic Sleeve', 'Plastic protective sleeve'),
+    ('Other', 'Other packaging type')
+ON CONFLICT (name) DO NOTHING;
+
+
+-- ============================================================================
+-- MAIN RELEASES TABLE
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS releases (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    
+    -- MusicBrainz identification
+    musicbrainz_release_id VARCHAR(36) UNIQUE,
+    musicbrainz_release_group_id VARCHAR(36),
+    
+    -- Release information
+    title VARCHAR(500) NOT NULL,
+    artist_credit VARCHAR(500),
+    disambiguation VARCHAR(500),
+    
+    -- Release event information
+    release_date DATE,
+    release_year INTEGER,
+    country VARCHAR(2),
+    
+    -- Label and catalog information
+    label VARCHAR(255),
+    catalog_number VARCHAR(100),
+    barcode VARCHAR(50),
+    
+    -- Format and packaging (foreign keys)
+    format_id INTEGER REFERENCES release_formats(id),
+    packaging_id INTEGER REFERENCES release_packaging(id),
+    status_id INTEGER REFERENCES release_statuses(id),
+    
+    -- Additional metadata
+    language VARCHAR(10),
+    script VARCHAR(10),
+    total_tracks INTEGER,
+    total_discs INTEGER DEFAULT 1,
+    
+    -- Cover art
+    cover_art_url VARCHAR(500),
+    cover_art_small VARCHAR(500),
+    cover_art_medium VARCHAR(500),
+    cover_art_large VARCHAR(500),
+    
+    -- External links
+    spotify_album_id VARCHAR(50),
+    spotify_album_url VARCHAR(500),
+    apple_music_url VARCHAR(500),
+    amazon_url VARCHAR(500),
+    discogs_url VARCHAR(500),
+    
+    -- Quality/annotation
+    data_quality VARCHAR(50),
+    annotation TEXT,
+    
+    -- Audit fields
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    created_by VARCHAR(100),
+    updated_by VARCHAR(100)
+);
+
+
+-- ============================================================================
+-- JUNCTION TABLE: RECORDING <-> RELEASE (Many-to-Many)
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS recording_releases (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    recording_id UUID NOT NULL REFERENCES recordings(id) ON DELETE CASCADE,
+    release_id UUID NOT NULL REFERENCES releases(id) ON DELETE CASCADE,
+    
+    -- Track position on the release
+    disc_number INTEGER DEFAULT 1,
+    track_number INTEGER,
+    track_position VARCHAR(20),
+    
+    -- Track-specific information
+    track_title VARCHAR(500),
+    track_artist_credit VARCHAR(500),
+    track_length_ms INTEGER,
+    
+    -- Audit
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    
+    -- Prevent duplicate track entries
+    UNIQUE (recording_id, release_id, disc_number, track_number)
+);
+
+
+-- ============================================================================
+-- RELEASE PERFORMERS (Performers associated with a release)
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS release_performers (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    release_id UUID NOT NULL REFERENCES releases(id) ON DELETE CASCADE,
+    performer_id UUID NOT NULL REFERENCES performers(id) ON DELETE CASCADE,
+    instrument_id UUID REFERENCES instruments(id) ON DELETE SET NULL,
+    role VARCHAR(100),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (release_id, performer_id, instrument_id)
+);
+
+
+-- ============================================================================
+-- INDEXES
+-- ============================================================================
+
+-- Releases table indexes
+CREATE INDEX IF NOT EXISTS idx_releases_musicbrainz_release_id 
+    ON releases(musicbrainz_release_id);
+CREATE INDEX IF NOT EXISTS idx_releases_musicbrainz_release_group_id 
+    ON releases(musicbrainz_release_group_id);
+CREATE INDEX IF NOT EXISTS idx_releases_title 
+    ON releases(title);
+CREATE INDEX IF NOT EXISTS idx_releases_artist_credit 
+    ON releases(artist_credit);
+CREATE INDEX IF NOT EXISTS idx_releases_release_year 
+    ON releases(release_year);
+CREATE INDEX IF NOT EXISTS idx_releases_label 
+    ON releases(label);
+CREATE INDEX IF NOT EXISTS idx_releases_barcode 
+    ON releases(barcode);
+CREATE INDEX IF NOT EXISTS idx_releases_spotify_album_id 
+    ON releases(spotify_album_id);
+
+-- Recording-releases junction table indexes
+CREATE INDEX IF NOT EXISTS idx_recording_releases_recording_id 
+    ON recording_releases(recording_id);
+CREATE INDEX IF NOT EXISTS idx_recording_releases_release_id 
+    ON recording_releases(release_id);
+
+-- Release performers indexes
+CREATE INDEX IF NOT EXISTS idx_release_performers_release_id 
+    ON release_performers(release_id);
+CREATE INDEX IF NOT EXISTS idx_release_performers_performer_id 
+    ON release_performers(performer_id);
+CREATE INDEX IF NOT EXISTS idx_release_performers_role 
+    ON release_performers(role);
+
+
+-- ============================================================================
+-- TRIGGERS
+-- ============================================================================
+
+-- Trigger to update updated_at timestamp on releases
+CREATE OR REPLACE FUNCTION update_releases_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = CURRENT_TIMESTAMP;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trigger_releases_updated_at ON releases;
+CREATE TRIGGER trigger_releases_updated_at
+    BEFORE UPDATE ON releases
+    FOR EACH ROW
+    EXECUTE FUNCTION update_releases_updated_at();
+
+
+-- ============================================================================
+-- COMMENTS
+-- ============================================================================
+
+COMMENT ON TABLE releases IS 
+    'MusicBrainz Release entities - specific product releases (albums, CDs, digital releases)';
+COMMENT ON TABLE recording_releases IS 
+    'Junction table linking recordings to releases with track position info';
+COMMENT ON TABLE release_performers IS 
+    'Junction table linking performers to releases with their instrument roles';
+COMMENT ON TABLE release_statuses IS 
+    'Lookup table for release status (official, promotional, bootleg, pseudo-release)';
+COMMENT ON TABLE release_formats IS 
+    'Lookup table for medium formats (CD, vinyl, digital, etc.)';
+COMMENT ON TABLE release_packaging IS 
+    'Lookup table for physical packaging types (jewel case, digipak, etc.)';
+
+COMMENT ON COLUMN releases.musicbrainz_release_id IS 
+    'MusicBrainz Release MBID - unique identifier for this specific release';
+COMMENT ON COLUMN releases.musicbrainz_release_group_id IS 
+    'MusicBrainz Release Group MBID - groups together different editions of the same album';
+
+
+-- ============================================================================
+-- VERIFICATION (uncomment to run)
+-- ============================================================================
+
+-- SELECT 
+--     'release_statuses' as table_name, COUNT(*) as row_count FROM release_statuses
+-- UNION ALL SELECT 'release_formats', COUNT(*) FROM release_formats
+-- UNION ALL SELECT 'release_packaging', COUNT(*) FROM release_packaging
+-- UNION ALL SELECT 'releases', COUNT(*) FROM releases
+-- UNION ALL SELECT 'recording_releases', COUNT(*) FROM recording_releases
+-- UNION ALL SELECT 'release_performers', COUNT(*) FROM release_performers;
 
