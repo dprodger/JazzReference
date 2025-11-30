@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Spotify Track Matcher - Command Line Interface
-Matches Spotify tracks to existing recordings and updates the database
+Spotify Release Matcher - Command Line Interface
+Matches Spotify albums to existing releases and updates the database
 
 This script provides a command-line interface to the SpotifyMatcher module.
 It handles argument parsing, logging configuration, and result presentation.
@@ -37,7 +37,7 @@ logger = logging.getLogger(__name__)
 def print_header(dry_run: bool, strict_mode: bool, min_artist: int, min_album: int, min_track: int, force_refresh: bool):
     """Print CLI header"""
     logger.info("="*80)
-    logger.info("Spotify Track Matching")
+    logger.info("Spotify Release Matching")
     logger.info("="*80)
     
     if dry_run:
@@ -61,7 +61,7 @@ def print_summary(result: dict):
     Print a CLI-friendly summary of the matching operation
     
     Args:
-        result: Result dict from SpotifyMatcher.match_recordings()
+        result: Result dict from SpotifyMatcher.match_releases()
     """
     logger.info("")
     logger.info("="*80)
@@ -71,11 +71,14 @@ def print_summary(result: dict):
     if result['success']:
         stats = result['stats']
         
-        logger.info(f"Recordings processed:       {stats['recordings_processed']}")
-        logger.info(f"Recordings already had URL: {stats['recordings_skipped']}")
-        logger.info(f"Spotify matches found:      {stats['recordings_with_spotify']}")
-        logger.info(f"Recordings updated:         {stats['recordings_updated']}")
-        logger.info(f"No match found:             {stats['recordings_no_match']}")
+        logger.info(f"Releases processed:         {stats['releases_processed']}")
+        logger.info(f"Releases already had URL:   {stats['releases_skipped']}")
+        logger.info(f"Spotify matches found:      {stats['releases_with_spotify']}")
+        logger.info(f"Releases updated:           {stats['releases_updated']}")
+        logger.info(f"No match found:             {stats['releases_no_match']}")
+        logger.info(f"Tracks matched:             {stats['tracks_matched']}")
+        logger.info(f"Tracks already matched:     {stats['tracks_skipped']}")
+        logger.info(f"Tracks no match:            {stats['tracks_no_match']}")
         logger.info(f"Errors:                     {stats['errors']}")
         logger.info(f"Cache hits:                 {stats['cache_hits']}")
         logger.info(f"API calls:                  {stats['api_calls']}")
@@ -90,7 +93,7 @@ def print_summary(result: dict):
 def main():
     """Main CLI entry point"""
     parser = argparse.ArgumentParser(
-        description='Match Spotify tracks to existing recordings',
+        description='Match Spotify albums to existing releases',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Setup:
@@ -106,7 +109,7 @@ Examples:
   # Match by song ID
   python match_spotify_tracks.py --id a1b2c3d4-e5f6-7890-abcd-ef1234567890
   
-  # Filter to only recordings by a specific artist
+  # Filter to only releases by a specific artist
   python match_spotify_tracks.py --name "Autumn Leaves" --artist "Bill Evans"
   
   # Force refresh from API (bypass cache)
@@ -136,7 +139,7 @@ Examples:
     
     parser.add_argument(
         '--artist',
-        help='Filter to recordings by this artist'
+        help='Filter to releases by this artist'
     )
     
     parser.add_argument(
@@ -203,9 +206,9 @@ Examples:
     # Get song identifier
     song_identifier = args.name or args.id
     
-    # Match recordings
+    # Match releases
     try:
-        result = matcher.match_recordings(song_identifier)
+        result = matcher.match_releases(song_identifier)
         print_summary(result)
         
         # Exit with appropriate code

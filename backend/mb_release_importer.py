@@ -237,7 +237,7 @@ class MBReleaseImporter:
         mb_recording_id = mb_recording.get('id')
         
         # Get the releases from the recording data
-        mb_releases = mb_recording.get('releases', [])
+        mb_releases = mb_recording.get('releases') or []
         if not mb_releases:
             self.logger.info("  No releases found for this recording")
             return
@@ -596,13 +596,17 @@ class MBReleaseImporter:
         Returns:
             Tuple of (disc_number, track_number, track_position)
         """
-        media = release_data.get('media', [])
+        media = release_data.get('media') or []  # Handle None explicitly
         
         for disc_idx, medium in enumerate(media, 1):
-            tracks = medium.get('tracks', [])
+            if not isinstance(medium, dict):
+                continue
+            tracks = medium.get('tracks') or []  # Handle None explicitly
             for track_idx, track in enumerate(tracks, 1):
-                recording = track.get('recording', {})
-                if recording.get('id') == target_recording_id:
+                if not isinstance(track, dict):
+                    continue
+                recording = track.get('recording') or {}
+                if isinstance(recording, dict) and recording.get('id') == target_recording_id:
                     position = track.get('position', track_idx)
                     return (disc_idx, position, str(position))
         
@@ -621,15 +625,18 @@ class MBReleaseImporter:
         """
         # Extract artist credit
         artist_credit = ''
-        artist_credit_list = mb_release.get('artist-credit', [])
+        artist_credit_list = mb_release.get('artist-credit') or []
         for credit in artist_credit_list:
-            if 'artist' in credit:
-                artist_credit += credit['artist'].get('name', '')
-            if 'joinphrase' in credit:
-                artist_credit += credit['joinphrase']
+            if isinstance(credit, dict):
+                if 'artist' in credit:
+                    artist = credit.get('artist')
+                    if isinstance(artist, dict):
+                        artist_credit += artist.get('name', '')
+                if 'joinphrase' in credit:
+                    artist_credit += credit['joinphrase']
         
         # Extract release date and year
-        release_date = mb_release.get('date', '')
+        release_date = mb_release.get('date', '') or ''  # Handle None from API
         release_year = None
         
         if release_date:
@@ -638,52 +645,56 @@ class MBReleaseImporter:
                     release_year = int(release_date[:4])
                 if len(release_date) == 10:
                     release_date = release_date  # Keep full date
-                elif len(release_date) < 10:
-                    release_date = None  # Only keep complete dates
+                else:
+                    release_date = None  # Only keep complete dates (YYYY-MM-DD)
             except (ValueError, TypeError):
                 release_date = None
+        else:
+            release_date = None  # Ensure empty string becomes None
         
         # Extract country
         country = mb_release.get('country')
         if not country:
-            release_events = mb_release.get('release-events', [])
-            if release_events:
-                area = release_events[0].get('area', {})
-                country = area.get('iso-3166-1-codes', [None])[0] if 'iso-3166-1-codes' in area else None
+            release_events = mb_release.get('release-events') or []
+            if release_events and isinstance(release_events[0], dict):
+                area = release_events[0].get('area') or {}
+                if isinstance(area, dict) and 'iso-3166-1-codes' in area:
+                    codes = area.get('iso-3166-1-codes') or []
+                    country = codes[0] if codes else None
         
         # Extract label info
         label = None
         catalog_number = None
-        label_info = mb_release.get('label-info', [])
-        if label_info:
+        label_info = mb_release.get('label-info') or []
+        if label_info and isinstance(label_info[0], dict):
             first_label = label_info[0]
-            label_obj = first_label.get('label', {})
-            label = label_obj.get('name') if label_obj else None
+            label_obj = first_label.get('label') or {}
+            label = label_obj.get('name') if isinstance(label_obj, dict) else None
             catalog_number = first_label.get('catalog-number')
         
         # Extract format from media
         format_name = None
         total_tracks = 0
         total_discs = 0
-        media = mb_release.get('media', [])
+        media = mb_release.get('media') or []  # Handle None explicitly
         if media:
             format_name = media[0].get('format')
             total_discs = len(media)
             for medium in media:
-                total_tracks += medium.get('track-count', 0)
+                total_tracks += medium.get('track-count', 0) or 0  # Handle None
         
         return {
             'musicbrainz_release_id': mb_release.get('id'),
             'musicbrainz_release_group_id': mb_release.get('release-group', {}).get('id'),
             'title': mb_release.get('title'),
             'artist_credit': artist_credit.strip() or None,
-            'disambiguation': mb_release.get('disambiguation'),
-            'release_date': release_date,
+            'disambiguation': mb_release.get('disambiguation') or None,
+            'release_date': release_date or None,  # Convert empty string to None
             'release_year': release_year,
-            'country': country,
+            'country': country or None,
             'label': label,
             'catalog_number': catalog_number,
-            'barcode': mb_release.get('barcode'),
+            'barcode': mb_release.get('barcode') or None,
             'format_name': format_name,
             'packaging_name': mb_release.get('packaging'),
             'status_name': mb_release.get('status'),
@@ -827,13 +838,17 @@ class MBReleaseImporter:
             
             # Extract recordings from relations
             recordings = []
-            relations = data.get('relations', [])
+            relations = data.get('relations') or []
             
             self.logger.info(f"Found {len(relations)} related items in work")
             
             for relation in relations:
+                if not isinstance(relation, dict):
+                    continue
                 if relation.get('type') == 'performance' and 'recording' in relation:
-                    recording = relation['recording']
+                    recording = relation.get('recording')
+                    if not isinstance(recording, dict):
+                        continue
                     recording_id = recording.get('id')
                     
                     # Fetch detailed recording information (CACHED by mb_utils)

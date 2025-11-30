@@ -171,7 +171,7 @@ class PerformerImporter:
                 )
                 
                 # Process instruments
-                instruments = performer_data.get('instruments', [])
+                instruments = performer_data.get('instruments') or []
                 
                 if instruments:
                     for instrument_name in instruments:
@@ -264,7 +264,7 @@ class PerformerImporter:
                 )
                 
                 # Process instruments
-                instruments = performer_data.get('instruments', [])
+                instruments = performer_data.get('instruments') or []
                 
                 if instruments:
                     for instrument_name in instruments:
@@ -319,7 +319,7 @@ class PerformerImporter:
         
         # Try recording-level relationships first
         if mb_recording:
-            relations = mb_recording.get('relations', [])
+            relations = mb_recording.get('relations') or []
             if relations:
                 performers = self.parse_artist_relationships(relations)
                 if performers:
@@ -338,7 +338,7 @@ class PerformerImporter:
         
         # Fallback to artist credits
         if mb_recording:
-            artist_credits = mb_recording.get('artist-credit', [])
+            artist_credits = mb_recording.get('artist-credit') or []
             artists = self.parse_artist_credits(artist_credits)
             if artists:
                 performers = [
@@ -354,16 +354,16 @@ class PerformerImporter:
         performers = []
         
         # Get artist credits
-        artist_credits = recording_data.get('artist-credit', [])
+        artist_credits = recording_data.get('artist-credit') or []
         artists_from_credits = self.parse_artist_credits(artist_credits)
         
         # Try to get relationships with instruments
-        relations = recording_data.get('relations', [])
+        relations = recording_data.get('relations') or []
         performers_with_instruments = self.parse_artist_relationships(relations)
         
         # If no relationships, try to get from first release
         if not performers_with_instruments:
-            releases = recording_data.get('releases', [])
+            releases = recording_data.get('releases') or []
             if releases:
                 first_release_id = releases[0].get('id')
                 release_data = self.fetch_release_credits(first_release_id)
@@ -396,7 +396,7 @@ class PerformerImporter:
         
         # From recording
         if mb_recording:
-            artist_credits = mb_recording.get('artist-credit', [])
+            artist_credits = mb_recording.get('artist-credit') or []
             for credit in artist_credits:
                 if isinstance(credit, dict) and 'artist' in credit:
                     artist = credit['artist']
@@ -407,7 +407,7 @@ class PerformerImporter:
         
         # From release
         if release_details:
-            artist_credits = release_details.get('artist-credit', [])
+            artist_credits = release_details.get('artist-credit') or []
             for credit in artist_credits:
                 if isinstance(credit, dict) and 'artist' in credit:
                     artist = credit['artist']
@@ -423,7 +423,7 @@ class PerformerImporter:
         leader_mbids = set()
         leader_names = set()
         
-        artist_credits = recording_data.get('artist-credit', [])
+        artist_credits = recording_data.get('artist-credit') or []
         for credit in artist_credits:
             if isinstance(credit, dict) and 'artist' in credit:
                 artist = credit['artist']
@@ -527,13 +527,14 @@ class PerformerImporter:
         
         artists = []
         for credit in artist_credits:
-            if 'artist' in credit:
-                artist = credit['artist']
-                artists.append({
-                    'name': artist.get('name'),
-                    'mbid': artist.get('id'),
-                    'sort_name': artist.get('sort-name')
-                })
+            if isinstance(credit, dict) and 'artist' in credit:
+                artist = credit.get('artist')
+                if isinstance(artist, dict):
+                    artists.append({
+                        'name': artist.get('name'),
+                        'mbid': artist.get('id'),
+                        'sort_name': artist.get('sort-name')
+                    })
         
         return artists
     
@@ -553,6 +554,10 @@ class PerformerImporter:
         performers = []
         
         for relation in relations:
+            # Skip None or non-dict relations
+            if not relation or not isinstance(relation, dict):
+                continue
+                
             rel_type = relation.get('type', 'unknown')
             target_type = relation.get('target-type', 'unknown')
             
@@ -563,7 +568,10 @@ class PerformerImporter:
             if 'artist' not in relation:
                 continue
             
-            artist = relation['artist']
+            artist = relation.get('artist')
+            if not artist or not isinstance(artist, dict):
+                continue
+                
             artist_name = artist.get('name')
             artist_mbid = artist.get('id')
             
@@ -575,7 +583,7 @@ class PerformerImporter:
             
             if rel_type == 'instrument':
                 # Extract instrument names from attributes
-                attributes = relation.get('attributes', [])
+                attributes = relation.get('attributes') or []
                 for attr in attributes:
                     if isinstance(attr, str):
                         instruments.append(attr)
@@ -610,42 +618,47 @@ class PerformerImporter:
         
         # Check release-level relationships if not looking for specific recording
         if not target_recording_id:
-            relations = release_data.get('relations', [])
+            relations = release_data.get('relations') or []
             if relations:
                 release_performers = self.parse_artist_relationships(relations)
                 if release_performers:
                     return release_performers
         
         # Check track-level credits
-        media = release_data.get('media', [])
+        media = release_data.get('media') or []  # Handle None explicitly
         for medium in media:
-            tracks = medium.get('tracks', [])
+            if not medium or not isinstance(medium, dict):
+                continue
+            tracks = medium.get('tracks') or []  # Handle None explicitly
             for track in tracks:
-                recording = track.get('recording', {})
-                recording_id = recording.get('id')
+                if not track or not isinstance(track, dict):
+                    continue
+                recording = track.get('recording') or {}
+                recording_id = recording.get('id') if isinstance(recording, dict) else None
                 
                 if target_recording_id and recording_id != target_recording_id:
                     continue
                 
                 # Check recording relationships on this track
-                recording_relations = recording.get('relations', [])
+                recording_relations = recording.get('relations') or [] if isinstance(recording, dict) else []
                 if recording_relations:
                     track_performers = self.parse_artist_relationships(recording_relations)
                     if track_performers:
                         performers.extend(track_performers)
                 
                 # Check track artist credits
-                track_artist_credits = track.get('artist-credit', [])
+                track_artist_credits = track.get('artist-credit') or []
                 if track_artist_credits:
                     for credit in track_artist_credits:
-                        if 'artist' in credit:
-                            artist = credit['artist']
-                            performers.append({
-                                'name': artist.get('name'),
-                                'mbid': artist.get('id'),
-                                'instruments': [],
-                                'role': 'performer'
-                            })
+                        if isinstance(credit, dict) and 'artist' in credit:
+                            artist = credit.get('artist')
+                            if isinstance(artist, dict):
+                                performers.append({
+                                    'name': artist.get('name'),
+                                    'mbid': artist.get('id'),
+                                    'instruments': [],
+                                    'role': 'performer'
+                                })
                 
                 if target_recording_id and recording_id == target_recording_id:
                     break
