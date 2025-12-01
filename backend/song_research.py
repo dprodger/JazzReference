@@ -68,9 +68,11 @@ def research_song(song_id: str, song_name: str) -> Dict[str, Any]:
         
         mb_stats = mb_result['stats']
         logger.info(f"✓ MusicBrainz import complete")
-        logger.info(f"  Imported: {mb_stats['releases_imported']} releases")
-        logger.info(f"  Skipped: {mb_stats['releases_skipped']} (already exist with credits)")
-        logger.info(f"  Credits added: {mb_stats['credits_added']} (to existing recordings)")
+        logger.info(f"  Recordings found: {mb_stats['recordings_found']}")
+        logger.info(f"  Recordings created: {mb_stats['recordings_created']}")
+        logger.info(f"  Releases created: {mb_stats['releases_created']}")
+        logger.info(f"  Releases existing: {mb_stats['releases_existing']}")
+        logger.info(f"  Performers linked: {mb_stats['performers_linked']}")
         if mb_stats['errors'] > 0:
             logger.info(f"  Errors: {mb_stats['errors']}")
         
