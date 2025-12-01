@@ -448,7 +448,12 @@ class SpotifyMatcher:
     
     def calculate_similarity(self, text1: str, text2: str) -> float:
         """
-        Calculate similarity between two strings using fuzzy matching
+        Calculate similarity between two strings using fuzzy matching.
+        
+        Handles common variations like parenthetical additions:
+        - "Who Cares?" vs "Who Cares (As Long As You Care For Me)"
+        - "Stella By Starlight" vs "Stella By Starlight (From 'The Uninvited')"
+        
         Returns a score from 0-100
         """
         if not text1 or not text2:
@@ -457,7 +462,24 @@ class SpotifyMatcher:
         norm1 = self.normalize_for_comparison(text1)
         norm2 = self.normalize_for_comparison(text2)
         
-        return fuzz.token_sort_ratio(norm1, norm2)
+        # Primary comparison using token_sort_ratio
+        score = fuzz.token_sort_ratio(norm1, norm2)
+        
+        # If score is below threshold, try comparing without parenthetical content
+        # This handles cases like "Who Cares?" vs "Who Cares (As Long As You Care For Me)"
+        if score < 80:
+            # Strip parenthetical content from both
+            stripped1 = re.sub(r'\s*\([^)]*\)\s*', ' ', norm1).strip()
+            stripped2 = re.sub(r'\s*\([^)]*\)\s*', ' ', norm2).strip()
+            
+            # Only use stripped comparison if something was actually removed
+            if stripped1 != norm1 or stripped2 != norm2:
+                stripped_score = fuzz.token_sort_ratio(stripped1, stripped2)
+                if stripped_score > score:
+                    self.logger.debug(f"      Parenthetical fallback: {score}% → {stripped_score}%")
+                    score = stripped_score
+        
+        return score
     
     def validate_match(self, spotify_track: dict, expected_song: str, 
                       expected_artist: str, expected_album: str) -> tuple:
@@ -1213,13 +1235,17 @@ class SpotifyMatcher:
     # RELEASE MATCHING METHODS (NEW)
     # ========================================================================
     
-    def search_spotify_album(self, album_title: str, artist_name: str = None) -> Optional[dict]:
+    def search_spotify_album(self, album_title: str, artist_name: str = None, 
+                              song_title: str = None) -> Optional[dict]:
         """
         Search Spotify for an album with fuzzy validation.
         
         Args:
             album_title: Album title to search for
             artist_name: Artist name (optional, but recommended)
+            song_title: Song title for track verification fallback (optional).
+                       When provided, albums with high similarity but low artist
+                       match can still be accepted if they contain this track.
             
         Returns:
             dict with 'url', 'id', 'artists', 'name', 'album_art', 'similarity_scores'
@@ -1284,7 +1310,7 @@ class SpotifyMatcher:
                     
                     for i, album in enumerate(albums):
                         is_valid, reason, scores = self.validate_album_match(
-                            album, album_title, artist_name or ''
+                            album, album_title, artist_name or '', song_title
                         )
                         
                         if is_valid:
@@ -1341,10 +1367,46 @@ class SpotifyMatcher:
         self._save_to_cache(cache_path, None)
         return None
     
+    def verify_album_contains_track(self, album_id: str, song_title: str) -> bool:
+        """
+        Verify that a Spotify album contains a track matching the song title.
+        
+        Used as a fallback validation when artist matching fails but album
+        similarity is high. This handles compilation albums, "Various Artists",
+        and artist name variations.
+        
+        Args:
+            album_id: Spotify album ID
+            song_title: Song title to search for in the album
+            
+        Returns:
+            True if a matching track was found, False otherwise
+        """
+        tracks = self.get_album_tracks(album_id)
+        if not tracks:
+            return False
+        
+        for track in tracks:
+            similarity = self.calculate_similarity(song_title, track['name'])
+            if similarity >= self.min_track_similarity:
+                self.logger.debug(f"      Track verification passed: '{track['name']}' ({similarity}%)")
+                return True
+        
+        return False
+    
     def validate_album_match(self, spotify_album: dict, expected_album: str, 
-                            expected_artist: str) -> tuple:
+                            expected_artist: str, song_title: str = None) -> tuple:
         """
         Validate that a Spotify album result actually matches what we're looking for
+        
+        Args:
+            spotify_album: Spotify album dict from search results
+            expected_album: Album title we're searching for
+            expected_artist: Artist name we're searching for
+            song_title: Optional song title for track verification fallback.
+                       When album similarity is high (>=80%) but artist fails,
+                       we can still accept the match if the album contains
+                       a track matching this title.
         
         Returns:
             tuple: (is_valid, reason, scores_dict)
@@ -1379,6 +1441,16 @@ class SpotifyMatcher:
             return False, f"Album similarity too low ({album_similarity}% < {self.min_album_similarity}%)", scores
         
         if expected_artist and artist_similarity < self.min_artist_similarity:
+            # Artist validation failed - try track verification fallback
+            # This handles "Various Artists", ensemble name variations, etc.
+            # Only attempt if album similarity is high (>=80%) and we have a song title
+            if song_title and album_similarity >= 80:
+                album_id = spotify_album.get('id')
+                if album_id and self.verify_album_contains_track(album_id, song_title):
+                    scores['verified_by_track'] = True
+                    self.logger.debug(f"      Album accepted via track verification (artist {artist_similarity}% < {self.min_artist_similarity}%)")
+                    return True, "Valid match (verified by track presence)", scores
+            
             return False, f"Artist similarity too low ({artist_similarity}% < {self.min_artist_similarity}%)", scores
         
         return True, "Valid match", scores
@@ -1559,8 +1631,8 @@ class SpotifyMatcher:
                     self.stats['releases_skipped'] += 1
                     continue
                 
-                # Search Spotify for album
-                spotify_match = self.search_spotify_album(title, artist_name)
+                # Search Spotify for album (with song title for track verification fallback)
+                spotify_match = self.search_spotify_album(title, artist_name, song['title'])
                 
                 if spotify_match:
                     with get_db_connection() as conn:
