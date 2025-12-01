@@ -2,7 +2,7 @@
 //  Models.swift
 //  JazzReference
 //
-//  Updated with Repertoire support
+//  Updated with Releases support
 //
 
 import Foundation
@@ -82,9 +82,12 @@ struct Recording: Codable, Identifiable {
     var authorityCount: Int?
     var authoritySources: [String]?
     var authorityRecommendations: [AuthorityRecommendation]?
+    
+    // NEW: Releases this recording appears on
+    let releases: [Release]?
 
     enum CodingKeys: String, CodingKey {
-        case id, label, notes, composer, performers
+        case id, label, notes, composer, performers, releases
         case songId = "song_id"
         case songTitle = "song_title"
         case albumTitle = "album_title"
@@ -103,6 +106,7 @@ struct Recording: Codable, Identifiable {
         case authoritySources = "authority_sources"
         case authorityRecommendations = "authority_recommendations"
     }
+    
     // Helper computed properties
     var hasAuthority: Bool {
         guard let count = authorityCount else { return false }
@@ -132,6 +136,146 @@ struct Recording: Codable, Identifiable {
         default:
             return source.capitalized
         }
+    }
+    
+    // MARK: - Release-aware computed properties
+    
+    /// Get the best Spotify URL - prefer track URL from release with Spotify, fall back to recording URL
+    var bestSpotifyUrl: String? {
+        // First try to get from a release with a specific track URL
+        if let release = releases?.first(where: { $0.spotifyTrackUrl != nil }) {
+            return release.spotifyTrackUrl
+        }
+        // Then try album URL from a release
+        if let release = releases?.first(where: { $0.spotifyAlbumUrl != nil }) {
+            return release.spotifyAlbumUrl
+        }
+        // Fall back to recording's spotify URL
+        return spotifyUrl
+    }
+    
+    /// Get the best album art - prefer from release with Spotify
+    var bestAlbumArtSmall: String? {
+        if let release = releases?.first(where: { $0.spotifyAlbumId != nil && $0.coverArtSmall != nil }) {
+            return release.coverArtSmall
+        }
+        return albumArtSmall
+    }
+    
+    var bestAlbumArtMedium: String? {
+        if let release = releases?.first(where: { $0.spotifyAlbumId != nil && $0.coverArtMedium != nil }) {
+            return release.coverArtMedium
+        }
+        return albumArtMedium
+    }
+    
+    var bestAlbumArtLarge: String? {
+        if let release = releases?.first(where: { $0.spotifyAlbumId != nil && $0.coverArtLarge != nil }) {
+            return release.coverArtLarge
+        }
+        return albumArtLarge
+    }
+    
+    /// Count of releases with Spotify links
+    var spotifyReleaseCount: Int {
+        releases?.filter { $0.hasSpotify }.count ?? 0
+    }
+    
+    /// Whether this recording has any releases
+    var hasReleases: Bool {
+        guard let releases = releases else { return false }
+        return !releases.isEmpty
+    }
+}
+
+// MARK: - Release Model (NEW)
+
+struct Release: Identifiable, Codable {
+    let id: String
+    let title: String
+    let artistCredit: String?
+    let releaseDate: String?
+    let releaseYear: Int?
+    let country: String?
+    let label: String?
+    let catalogNumber: String?
+    
+    // Spotify integration
+    let spotifyAlbumId: String?
+    let spotifyAlbumUrl: String?
+    let spotifyTrackId: String?
+    let spotifyTrackUrl: String?
+    
+    // Cover art
+    let coverArtSmall: String?
+    let coverArtMedium: String?
+    let coverArtLarge: String?
+    
+    // Track position on release
+    let discNumber: Int?
+    let trackNumber: Int?
+    let totalTracks: Int?
+    
+    // Format info
+    let formatName: String?
+    let statusName: String?
+    
+    // MusicBrainz reference
+    let musicbrainzReleaseId: String?
+    
+    // Performers on this release (when fetched separately)
+    let performers: [Performer]?
+    let performerCount: Int?
+    
+    enum CodingKeys: String, CodingKey {
+        case id, title, country, label, performers
+        case artistCredit = "artist_credit"
+        case releaseDate = "release_date"
+        case releaseYear = "release_year"
+        case catalogNumber = "catalog_number"
+        case spotifyAlbumId = "spotify_album_id"
+        case spotifyAlbumUrl = "spotify_album_url"
+        case spotifyTrackId = "spotify_track_id"
+        case spotifyTrackUrl = "spotify_track_url"
+        case coverArtSmall = "cover_art_small"
+        case coverArtMedium = "cover_art_medium"
+        case coverArtLarge = "cover_art_large"
+        case discNumber = "disc_number"
+        case trackNumber = "track_number"
+        case totalTracks = "total_tracks"
+        case formatName = "format_name"
+        case statusName = "status_name"
+        case musicbrainzReleaseId = "musicbrainz_release_id"
+        case performerCount = "performer_count"
+    }
+    
+    // MARK: - Computed Properties
+    
+    /// Whether this release has Spotify integration
+    var hasSpotify: Bool {
+        spotifyAlbumId != nil || spotifyTrackUrl != nil
+    }
+    
+    /// Display string for track position
+    var trackPositionDisplay: String? {
+        guard let track = trackNumber else { return nil }
+        if let disc = discNumber, disc > 1 {
+            return "Disc \(disc), Track \(track)"
+        }
+        return "Track \(track)"
+    }
+    
+    /// Year display string
+    var yearDisplay: String {
+        if let year = releaseYear {
+            return String(year)
+        }
+        return "Unknown year"
+    }
+    
+    /// Format display with fallback
+    var formatDisplay: String {
+        formatName ?? "Unknown format"
     }
 }
 
@@ -312,7 +456,7 @@ struct SoloTranscription: Codable, Identifiable {
 
 struct AuthorityRecommendation: Codable, Identifiable {
     let id: String
-    let source: String
+    let source: String?
     let recommendationText: String?
     let sourceUrl: String?
     let artistName: String?
@@ -327,6 +471,10 @@ struct AuthorityRecommendation: Codable, Identifiable {
     let matchedYear: Int?
     let matchedSpotifyUrl: String?
     let matchedAlbumArt: String?
+    
+    // Fields from recording detail endpoint (uses different keys)
+    let sourceName: String?
+    let recAlbumTitle: String?
 
     enum CodingKeys: String, CodingKey {
         case id, source
@@ -342,6 +490,8 @@ struct AuthorityRecommendation: Codable, Identifiable {
         case matchedYear = "matched_year"
         case matchedSpotifyUrl = "matched_spotify_url"
         case matchedAlbumArt = "matched_album_art"
+        case sourceName = "source_name"
+        case recAlbumTitle = "rec_album_title"
     }
 
     // Helper properties
@@ -354,7 +504,7 @@ struct AuthorityRecommendation: Codable, Identifiable {
     }
 
     var displayAlbum: String {
-        matchedAlbumTitle ?? albumTitle ?? "Unknown Album"
+        matchedAlbumTitle ?? albumTitle ?? recAlbumTitle ?? "Unknown Album"
     }
 
     var displayYear: String? {
@@ -365,7 +515,8 @@ struct AuthorityRecommendation: Codable, Identifiable {
     }
 
     var sourceDisplayName: String {
-        switch source.lowercased() {
+        let src = source ?? sourceName ?? ""
+        switch src.lowercased() {
         case "jazzstandards.com":
             return "JazzStandards.com"
         case "allmusic":
@@ -373,12 +524,13 @@ struct AuthorityRecommendation: Codable, Identifiable {
         case "discogs":
             return "Discogs"
         default:
-            return source.capitalized
+            return src.capitalized
         }
     }
 
     var sourceColor: Color {
-        switch source.lowercased() {
+        let src = source ?? sourceName ?? ""
+        switch src.lowercased() {
         case "jazzstandards.com", "jazzstandards":
             return .blue
         case "ted_gioia":
@@ -528,6 +680,7 @@ enum RecordingSortOrder: String, CaseIterable, Identifiable {
             )
         }
     }
+
 #endif
 
 /// Special repertoire option for "All Songs"

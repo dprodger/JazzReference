@@ -70,7 +70,8 @@ extension Recording {
         isCanonical: true,
         notes: "The definitive recording that made this song famous worldwide.",
         performers: [Performer.preview1, Performer.preview2, Performer.preview3],
-        composer: "Paul Desmond"
+        composer: "Paul Desmond",
+        releases: [Release.preview, Release.previewNoSpotify]
     )
     
     static let preview2 = Recording(
@@ -92,7 +93,8 @@ extension Recording {
         isCanonical: false,
         notes: "Live recording from their Japan tour.",
         performers: [Performer.preview1, Performer.preview4],
-        composer: "Paul Desmond"
+        composer: "Paul Desmond",
+        releases: nil
     )
     
     static let previewMinimal = Recording(
@@ -114,7 +116,62 @@ extension Recording {
         isCanonical: false,
         notes: nil,
         performers: nil,
-        composer: nil
+        composer: nil,
+        releases: nil
+    )
+}
+
+extension Release {
+    static let preview = Release(
+        id: "preview-release-1",
+        title: "Time Out",
+        artistCredit: "The Dave Brubeck Quartet",
+        releaseDate: "1959-12-14",
+        releaseYear: 1959,
+        country: "US",
+        label: "Columbia",
+        catalogNumber: "CL 1397",
+        spotifyAlbumId: "0nTTEAhCZsbbeplyDMIFuA",
+        spotifyAlbumUrl: "https://open.spotify.com/album/0nTTEAhCZsbbeplyDMIFuA",
+        spotifyTrackId: "1YQWosTIljIvxAgHWTp7KP",
+        spotifyTrackUrl: "https://open.spotify.com/track/1YQWosTIljIvxAgHWTp7KP",
+        coverArtSmall: "https://i.scdn.co/image/ab67616d0000485196384c98ac4f3e7c2440f5b5",
+        coverArtMedium: "https://i.scdn.co/image/ab67616d0000b27396384c98ac4f3e7c2440f5b5",
+        coverArtLarge: "https://i.scdn.co/image/ab67616d000082c196384c98ac4f3e7c2440f5b5",
+        discNumber: 1,
+        trackNumber: 1,
+        totalTracks: 7,
+        formatName: "CD",
+        statusName: "official",
+        musicbrainzReleaseId: "b84ee12a-09ef-421b-82de-0441a926375b",
+        performers: nil,
+        performerCount: 4
+    )
+    
+    static let previewNoSpotify = Release(
+        id: "preview-release-2",
+        title: "Time Out (Original Mono)",
+        artistCredit: "The Dave Brubeck Quartet",
+        releaseDate: "1959-12-14",
+        releaseYear: 1959,
+        country: "US",
+        label: "Columbia",
+        catalogNumber: "CL 1397",
+        spotifyAlbumId: nil,
+        spotifyAlbumUrl: nil,
+        spotifyTrackId: nil,
+        spotifyTrackUrl: nil,
+        coverArtSmall: nil,
+        coverArtMedium: nil,
+        coverArtLarge: nil,
+        discNumber: 1,
+        trackNumber: 1,
+        totalTracks: 7,
+        formatName: "12\" Vinyl",
+        statusName: "official",
+        musicbrainzReleaseId: "c94ee12a-09ef-421b-82de-0441a926375c",
+        performers: nil,
+        performerCount: 4
     )
 }
 

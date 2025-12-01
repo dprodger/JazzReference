@@ -1367,3 +1367,22 @@ COMMENT ON COLUMN releases.musicbrainz_release_group_id IS
 -- UNION ALL SELECT 'recording_releases', COUNT(*) FROM recording_releases
 -- UNION ALL SELECT 'release_performers', COUNT(*) FROM release_performers;
 
+
+
+-- Migration: Add Spotify track fields to recording_releases junction table
+-- This allows storing the Spotify track ID/URL that links a specific recording
+-- to a specific track on a Spotify album (release)
+
+-- Add Spotify track fields
+ALTER TABLE recording_releases
+ADD COLUMN IF NOT EXISTS spotify_track_id VARCHAR(50),
+ADD COLUMN IF NOT EXISTS spotify_track_url VARCHAR(500);
+
+-- Index for quick lookups by Spotify track ID
+CREATE INDEX IF NOT EXISTS idx_recording_releases_spotify_track_id 
+ON recording_releases(spotify_track_id) 
+WHERE spotify_track_id IS NOT NULL;
+
+-- Comment
+COMMENT ON COLUMN recording_releases.spotify_track_id IS 'Spotify track ID for this recording on this release';
+COMMENT ON COLUMN recording_releases.spotify_track_url IS 'Full Spotify URL to the track';
