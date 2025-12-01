@@ -76,6 +76,7 @@ def get_song_detail(song_id):
                     FROM recording_performers rp2
                     JOIN performers p2 ON rp2.performer_id = p2.id
                     WHERE rp2.recording_id = r.id AND rp2.role = 'leader'
+                    ORDER BY p2.name
                     LIMIT 1
                 ) ASC NULLS LAST,
                 r.recording_year ASC NULLS LAST
