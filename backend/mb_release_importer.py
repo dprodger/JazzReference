@@ -222,12 +222,16 @@ class MBReleaseImporter:
         """
         Process a single MusicBrainz recording
         
-        OPTIMIZED: Uses the provided database connection (no new connections)
+        OPTIMIZED: 
+        - Uses the provided database connection (no new connections)
+        - Batch checks existing releases AND links in 2 queries total
+        - Skips all DB operations for fully-linked existing releases
         
         1. Create/find the recording in our database
         2. Check which releases already exist (batch query)
-        3. Only fetch details for NEW releases
-        4. Create releases and link performers
+        3. Check which links already exist (batch query)  
+        4. Only fetch details for NEW releases
+        5. Only create links for releases not yet linked
         
         Args:
             conn: Database connection (reused from caller)
@@ -269,59 +273,102 @@ class MBReleaseImporter:
             self.logger.error("  Failed to get/create recording")
             return
         
-        # STEP 2: Get list of MusicBrainz release IDs that already exist
-        existing_release_ids = self._get_existing_release_ids(
+        # STEP 2: Get mapping of MB release IDs to our release IDs (single query)
+        existing_releases = self._get_existing_release_ids(
             conn, [r.get('id') for r in mb_releases if r.get('id')]
         )
         
-        self.logger.info(f"  Processing {len(mb_releases)} releases "
-                       f"({len(existing_release_ids)} already in database)...")
+        # STEP 3: Batch check which links already exist (single query)
+        existing_release_db_ids = list(existing_releases.values())
+        existing_links = set()
+        if recording_id and existing_release_db_ids:
+            existing_links = self._get_existing_recording_release_links(
+                conn, recording_id, existing_release_db_ids
+            )
         
-        # STEP 3: Process each release
+        # Count how many existing releases are already fully linked
+        fully_linked_count = len(existing_links)
+        new_releases_count = len(mb_releases) - len(existing_releases)
+        needs_linking_count = len(existing_releases) - fully_linked_count
+        
+        self.logger.info(f"  Processing {len(mb_releases)} releases "
+                       f"({len(existing_releases)} in DB, {fully_linked_count} already linked, "
+                       f"{needs_linking_count} need linking, {new_releases_count} new)...")
+        
+        # STEP 4: Process each release
         for mb_release in mb_releases:
             self._process_release_in_transaction(
                 conn, recording_id, mb_recording_id, mb_recording, 
-                mb_release, existing_release_ids
+                mb_release, existing_releases, existing_links
             )
     
-    def _get_existing_release_ids(self, conn, mb_release_ids: List[str]) -> Set[str]:
+    def _get_existing_release_ids(self, conn, mb_release_ids: List[str]) -> Dict[str, str]:
         """
         Check which MusicBrainz release IDs already exist in the database
         
         OPTIMIZATION: Single batch query instead of one per release
+        Now returns mapping of MB ID -> our release ID for efficient lookup
         
         Args:
             conn: Database connection
             mb_release_ids: List of MusicBrainz release IDs to check
             
         Returns:
-            Set of MusicBrainz release IDs that already exist
+            Dict mapping MusicBrainz release ID -> our database release ID
         """
         if not mb_release_ids:
-            return set()
+            return {}
         
         with conn.cursor() as cur:
-            # Use ANY() for efficient batch lookup
+            # Use ANY() for efficient batch lookup, return both IDs
             cur.execute("""
-                SELECT musicbrainz_release_id 
+                SELECT musicbrainz_release_id, id 
                 FROM releases 
                 WHERE musicbrainz_release_id = ANY(%s)
             """, (mb_release_ids,))
             
-            return {row['musicbrainz_release_id'] for row in cur.fetchall()}
+            return {row['musicbrainz_release_id']: row['id'] for row in cur.fetchall()}
+    
+    def _get_existing_recording_release_links(self, conn, recording_id: str, 
+                                               release_ids: List[str]) -> Set[str]:
+        """
+        Check which recording-release links already exist
+        
+        OPTIMIZATION: Single batch query for all releases
+        
+        Args:
+            conn: Database connection
+            recording_id: Our recording ID
+            release_ids: List of our release IDs to check
+            
+        Returns:
+            Set of release IDs that are already linked to this recording
+        """
+        if not release_ids or not recording_id:
+            return set()
+        
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT release_id 
+                FROM recording_releases 
+                WHERE recording_id = %s AND release_id = ANY(%s)
+            """, (recording_id, release_ids))
+            
+            return {row['release_id'] for row in cur.fetchall()}
     
     def _process_release_in_transaction(
         self, conn, recording_id: Optional[str], mb_recording_id: str,
         mb_recording: Dict[str, Any], mb_release: Dict[str, Any],
-        existing_release_ids: Set[str]
+        existing_releases: Dict[str, str], existing_links: Set[str]
     ) -> None:
         """
         Process a single release within an existing transaction
         
         OPTIMIZED:
-        - Checks if release exists BEFORE making API call
-        - Skips API call for existing releases
-        - Uses existing connection (no new connections)
+        - Uses pre-fetched existing_releases mapping (MB ID -> our ID)
+        - Uses pre-fetched existing_links set (our release IDs already linked)
+        - Skips entirely for releases that are already fully linked
+        - No individual DB queries for existing releases
         
         Args:
             conn: Database connection (reused)
@@ -329,21 +376,27 @@ class MBReleaseImporter:
             mb_recording_id: MusicBrainz recording ID
             mb_recording: MusicBrainz recording data
             mb_release: Basic MusicBrainz release data
-            existing_release_ids: Set of MB release IDs already in database
+            existing_releases: Dict mapping MB release ID -> our release ID
+            existing_links: Set of our release IDs already linked to this recording
         """
         mb_release_id = mb_release.get('id')
         release_title = mb_release.get('title', 'Unknown')
         
-        # OPTIMIZATION: Check if release already exists BEFORE API call
-        if mb_release_id in existing_release_ids:
-            self.logger.debug(f"    Skipping API call for existing release: {release_title[:40]}")
+        # OPTIMIZATION: Check if release exists using pre-fetched data
+        if mb_release_id in existing_releases:
+            release_id = existing_releases[mb_release_id]
             self.stats['releases_existing'] += 1
             self.stats['releases_skipped_api'] += 1
             
-            # Still need to link recording to release if not already linked
-            release_id = self._get_release_id_by_mb_id(conn, mb_release_id)
-            if release_id and recording_id:
-                self._link_recording_to_release(
+            # Check if already linked using pre-fetched data (no DB query!)
+            if release_id in existing_links:
+                self.logger.debug(f"    Skipping fully-linked release: {release_title[:40]}")
+                return
+            
+            # Need to create link (but release exists)
+            if recording_id:
+                self.logger.debug(f"    Creating link for existing release: {release_title[:40]}")
+                self._link_recording_to_release_fast(
                     conn, recording_id, release_id, mb_recording_id, mb_release
                 )
             return
@@ -376,7 +429,7 @@ class MBReleaseImporter:
             self.stats['releases_created'] += 1
             
             # Link recording to release
-            link_created = self._link_recording_to_release(
+            link_created = self._link_recording_to_release_fast(
                 conn, recording_id, release_id, mb_recording_id, release_details
             )
             
@@ -573,6 +626,42 @@ class MBReleaseImporter:
                 return False
             
             # Create the link
+            cur.execute("""
+                INSERT INTO recording_releases (
+                    recording_id, release_id, disc_number, track_number, track_position
+                )
+                VALUES (%s, %s, %s, %s, %s)
+                ON CONFLICT DO NOTHING
+            """, (recording_id, release_id, disc_number, track_number, track_position))
+            
+            self.logger.debug(f"    Linked recording to release (disc {disc_number}, track {track_number})")
+            return True
+    
+    def _link_recording_to_release_fast(self, conn, recording_id: str, release_id: str,
+                                         mb_recording_id: str, release_data: Dict[str, Any]) -> bool:
+        """
+        Link a recording to a release - FAST version that skips existence check
+        
+        OPTIMIZATION: Caller has already verified link doesn't exist via batch query.
+        Uses INSERT ... ON CONFLICT DO NOTHING as safety net.
+        
+        Args:
+            conn: Database connection
+            recording_id: Our recording ID
+            release_id: Our release ID
+            mb_recording_id: MusicBrainz recording ID
+            release_data: MusicBrainz release data (for track position)
+            
+        Returns:
+            True (always, since we skip the check)
+        """
+        # Find track position for this recording in the release
+        disc_number, track_number, track_position = self._find_track_position(
+            release_data, mb_recording_id
+        )
+        
+        with conn.cursor() as cur:
+            # Insert directly - ON CONFLICT handles race conditions
             cur.execute("""
                 INSERT INTO recording_releases (
                     recording_id, release_id, disc_number, track_number, track_position
