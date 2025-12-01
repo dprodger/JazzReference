@@ -342,7 +342,8 @@ struct RecordingsSection: View {
         // Then, apply Spotify filter
         switch selectedFilter {
         case .withSpotify:
-            result = result.filter { $0.spotifyUrl != nil }
+            // Use bestSpotifyUrl which checks releases first, then falls back to recording URL
+            result = result.filter { $0.bestSpotifyUrl != nil }
         case .all:
             break
         }

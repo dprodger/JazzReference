@@ -71,6 +71,14 @@ struct Recording: Codable, Identifiable {
     let albumArtSmall: String?
     let albumArtMedium: String?
     let albumArtLarge: String?
+    
+    // Best cover art from Spotify-linked releases (provided by API)
+    let bestCoverArtSmall: String?
+    let bestCoverArtMedium: String?
+    let bestCoverArtLarge: String?
+    // Best Spotify URL from releases (provided by API)
+    let bestSpotifyUrlFromRelease: String?
+    
     let youtubeUrl: String?
     let appleMusicUrl: String?
     let musicbrainzId: String?
@@ -83,7 +91,7 @@ struct Recording: Codable, Identifiable {
     var authoritySources: [String]?
     var authorityRecommendations: [AuthorityRecommendation]?
     
-    // NEW: Releases this recording appears on
+    // Releases this recording appears on (only populated on recording detail)
     let releases: [Release]?
 
     enum CodingKeys: String, CodingKey {
@@ -98,6 +106,10 @@ struct Recording: Codable, Identifiable {
         case albumArtSmall = "album_art_small"
         case albumArtMedium = "album_art_medium"
         case albumArtLarge = "album_art_large"
+        case bestCoverArtSmall = "best_cover_art_small"
+        case bestCoverArtMedium = "best_cover_art_medium"
+        case bestCoverArtLarge = "best_cover_art_large"
+        case bestSpotifyUrlFromRelease = "best_spotify_url"
         case youtubeUrl = "youtube_url"
         case appleMusicUrl = "apple_music_url"
         case isCanonical = "is_canonical"
@@ -118,7 +130,7 @@ struct Recording: Codable, Identifiable {
         if count == 1, let source = authoritySources?.first {
             return authoritySourceDisplayName(source)
         }
-        return "\(count) sources"
+        return "\\(count) sources"
     }
 
     var primaryAuthoritySource: String? {
@@ -140,13 +152,16 @@ struct Recording: Codable, Identifiable {
     
     // MARK: - Release-aware computed properties
     
-    /// Get the best Spotify URL - prefer track URL from release with Spotify, fall back to recording URL
+    /// Get the best Spotify URL - prefer API-provided best, then releases, then recording URL
     var bestSpotifyUrl: String? {
-        // First try to get from a release with a specific track URL
+        // First try API-provided best URL (from song detail endpoint)
+        if let apiUrl = bestSpotifyUrlFromRelease {
+            return apiUrl
+        }
+        // Then try releases array (when viewing recording detail)
         if let release = releases?.first(where: { $0.spotifyTrackUrl != nil }) {
             return release.spotifyTrackUrl
         }
-        // Then try album URL from a release
         if let release = releases?.first(where: { $0.spotifyAlbumUrl != nil }) {
             return release.spotifyAlbumUrl
         }
@@ -154,8 +169,11 @@ struct Recording: Codable, Identifiable {
         return spotifyUrl
     }
     
-    /// Get the best album art - prefer from release with Spotify
+    /// Get the best album art - prefer API-provided best, then releases, then recording
     var bestAlbumArtSmall: String? {
+        if let apiArt = bestCoverArtSmall {
+            return apiArt
+        }
         if let release = releases?.first(where: { $0.spotifyAlbumId != nil && $0.coverArtSmall != nil }) {
             return release.coverArtSmall
         }
@@ -163,6 +181,9 @@ struct Recording: Codable, Identifiable {
     }
     
     var bestAlbumArtMedium: String? {
+        if let apiArt = bestCoverArtMedium {
+            return apiArt
+        }
         if let release = releases?.first(where: { $0.spotifyAlbumId != nil && $0.coverArtMedium != nil }) {
             return release.coverArtMedium
         }
@@ -170,6 +191,9 @@ struct Recording: Codable, Identifiable {
     }
     
     var bestAlbumArtLarge: String? {
+        if let apiArt = bestCoverArtLarge {
+            return apiArt
+        }
         if let release = releases?.first(where: { $0.spotifyAlbumId != nil && $0.coverArtLarge != nil }) {
             return release.coverArtLarge
         }
@@ -187,7 +211,6 @@ struct Recording: Codable, Identifiable {
         return !releases.isEmpty
     }
 }
-
 // MARK: - Release Model (NEW)
 
 struct Release: Identifiable, Codable {

@@ -620,9 +620,9 @@ struct AuthoritativeRecordingCard: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            // Album Art - larger size
+            // Album Art - larger size (use bestAlbumArt which prefers release cover art)
             Group {
-                if let albumArtUrl = recording.albumArtLarge ?? recording.albumArtMedium {
+                if let albumArtUrl = recording.bestAlbumArtLarge ?? recording.bestAlbumArtMedium {
                     AsyncImage(url: URL(string: albumArtUrl)) { phase in
                         switch phase {
                         case .empty:
@@ -707,3 +707,4 @@ struct AuthoritativeRecordingCard: View {
             .environmentObject(RepertoireManager())
     }
 }
+    

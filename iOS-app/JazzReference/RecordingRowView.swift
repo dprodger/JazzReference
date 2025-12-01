@@ -31,7 +31,8 @@ struct RecordingRowView: View {
         VStack(alignment: .leading, spacing: 8) {
             // Album artwork
             ZStack(alignment: .topTrailing) {
-                if let albumArtUrl = recording.albumArtMedium ?? recording.albumArtSmall {
+                // Use bestAlbumArt properties which prefer release cover art with Spotify
+                if let albumArtUrl = recording.bestAlbumArtMedium ?? recording.bestAlbumArtSmall {
                     AsyncImage(url: URL(string: albumArtUrl)) { phase in
                         switch phase {
                         case .empty:
