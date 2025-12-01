@@ -31,7 +31,7 @@ from db_utils import get_db_connection
 from rapidfuzz import fuzz
 
 # Ensure log directory exists BEFORE logging configuration
-(Path(__file__).parent / 'logs').mkdir(exist_ok=True)
+(Path(__file__).parent / 'log').mkdir(exist_ok=True)
 
 # Logging configuration
 logging.basicConfig(
