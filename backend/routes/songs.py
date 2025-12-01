@@ -110,6 +110,41 @@ def get_song_detail(song_id):
                     r.album_art_small,
                     r.album_art_medium,
                     r.album_art_large,
+                    -- Best cover art from Spotify-linked releases
+                    (SELECT rel.cover_art_small 
+                     FROM recording_releases rr_sub
+                     JOIN releases rel ON rr_sub.release_id = rel.id
+                     WHERE rr_sub.recording_id = r.id 
+                       AND rel.spotify_album_id IS NOT NULL 
+                       AND rel.cover_art_small IS NOT NULL
+                     ORDER BY rel.release_year DESC NULLS LAST
+                     LIMIT 1) as best_cover_art_small,
+                    (SELECT rel.cover_art_medium 
+                     FROM recording_releases rr_sub
+                     JOIN releases rel ON rr_sub.release_id = rel.id
+                     WHERE rr_sub.recording_id = r.id 
+                       AND rel.spotify_album_id IS NOT NULL 
+                       AND rel.cover_art_medium IS NOT NULL
+                     ORDER BY rel.release_year DESC NULLS LAST
+                     LIMIT 1) as best_cover_art_medium,
+                    (SELECT rel.cover_art_large 
+                     FROM recording_releases rr_sub
+                     JOIN releases rel ON rr_sub.release_id = rel.id
+                     WHERE rr_sub.recording_id = r.id 
+                       AND rel.spotify_album_id IS NOT NULL 
+                       AND rel.cover_art_large IS NOT NULL
+                     ORDER BY rel.release_year DESC NULLS LAST
+                     LIMIT 1) as best_cover_art_large,
+                    -- Best Spotify URL from releases
+                    (SELECT COALESCE(rr_sub.spotify_track_url, rel.spotify_album_url)
+                     FROM recording_releases rr_sub
+                     JOIN releases rel ON rr_sub.release_id = rel.id
+                     WHERE rr_sub.recording_id = r.id 
+                       AND (rr_sub.spotify_track_url IS NOT NULL OR rel.spotify_album_url IS NOT NULL)
+                     ORDER BY 
+                       CASE WHEN rr_sub.spotify_track_url IS NOT NULL THEN 0 ELSE 1 END,
+                       rel.release_year DESC NULLS LAST
+                     LIMIT 1) as best_spotify_url,
                     r.youtube_url,
                     r.apple_music_url,
                     r.musicbrainz_id,
@@ -133,9 +168,9 @@ def get_song_detail(song_id):
                         ) FILTER (WHERE p.id IS NOT NULL),
                         '[]'::json
                     ) as performers,
-                    -- NEW: Authority recommendation count per recording
+                    -- Authority recommendation count per recording
                     COUNT(DISTINCT sar.id) as authority_count,
-                    -- NEW: Array of authority sources
+                    -- Array of authority sources
                     COALESCE(
                         array_agg(DISTINCT sar.source) FILTER (WHERE sar.source IS NOT NULL),
                         ARRAY[]::text[]
@@ -144,7 +179,6 @@ def get_song_detail(song_id):
                 LEFT JOIN recording_performers rp ON r.id = rp.recording_id
                 LEFT JOIN performers p ON rp.performer_id = p.id
                 LEFT JOIN instruments i ON rp.instrument_id = i.id
-                -- NEW: Join authority recommendations
                 LEFT JOIN song_authority_recommendations sar 
                     ON r.id = sar.recording_id
                 WHERE r.song_id = %s
