@@ -4,7 +4,7 @@ Coordinates background research tasks for songs
 
 It uses:
 - MBReleaseImporter for MusicBrainz releases and performer data
-- SpotifyMatcher for Spotify track matching (with caching)
+- SpotifyMatcher for Spotify release and track matching (with caching)
 """
 
 import logging
@@ -88,13 +88,13 @@ def research_song(song_id: str, song_name: str) -> Dict[str, Any]:
         if not wikipedia_updated:
             logger.debug("Wikipedia URL not updated (already set or not found)")
         
-        # Step 2: Match Spotify tracks
+        # Step 2: Match Spotify releases and tracks
         # SpotifyMatcher uses default cache settings: 30 days expiration, no force_refresh
         # This minimizes API calls and speeds up repeated research operations
         matcher = SpotifyMatcher(dry_run=False, strict_mode=True, logger=logger)
         
-        logger.info("Matching Spotify tracks...")
-        spotify_result = matcher.match_recordings(str(song_id))
+        logger.info("Matching Spotify releases...")
+        spotify_result = matcher.match_releases(str(song_id))
         
         if not spotify_result['success']:
             # Spotify matching failed, but MusicBrainz succeeded
@@ -119,11 +119,14 @@ def research_song(song_id: str, song_name: str) -> Dict[str, Any]:
         
         spotify_stats = spotify_result['stats']
         logger.info(f"✓ Spotify matching complete")
-        logger.info(f"  Recordings processed: {spotify_stats['recordings_processed']}")
-        logger.info(f"  Spotify matches found: {spotify_stats['recordings_with_spotify']}")
-        logger.info(f"  Recordings updated: {spotify_stats['recordings_updated']}")
-        logger.info(f"  No match found: {spotify_stats['recordings_no_match']}")
-        logger.info(f"  Already had URL: {spotify_stats['recordings_skipped']}")
+        logger.info(f"  Releases processed: {spotify_stats['releases_processed']}")
+        logger.info(f"  Spotify matches found: {spotify_stats['releases_with_spotify']}")
+        logger.info(f"  Releases updated: {spotify_stats['releases_updated']}")
+        logger.info(f"  No match found: {spotify_stats['releases_no_match']}")
+        logger.info(f"  Already had URL: {spotify_stats['releases_skipped']}")
+        logger.info(f"  Tracks matched: {spotify_stats['tracks_matched']}")
+        logger.info(f"  Tracks skipped: {spotify_stats['tracks_skipped']}")
+        logger.info(f"  Tracks no match: {spotify_stats['tracks_no_match']}")
         logger.info(f"  Cache hits: {spotify_stats['cache_hits']}")
         logger.info(f"  API calls: {spotify_stats['api_calls']}")
         
