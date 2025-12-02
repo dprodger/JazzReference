@@ -524,6 +524,38 @@ class SpotifyMatcher:
         # Check if shorter is a complete substring of longer
         return shorter in longer
     
+    def extract_primary_artist(self, artist_credit: str) -> str:
+        """
+        Extract the primary artist from a MusicBrainz artist_credit string.
+        
+        MusicBrainz artist_credit can contain multiple artists joined by various
+        separators (', ', '; ', '/', ' & '). For Spotify searches, we typically
+        only need the primary (first) artist to get a good match.
+        
+        This prevents issues with long artist strings like:
+        "Dave Brubeck, Claude Debussy, João Donato/João Gilberto, Bill Evans..."
+        
+        Args:
+            artist_credit: Full artist credit string from MusicBrainz
+            
+        Returns:
+            Primary artist name (first artist in the credit)
+        """
+        if not artist_credit:
+            return None
+        
+        # Common separators in MusicBrainz artist credits
+        # Order matters - check multi-char separators first
+        separators = [', ', '; ', ' / ', '/', ' & ']
+        
+        result = artist_credit
+        for sep in separators:
+            if sep in result:
+                result = result.split(sep)[0]
+                break
+        
+        return result.strip() if result else None
+    
     def validate_match(self, spotify_track: dict, expected_song: str, 
                       expected_artist: str, expected_album: str) -> tuple:
         """
@@ -1672,7 +1704,10 @@ class SpotifyMatcher:
                 year = release['release_year']
                 
                 # Get artist - prefer artist_credit, fall back to performers
-                artist_name = release.get('artist_credit')
+                # Use extract_primary_artist to avoid overly long search queries
+                artist_credit = release.get('artist_credit')
+                artist_name = self.extract_primary_artist(artist_credit) if artist_credit else None
+                
                 if not artist_name:
                     performers = release.get('performers') or []
                     leaders = [p['name'] for p in performers if p.get('role') == 'leader']
