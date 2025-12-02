@@ -36,13 +36,15 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def print_header(dry_run: bool):
+def print_header(dry_run: bool, force_refresh: bool = False):
     """Print CLI header"""
     logger.info("="*80)
     logger.info("MusicBrainz Recording & Release Import")
     logger.info("="*80)
     if dry_run:
         logger.info("*** DRY RUN MODE - No database changes will be made ***")
+    if force_refresh:
+        logger.info("*** FORCE REFRESH MODE - Bypassing MusicBrainz cache ***")
     logger.info("")
 
 
@@ -107,6 +109,9 @@ Examples:
   # Enable debug logging
   python import_mb_releases.py --name "Autumn Leaves" --debug
   
+  # Force refresh from MusicBrainz API (bypass cache)
+  python import_mb_releases.py --name "Autumn Leaves" --force-refresh
+  
   # Limit recordings to process
   python import_mb_releases.py --name "Body and Soul" --limit 10
 
@@ -157,6 +162,12 @@ Performance optimizations:
         help='Maximum number of recordings to fetch (default: 100)'
     )
     
+    parser.add_argument(
+        '--force-refresh',
+        action='store_true',
+        help='Force refresh from MusicBrainz API (bypass cache)'
+    )
+    
     args = parser.parse_args()
     
     # Set logging level
@@ -164,10 +175,14 @@ Performance optimizations:
         logging.getLogger().setLevel(logging.DEBUG)
     
     # Print header
-    print_header(args.dry_run)
+    print_header(args.dry_run, args.force_refresh)
     
     # Create importer with CLI logger
-    importer = MBReleaseImporter(dry_run=args.dry_run, logger=logger)
+    importer = MBReleaseImporter(
+        dry_run=args.dry_run,
+        force_refresh=args.force_refresh,
+        logger=logger
+    )
     
     # Retrieve song from database
     try:

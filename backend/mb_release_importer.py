@@ -34,17 +34,19 @@ class MBReleaseImporter:
     - Efficient lookup table caching
     """
     
-    def __init__(self, dry_run: bool = False, logger: Optional[logging.Logger] = None):
+    def __init__(self, dry_run: bool = False, force_refresh: bool = False, logger: Optional[logging.Logger] = None):
         """
         Initialize the importer
         
         Args:
             dry_run: If True, don't make database changes
+            force_refresh: If True, bypass MusicBrainz cache
             logger: Optional logger instance (creates one if not provided)
         """
         self.dry_run = dry_run
+        self.force_refresh = force_refresh
         self.logger = logger or logging.getLogger(__name__)
-        self.mb_searcher = MusicBrainzSearcher()
+        self.mb_searcher = MusicBrainzSearcher(force_refresh=force_refresh)
         self.performer_importer = PerformerImporter(dry_run=dry_run)
         self.stats = {
             'recordings_found': 0,
@@ -64,7 +66,7 @@ class MBReleaseImporter:
         self._status_cache = {}
         self._packaging_cache = {}
         
-        self.logger.info("MBReleaseImporter initialized (optimized version)")
+        self.logger.info(f"MBReleaseImporter initialized (optimized version, force_refresh={force_refresh})")
     
     def find_song(self, song_identifier: str) -> Optional[Dict[str, Any]]:
         """
