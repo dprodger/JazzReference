@@ -130,7 +130,7 @@ struct Recording: Codable, Identifiable {
         if count == 1, let source = authoritySources?.first {
             return authoritySourceDisplayName(source)
         }
-        return "\\(count) sources"
+        return "\(count) sources"
     }
 
     var primaryAuthoritySource: String? {
@@ -232,7 +232,8 @@ struct Recording: Codable, Identifiable {
         return !releases.isEmpty
     }
 }
-// MARK: - Release Model (NEW)
+
+// MARK: - Release Model
 
 struct Release: Identifiable, Codable {
     let id: String
@@ -433,7 +434,7 @@ struct ArtistImage: Codable, Identifiable {
     }
 }
 
-// MARK: - NEW: Repertoire Models
+// MARK: - Repertoire Model
 
 /// Represents a named collection of songs (a repertoire)
 struct Repertoire: Codable, Identifiable, Hashable {
@@ -459,10 +460,19 @@ struct Repertoire: Codable, Identifiable, Hashable {
     static func == (lhs: Repertoire, rhs: Repertoire) -> Bool {
         lhs.id == rhs.id
     }
+    
+    /// Special repertoire option for "All Songs"
+    static var allSongs: Repertoire {
+        Repertoire(
+            id: "all",
+            name: "All Songs",
+            description: "View all songs in the database",
+            songCount: 0,
+            createdAt: nil,
+            updatedAt: nil
+        )
+    }
 }
-
-// Solo Transcriptions - iOS Models and API Methods
-// Add these to iOS-app/JazzReference/JazzReferenceApp.swift
 
 // MARK: - Solo Transcription Model
 
@@ -494,6 +504,58 @@ struct SoloTranscription: Codable, Identifiable {
         case composer
         case label
     }
+    
+    // MARK: - Preview Data
+    
+    #if DEBUG
+    static var preview1: SoloTranscription {
+        SoloTranscription(
+            id: "preview-transcription-1",
+            songId: "preview-song-1",
+            recordingId: "preview-recording-1",
+            youtubeUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+            createdAt: "2024-01-15T10:30:00Z",
+            updatedAt: "2024-01-15T10:30:00Z",
+            songTitle: "Autumn Leaves",
+            albumTitle: "Kind of Blue",
+            recordingYear: 1959,
+            composer: "Joseph Kosma",
+            label: "Columbia"
+        )
+    }
+
+    static var preview2: SoloTranscription {
+        SoloTranscription(
+            id: "preview-transcription-2",
+            songId: "preview-song-1",
+            recordingId: "preview-recording-2",
+            youtubeUrl: "https://www.youtube.com/watch?v=abc123xyz",
+            createdAt: "2024-02-20T14:15:00Z",
+            updatedAt: "2024-02-20T14:15:00Z",
+            songTitle: "Autumn Leaves",
+            albumTitle: "Waltz for Debby",
+            recordingYear: 1961,
+            composer: "Joseph Kosma",
+            label: "Riverside"
+        )
+    }
+
+    static var previewMinimal: SoloTranscription {
+        SoloTranscription(
+            id: "preview-transcription-3",
+            songId: "preview-song-2",
+            recordingId: "preview-recording-3",
+            youtubeUrl: "https://www.youtube.com/watch?v=xyz789abc",
+            createdAt: "2024-03-10T09:00:00Z",
+            updatedAt: "2024-03-10T09:00:00Z",
+            songTitle: "Blue in Green",
+            albumTitle: nil,
+            recordingYear: nil,
+            composer: nil,
+            label: nil
+        )
+    }
+    #endif
 }
 
 // MARK: - Authority Recommendation Model
@@ -650,7 +712,7 @@ struct ExternalReference: Identifiable {
 }
 
 // MARK: - Recording Sort Order Enum
-// UPDATED: Changed from authority/year/canonical to name/year
+
 enum RecordingSortOrder: String, CaseIterable, Identifiable {
     case year = "year"
     case name = "name"
@@ -669,74 +731,5 @@ enum RecordingSortOrder: String, CaseIterable, Identifiable {
         case .year: return "calendar"
         case .name: return "person.text.rectangle"
         }
-    }
-}
-
-// MARK: - Preview Data for Solo Transcriptions
-
-#if DEBUG
-    extension SoloTranscription {
-        static var preview1: SoloTranscription {
-            SoloTranscription(
-                id: "preview-transcription-1",
-                songId: "preview-song-1",
-                recordingId: "preview-recording-1",
-                youtubeUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-                createdAt: "2024-01-15T10:30:00Z",
-                updatedAt: "2024-01-15T10:30:00Z",
-                songTitle: "Autumn Leaves",
-                albumTitle: "Kind of Blue",
-                recordingYear: 1959,
-                composer: "Joseph Kosma",
-                label: "Columbia"
-            )
-        }
-
-        static var preview2: SoloTranscription {
-            SoloTranscription(
-                id: "preview-transcription-2",
-                songId: "preview-song-1",
-                recordingId: "preview-recording-2",
-                youtubeUrl: "https://www.youtube.com/watch?v=abc123xyz",
-                createdAt: "2024-02-20T14:15:00Z",
-                updatedAt: "2024-02-20T14:15:00Z",
-                songTitle: "Autumn Leaves",
-                albumTitle: "Waltz for Debby",
-                recordingYear: 1961,
-                composer: "Joseph Kosma",
-                label: "Riverside"
-            )
-        }
-
-        static var previewMinimal: SoloTranscription {
-            SoloTranscription(
-                id: "preview-transcription-3",
-                songId: "preview-song-2",
-                recordingId: "preview-recording-3",
-                youtubeUrl: "https://www.youtube.com/watch?v=xyz789abc",
-                createdAt: "2024-03-10T09:00:00Z",
-                updatedAt: "2024-03-10T09:00:00Z",
-                songTitle: "Blue in Green",
-                albumTitle: nil,
-                recordingYear: nil,
-                composer: nil,
-                label: nil
-            )
-        }
-    }
-
-#endif
-
-/// Special repertoire option for "All Songs"
-extension Repertoire {
-    static var allSongs: Repertoire {
-        Repertoire(
-            id: "all",
-            name: "All Songs",
-            description: "View all songs in the database",
-            songCount: 0,
-            createdAt: nil,
-            updatedAt: nil
-        )
     }
 }
