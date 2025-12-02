@@ -270,3 +270,171 @@ def get_song_authorities(song_id):
     except Exception as e:
         logger.error(f"Error fetching song authorities: {e}", exc_info=True)
         return jsonify({'error': 'Failed to fetch authorities', 'detail': str(e)}), 500
+        
+        
+# Add this endpoint to backend/routes/authority.py
+# Place after the DELETE /api/authorities/<authority_id> endpoint
+
+# =============================================================================
+# PATCH /api/authorities/<authority_id>/link
+# =============================================================================
+
+@authorities_bp.route('/api/authorities/<authority_id>/link', methods=['PATCH'])
+def link_authority_to_recording(authority_id):
+    """
+    Link an unmatched authority recommendation to a recording
+    
+    Request body:
+    {
+        "recording_id": "uuid-of-recording"
+    }
+    
+    Returns the updated authority recommendation
+    """
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({'error': 'Request body required'}), 400
+        
+        recording_id = data.get('recording_id')
+        if not recording_id:
+            return jsonify({'error': 'recording_id is required'}), 400
+        
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                # Verify authority exists
+                cur.execute("""
+                    SELECT id, song_id, recording_id, source
+                    FROM song_authority_recommendations
+                    WHERE id = %s
+                """, (authority_id,))
+                
+                authority = cur.fetchone()
+                
+                if not authority:
+                    return jsonify({'error': 'Authority recommendation not found'}), 404
+                
+                # Verify recording exists and belongs to the same song
+                cur.execute("""
+                    SELECT id, song_id, album_title
+                    FROM recordings
+                    WHERE id = %s
+                """, (recording_id,))
+                
+                recording = cur.fetchone()
+                
+                if not recording:
+                    return jsonify({'error': 'Recording not found'}), 404
+                
+                # Verify the recording belongs to the same song
+                if str(recording['song_id']) != str(authority['song_id']):
+                    return jsonify({
+                        'error': 'Recording does not belong to the same song as the authority recommendation'
+                    }), 400
+                
+                # Check if already linked to a different recording
+                if authority['recording_id'] and str(authority['recording_id']) != recording_id:
+                    return jsonify({
+                        'error': 'Authority is already linked to a different recording',
+                        'current_recording_id': str(authority['recording_id'])
+                    }), 409
+                
+                # Update the authority with the recording_id
+                cur.execute("""
+                    UPDATE song_authority_recommendations
+                    SET recording_id = %s,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE id = %s
+                    RETURNING 
+                        id,
+                        song_id,
+                        recording_id,
+                        source,
+                        recommendation_text,
+                        source_url,
+                        artist_name,
+                        album_title,
+                        recording_year,
+                        itunes_album_id,
+                        itunes_track_id,
+                        captured_at,
+                        created_at,
+                        updated_at
+                """, (recording_id, authority_id))
+                
+                updated_authority = cur.fetchone()
+                conn.commit()
+                
+                logger.info(f"Linked authority {authority_id} to recording {recording_id}")
+                
+                return jsonify(updated_authority), 200
+                
+    except Exception as e:
+        logger.error(f"Error linking authority to recording: {e}", exc_info=True)
+        return jsonify({'error': 'Failed to link authority', 'detail': str(e)}), 500
+
+
+# =============================================================================
+# PATCH /api/authorities/<authority_id>/unlink
+# =============================================================================
+
+@authorities_bp.route('/api/authorities/<authority_id>/unlink', methods=['PATCH'])
+def unlink_authority_from_recording(authority_id):
+    """
+    Unlink an authority recommendation from its recording
+    Sets recording_id to NULL
+    
+    Returns the updated authority recommendation
+    """
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                # Verify authority exists
+                cur.execute("""
+                    SELECT id, recording_id
+                    FROM song_authority_recommendations
+                    WHERE id = %s
+                """, (authority_id,))
+                
+                authority = cur.fetchone()
+                
+                if not authority:
+                    return jsonify({'error': 'Authority recommendation not found'}), 404
+                
+                if not authority['recording_id']:
+                    return jsonify({'error': 'Authority is not linked to any recording'}), 400
+                
+                # Update the authority to remove the recording_id
+                cur.execute("""
+                    UPDATE song_authority_recommendations
+                    SET recording_id = NULL,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE id = %s
+                    RETURNING 
+                        id,
+                        song_id,
+                        recording_id,
+                        source,
+                        recommendation_text,
+                        source_url,
+                        artist_name,
+                        album_title,
+                        recording_year,
+                        itunes_album_id,
+                        itunes_track_id,
+                        captured_at,
+                        created_at,
+                        updated_at
+                """, (authority_id,))
+                
+                updated_authority = cur.fetchone()
+                conn.commit()
+                
+                logger.info(f"Unlinked authority {authority_id} from recording")
+                
+                return jsonify(updated_authority), 200
+                
+    except Exception as e:
+        logger.error(f"Error unlinking authority from recording: {e}", exc_info=True)
+        return jsonify({'error': 'Failed to unlink authority', 'detail': str(e)}), 500        
