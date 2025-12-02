@@ -100,24 +100,34 @@ def get_queue_items():
 @research_bp.route('/api/admin/research/queue-all-songs', methods=['POST'])
 def queue_all_songs_for_research():
     """
-    Admin endpoint to queue all songs in the database for research
+    Admin endpoint to queue songs for research
     
-    This endpoint queries all songs from the database and adds each one
-    to the background research queue for data refresh.
-    
-    Returns:
-        JSON response with summary statistics
+    Query Parameters:
+        batch_size (int, optional): Limit number of songs to queue
+        repertoire_id (uuid, optional): Only queue songs from this repertoire
     """
     try:
-        # Get optional batch_size parameter
         batch_size = request.args.get('batch_size', type=int)
+        repertoire_id = request.args.get('repertoire_id')
         
-        # Query with optional LIMIT
-        query = "SELECT id, title FROM songs ORDER BY title"
+        # Build query based on parameters
+        if repertoire_id:
+            query = """
+                SELECT s.id, s.title 
+                FROM songs s
+                INNER JOIN repertoire_songs rs ON s.id = rs.song_id
+                WHERE rs.repertoire_id = %s
+                ORDER BY s.title
+            """
+            params = (repertoire_id,)
+        else:
+            query = "SELECT id, title FROM songs ORDER BY title"
+            params = None
+        
         if batch_size and batch_size > 0:
-            query += f" LIMIT {batch_size}"        
-            
-        songs = db_tools.execute_query(query)
+            query += f" LIMIT {batch_size}"
+        
+        songs = db_tools.execute_query(query, params) if params else db_tools.execute_query(query)
         
         if not songs:
             return jsonify({
