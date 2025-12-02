@@ -288,7 +288,8 @@ struct RecordingDetailView: View {
         .sheet(isPresented: $showingAuthoritySheet) {
             AuthorityRecommendationsView(
                 recordingId: recordingId,
-                albumTitle: recording?.albumTitle ?? "Unknown Album"
+                albumTitle: recording?.albumTitle ?? "Unknown Album",
+                songId: recording?.songId  // ← Add this line
             )
         }
         .alert("Report Submitted", isPresented: $showingSubmissionAlert) {

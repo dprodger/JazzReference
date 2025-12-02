@@ -4,6 +4,7 @@
 //
 //  Created by Dave Rodger on 11/28/25.
 //  View and manage authority recommendations for a recording
+//  Updated to show unmatched song recommendations for linking
 //
 
 import SwiftUI
@@ -13,13 +14,18 @@ import SwiftUI
 struct AuthorityRecommendationsView: View {
     let recordingId: String
     let albumTitle: String
+    let songId: String?  // Optional: when provided, also fetch unmatched song recommendations
     
     @State private var authorities: [AuthorityRecommendation] = []
+    @State private var unmatchedAuthorities: [AuthorityRecommendation] = []
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var showingAddSheet = false
     @State private var deleteTarget: AuthorityRecommendation?
     @State private var showingDeleteConfirmation = false
+    @State private var linkTarget: AuthorityRecommendation?
+    @State private var showingLinkConfirmation = false
+    @State private var linkingInProgress = false
     
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openURL) private var openURL
@@ -43,7 +49,7 @@ struct AuthorityRecommendationsView: View {
                         .buttonStyle(.bordered)
                     }
                     .padding()
-                } else if authorities.isEmpty {
+                } else if authorities.isEmpty && unmatchedAuthorities.isEmpty {
                     VStack(spacing: 16) {
                         Image(systemName: "doc.badge.plus")
                             .font(.system(size: 48))
@@ -60,22 +66,64 @@ struct AuthorityRecommendationsView: View {
                     .padding()
                 } else {
                     List {
-                        ForEach(authorities) { authority in
-                            AuthorityRowView(authority: authority)
-                                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                                    Button(role: .destructive) {
-                                        deleteTarget = authority
-                                        showingDeleteConfirmation = true
-                                    } label: {
-                                        Label("Delete", systemImage: "trash")
-                                    }
+                        // Section for authorities linked to this recording
+                        if !authorities.isEmpty {
+                            Section {
+                                ForEach(authorities) { authority in
+                                    AuthorityRowView(authority: authority)
+                                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                                            Button(role: .destructive) {
+                                                deleteTarget = authority
+                                                showingDeleteConfirmation = true
+                                            } label: {
+                                                Label("Delete", systemImage: "trash")
+                                            }
+                                        }
+                                        .onTapGesture {
+                                            if let urlString = authority.sourceUrl,
+                                               let url = URL(string: urlString) {
+                                                openURL(url)
+                                            }
+                                        }
                                 }
-                                .onTapGesture {
-                                    if let urlString = authority.sourceUrl,
-                                       let url = URL(string: urlString) {
-                                        openURL(url)
-                                    }
+                            } header: {
+                                Text("Linked to This Recording")
+                            }
+                        }
+                        
+                        // Section for unmatched song recommendations
+                        if !unmatchedAuthorities.isEmpty {
+                            Section {
+                                ForEach(unmatchedAuthorities) { authority in
+                                    UnmatchedAuthorityRowView(authority: authority)
+                                        .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                                            Button {
+                                                linkTarget = authority
+                                                showingLinkConfirmation = true
+                                            } label: {
+                                                Label("Link", systemImage: "link")
+                                            }
+                                            .tint(JazzTheme.teal)
+                                        }
+                                        .onTapGesture {
+                                            if let urlString = authority.sourceUrl,
+                                               let url = URL(string: urlString) {
+                                                openURL(url)
+                                            }
+                                        }
                                 }
+                            } header: {
+                                HStack {
+                                    Text("Unmatched Song Recommendations")
+                                    Spacer()
+                                    Text("\(unmatchedAuthorities.count)")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                            } footer: {
+                                Text("Swipe right to link a recommendation to this recording")
+                                    .font(.caption)
+                            }
                         }
                     }
                     .listStyle(.insetGrouped)
@@ -118,7 +166,34 @@ struct AuthorityRecommendationsView: View {
                 }
             } message: {
                 if let authority = deleteTarget {
-                    Text("Remove this \(authority.displayName) reference from the recording?")
+                    Text("Remove this \(authority.sourceDisplayName) reference from the recording?")
+                }
+            }
+            .confirmationDialog(
+                "Link to This Recording",
+                isPresented: $showingLinkConfirmation,
+                titleVisibility: .visible
+            ) {
+                Button("Link to \(albumTitle)") {
+                    if let authority = linkTarget {
+                        Task { await linkAuthority(authority) }
+                    }
+                }
+                Button("Cancel", role: .cancel) {
+                    linkTarget = nil
+                }
+            } message: {
+                if let authority = linkTarget {
+                    Text("Link \"\(authority.artistName ?? "Unknown") - \(authority.albumTitle ?? "Unknown")\" to this recording?")
+                }
+            }
+            .overlay {
+                if linkingInProgress {
+                    ProgressView("Linking...")
+                        .padding()
+                        .background(Color(.systemBackground))
+                        .cornerRadius(10)
+                        .shadow(radius: 10)
                 }
             }
             .task {
@@ -133,6 +208,7 @@ struct AuthorityRecommendationsView: View {
         isLoading = true
         errorMessage = nil
         
+        // Load recording authorities
         guard let url = URL(string: "\(NetworkManager.baseURL)/recordings/\(recordingId)/authorities") else {
             errorMessage = "Invalid URL"
             isLoading = false
@@ -149,8 +225,14 @@ struct AuthorityRecommendationsView: View {
             }
             
             if httpResponse.statusCode == 200 {
-                let decoded = try JSONDecoder().decode(AuthoritiesResponse.self, from: data)
+                let decoded = try JSONDecoder().decode(RecordingAuthoritiesResponse.self, from: data)
                 authorities = decoded.authorities
+                
+                // If we have a songId, also load unmatched song recommendations
+                let effectiveSongId = songId ?? decoded.songId
+                if let sid = effectiveSongId {
+                    await loadUnmatchedSongAuthorities(songId: sid)
+                }
             } else if httpResponse.statusCode == 404 {
                 errorMessage = "Recording not found"
             } else {
@@ -162,6 +244,28 @@ struct AuthorityRecommendationsView: View {
         }
         
         isLoading = false
+    }
+    
+    private func loadUnmatchedSongAuthorities(songId: String) async {
+        guard let url = URL(string: "\(NetworkManager.baseURL)/songs/\(songId)/authorities") else {
+            return
+        }
+        
+        do {
+            let (data, response) = try await URLSession.shared.data(from: url)
+            
+            guard let httpResponse = response as? HTTPURLResponse,
+                  httpResponse.statusCode == 200 else {
+                return
+            }
+            
+            let decoded = try JSONDecoder().decode(SongAuthoritiesResponse.self, from: data)
+            
+            // Filter to only unmatched (recording_id is nil)
+            unmatchedAuthorities = decoded.authorities.filter { $0.recordingId == nil }
+        } catch {
+            print("Error loading song authorities: \(error)")
+        }
     }
     
     private func deleteAuthority(_ authority: AuthorityRecommendation) async {
@@ -186,6 +290,76 @@ struct AuthorityRecommendationsView: View {
         
         deleteTarget = nil
     }
+    
+    private func linkAuthority(_ authority: AuthorityRecommendation) async {
+        linkingInProgress = true
+        
+        guard let url = URL(string: "\(NetworkManager.baseURL)/authorities/\(authority.id)/link") else {
+            linkingInProgress = false
+            return
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "PATCH"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        let body: [String: Any] = ["recording_id": recordingId]
+        
+        do {
+            request.httpBody = try JSONSerialization.data(withJSONObject: body)
+            
+            let (data, response) = try await URLSession.shared.data(for: request)
+            
+            if let httpResponse = response as? HTTPURLResponse,
+               httpResponse.statusCode == 200 {
+                // Decode the updated authority
+                let updatedAuthority = try JSONDecoder().decode(AuthorityRecommendation.self, from: data)
+                
+                // Move from unmatched to matched
+                unmatchedAuthorities.removeAll { $0.id == authority.id }
+                authorities.append(updatedAuthority)
+            }
+        } catch {
+            print("Error linking authority: \(error)")
+        }
+        
+        linkTarget = nil
+        linkingInProgress = false
+    }
+}
+
+// MARK: - Response Structs
+
+struct RecordingAuthoritiesResponse: Codable {
+    let recordingId: String
+    let songId: String?
+    let authorities: [AuthorityRecommendation]
+    let count: Int
+    
+    enum CodingKeys: String, CodingKey {
+        case recordingId = "recording_id"
+        case songId = "song_id"
+        case authorities
+        case count
+    }
+}
+
+struct SongAuthoritiesResponse: Codable {
+    let songId: String
+    let songTitle: String?
+    let authorities: [AuthorityRecommendation]
+    let totalCount: Int
+    let matchedCount: Int
+    let unmatchedCount: Int
+    
+    enum CodingKeys: String, CodingKey {
+        case songId = "song_id"
+        case songTitle = "song_title"
+        case authorities
+        case totalCount = "total_count"
+        case matchedCount = "matched_count"
+        case unmatchedCount = "unmatched_count"
+    }
 }
 
 // MARK: - Authority Row View
@@ -197,7 +371,7 @@ struct AuthorityRowView: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 // Source badge
-                Text(authority.displayName)
+                Text(authority.sourceDisplayName)
                     .font(.caption)
                     .fontWeight(.semibold)
                     .foregroundColor(.white)
@@ -243,6 +417,73 @@ struct AuthorityRowView: View {
                     .lineLimit(3)
                     .padding(.top, 4)
             }
+        }
+        .padding(.vertical, 4)
+    }
+}
+
+// MARK: - Unmatched Authority Row View
+
+struct UnmatchedAuthorityRowView: View {
+    let authority: AuthorityRecommendation
+    
+    var body: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    // Source badge
+                    Text(authority.sourceDisplayName)
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(authority.sourceColor)
+                        .cornerRadius(4)
+                    
+                    // Unmatched indicator
+                    Text("Unlinked")
+                        .font(.caption2)
+                        .foregroundColor(JazzTheme.amber)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(JazzTheme.amber.opacity(0.15))
+                        .cornerRadius(4)
+                    
+                    Spacer()
+                    
+                    if authority.sourceUrl != nil {
+                        Image(systemName: "arrow.up.right.square")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                
+                // Artist/Album info
+                if let artist = authority.artistName {
+                    Text(artist)
+                        .font(.headline)
+                        .foregroundColor(JazzTheme.charcoal)
+                }
+                
+                if let album = authority.albumTitle {
+                    Text(album)
+                        .font(.subheadline)
+                        .foregroundColor(JazzTheme.smokeGray)
+                }
+                
+                // Year
+                if let year = authority.recordingYear {
+                    Text("(\(year))")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+            
+            // Link hint icon
+            Image(systemName: "link.badge.plus")
+                .font(.title3)
+                .foregroundColor(JazzTheme.teal.opacity(0.5))
         }
         .padding(.vertical, 4)
     }
@@ -422,6 +663,7 @@ struct AddAuthorityView: View {
 #Preview {
     AuthorityRecommendationsView(
         recordingId: "preview-recording",
-        albumTitle: "Kind of Blue"
+        albumTitle: "Kind of Blue",
+        songId: "preview-song"
     )
 }
