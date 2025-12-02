@@ -152,17 +152,38 @@ struct Recording: Codable, Identifiable {
     
     // MARK: - Release-aware computed properties
     
+    /// Releases sorted consistently to match songs.py best_cover_art_* selection
+    /// Matches: spotify_album_id IS NOT NULL, ORDER BY release_year DESC
+    private var sortedReleases: [Release]? {
+        releases?.sorted { r1, r2 in
+            // First: releases with Spotify come first
+            let r1HasSpotify = r1.spotifyAlbumId != nil
+            let r2HasSpotify = r2.spotifyAlbumId != nil
+            if r1HasSpotify != r2HasSpotify {
+                return r1HasSpotify && !r2HasSpotify
+            }
+            // Second: sort by year DESCENDING (newest first) to match songs.py
+            // songs.py uses: ORDER BY rel.release_year DESC NULLS LAST
+            switch (r1.releaseYear, r2.releaseYear) {
+            case (nil, nil): return false
+            case (nil, _): return false  // nil years go last
+            case (_, nil): return true
+            case let (y1?, y2?): return y1 > y2  // DESCENDING - newest first
+            }
+        }
+    }
+    
     /// Get the best Spotify URL - prefer API-provided best, then releases, then recording URL
     var bestSpotifyUrl: String? {
         // First try API-provided best URL (from song detail endpoint)
         if let apiUrl = bestSpotifyUrlFromRelease {
             return apiUrl
         }
-        // Then try releases array (when viewing recording detail)
-        if let release = releases?.first(where: { $0.spotifyTrackUrl != nil }) {
+        // Then try sorted releases array (when viewing recording detail)
+        if let release = sortedReleases?.first(where: { $0.spotifyTrackUrl != nil }) {
             return release.spotifyTrackUrl
         }
-        if let release = releases?.first(where: { $0.spotifyAlbumUrl != nil }) {
+        if let release = sortedReleases?.first(where: { $0.spotifyAlbumUrl != nil }) {
             return release.spotifyAlbumUrl
         }
         // Fall back to recording's spotify URL
@@ -174,7 +195,7 @@ struct Recording: Codable, Identifiable {
         if let apiArt = bestCoverArtSmall {
             return apiArt
         }
-        if let release = releases?.first(where: { $0.spotifyAlbumId != nil && $0.coverArtSmall != nil }) {
+        if let release = sortedReleases?.first(where: { $0.spotifyAlbumId != nil && $0.coverArtSmall != nil }) {
             return release.coverArtSmall
         }
         return albumArtSmall
@@ -184,7 +205,7 @@ struct Recording: Codable, Identifiable {
         if let apiArt = bestCoverArtMedium {
             return apiArt
         }
-        if let release = releases?.first(where: { $0.spotifyAlbumId != nil && $0.coverArtMedium != nil }) {
+        if let release = sortedReleases?.first(where: { $0.spotifyAlbumId != nil && $0.coverArtMedium != nil }) {
             return release.coverArtMedium
         }
         return albumArtMedium
@@ -194,7 +215,7 @@ struct Recording: Codable, Identifiable {
         if let apiArt = bestCoverArtLarge {
             return apiArt
         }
-        if let release = releases?.first(where: { $0.spotifyAlbumId != nil && $0.coverArtLarge != nil }) {
+        if let release = sortedReleases?.first(where: { $0.spotifyAlbumId != nil && $0.coverArtLarge != nil }) {
             return release.coverArtLarge
         }
         return albumArtLarge

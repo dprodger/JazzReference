@@ -35,14 +35,22 @@ struct RecordingDetailView: View {
         return releases.first { $0.id == releaseId }
     }
     
-    /// Album art URL from selected release, falling back to recording default
+    /// Album art URL - uses selected release if user picked one, otherwise uses bestAlbumArt*
     private var displayAlbumArtLarge: String? {
-        selectedRelease?.coverArtLarge ?? selectedRelease?.coverArtMedium ?? recording?.albumArtLarge ?? recording?.albumArtMedium
+        if let release = selectedRelease {
+            return release.coverArtLarge ?? release.coverArtMedium
+        }
+        // Use bestAlbumArt* which is consistent across API endpoints
+        return recording?.bestAlbumArtLarge ?? recording?.bestAlbumArtMedium
     }
     
-    /// Spotify URL from selected release track, falling back to recording default
+    /// Spotify URL - uses selected release if user picked one, otherwise uses bestSpotifyUrl
     private var displaySpotifyUrl: String? {
-        selectedRelease?.spotifyTrackUrl ?? selectedRelease?.spotifyAlbumUrl ?? recording?.spotifyUrl
+        if let release = selectedRelease {
+            return release.spotifyTrackUrl ?? release.spotifyAlbumUrl
+        }
+        // Use bestSpotifyUrl which is consistent across API endpoints
+        return recording?.bestSpotifyUrl
     }
     
     /// Display title - selected release title or recording album title
@@ -293,6 +301,7 @@ struct RecordingDetailView: View {
             if ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1" {
                 let networkManager = NetworkManager()
                 recording = networkManager.fetchRecordingDetailSync(id: recordingId)
+                autoSelectFirstRelease()
                 isLoading = false
                 return
             }
@@ -300,6 +309,7 @@ struct RecordingDetailView: View {
             
             let networkManager = NetworkManager()
             recording = await networkManager.fetchRecordingDetail(id: recordingId)
+            autoSelectFirstRelease()
             isLoading = false
         }
     }
@@ -626,6 +636,47 @@ struct RecordingDetailView: View {
             // Multiple sources - show picker
             showingStreamingPicker = true
         }
+    }
+    
+    /// Auto-select the first release that has album art, preferring one with Spotify
+    /// Uses same sorting as Recording.sortedReleases (and songs.py) to ensure consistency
+    private func autoSelectFirstRelease() {
+        guard let releases = recording?.releases, !releases.isEmpty else { return }
+        
+        // Sort releases to match songs.py best_cover_art_* logic:
+        // spotify_album_id IS NOT NULL, ORDER BY release_year DESC
+        let sorted = releases.sorted { r1, r2 in
+            // First: releases with Spotify come first
+            let r1HasSpotify = r1.spotifyAlbumId != nil
+            let r2HasSpotify = r2.spotifyAlbumId != nil
+            if r1HasSpotify != r2HasSpotify {
+                return r1HasSpotify && !r2HasSpotify
+            }
+            // Second: sort by year DESCENDING (newest first) to match songs.py
+            switch (r1.releaseYear, r2.releaseYear) {
+            case (nil, nil): return false
+            case (nil, _): return false  // nil years go last
+            case (_, nil): return true
+            case let (y1?, y2?): return y1 > y2  // DESCENDING - newest first
+            }
+        }
+        
+        // Select the first release with Spotify and cover art (matches bestAlbumArt* logic)
+        if let releaseWithSpotifyAndArt = sorted.first(where: {
+            $0.spotifyAlbumId != nil && ($0.coverArtLarge != nil || $0.coverArtMedium != nil)
+        }) {
+            selectedReleaseId = releaseWithSpotifyAndArt.id
+            return
+        }
+        
+        // Fall back to first release with cover art
+        if let releaseWithArt = sorted.first(where: { $0.coverArtLarge != nil || $0.coverArtMedium != nil }) {
+            selectedReleaseId = releaseWithArt.id
+            return
+        }
+        
+        // Fall back to first release
+        selectedReleaseId = sorted.first?.id
     }
     
     // MARK: - Learn More Section (Collapsible)
