@@ -1,3 +1,7 @@
+backend/client-google-client
+backend/scripts/.env.spotify2_jazzlinernotes
+backend/scripts/.env.spotify_jazzlinernotes
+
 cache
 cache/*
 

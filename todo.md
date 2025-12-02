@@ -70,6 +70,40 @@ Done:
 * Dellington Indigos not matched for spotify
 
 
+Data problems:
+    2025-12-02 13:22:14,841 - DEBUG - [77/88] Ella Fitzgerald at the Opera House
+    2025-12-02 13:22:14,841 - DEBUG -     Artist: Ella Fitzgerald
+    2025-12-02 13:22:14,841 - DEBUG -     Year: 2017
+    2025-12-02 13:22:14,841 - DEBUG - Cache hit: search_album_99d445fd069e014475278a69313793f6.json
+    2025-12-02 13:22:15,141 - DEBUG - Simple database connection created
+    2025-12-02 13:22:15,141 - DEBUG - Cache hit: album_1CnbixG8kZbknL8ryNXbKn.json
+    2025-12-02 13:22:15,141 - DEBUG -     Matching tracks (18 tracks in album)...
+    2025-12-02 13:22:15,441 - DEBUG - Simple database connection created
+    2025-12-02 13:22:15,586 - DEBUG - Transaction committed successfully
+    2025-12-02 13:22:15,587 - DEBUG - Database connection closed
+    2025-12-02 13:22:15,588 - DEBUG -       No track match for 'Don’cha Go ’Way Mad'
+    2025-12-02 13:22:15,588 - DEBUG -       Album tracks: ["It's All Right With Me - Live At The Chicago Opera House,1957", 'Don Cha Go Way Mad - Live At The Chicago Opera House,1957', 'Bewitched, Bothered And Bewildered - Live At The Chicago Opera House,1957', 'These Foolish Things - Live At The Chicago Opera House,1957', 'Ill Wind - Live At The Chicago Opera House,1957', 'Goody, Goody - Live At The Chicago Opera House,1957', 'Moonlight In Vermont - Live At The Chicago Opera House,1957', 'Them There Eyes - Live At The Chicago Opera House,1957']... (+10 more)
+    2025-12-02 13:22:15,588 - INFO - [77/88] Ella Fitzgerald at the Opera House (Ella Fitzgerald, 2017) - ✗ Album matched but track not found (possible false positive)
+
+2025-12-02 13:22:15,589 - DEBUG - [80/88] The Complete Decca Singles Vol. 4: 1950–1955
+2025-12-02 13:22:15,589 - DEBUG -     Artist: Ella Fitzgerald
+2025-12-02 13:22:15,589 - DEBUG -     Year: 2017
+2025-12-02 13:22:15,590 - DEBUG - Cache hit: search_album_963731962116f002b857e59f63c3a4ea.json
+2025-12-02 13:22:15,899 - DEBUG - Simple database connection created
+2025-12-02 13:22:15,899 - DEBUG - Cache hit: album_3nXCCfwBpz0FlUdxJrMfwM.json
+2025-12-02 13:22:15,899 - DEBUG -     Matching tracks (50 tracks in album)...
+2025-12-02 13:22:16,208 - DEBUG - Simple database connection created
+2025-12-02 13:22:16,357 - DEBUG - Transaction committed successfully
+2025-12-02 13:22:16,357 - DEBUG - Database connection closed
+2025-12-02 13:22:16,358 - DEBUG -       Parenthetical fallback: 27.27272727272727% → 39.02439024390244%
+2025-12-02 13:22:16,359 - DEBUG -       Parenthetical fallback: 39.28571428571429% → 40.0%
+2025-12-02 13:22:16,359 - DEBUG -       Parenthetical fallback: 26.470588235294112% → 29.268292682926834%
+2025-12-02 13:22:16,361 - DEBUG -       No track match for 'Don’cha Go ’Way Mad'
+2025-12-02 13:22:16,361 - DEBUG -       Album tracks: ["Baby, Won't You Say You Love Me", "Don'cha Go 'Way Mad", 'Solid As A Rock', 'Sugarfoot Rag', 'M-I-S-S-I-S-S-I-P-P-I', "I Don't Want The World (With A Fence Around It)", "I've Got The World On A String", 'Peas And Rice']... (+42 more)
+2025-12-02 13:22:16,361 - INFO - [80/88] The Complete Decca Singles Vol. 4: 1950–1955 (Ella Fitzgerald, 2017) - ✗ Album matched but track not found (possible false positive)
+
+
+
 
 
 
