@@ -196,7 +196,7 @@ struct RecordingsListView: View {
     private func recordingRowView(recording: Recording) -> some View {
         HStack(spacing: 12) {
             // Album artwork thumbnail
-            if let albumArtUrl = recording.albumArtSmall ?? recording.albumArtMedium {
+            if let albumArtUrl = recording.bestAlbumArtSmall ?? recording.bestAlbumArtMedium {
                 AsyncImage(url: URL(string: albumArtUrl)) { phase in
                     switch phase {
                     case .empty:

@@ -2,7 +2,10 @@
 //  Models.swift
 //  JazzReference
 //
-//  Updated with Releases support
+//  UPDATED: Recording-Centric Performer Architecture
+//  - Removed dropped columns: spotify_url, spotify_track_id, album_art_small/medium/large
+//  - Added: default_release_id
+//  - Spotify/album art now comes from releases (via best_* API fields or releases array)
 //
 
 import Foundation
@@ -58,6 +61,12 @@ struct Song: Identifiable, Codable {
     }
 }
 
+// MARK: - Recording Model
+// UPDATED: Recording-Centric Architecture
+// - Removed: spotifyUrl, spotifyTrackId, albumArtSmall/Medium/Large (dropped from DB)
+// - Added: defaultReleaseId
+// - Spotify/album art now sourced from releases via best_* API fields
+
 struct Recording: Codable, Identifiable {
     let id: String
     let songId: String?
@@ -66,17 +75,15 @@ struct Recording: Codable, Identifiable {
     let recordingDate: String?
     let recordingYear: Int?
     let label: String?
-    let spotifyUrl: String?
-    let spotifyTrackId: String?
-    let albumArtSmall: String?
-    let albumArtMedium: String?
-    let albumArtLarge: String?
     
-    // Best cover art from Spotify-linked releases (provided by API)
+    // NEW: Default release for this recording (provides Spotify/album art)
+    let defaultReleaseId: String?
+    
+    // Best cover art from releases (provided by API via subqueries)
     let bestCoverArtSmall: String?
     let bestCoverArtMedium: String?
     let bestCoverArtLarge: String?
-    // Best Spotify URL from releases (provided by API)
+    // Best Spotify URL from releases (provided by API via subqueries)
     let bestSpotifyUrlFromRelease: String?
     
     let youtubeUrl: String?
@@ -101,11 +108,7 @@ struct Recording: Codable, Identifiable {
         case albumTitle = "album_title"
         case recordingDate = "recording_date"
         case recordingYear = "recording_year"
-        case spotifyUrl = "spotify_url"
-        case spotifyTrackId = "spotify_track_id"
-        case albumArtSmall = "album_art_small"
-        case albumArtMedium = "album_art_medium"
-        case albumArtLarge = "album_art_large"
+        case defaultReleaseId = "default_release_id"
         case bestCoverArtSmall = "best_cover_art_small"
         case bestCoverArtMedium = "best_cover_art_medium"
         case bestCoverArtLarge = "best_cover_art_large"
@@ -173,7 +176,7 @@ struct Recording: Codable, Identifiable {
         }
     }
     
-    /// Get the best Spotify URL - prefer API-provided best, then releases, then recording URL
+    /// Get the best Spotify URL - prefer API-provided best, then check releases array
     var bestSpotifyUrl: String? {
         // First try API-provided best URL (from song detail endpoint)
         if let apiUrl = bestSpotifyUrlFromRelease {
@@ -186,11 +189,11 @@ struct Recording: Codable, Identifiable {
         if let release = sortedReleases?.first(where: { $0.spotifyAlbumUrl != nil }) {
             return release.spotifyAlbumUrl
         }
-        // Fall back to recording's spotify URL
-        return spotifyUrl
+        // No Spotify URL available
+        return nil
     }
     
-    /// Get the best album art - prefer API-provided best, then releases, then recording
+    /// Get the best album art - prefer API-provided best, then check releases array
     var bestAlbumArtSmall: String? {
         if let apiArt = bestCoverArtSmall {
             return apiArt
@@ -198,7 +201,8 @@ struct Recording: Codable, Identifiable {
         if let release = sortedReleases?.first(where: { $0.spotifyAlbumId != nil && $0.coverArtSmall != nil }) {
             return release.coverArtSmall
         }
-        return albumArtSmall
+        // No album art available
+        return nil
     }
     
     var bestAlbumArtMedium: String? {
@@ -208,7 +212,8 @@ struct Recording: Codable, Identifiable {
         if let release = sortedReleases?.first(where: { $0.spotifyAlbumId != nil && $0.coverArtMedium != nil }) {
             return release.coverArtMedium
         }
-        return albumArtMedium
+        // No album art available
+        return nil
     }
     
     var bestAlbumArtLarge: String? {
@@ -218,7 +223,8 @@ struct Recording: Codable, Identifiable {
         if let release = sortedReleases?.first(where: { $0.spotifyAlbumId != nil && $0.coverArtLarge != nil }) {
             return release.coverArtLarge
         }
-        return albumArtLarge
+        // No album art available
+        return nil
     }
     
     /// Count of releases with Spotify links
