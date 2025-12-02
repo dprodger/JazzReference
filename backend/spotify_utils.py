@@ -51,6 +51,38 @@ class SpotifyRateLimitError(Exception):
         super().__init__(f"Spotify rate limit exceeded. Retry after {retry_after} seconds." if retry_after else "Spotify rate limit exceeded.")
 
 
+# Common jazz ensemble suffixes that may not appear in Spotify artist names
+# e.g., "Bill Evans Trio" in our DB might be just "Bill Evans" on Spotify
+ENSEMBLE_SUFFIXES = [
+    'Trio', 'Quartet', 'Quintet', 'Sextet', 'Septet', 'Octet', 'Nonet',
+    'Orchestra', 'Big Band', 'Band', 'Ensemble', 'Group'
+]
+
+def strip_ensemble_suffix(artist_name: str) -> str:
+    """
+    Strip common ensemble suffixes from artist names.
+    
+    Examples:
+        "Lynne Arriale Trio" -> "Lynne Arriale"
+        "Bill Evans Trio" -> "Bill Evans"
+        "Duke Ellington Orchestra" -> "Duke Ellington"
+        "Miles Davis" -> "Miles Davis" (unchanged)
+    
+    Returns:
+        Artist name with suffix stripped, or original if no suffix found
+    """
+    if not artist_name:
+        return artist_name
+    
+    for suffix in ENSEMBLE_SUFFIXES:
+        # Check for suffix at end of string (case-insensitive)
+        pattern = rf'\s+{re.escape(suffix)}$'
+        if re.search(pattern, artist_name, re.IGNORECASE):
+            return re.sub(pattern, '', artist_name, flags=re.IGNORECASE).strip()
+    
+    return artist_name
+
+
 class SpotifyMatcher:
     """
     Handles matching recordings to Spotify tracks with fuzzy validation and caching
@@ -768,6 +800,10 @@ class SpotifyMatcher:
         # Start with specific queries, fall back to broader searches
         search_strategies = []
         
+        # Check if we should try a stripped artist name as fallback
+        stripped_artist = strip_ensemble_suffix(artist_name) if artist_name else None
+        has_stripped_fallback = stripped_artist and stripped_artist != artist_name
+        
         if artist_name and year:
             search_strategies.append({
                 'query': f'track:"{song_title}" artist:"{artist_name}" album:"{album_title}" year:{year}',
@@ -782,6 +818,17 @@ class SpotifyMatcher:
             search_strategies.append({
                 'query': f'track:"{song_title}" artist:"{artist_name}"',
                 'description': 'exact track and artist'
+            })
+        
+        # Fallback: try with ensemble suffix stripped (e.g., "Bill Evans Trio" -> "Bill Evans")
+        if has_stripped_fallback:
+            search_strategies.append({
+                'query': f'track:"{song_title}" artist:"{stripped_artist}" album:"{album_title}"',
+                'description': f'exact track, stripped artist ({stripped_artist}), and album'
+            })
+            search_strategies.append({
+                'query': f'track:"{song_title}" artist:"{stripped_artist}"',
+                'description': f'exact track and stripped artist ({stripped_artist})'
             })
         
         search_strategies.append({
@@ -1312,6 +1359,18 @@ class SpotifyMatcher:
                 'query': f'"{album_title}" "{artist_name}"',
                 'description': 'quoted album and artist'
             })
+            
+            # Try with ensemble suffix stripped (e.g., "Bill Evans Trio" -> "Bill Evans")
+            stripped_artist = strip_ensemble_suffix(artist_name)
+            if stripped_artist != artist_name:
+                search_strategies.append({
+                    'query': f'album:"{album_title}" artist:"{stripped_artist}"',
+                    'description': f'exact album with stripped artist ({stripped_artist})'
+                })
+                search_strategies.append({
+                    'query': f'"{album_title}" "{stripped_artist}"',
+                    'description': f'quoted album with stripped artist ({stripped_artist})'
+                })
         
         search_strategies.append({
             'query': f'album:"{album_title}"',
@@ -1455,6 +1514,23 @@ class SpotifyMatcher:
         # Calculate album similarity
         album_similarity = self.calculate_similarity(expected_album, spotify_album_name)
         
+        # Check for substring containment (e.g., "Live at Montreux" in "Live At The Montreux Jazz Festival")
+        # This is a strong signal even if fuzzy similarity is below threshold
+        # Strip articles (the, a, an) for more flexible matching
+        def strip_articles(text):
+            return re.sub(r'\b(the|a|an)\b', '', text, flags=re.IGNORECASE).strip()
+        
+        normalized_expected = strip_articles(self.normalize_for_comparison(expected_album))
+        normalized_spotify = strip_articles(self.normalize_for_comparison(spotify_album_name))
+        # Also remove extra spaces that may result from stripping articles
+        normalized_expected = ' '.join(normalized_expected.split())
+        normalized_spotify = ' '.join(normalized_spotify.split())
+        
+        album_is_substring = (
+            normalized_expected in normalized_spotify or 
+            normalized_spotify in normalized_expected
+        )
+        
         # Calculate artist similarity
         individual_artist_scores = [
             self.calculate_similarity(expected_artist, spotify_artist)
@@ -1464,9 +1540,19 @@ class SpotifyMatcher:
         full_artist_similarity = self.calculate_similarity(expected_artist, spotify_artists)
         artist_similarity = max(best_individual_match, full_artist_similarity)
         
+        # Check for artist substring containment (e.g., "Lynne Arriale" in "Lynne Arriale Trio")
+        normalized_expected_artist = self.normalize_for_comparison(expected_artist)
+        artist_is_substring = any(
+            normalized_expected_artist in self.normalize_for_comparison(sa) or
+            self.normalize_for_comparison(sa) in normalized_expected_artist
+            for sa in spotify_artist_list
+        )
+        
         scores = {
             'album': album_similarity,
+            'album_is_substring': album_is_substring,
             'artist': artist_similarity,
+            'artist_is_substring': artist_is_substring,
             'artist_best_individual': best_individual_match,
             'artist_full_string': full_artist_similarity,
             'spotify_album': spotify_album_name,
@@ -1474,21 +1560,37 @@ class SpotifyMatcher:
         }
         
         # Validation logic
-        if album_similarity < self.min_album_similarity:
+        # Accept if: fuzzy similarity meets threshold OR album title is a substring (with reasonable similarity)
+        album_valid = (
+            album_similarity >= self.min_album_similarity or
+            (album_is_substring and album_similarity >= 50)  # Substring match with at least 50% similarity
+        )
+        
+        if not album_valid:
             return False, f"Album similarity too low ({album_similarity}% < {self.min_album_similarity}%)", scores
         
+        if album_is_substring and album_similarity < self.min_album_similarity:
+            self.logger.debug(f"      Album accepted via substring containment ({album_similarity}%)")
+        
         if expected_artist and artist_similarity < self.min_artist_similarity:
-            # Artist validation failed - try track verification fallback
-            # This handles "Various Artists", ensemble name variations, etc.
-            # Only attempt if album similarity is high (>=80%) and we have a song title
-            if song_title and album_similarity >= 80:
-                album_id = spotify_album.get('id')
-                if album_id and self.verify_album_contains_track(album_id, song_title):
-                    scores['verified_by_track'] = True
-                    self.logger.debug(f"      Album accepted via track verification (artist {artist_similarity}% < {self.min_artist_similarity}%)")
-                    return True, "Valid match (verified by track presence)", scores
+            # Check if artist is accepted via substring containment 
+            # (e.g., "Lynne Arriale" contained in "Lynne Arriale Trio")
+            artist_valid_by_substring = artist_is_substring and artist_similarity >= 50
             
-            return False, f"Artist similarity too low ({artist_similarity}% < {self.min_artist_similarity}%)", scores
+            if artist_valid_by_substring:
+                self.logger.debug(f"      Artist accepted via substring containment ({artist_similarity}%)")
+            else:
+                # Artist validation failed - try track verification fallback
+                # This handles "Various Artists", ensemble name variations, etc.
+                # Only attempt if album similarity is high (>=80%) and we have a song title
+                if song_title and album_similarity >= 80:
+                    album_id = spotify_album.get('id')
+                    if album_id and self.verify_album_contains_track(album_id, song_title):
+                        scores['verified_by_track'] = True
+                        self.logger.debug(f"      Album accepted via track verification (artist {artist_similarity}% < {self.min_artist_similarity}%)")
+                        return True, "Valid match (verified by track presence)", scores
+                
+                return False, f"Artist similarity too low ({artist_similarity}% < {self.min_artist_similarity}%)", scores
         
         return True, "Valid match", scores
     

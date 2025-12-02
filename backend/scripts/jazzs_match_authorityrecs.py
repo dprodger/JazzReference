@@ -39,7 +39,7 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
         logging.StreamHandler(),
-        logging.FileHandler(Path(__file__).parent / 'logs' / 'match_authority_recommendations.log')
+        logging.FileHandler(Path(__file__).parent / 'log' / 'match_authority_recommendations.log')
     ]
 )
 logger = logging.getLogger(__name__)
@@ -225,7 +225,6 @@ class AuthorityRecommendationMatcher:
                             r.id,
                             r.album_title,
                             r.recording_year,
-                            r.spotify_url,
                             r.label,
                             STRING_AGG(DISTINCT p.name, ' / ' ORDER BY p.name) as artist_names,
                             -- Get primary performer as main artist
