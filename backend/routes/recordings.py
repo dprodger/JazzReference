@@ -1,7 +1,13 @@
 # routes/recordings.py
 """
-Recording API Routes - Updated with Releases Support
-Provides endpoints for listing and searching recordings, now including releases
+Recording API Routes - Recording-Centric Performer Architecture
+
+UPDATED: Recording-Centric Architecture
+- Performers come from recording_performers table (not release_performers)
+- Spotify URL and album art come from default_release or best release
+- release_performers is now for release-specific credits (producers, engineers)
+
+Provides endpoints for listing and searching recordings, including releases.
 """
 from flask import Blueprint, jsonify, request
 import logging
@@ -37,11 +43,44 @@ def get_recordings():
                     r.recording_date,
                     r.recording_year,
                     r.label,
-                    r.spotify_url,
-                    r.spotify_track_id,
-                    r.album_art_small,
-                    r.album_art_medium,
-                    r.album_art_large,
+                    r.default_release_id,
+                    -- Get Spotify URL from default release or best available
+                    COALESCE(
+                        (SELECT COALESCE(rr.spotify_track_url, rel.spotify_album_url)
+                         FROM releases rel
+                         LEFT JOIN recording_releases rr ON rr.release_id = rel.id AND rr.recording_id = r.id
+                         WHERE rel.id = r.default_release_id
+                           AND (rel.spotify_album_url IS NOT NULL OR rr.spotify_track_url IS NOT NULL)
+                        ),
+                        (SELECT COALESCE(rr.spotify_track_url, rel.spotify_album_url)
+                         FROM recording_releases rr
+                         JOIN releases rel ON rr.release_id = rel.id
+                         WHERE rr.recording_id = r.id 
+                           AND (rr.spotify_track_url IS NOT NULL OR rel.spotify_album_url IS NOT NULL)
+                         ORDER BY 
+                           CASE WHEN rr.spotify_track_url IS NOT NULL THEN 0 ELSE 1 END,
+                           rel.release_year DESC NULLS LAST
+                         LIMIT 1)
+                    ) as spotify_url,
+                    -- Get album art from default release or best available
+                    COALESCE(
+                        (SELECT rel.cover_art_small FROM releases rel WHERE rel.id = r.default_release_id AND rel.cover_art_small IS NOT NULL),
+                        (SELECT rel.cover_art_small FROM recording_releases rr JOIN releases rel ON rr.release_id = rel.id
+                         WHERE rr.recording_id = r.id AND rel.cover_art_small IS NOT NULL
+                         ORDER BY rel.release_year DESC NULLS LAST LIMIT 1)
+                    ) as album_art_small,
+                    COALESCE(
+                        (SELECT rel.cover_art_medium FROM releases rel WHERE rel.id = r.default_release_id AND rel.cover_art_medium IS NOT NULL),
+                        (SELECT rel.cover_art_medium FROM recording_releases rr JOIN releases rel ON rr.release_id = rel.id
+                         WHERE rr.recording_id = r.id AND rel.cover_art_medium IS NOT NULL
+                         ORDER BY rel.release_year DESC NULLS LAST LIMIT 1)
+                    ) as album_art_medium,
+                    COALESCE(
+                        (SELECT rel.cover_art_large FROM releases rel WHERE rel.id = r.default_release_id AND rel.cover_art_large IS NOT NULL),
+                        (SELECT rel.cover_art_large FROM recording_releases rr JOIN releases rel ON rr.release_id = rel.id
+                         WHERE rr.recording_id = r.id AND rel.cover_art_large IS NOT NULL
+                         ORDER BY rel.release_year DESC NULLS LAST LIMIT 1)
+                    ) as album_art_large,
                     r.youtube_url,
                     r.apple_music_url,
                     r.musicbrainz_id,
@@ -75,11 +114,44 @@ def get_recordings():
                     r.recording_date,
                     r.recording_year,
                     r.label,
-                    r.spotify_url,
-                    r.spotify_track_id,
-                    r.album_art_small,
-                    r.album_art_medium,
-                    r.album_art_large,
+                    r.default_release_id,
+                    -- Get Spotify URL from default release or best available
+                    COALESCE(
+                        (SELECT COALESCE(rr.spotify_track_url, rel.spotify_album_url)
+                         FROM releases rel
+                         LEFT JOIN recording_releases rr ON rr.release_id = rel.id AND rr.recording_id = r.id
+                         WHERE rel.id = r.default_release_id
+                           AND (rel.spotify_album_url IS NOT NULL OR rr.spotify_track_url IS NOT NULL)
+                        ),
+                        (SELECT COALESCE(rr.spotify_track_url, rel.spotify_album_url)
+                         FROM recording_releases rr
+                         JOIN releases rel ON rr.release_id = rel.id
+                         WHERE rr.recording_id = r.id 
+                           AND (rr.spotify_track_url IS NOT NULL OR rel.spotify_album_url IS NOT NULL)
+                         ORDER BY 
+                           CASE WHEN rr.spotify_track_url IS NOT NULL THEN 0 ELSE 1 END,
+                           rel.release_year DESC NULLS LAST
+                         LIMIT 1)
+                    ) as spotify_url,
+                    -- Get album art from default release or best available
+                    COALESCE(
+                        (SELECT rel.cover_art_small FROM releases rel WHERE rel.id = r.default_release_id AND rel.cover_art_small IS NOT NULL),
+                        (SELECT rel.cover_art_small FROM recording_releases rr JOIN releases rel ON rr.release_id = rel.id
+                         WHERE rr.recording_id = r.id AND rel.cover_art_small IS NOT NULL
+                         ORDER BY rel.release_year DESC NULLS LAST LIMIT 1)
+                    ) as album_art_small,
+                    COALESCE(
+                        (SELECT rel.cover_art_medium FROM releases rel WHERE rel.id = r.default_release_id AND rel.cover_art_medium IS NOT NULL),
+                        (SELECT rel.cover_art_medium FROM recording_releases rr JOIN releases rel ON rr.release_id = rel.id
+                         WHERE rr.recording_id = r.id AND rel.cover_art_medium IS NOT NULL
+                         ORDER BY rel.release_year DESC NULLS LAST LIMIT 1)
+                    ) as album_art_medium,
+                    COALESCE(
+                        (SELECT rel.cover_art_large FROM releases rel WHERE rel.id = r.default_release_id AND rel.cover_art_large IS NOT NULL),
+                        (SELECT rel.cover_art_large FROM recording_releases rr JOIN releases rel ON rr.release_id = rel.id
+                         WHERE rr.recording_id = r.id AND rel.cover_art_large IS NOT NULL
+                         ORDER BY rel.release_year DESC NULLS LAST LIMIT 1)
+                    ) as album_art_large,
                     r.youtube_url,
                     r.apple_music_url,
                     r.musicbrainz_id,
@@ -106,9 +178,13 @@ def get_recording_detail(recording_id):
     """
     Get detailed information about a specific recording, including releases
     
+    UPDATED: Recording-Centric Architecture
+    - Performers come from recording_performers (not release_performers)
+    - Spotify URL and album art come from default_release or best release
+    
     The response includes:
     - Recording metadata
-    - Performers from the "best" release (Spotify + most performers)
+    - Performers from recording_performers table
     - List of all releases this recording appears on
     - Authority recommendations for this recording
     
@@ -126,11 +202,44 @@ def get_recording_detail(recording_id):
                     r.recording_date,
                     r.recording_year,
                     r.label,
-                    r.spotify_url,
-                    r.spotify_track_id,
-                    r.album_art_small,
-                    r.album_art_medium,
-                    r.album_art_large,
+                    r.default_release_id,
+                    -- Get Spotify URL from default release or best available
+                    COALESCE(
+                        (SELECT COALESCE(rr_sub.spotify_track_url, rel_sub.spotify_album_url)
+                         FROM releases rel_sub
+                         LEFT JOIN recording_releases rr_sub ON rr_sub.release_id = rel_sub.id AND rr_sub.recording_id = r.id
+                         WHERE rel_sub.id = r.default_release_id
+                           AND (rel_sub.spotify_album_url IS NOT NULL OR rr_sub.spotify_track_url IS NOT NULL)
+                        ),
+                        (SELECT COALESCE(rr_sub.spotify_track_url, rel_sub.spotify_album_url)
+                         FROM recording_releases rr_sub
+                         JOIN releases rel_sub ON rr_sub.release_id = rel_sub.id
+                         WHERE rr_sub.recording_id = r.id 
+                           AND (rr_sub.spotify_track_url IS NOT NULL OR rel_sub.spotify_album_url IS NOT NULL)
+                         ORDER BY 
+                           CASE WHEN rr_sub.spotify_track_url IS NOT NULL THEN 0 ELSE 1 END,
+                           rel_sub.release_year DESC NULLS LAST
+                         LIMIT 1)
+                    ) as spotify_url,
+                    -- Get album art from default release or best available
+                    COALESCE(
+                        (SELECT rel_sub.cover_art_small FROM releases rel_sub WHERE rel_sub.id = r.default_release_id AND rel_sub.cover_art_small IS NOT NULL),
+                        (SELECT rel_sub.cover_art_small FROM recording_releases rr_sub JOIN releases rel_sub ON rr_sub.release_id = rel_sub.id
+                         WHERE rr_sub.recording_id = r.id AND rel_sub.cover_art_small IS NOT NULL
+                         ORDER BY rel_sub.release_year DESC NULLS LAST LIMIT 1)
+                    ) as album_art_small,
+                    COALESCE(
+                        (SELECT rel_sub.cover_art_medium FROM releases rel_sub WHERE rel_sub.id = r.default_release_id AND rel_sub.cover_art_medium IS NOT NULL),
+                        (SELECT rel_sub.cover_art_medium FROM recording_releases rr_sub JOIN releases rel_sub ON rr_sub.release_id = rel_sub.id
+                         WHERE rr_sub.recording_id = r.id AND rel_sub.cover_art_medium IS NOT NULL
+                         ORDER BY rel_sub.release_year DESC NULLS LAST LIMIT 1)
+                    ) as album_art_medium,
+                    COALESCE(
+                        (SELECT rel_sub.cover_art_large FROM releases rel_sub WHERE rel_sub.id = r.default_release_id AND rel_sub.cover_art_large IS NOT NULL),
+                        (SELECT rel_sub.cover_art_large FROM recording_releases rr_sub JOIN releases rel_sub ON rr_sub.release_id = rel_sub.id
+                         WHERE rr_sub.recording_id = r.id AND rel_sub.cover_art_large IS NOT NULL
+                         ORDER BY rel_sub.release_year DESC NULLS LAST LIMIT 1)
+                    ) as album_art_large,
                     r.youtube_url,
                     r.apple_music_url,
                     r.musicbrainz_id,
@@ -142,7 +251,7 @@ def get_recording_detail(recording_id):
                 JOIN songs s ON r.song_id = s.id
                 WHERE r.id = %s
             ),
-            -- Get all releases for this recording with performer counts
+            -- Get all releases for this recording with performer counts (from recording_performers)
             releases_data AS (
                 SELECT 
                     rel.id,
@@ -166,28 +275,15 @@ def get_recording_detail(recording_id):
                     rr.spotify_track_url,
                     rf.name as format_name,
                     rs.name as status_name,
-                    COUNT(DISTINCT rp.performer_id) as performer_count,
                     CASE WHEN rel.spotify_album_id IS NOT NULL THEN 1 ELSE 0 END as has_spotify
                 FROM recording_releases rr
                 JOIN releases rel ON rr.release_id = rel.id
                 LEFT JOIN release_formats rf ON rel.format_id = rf.id
                 LEFT JOIN release_statuses rs ON rel.status_id = rs.id
-                LEFT JOIN release_performers rp ON rel.id = rp.release_id
                 WHERE rr.recording_id = %s
-                GROUP BY rel.id, rel.title, rel.artist_credit, rel.release_date, 
-                         rel.release_year, rel.country, rel.label, rel.catalog_number,
-                         rel.spotify_album_id, rel.spotify_album_url,
-                         rel.cover_art_small, rel.cover_art_medium, rel.cover_art_large,
-                         rel.total_tracks, rel.musicbrainz_release_id,
-                         rr.disc_number, rr.track_number, rr.spotify_track_id, rr.spotify_track_url,
-                         rf.name, rs.name
-                ORDER BY has_spotify DESC, performer_count DESC, rel.release_year ASC NULLS LAST
+                ORDER BY has_spotify DESC, rel.release_year ASC NULLS LAST
             ),
-            -- Get the "best" release ID (has Spotify + most performers)
-            best_release AS (
-                SELECT id FROM releases_data LIMIT 1
-            ),
-            -- Get performers from the best release
+            -- Get performers from recording_performers (not release_performers)
             performers_data AS (
                 SELECT 
                     p.id,
@@ -196,10 +292,17 @@ def get_recording_detail(recording_id):
                     rp.role,
                     p.birth_date,
                     p.death_date
-                FROM release_performers rp
+                FROM recording_performers rp
                 JOIN performers p ON rp.performer_id = p.id
                 LEFT JOIN instruments i ON rp.instrument_id = i.id
-                WHERE rp.release_id = (SELECT id FROM best_release)
+                WHERE rp.recording_id = %s
+                ORDER BY 
+                    CASE rp.role 
+                        WHEN 'leader' THEN 1 
+                        WHEN 'sideman' THEN 2 
+                        ELSE 3 
+                    END,
+                    p.name
             ),
             -- Authority recommendations for this recording
             authority_data AS (
@@ -221,10 +324,10 @@ def get_recording_detail(recording_id):
                 (SELECT COALESCE(json_agg(authority_data.*), '[]'::json) FROM authority_data) as authority_recommendations
         """
         
-        # Execute the single query with recording_id passed 3 times (for each CTE)
+        # Execute the single query with recording_id passed 4 times (for each CTE)
         result = db_tools.execute_query(
             combined_query, 
-            (recording_id, recording_id, recording_id), 
+            (recording_id, recording_id, recording_id, recording_id), 
             fetch_one=True
         )
         
@@ -249,8 +352,12 @@ def get_recording_releases(recording_id):
     """
     Get all releases that contain a specific recording
     
+    UPDATED: Recording-Centric Architecture
+    - Performers come from recording_performers (the recording's performers)
+    - release_performers now contains only release-specific credits (producers, engineers)
+    
     Returns:
-        List of releases with their performers and Spotify info
+        List of releases with recording's performers and Spotify info
     """
     try:
         query = """
@@ -276,32 +383,49 @@ def get_recording_releases(recording_id):
                 rr.spotify_track_url,
                 rf.name as format_name,
                 rs.name as status_name,
+                -- Performers from recording_performers (not release_performers)
                 COALESCE(
-                    json_agg(
-                        DISTINCT jsonb_build_object(
+                    (SELECT json_agg(
+                        jsonb_build_object(
                             'id', p.id,
                             'name', p.name,
                             'instrument', i.name,
                             'role', rp.role
-                        )
-                    ) FILTER (WHERE p.id IS NOT NULL),
+                        ) ORDER BY 
+                            CASE rp.role 
+                                WHEN 'leader' THEN 1 
+                                WHEN 'sideman' THEN 2 
+                                ELSE 3 
+                            END,
+                            p.name
+                    )
+                    FROM recording_performers rp
+                    JOIN performers p ON rp.performer_id = p.id
+                    LEFT JOIN instruments i ON rp.instrument_id = i.id
+                    WHERE rp.recording_id = rr.recording_id
+                    ),
                     '[]'::json
-                ) as performers
+                ) as performers,
+                -- Release-specific credits (producers, engineers, etc.)
+                COALESCE(
+                    (SELECT json_agg(
+                        jsonb_build_object(
+                            'id', p.id,
+                            'name', p.name,
+                            'role', relp.role
+                        ) ORDER BY relp.role, p.name
+                    )
+                    FROM release_performers relp
+                    JOIN performers p ON relp.performer_id = p.id
+                    WHERE relp.release_id = rel.id
+                    ),
+                    '[]'::json
+                ) as release_credits
             FROM recording_releases rr
             JOIN releases rel ON rr.release_id = rel.id
             LEFT JOIN release_formats rf ON rel.format_id = rf.id
             LEFT JOIN release_statuses rs ON rel.status_id = rs.id
-            LEFT JOIN release_performers rp ON rel.id = rp.release_id
-            LEFT JOIN performers p ON rp.performer_id = p.id
-            LEFT JOIN instruments i ON rp.instrument_id = i.id
             WHERE rr.recording_id = %s
-            GROUP BY rel.id, rel.title, rel.artist_credit, rel.release_date, 
-                     rel.release_year, rel.country, rel.label, rel.catalog_number,
-                     rel.spotify_album_id, rel.spotify_album_url,
-                     rel.cover_art_small, rel.cover_art_medium, rel.cover_art_large,
-                     rel.total_tracks, rel.musicbrainz_release_id,
-                     rr.disc_number, rr.track_number, rr.spotify_track_id, rr.spotify_track_url,
-                     rf.name, rs.name
             ORDER BY 
                 CASE WHEN rel.spotify_album_id IS NOT NULL THEN 0 ELSE 1 END,
                 rel.release_year ASC NULLS LAST

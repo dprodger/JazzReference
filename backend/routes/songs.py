@@ -1,6 +1,17 @@
 # routes/songs.py
+"""
+Song API Routes - Recording-Centric Performer Architecture
+
+UPDATED: Recording-Centric Architecture
+- Performers come from recording_performers table (not release_performers)
+- Spotify URL and album art come from default_release or best release via subqueries
+- Dropped columns (spotify_url, spotify_track_id, album_art_*) removed from recordings table
+
+Provides endpoints for listing, searching, and creating songs.
+"""
 from flask import Blueprint, jsonify, request
 import logging
+import json
 import db_utils as db_tools
 from utils.helpers import safe_strip
 
@@ -56,6 +67,11 @@ def get_song_detail(song_id):
     ULTRA-OPTIMIZED VERSION: Uses a SINGLE query with CTEs instead of 4+ separate queries.
     This eliminates network round trips between Render and Supabase.
     
+    UPDATED: Recording-Centric Architecture
+    - Removed dropped columns (spotify_url, spotify_track_id, album_art_*) from recordings
+    - Spotify/artwork data now comes entirely from releases via subqueries
+    - Performers come from recording_performers table
+    
     NEW: Includes authority recommendation counts and sort parameter support.
     """
     try:
@@ -86,6 +102,7 @@ def get_song_detail(song_id):
             recordings_order = "r.recording_year ASC NULLS LAST"
         
         # ONE QUERY to get everything - song, recordings+performers+authority, transcriptions
+        # UPDATED: Removed dropped columns, all Spotify/artwork from releases
         combined_query = f"""
             WITH song_data AS (
                 SELECT 
@@ -106,52 +123,65 @@ def get_song_detail(song_id):
                     r.recording_date,
                     r.recording_year,
                     r.label,
-                    r.spotify_url,
-                    r.spotify_track_id,
-                    r.album_art_small,
-                    r.album_art_medium,
-                    r.album_art_large,
-                    -- Best cover art from Spotify-linked releases
-                    (SELECT rel.cover_art_small 
-                     FROM recording_releases rr_sub
-                     JOIN releases rel ON rr_sub.release_id = rel.id
-                     WHERE rr_sub.recording_id = r.id 
-                       AND rel.spotify_album_id IS NOT NULL 
-                       AND rel.cover_art_small IS NOT NULL
-                     ORDER BY rel.release_year DESC NULLS LAST
-                     LIMIT 1) as best_cover_art_small,
-                    (SELECT rel.cover_art_medium 
-                     FROM recording_releases rr_sub
-                     JOIN releases rel ON rr_sub.release_id = rel.id
-                     WHERE rr_sub.recording_id = r.id 
-                       AND rel.spotify_album_id IS NOT NULL 
-                       AND rel.cover_art_medium IS NOT NULL
-                     ORDER BY rel.release_year DESC NULLS LAST
-                     LIMIT 1) as best_cover_art_medium,
-                    (SELECT rel.cover_art_large 
-                     FROM recording_releases rr_sub
-                     JOIN releases rel ON rr_sub.release_id = rel.id
-                     WHERE rr_sub.recording_id = r.id 
-                       AND rel.spotify_album_id IS NOT NULL 
-                       AND rel.cover_art_large IS NOT NULL
-                     ORDER BY rel.release_year DESC NULLS LAST
-                     LIMIT 1) as best_cover_art_large,
-                    -- Best Spotify URL from releases
-                    (SELECT COALESCE(rr_sub.spotify_track_url, rel.spotify_album_url)
-                     FROM recording_releases rr_sub
-                     JOIN releases rel ON rr_sub.release_id = rel.id
-                     WHERE rr_sub.recording_id = r.id 
-                       AND (rr_sub.spotify_track_url IS NOT NULL OR rel.spotify_album_url IS NOT NULL)
-                     ORDER BY 
-                       CASE WHEN rr_sub.spotify_track_url IS NOT NULL THEN 0 ELSE 1 END,
-                       rel.release_year DESC NULLS LAST
-                     LIMIT 1) as best_spotify_url,
+                    r.default_release_id,
+                    -- Spotify URL from default release or best available
+                    COALESCE(
+                        (SELECT COALESCE(rr_sub.spotify_track_url, rel_sub.spotify_album_url)
+                         FROM releases rel_sub
+                         LEFT JOIN recording_releases rr_sub ON rr_sub.release_id = rel_sub.id AND rr_sub.recording_id = r.id
+                         WHERE rel_sub.id = r.default_release_id
+                           AND (rel_sub.spotify_album_url IS NOT NULL OR rr_sub.spotify_track_url IS NOT NULL)
+                        ),
+                        (SELECT COALESCE(rr_sub.spotify_track_url, rel_sub.spotify_album_url)
+                         FROM recording_releases rr_sub
+                         JOIN releases rel_sub ON rr_sub.release_id = rel_sub.id
+                         WHERE rr_sub.recording_id = r.id 
+                           AND (rr_sub.spotify_track_url IS NOT NULL OR rel_sub.spotify_album_url IS NOT NULL)
+                         ORDER BY 
+                           CASE WHEN rr_sub.spotify_track_url IS NOT NULL THEN 0 ELSE 1 END,
+                           rel_sub.release_year DESC NULLS LAST
+                         LIMIT 1)
+                    ) as best_spotify_url,
+                    -- Best cover art from default release or Spotify-linked releases
+                    COALESCE(
+                        (SELECT rel_sub.cover_art_small FROM releases rel_sub WHERE rel_sub.id = r.default_release_id AND rel_sub.cover_art_small IS NOT NULL),
+                        (SELECT rel.cover_art_small 
+                         FROM recording_releases rr_sub
+                         JOIN releases rel ON rr_sub.release_id = rel.id
+                         WHERE rr_sub.recording_id = r.id 
+                           AND rel.spotify_album_id IS NOT NULL 
+                           AND rel.cover_art_small IS NOT NULL
+                         ORDER BY rel.release_year DESC NULLS LAST
+                         LIMIT 1)
+                    ) as best_cover_art_small,
+                    COALESCE(
+                        (SELECT rel_sub.cover_art_medium FROM releases rel_sub WHERE rel_sub.id = r.default_release_id AND rel_sub.cover_art_medium IS NOT NULL),
+                        (SELECT rel.cover_art_medium 
+                         FROM recording_releases rr_sub
+                         JOIN releases rel ON rr_sub.release_id = rel.id
+                         WHERE rr_sub.recording_id = r.id 
+                           AND rel.spotify_album_id IS NOT NULL 
+                           AND rel.cover_art_medium IS NOT NULL
+                         ORDER BY rel.release_year DESC NULLS LAST
+                         LIMIT 1)
+                    ) as best_cover_art_medium,
+                    COALESCE(
+                        (SELECT rel_sub.cover_art_large FROM releases rel_sub WHERE rel_sub.id = r.default_release_id AND rel_sub.cover_art_large IS NOT NULL),
+                        (SELECT rel.cover_art_large 
+                         FROM recording_releases rr_sub
+                         JOIN releases rel ON rr_sub.release_id = rel.id
+                         WHERE rr_sub.recording_id = r.id 
+                           AND rel.spotify_album_id IS NOT NULL 
+                           AND rel.cover_art_large IS NOT NULL
+                         ORDER BY rel.release_year DESC NULLS LAST
+                         LIMIT 1)
+                    ) as best_cover_art_large,
                     r.youtube_url,
                     r.apple_music_url,
                     r.musicbrainz_id,
                     r.is_canonical,
                     r.notes,
-                    -- Performers aggregation (existing)
+                    -- Performers aggregation from recording_performers
                     COALESCE(
                         json_agg(
                             json_build_object(
@@ -184,8 +214,7 @@ def get_song_detail(song_id):
                     ON r.id = sar.recording_id
                 WHERE r.song_id = %s
                 GROUP BY r.id, r.album_title, r.recording_date, r.recording_year,
-                         r.label, r.spotify_url, r.spotify_track_id,
-                         r.album_art_small, r.album_art_medium, r.album_art_large,
+                         r.label, r.default_release_id,
                          r.youtube_url, r.apple_music_url, r.musicbrainz_id,
                          r.is_canonical, r.notes
                 ORDER BY {recordings_order}
@@ -240,51 +269,32 @@ def get_song_detail(song_id):
 #    - Uses (SELECT COUNT(*) FROM song_authority_recommendations WHERE song_id = s.id)
 #    - No joins needed, keeps it simple
 #
-# 2. RECORDINGS CTE - Added authority information
-#    - LEFT JOIN song_authority_recommendations sar ON r.id = sar.recording_id
-#    - COUNT(DISTINCT sar.id) as authority_count
-#    - array_agg(DISTINCT sar.source) as authority_sources
-#    - Added to GROUP BY (no changes needed, already grouping by r.id)
+# 2. RECORDINGS CTE - Recording-Centric Architecture Updates
+#    - REMOVED: r.spotify_url, r.spotify_track_id, r.album_art_small/medium/large (dropped columns)
+#    - ADDED: r.default_release_id to GROUP BY
+#    - Spotify URL comes from best_spotify_url subquery (default release or best available)
+#    - Cover art comes from best_cover_art_* subqueries (default release or best available)
+#    - Performers still from recording_performers (unchanged)
 #
 # 3. ORDER BY - Made dynamic based on sort parameter
-#    - Default 'authority' uses CASE expression to prioritize recordings with recommendations
-#    - 'year' and 'canonical' options preserved
-#    - Uses Python f-string to inject ORDER BY clause (safe because sort_by is validated)
+#    - Default 'year' sorts by recording year
+#    - 'name' sorts by leader's last name
 #
 # 4. PERFORMANCE CHARACTERISTICS:
 #    - Still ONE database query (single network round trip)
 #    - Uses existing indexes on recordings(song_id) and song_authority_recommendations(recording_id)
-#    - Authority aggregation happens in parallel with performer aggregation
-#    - No performance degradation vs original version
+#    - Subqueries for Spotify/artwork are correlated but efficient with indexes
 #
 # 5. RESPONSE FORMAT:
 #    Song object now includes:
 #    - authority_recommendation_count: int
 #    
 #    Each recording now includes:
+#    - best_spotify_url: string (from releases)
+#    - best_cover_art_small/medium/large: string (from releases)
 #    - authority_count: int
 #    - authority_sources: string[]
-#    - performers: array (unchanged)
-#
-# EXAMPLE RESPONSE:
-# {
-#   "song": {
-#     "id": "...",
-#     "title": "Take Five",
-#     "authority_recommendation_count": 3,  # NEW
-#     ...
-#   },
-#   "recordings": [
-#     {
-#       "id": "...",
-#       "album_title": "Time Out",
-#       "authority_count": 1,              # NEW
-#       "authority_sources": ["jazzstandards.com"],  # NEW
-#       "performers": [...]
-#     }
-#   ],
-#   "transcriptions": [...]
-# }
+#    - performers: array (from recording_performers)
 
    
 @songs_bp.route('/api/songs/search', methods=['GET'])
@@ -526,48 +536,81 @@ def update_song_musicbrainz_id(song_id):
 
 @songs_bp.route('/api/songs/<song_id>/authority_recommendations', methods=['GET'])
 def get_song_authority_recommendations(song_id):
-    """Get all authority recommendations for a song (matched and unmatched)"""
-    conn = get_db_connection()
-    cur = conn.cursor()
+    """
+    Get all authority recommendations for a song (matched and unmatched)
     
-    # Verify song exists
-    cur.execute("SELECT id FROM songs WHERE id = %s", (song_id,))
-    if not cur.fetchone():
-        cur.close()
-        conn.close()
-        return jsonify({'error': 'Song not found'}), 404
-    
-    # Get all recommendations with optional recording details
-    cur.execute("""
-        SELECT sar.id, sar.source, sar.recommendation_text, sar.source_url,
-               sar.artist_name, sar.album_title, sar.recording_year,
-               sar.itunes_album_id, sar.itunes_track_id,
-               sar.recording_id,
-               r.album_title as matched_album_title,
-               r.recording_year as matched_year,
-               r.spotify_url as matched_spotify_url,
-               r.album_art_large as matched_album_art
-        FROM song_authority_recommendations sar
-        LEFT JOIN recordings r ON sar.recording_id = r.id
-        WHERE sar.song_id = %s
-        ORDER BY 
-            CASE WHEN sar.recording_id IS NOT NULL THEN 0 ELSE 1 END,
-            sar.source,
-            sar.artist_name
-    """, (song_id,))
-    
-    recommendations = cur.fetchall()
-    
-    cur.close()
-    conn.close()
-    
-    return jsonify({
-        'song_id': song_id,
-        'recommendations': recommendations,
-        'total_count': len(recommendations),
-        'matched_count': sum(1 for r in recommendations if r['recording_id']),
-        'unmatched_count': sum(1 for r in recommendations if not r['recording_id'])
-    })
+    UPDATED: Recording-Centric Architecture
+    - Spotify URL and album art now come from releases via subqueries
+    - Dropped columns no longer exist on recordings table
+    """
+    try:
+        with db_tools.get_db_connection() as conn:
+            with conn.cursor() as cur:
+                # Verify song exists
+                cur.execute("SELECT id FROM songs WHERE id = %s", (song_id,))
+                if not cur.fetchone():
+                    return jsonify({'error': 'Song not found'}), 404
+                
+                # Get all recommendations with optional recording details
+                # UPDATED: Spotify URL and album art from releases, not recordings
+                cur.execute("""
+                    SELECT sar.id, sar.source, sar.recommendation_text, sar.source_url,
+                           sar.artist_name, sar.album_title, sar.recording_year,
+                           sar.itunes_album_id, sar.itunes_track_id,
+                           sar.recording_id,
+                           r.album_title as matched_album_title,
+                           r.recording_year as matched_year,
+                           -- Get Spotify URL from default release or best available
+                           COALESCE(
+                               (SELECT COALESCE(rr.spotify_track_url, rel.spotify_album_url)
+                                FROM releases rel
+                                LEFT JOIN recording_releases rr ON rr.release_id = rel.id AND rr.recording_id = r.id
+                                WHERE rel.id = r.default_release_id
+                                  AND (rel.spotify_album_url IS NOT NULL OR rr.spotify_track_url IS NOT NULL)
+                               ),
+                               (SELECT COALESCE(rr.spotify_track_url, rel.spotify_album_url)
+                                FROM recording_releases rr
+                                JOIN releases rel ON rr.release_id = rel.id
+                                WHERE rr.recording_id = r.id 
+                                  AND (rr.spotify_track_url IS NOT NULL OR rel.spotify_album_url IS NOT NULL)
+                                ORDER BY 
+                                  CASE WHEN rr.spotify_track_url IS NOT NULL THEN 0 ELSE 1 END,
+                                  rel.release_year DESC NULLS LAST
+                                LIMIT 1)
+                           ) as matched_spotify_url,
+                           -- Get album art from default release or best available
+                           COALESCE(
+                               (SELECT rel.cover_art_large FROM releases rel 
+                                WHERE rel.id = r.default_release_id AND rel.cover_art_large IS NOT NULL),
+                               (SELECT rel.cover_art_large 
+                                FROM recording_releases rr
+                                JOIN releases rel ON rr.release_id = rel.id
+                                WHERE rr.recording_id = r.id AND rel.cover_art_large IS NOT NULL
+                                ORDER BY rel.release_year DESC NULLS LAST
+                                LIMIT 1)
+                           ) as matched_album_art
+                    FROM song_authority_recommendations sar
+                    LEFT JOIN recordings r ON sar.recording_id = r.id
+                    WHERE sar.song_id = %s
+                    ORDER BY 
+                        CASE WHEN sar.recording_id IS NOT NULL THEN 0 ELSE 1 END,
+                        sar.source,
+                        sar.artist_name
+                """, (song_id,))
+                
+                recommendations = cur.fetchall()
+                
+                return jsonify({
+                    'song_id': song_id,
+                    'recommendations': recommendations,
+                    'total_count': len(recommendations),
+                    'matched_count': sum(1 for r in recommendations if r['recording_id']),
+                    'unmatched_count': sum(1 for r in recommendations if not r['recording_id'])
+                })
+                
+    except Exception as e:
+        logger.error(f"Error fetching authority recommendations: {e}")
+        return jsonify({'error': 'Failed to fetch recommendations', 'detail': str(e)}), 500
 
 
 # ============================================================================
