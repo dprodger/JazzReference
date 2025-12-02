@@ -8,11 +8,12 @@ PERFORMANCE OPTIMIZATIONS:
 3. Only fetch release details for releases that don't exist in DB
 4. Batch all release operations for a recording in one transaction
 
-KEY ARCHITECTURE:
+KEY ARCHITECTURE (UPDATED):
 - Recording = a specific sound recording (same audio across all releases)
 - Release = a product (album, CD, digital release, etc.)
 - A recording can appear on multiple releases
-- Performers are now associated with releases, not recordings
+- Performers are associated with RECORDINGS (the audio), not releases
+- Releases store Spotify/album art data and release-specific credits (producers, engineers)
 """
 
 import logging
@@ -32,6 +33,10 @@ class MBReleaseImporter:
     - Minimal database connections (one per recording batch)
     - Skip API calls for existing releases
     - Efficient lookup table caching
+    
+    UPDATED: Recording-Centric Performer Architecture
+    - Performers are now added to recordings (aggregated from all releases)
+    - Releases only get release-specific credits (producers, engineers)
     """
     
     def __init__(self, dry_run: bool = False, force_refresh: bool = False, logger: Optional[logging.Logger] = None):
@@ -55,9 +60,11 @@ class MBReleaseImporter:
             'releases_found': 0,
             'releases_created': 0,
             'releases_existing': 0,
-            'releases_skipped_api': 0,  # NEW: Count of API calls skipped
+            'releases_skipped_api': 0,  # Count of API calls skipped
             'links_created': 0,
             'performers_linked': 0,
+            'performers_added_to_recordings': 0,  # NEW: Performers added to recordings
+            'release_credits_linked': 0,  # NEW: Release-specific credits (producers, etc.)
             'errors': 0
         }
         
@@ -96,107 +103,71 @@ class MBReleaseImporter:
         2. Fetches recordings from MusicBrainz (via the work)
         3. For each recording:
            - Creates the recording if it doesn't exist
+           - Adds performers to the RECORDING (aggregated from all releases)
            - Checks which releases already exist (OPTIMIZATION)
            - Only fetches details for NEW releases
-           - Creates releases and links performers
+           - Creates release-specific credits (producers, engineers)
+        4. Links recordings to releases
         
         Args:
-            song_identifier: Song name or database ID
-            limit: Max recordings to fetch (default: 200)
+            song_identifier: Song name or UUID to find recordings for
+            limit: Maximum number of recordings to process
             
         Returns:
-            dict: {
-                'success': bool,
-                'song': dict (if found),
-                'stats': dict with import statistics,
-                'errors': list of error messages (if any),
-                'error': string error message (if failed)
-            }
+            Dict with import statistics
         """
-        self.logger.info(f"Starting release import for: {song_identifier}")
-        
-        # STEP 1: Find the song
+        # Find the song
         song = self.find_song(song_identifier)
+        
         if not song:
-            self.logger.error("Song not found")
-            return {
-                'success': False,
-                'error': 'Song not found',
-                'stats': self.stats
-            }
+            return {'success': False, 'error': 'Song not found', 'stats': self.stats}
         
-        self.logger.info(f"Found song: {song['title']} by {song['composer']}")
-        self.logger.info(f"Database ID: {song['id']}")
-        self.logger.info(f"MusicBrainz Work ID: {song['musicbrainz_id']}")
+        self.logger.info(f"Found song: {song['title']} (ID: {song['id']})")
         
-        # Check for MusicBrainz ID
-        if not song['musicbrainz_id']:
-            self.logger.error("Song has no MusicBrainz ID")
-            return {
-                'success': False,
-                'error': 'Song has no MusicBrainz ID',
-                'song': song,
-                'stats': self.stats
-            }
+        # Get MusicBrainz work ID
+        mb_work_id = song.get('musicbrainz_id')
         
-        # STEP 2: Fetch recordings from MusicBrainz (NO DATABASE CONNECTION)
-        mb_recordings = self._fetch_musicbrainz_recordings(
-            song['musicbrainz_id'], 
-            limit
-        )
+        if not mb_work_id:
+            return {'success': False, 'error': 'Song has no MusicBrainz ID', 'stats': self.stats}
         
-        if not mb_recordings:
-            self.logger.warning("No recordings found in MusicBrainz for this work")
-            return {
-                'success': False,
-                'error': 'No recordings found',
-                'song': song,
-                'stats': self.stats
-            }
+        # Fetch recordings from MusicBrainz
+        recordings = self._fetch_musicbrainz_recordings(mb_work_id, limit)
         
-        self.stats['recordings_found'] = len(mb_recordings)
-        self.logger.info(f"Found {len(mb_recordings)} recordings in MusicBrainz")
-        self.logger.info("")
+        if not recordings:
+            return {'success': False, 'error': 'No recordings found on MusicBrainz', 'stats': self.stats}
         
-        # STEP 3: Process all recordings with a SINGLE database connection
-        errors = []
+        self.logger.info(f"Found {len(recordings)} recordings to process")
+        
+        # Process each recording with a SINGLE connection
         with get_db_connection() as conn:
-            # Pre-populate lookup table caches (uses existing connection)
-            self._preload_lookup_caches(conn)
+            # Pre-load lookup table caches (one-time cost)
+            self._load_lookup_caches(conn)
             
-            for i, mb_recording in enumerate(mb_recordings, 1):
-                mb_recording_id = mb_recording.get('id')
-                mb_recording_title = mb_recording.get('title', 'Unknown')
-                
-                self.logger.info(f"[{i}/{len(mb_recordings)}] Recording: {mb_recording_title[:60]}")
+            for i, mb_recording in enumerate(recordings, 1):
+                recording_title = mb_recording.get('title', 'Unknown')
+                self.logger.info(f"\n[{i}/{len(recordings)}] Processing: {recording_title}")
                 
                 try:
                     self._process_recording(conn, song['id'], mb_recording)
-                    # Commit after each recording to avoid holding locks too long
-                    conn.commit()
+                    self.stats['recordings_found'] += 1
                 except Exception as e:
-                    error_msg = f"Error processing recording {mb_recording_title}: {e}"
-                    self.logger.error(error_msg)
+                    self.logger.error(f"  Error processing recording: {e}")
                     self.stats['errors'] += 1
-                    errors.append(error_msg)
-                    # Rollback this recording's changes, continue with next
-                    conn.rollback()
+                    # Continue with next recording
+                    continue
         
         return {
             'success': True,
             'song': song,
-            'stats': self.stats,
-            'errors': errors if errors else None
+            'recordings_processed': len(recordings),
+            'stats': self.stats
         }
     
-    def _preload_lookup_caches(self, conn) -> None:
+    def _load_lookup_caches(self, conn) -> None:
         """
-        Pre-load lookup table caches to avoid repeated queries
+        Pre-load lookup table caches for efficient access
         
-        OPTIMIZATION: Load all lookup values once at start
-        
-        Args:
-            conn: Database connection to use
+        OPTIMIZATION: Single query each for formats, statuses, packaging
         """
         self.logger.debug("Pre-loading lookup table caches...")
         
@@ -229,11 +200,16 @@ class MBReleaseImporter:
         - Batch checks existing releases AND links in 2 queries total
         - Skips all DB operations for fully-linked existing releases
         
+        UPDATED: Recording-Centric Performer Architecture
+        - After creating/finding the recording, adds performers to the RECORDING
+        - Performers are aggregated from all releases for that recording
+        
         1. Create/find the recording in our database
-        2. Check which releases already exist (batch query)
-        3. Check which links already exist (batch query)  
-        4. Only fetch details for NEW releases
-        5. Only create links for releases not yet linked
+        2. Add performers to the RECORDING (NEW)
+        3. Check which releases already exist (batch query)
+        4. Check which links already exist (batch query)  
+        5. Only fetch details for NEW releases
+        6. Only create links for releases not yet linked
         
         Args:
             conn: Database connection (reused from caller)
@@ -275,12 +251,22 @@ class MBReleaseImporter:
             self.logger.error("  Failed to get/create recording")
             return
         
-        # STEP 2: Get mapping of MB release IDs to our release IDs (single query)
+        # STEP 2: Add performers to the RECORDING (NEW - Recording-Centric Architecture)
+        # This aggregates performers from the recording's MusicBrainz data
+        performers_added = self.performer_importer.add_performers_to_recording(
+            conn, recording_id, mb_recording, 
+            source_release_title=album_title
+        )
+        if performers_added > 0:
+            self.stats['performers_added_to_recordings'] += performers_added
+            self.logger.info(f"  Added {performers_added} performers to recording")
+        
+        # STEP 3: Get mapping of MB release IDs to our release IDs (single query)
         existing_releases = self._get_existing_release_ids(
             conn, [r.get('id') for r in mb_releases if r.get('id')]
         )
         
-        # STEP 3: Batch check which links already exist (single query)
+        # STEP 4: Batch check which links already exist (single query)
         existing_release_db_ids = list(existing_releases.values())
         existing_links = set()
         if recording_id and existing_release_db_ids:
@@ -297,7 +283,7 @@ class MBReleaseImporter:
                        f"({len(existing_releases)} in DB, {fully_linked_count} already linked, "
                        f"{needs_linking_count} need linking, {new_releases_count} new)...")
         
-        # STEP 4: Process each release
+        # STEP 5: Process each release
         for mb_release in mb_releases:
             self._process_release_in_transaction(
                 conn, recording_id, mb_recording_id, mb_recording, 
@@ -372,6 +358,10 @@ class MBReleaseImporter:
         - Skips entirely for releases that are already fully linked
         - No individual DB queries for existing releases
         
+        UPDATED: Recording-Centric Performer Architecture
+        - Performers are added to RECORDINGS, not releases
+        - Releases only get release-specific credits (producers, engineers)
+        
         Args:
             conn: Database connection (reused)
             recording_id: Our database recording ID (may be None in dry-run)
@@ -418,9 +408,9 @@ class MBReleaseImporter:
         if self.dry_run:
             self.logger.info(f"    [DRY RUN] Would create release: {release_title[:50]}")
             self._log_release_info(release_data)
-            # Show performers that would be linked
-            self.performer_importer.link_performers_to_release(
-                None, None, mb_recording, release_details
+            # Show performers that would be added to recording
+            self.performer_importer.add_performers_to_recording(
+                None, None, mb_recording, source_release_title=release_title
             )
             return
         
@@ -438,11 +428,22 @@ class MBReleaseImporter:
             if link_created:
                 self.stats['links_created'] += 1
             
-            # Link performers to the release
-            performers_linked = self.performer_importer.link_performers_to_release(
+            # UPDATED: Add performers to the RECORDING (not release)
+            # This aggregates performers from this release into the recording
+            performers_added = self.performer_importer.add_performers_to_recording(
+                conn, recording_id, mb_recording,
+                source_release_title=release_title
+            )
+            if performers_added > 0:
+                self.stats['performers_added_to_recordings'] += performers_added
+            
+            # Link release-specific credits (producers, engineers, etc.)
+            # These go to the RELEASE, not the recording
+            credits_linked = self.performer_importer.link_release_credits(
                 conn, release_id, mb_recording, release_details
             )
-            self.stats['performers_linked'] += performers_linked
+            if credits_linked > 0:
+                self.stats['release_credits_linked'] += credits_linked
     
     def _get_release_id_by_mb_id(self, conn, mb_release_id: str) -> Optional[str]:
         """Get our database release ID by MusicBrainz release ID"""

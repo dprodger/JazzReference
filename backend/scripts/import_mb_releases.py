@@ -3,7 +3,7 @@
 MusicBrainz Release Importer - Command Line Interface
 
 Fetches recordings and releases for songs with MusicBrainz IDs and imports them 
-into the database. Creates recordings, releases, and links performers to releases.
+into the database. Creates recordings, releases, and links performers to recordings.
 
 This script provides a command-line interface to the MBReleaseImporter module.
 It handles argument parsing, logging configuration, and result presentation.
@@ -80,7 +80,11 @@ def print_summary(result: dict):
             logger.info(f"  API calls skipped: {stats['releases_skipped_api']}")
         logger.info("")
         logger.info(f"Links created:      {stats['links_created']}")
-        logger.info(f"Performers linked:  {stats['performers_linked']}")
+        logger.info("")
+        logger.info("Performers:")
+        logger.info(f"  Added to recordings:  {stats['performers_added_to_recordings']}")
+        logger.info(f"  Release credits:      {stats['release_credits_linked']}")
+        logger.info("")
         logger.info(f"Errors:             {stats['errors']}")
     else:
         logger.error(f"Import failed: {result.get('error', 'Unknown error')}")
@@ -120,10 +124,11 @@ What this script does:
   2. Fetches recordings from MusicBrainz (via the song's MusicBrainz Work ID)
   3. For each recording:
      - Creates the recording if it doesn't exist
+     - Adds performers to the RECORDING (aggregated from all releases)
      - Fetches all releases containing that recording
      - Creates releases if they don't exist
      - Links recordings to releases
-     - Associates performers with releases
+     - Adds release-specific credits (producers, engineers) to releases
 
 Performance optimizations:
   - Checks if releases exist BEFORE making API calls

@@ -1386,3 +1386,92 @@ WHERE spotify_track_id IS NOT NULL;
 -- Comment
 COMMENT ON COLUMN recording_releases.spotify_track_id IS 'Spotify track ID for this recording on this release';
 COMMENT ON COLUMN recording_releases.spotify_track_url IS 'Full Spotify URL to the track';
+
+-- ============================================================================
+-- Migration: Recording-Centric Performer Architecture
+-- ============================================================================
+-- 
+-- Purpose: Restructure the data model so that:
+--   1. Performers are associated with RECORDINGS (not releases)
+--   2. Recordings have a "default_release_id" for Spotify/album art display
+--   3. Release-level Spotify/art columns are removed from recordings table
+--   4. release_performers is kept but redesignated for release-specific credits
+--      (producers, engineers, remasters - NOT the performing musicians)
+--
+-- This migration:
+--   1. Adds default_release_id FK to recordings
+--   2. Drops redundant Spotify/album art columns from recordings
+--   3. Updates comments to clarify the new architecture
+--
+-- ============================================================================
+
+-- ============================================================================
+-- STEP 1: Add default_release_id to recordings
+-- ============================================================================
+
+-- Add the foreign key column (nullable - not all recordings have releases yet)
+ALTER TABLE recordings
+ADD COLUMN IF NOT EXISTS default_release_id UUID REFERENCES releases(id) ON DELETE SET NULL;
+
+-- Add index for efficient lookups
+CREATE INDEX IF NOT EXISTS idx_recordings_default_release_id 
+    ON recordings(default_release_id) 
+    WHERE default_release_id IS NOT NULL;
+
+-- Add comment
+COMMENT ON COLUMN recordings.default_release_id IS 
+    'The preferred release for this recording (provides Spotify URL, album art). '
+    'Typically the release with best Spotify match or most complete data.';
+
+
+-- ============================================================================
+-- STEP 2: Drop redundant columns from recordings
+-- ============================================================================
+
+-- These columns are now sourced from the default_release (or best available release)
+-- Data loss is acceptable per user requirements (will re-import)
+
+DROP VIEW songs_with_canonical_recordings;
+ALTER TABLE recordings
+DROP COLUMN IF EXISTS spotify_track_id,
+DROP COLUMN IF EXISTS album_art_small,
+DROP COLUMN IF EXISTS album_art_medium,
+DROP COLUMN IF EXISTS album_art_large,
+DROP COLUMN IF EXISTS spotify_url;
+
+
+-- ============================================================================
+-- STEP 3: Update table comments to reflect new architecture
+-- ============================================================================
+
+COMMENT ON TABLE recordings IS 
+    'A specific audio recording of a song. Performers are linked via recording_performers. '
+    'Spotify/album art comes from the default_release or is computed from linked releases.';
+
+COMMENT ON TABLE recording_performers IS 
+    'Junction table linking performers to recordings with their instrument and role. '
+    'This is the PRIMARY source of performer information for a recording.';
+
+COMMENT ON TABLE release_performers IS 
+    'Junction table for RELEASE-SPECIFIC credits only. Use for producers, engineers, '
+    'remaster credits, liner notes authors, etc. - NOT for performing musicians. '
+    'Performing musicians should be linked via recording_performers.';
+
+
+-- ============================================================================
+-- VERIFICATION
+-- ============================================================================
+
+-- Uncomment to verify the changes:
+-- SELECT column_name, data_type, is_nullable
+-- FROM information_schema.columns
+-- WHERE table_name = 'recordings'
+-- ORDER BY ordinal_position;
+
+-- Check that default_release_id exists:
+-- SELECT column_name FROM information_schema.columns 
+-- WHERE table_name = 'recordings' AND column_name = 'default_release_id';
+
+-- Verify dropped columns are gone:
+-- SELECT column_name FROM information_schema.columns 
+-- WHERE table_name = 'recordings' AND column_name IN ('spotify_track_id', 'album_art_small', 'album_art_medium', 'album_art_large', 'spotify_url');

@@ -2,11 +2,17 @@
 """
 Shared utilities for importing performer and instrument data from MusicBrainz
 
-UPDATED: Now supports linking performers to releases (not just recordings)
+UPDATED: Recording-Centric Performer Architecture
+- Performers are now associated with RECORDINGS (primary)
+- release_performers is kept for release-specific credits only (producers, engineers)
+- New add_performers_to_recording() method aggregates performers from all releases
+- Special logging when adding performers to recordings that already have performers
 """
 
 import logging
 import re
+from datetime import datetime
+from pathlib import Path
 from db_utils import get_db_connection
 from mb_utils import MusicBrainzSearcher
 
@@ -71,12 +77,40 @@ def is_performer_leader_of_group(performer_name, group_name):
 
 logger = logging.getLogger(__name__)
 
+# Special logger for performer additions to existing recordings
+# This creates a separate log file for review
+_additions_logger = None
+
+def get_additions_logger():
+    """Get or create the special additions logger"""
+    global _additions_logger
+    if _additions_logger is None:
+        _additions_logger = logging.getLogger('performer_additions')
+        _additions_logger.setLevel(logging.INFO)
+        
+        # Create log directory if needed
+        log_dir = Path(__file__).parent / 'scripts' / 'log'
+        log_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Create file handler
+        log_file = log_dir / 'performer_additions.log'
+        handler = logging.FileHandler(log_file)
+        handler.setFormatter(logging.Formatter('%(asctime)s - %(message)s'))
+        _additions_logger.addHandler(handler)
+        
+        # Don't propagate to root logger
+        _additions_logger.propagate = False
+    
+    return _additions_logger
+
 
 class PerformerImporter:
     """
     Handles importing performers and instruments from MusicBrainz data
     
-    UPDATED: Now supports linking performers to releases via release_performers table
+    UPDATED: Recording-Centric Architecture
+    - Primary method is now add_performers_to_recording()
+    - link_performers_to_release() kept for release-specific credits only
     """
     
     def __init__(self, dry_run=False):
@@ -85,159 +119,64 @@ class PerformerImporter:
         self.stats = {
             'performers_created': 0,
             'instruments_created': 0,
-            'performer_links_created': 0
+            'performer_links_created': 0,
+            'recordings_with_new_performers': 0,  # Recordings that got new performers added
         }
     
-    def fetch_release_credits(self, release_id):
-        """
-        Fetch detailed credits from a release
-        
-        Args:
-            release_id: MusicBrainz release MBID
-            
-        Returns:
-            Release data dict or None if error
-        """
-        try:
-            return self.mb_searcher.get_release_details(release_id)
-        except Exception as e:
-            logger.warning(f"Error fetching release credits: {e}")
-            return None
+    # ========================================================================
+    # PRIMARY METHOD: Add performers to recordings
+    # ========================================================================
     
-    def link_performers_to_release(self, conn, release_id, mb_recording, release_details):
+    def add_performers_to_recording(self, conn, recording_id, recording_data, 
+                                     source_release_title=None):
         """
-        Link performers to a release (NEW METHOD)
+        Add performers to a recording, aggregating from release data.
         
-        This extracts performer information from MusicBrainz and creates
-        entries in the release_performers table.
+        This is the PRIMARY method for associating performers with recordings.
+        It implements the maximalist approach: any performer found on any release
+        gets added to the recording.
         
-        Args:
-            conn: Database connection (None for dry-run)
-            release_id: Our database release ID (None for dry-run)
-            mb_recording: MusicBrainz recording data
-            release_details: Full MusicBrainz release details
-            
-        Returns:
-            Number of performers linked
-        """
-        mb_recording_id = mb_recording.get('id') if mb_recording else None
-        
-        # Extract performers from various sources
-        performers_to_import = self._extract_performers(
-            mb_recording, release_details, mb_recording_id
-        )
-        
-        if not performers_to_import:
-            logger.debug("  No performers found to import")
-            return 0
-        
-        # Get leader information from artist credits
-        leader_mbids, leader_names = self._extract_leader_info(mb_recording, release_details)
-        
-        if self.dry_run:
-            self._log_performers_dry_run(performers_to_import, leader_mbids, leader_names)
-            return len(performers_to_import)
-        
-        if not conn or not release_id:
-            return 0
-        
-        performers_linked = 0
-        
-        with conn.cursor() as cur:
-            for performer_data in performers_to_import:
-                performer_id = self.get_or_create_performer(
-                    conn,
-                    performer_data['name'],
-                    performer_data.get('mbid')
-                )
-                
-                if not performer_id:
-                    continue
-                
-                # Check if already linked
-                cur.execute("""
-                    SELECT COUNT(*) as count
-                    FROM release_performers
-                    WHERE release_id = %s AND performer_id = %s
-                """, (release_id, performer_id))
-                
-                if cur.fetchone()['count'] > 0:
-                    logger.debug(f"  Skipping {performer_data['name']} - already linked")
-                    continue
-                
-                # Determine role
-                db_role = self._determine_role(
-                    performer_data, leader_mbids, leader_names
-                )
-                
-                # Process instruments
-                instruments = performer_data.get('instruments') or []
-                
-                if instruments:
-                    for instrument_name in instruments:
-                        instrument_id = self.get_or_create_instrument(conn, instrument_name)
-                        
-                        if instrument_id:
-                            cur.execute("""
-                                INSERT INTO release_performers (
-                                    release_id, performer_id, instrument_id, role
-                                )
-                                VALUES (%s, %s, %s, %s)
-                                ON CONFLICT DO NOTHING
-                            """, (release_id, performer_id, instrument_id, db_role))
-                            
-                            self.link_performer_instrument(conn, performer_id, instrument_id)
-                            performers_linked += 1
-                else:
-                    # No instrument info
-                    cur.execute("""
-                        INSERT INTO release_performers (
-                            release_id, performer_id, role
-                        )
-                        VALUES (%s, %s, %s)
-                        ON CONFLICT DO NOTHING
-                    """, (release_id, performer_id, db_role))
-                    performers_linked += 1
-            
-            # Ensure at least one leader
-            if performers_linked > 0:
-                self._ensure_leader_exists(cur, release_id, 'release_performers')
-        
-        return performers_linked
-    
-    def link_performers_to_recording(self, conn, recording_id, recording_data):
-        """
-        Link performers to a recording (LEGACY METHOD - kept for backwards compatibility)
+        SPECIAL LOGGING: When adding performers to a recording that already has
+        performers, logs to performer_additions.log for manual review.
         
         Args:
             conn: Database connection
             recording_id: Our database recording ID
             recording_data: MusicBrainz recording data
+            source_release_title: Title of the release being processed (for logging)
             
         Returns:
-            Number of performers linked
+            Number of NEW performers added (0 if all already existed)
         """
-        # Extract performers from recording data
-        performers_to_import = self._extract_performers_from_recording(recording_data)
+        if not recording_data:
+            logger.debug("  No recording data provided")
+            return 0
         
-        if not performers_to_import:
-            logger.debug("  No performers found to import")
+        # Extract performers from recording data
+        performers_to_add = self._extract_performers_from_recording(recording_data)
+        
+        if not performers_to_add:
+            logger.debug("  No performers found in recording data")
             return 0
         
         # Get leader information from artist credits
         leader_mbids, leader_names = self._extract_leader_info_from_recording(recording_data)
         
         if self.dry_run:
-            self._log_performers_dry_run(performers_to_import, leader_mbids, leader_names)
-            return len(performers_to_import)
+            self._log_performers_dry_run(performers_to_add, leader_mbids, leader_names)
+            return len(performers_to_add)
         
         if not conn or not recording_id:
             return 0
         
-        performers_linked = 0
+        # Check how many performers already exist for this recording
+        existing_performer_count = self._get_recording_performer_count(conn, recording_id)
+        
+        new_performers_added = 0
+        new_performer_names = []
         
         with conn.cursor() as cur:
-            for performer_data in performers_to_import:
+            for performer_data in performers_to_add:
                 performer_id = self.get_or_create_performer(
                     conn,
                     performer_data['name'],
@@ -247,7 +186,7 @@ class PerformerImporter:
                 if not performer_id:
                     continue
                 
-                # Check if already linked
+                # Check if already linked to this recording
                 cur.execute("""
                     SELECT COUNT(*) as count
                     FROM recording_performers
@@ -258,6 +197,7 @@ class PerformerImporter:
                     logger.debug(f"  Skipping {performer_data['name']} - already linked")
                     continue
                 
+                # This is a NEW performer for this recording
                 # Determine role
                 db_role = self._determine_role(
                     performer_data, leader_mbids, leader_names
@@ -280,7 +220,8 @@ class PerformerImporter:
                             """, (recording_id, performer_id, instrument_id, db_role))
                             
                             self.link_performer_instrument(conn, performer_id, instrument_id)
-                            performers_linked += 1
+                            new_performers_added += 1
+                            new_performer_names.append(f"{performer_data['name']} ({instrument_name})")
                 else:
                     cur.execute("""
                         INSERT INTO recording_performers (
@@ -289,68 +230,207 @@ class PerformerImporter:
                         VALUES (%s, %s, %s)
                         ON CONFLICT DO NOTHING
                     """, (recording_id, performer_id, db_role))
-                    performers_linked += 1
+                    new_performers_added += 1
+                    new_performer_names.append(performer_data['name'])
             
             # Ensure at least one leader
-            if performers_linked > 0:
+            if new_performers_added > 0:
                 self._ensure_leader_exists(cur, recording_id, 'recording_performers')
         
-        return performers_linked
-    
-    def _extract_performers(self, mb_recording, release_details, target_recording_id=None):
-        """
-        Extract performers from MusicBrainz data (for releases)
+        # SPECIAL LOGGING: If we added performers to a recording that already had some
+        if new_performers_added > 0 and existing_performer_count > 0:
+            self._log_performer_addition(
+                conn, recording_id, existing_performer_count, 
+                new_performer_names, source_release_title
+            )
+            self.stats['recordings_with_new_performers'] += 1
         
-        Checks multiple sources:
-        1. Recording relationships (artist-rels)
-        2. Release relationships
-        3. Track-level credits
-        4. Artist credits (fallback)
+        return new_performers_added
+    
+    def _get_recording_performer_count(self, conn, recording_id):
+        """Get the current count of performers for a recording"""
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT COUNT(DISTINCT performer_id) as count
+                FROM recording_performers
+                WHERE recording_id = %s
+            """, (recording_id,))
+            return cur.fetchone()['count']
+    
+    def _log_performer_addition(self, conn, recording_id, existing_count, 
+                                 new_performer_names, source_release_title):
+        """Log when performers are added to a recording that already has performers"""
+        additions_log = get_additions_logger()
+        
+        # Get recording info for logging
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT r.album_title, r.recording_year, s.title as song_title
+                FROM recordings r
+                JOIN songs s ON r.song_id = s.id
+                WHERE r.id = %s
+            """, (recording_id,))
+            recording_info = cur.fetchone()
+        
+        if recording_info:
+            album = recording_info['album_title'] or 'Unknown Album'
+            year = recording_info['recording_year'] or 'N/A'
+            song = recording_info['song_title'] or 'Unknown Song'
+        else:
+            album = 'Unknown'
+            year = 'N/A'
+            song = 'Unknown'
+        
+        additions_log.info(
+            f"ADDITION - Recording: {album} ({year}) - Song: {song}\n"
+            f"  Recording ID: {recording_id}\n"
+            f"  Existing performers: {existing_count}\n"
+            f"  Source release: {source_release_title or 'Unknown'}\n"
+            f"  New performers added: {', '.join(new_performer_names)}\n"
+        )
+    
+    # ========================================================================
+    # RELEASE-SPECIFIC CREDITS: For producers, engineers, etc.
+    # ========================================================================
+    
+    def link_release_credits(self, conn, release_id, mb_recording, release_details):
+        """
+        Link release-specific credits (producers, engineers, etc.) to a release.
+        
+        This is for NON-PERFORMER credits only. Performing musicians should use
+        add_performers_to_recording() instead.
         
         Args:
+            conn: Database connection
+            release_id: Our database release ID
             mb_recording: MusicBrainz recording data
-            release_details: Full release details
-            target_recording_id: Recording MBID to match
+            release_details: Full MusicBrainz release details
             
         Returns:
-            List of performer dicts with name, mbid, instruments, role
+            Number of credits linked
         """
-        performers = []
+        if not release_details:
+            return 0
         
-        # Try recording-level relationships first
-        if mb_recording:
-            relations = mb_recording.get('relations') or []
-            if relations:
-                performers = self.parse_artist_relationships(relations)
-                if performers:
-                    logger.debug(f"  Found {len(performers)} performers from recording relationships")
-                    return performers
+        # Extract only non-performer credits (producers, engineers, etc.)
+        credits_to_add = self._extract_release_credits(release_details)
         
-        # Try release-level relationships
-        if release_details:
-            # Check track-level credits for the specific recording
-            performers = self.parse_release_artist_credits(
-                release_details, target_recording_id
-            )
-            if performers:
-                logger.debug(f"  Found {len(performers)} performers from release/track credits")
-                return performers
+        if not credits_to_add:
+            return 0
         
-        # Fallback to artist credits
-        if mb_recording:
-            artist_credits = mb_recording.get('artist-credit') or []
-            artists = self.parse_artist_credits(artist_credits)
-            if artists:
-                performers = [
-                    {'name': a['name'], 'mbid': a['mbid'], 'instruments': [], 'role': 'performer'}
-                    for a in artists
-                ]
-                logger.debug(f"  Found {len(performers)} performers from artist credits (fallback)")
+        if self.dry_run:
+            logger.info(f"  [DRY RUN] Would add {len(credits_to_add)} release credits")
+            for credit in credits_to_add:
+                logger.info(f"    - {credit['name']} ({credit['role']})")
+            return len(credits_to_add)
         
-        return performers
+        if not conn or not release_id:
+            return 0
+        
+        credits_linked = 0
+        
+        with conn.cursor() as cur:
+            for credit in credits_to_add:
+                performer_id = self.get_or_create_performer(
+                    conn,
+                    credit['name'],
+                    credit.get('mbid')
+                )
+                
+                if not performer_id:
+                    continue
+                
+                # Check if already linked
+                cur.execute("""
+                    SELECT COUNT(*) as count
+                    FROM release_performers
+                    WHERE release_id = %s AND performer_id = %s
+                """, (release_id, performer_id))
+                
+                if cur.fetchone()['count'] > 0:
+                    continue
+                
+                # Add release credit
+                cur.execute("""
+                    INSERT INTO release_performers (
+                        release_id, performer_id, role
+                    )
+                    VALUES (%s, %s, %s)
+                    ON CONFLICT DO NOTHING
+                """, (release_id, performer_id, credit['role']))
+                credits_linked += 1
+        
+        return credits_linked
+    
+    def _extract_release_credits(self, release_details):
+        """
+        Extract non-performer credits from release data.
+        Only returns producers, engineers, etc. - NOT performing musicians.
+        """
+        credits = []
+        
+        relations = release_details.get('relations') or []
+        for relation in relations:
+            if not relation or not isinstance(relation, dict):
+                continue
+            
+            rel_type = relation.get('type', '')
+            target_type = relation.get('target-type', '')
+            
+            # Only process artist relationships that are NOT instruments/vocals
+            if target_type != 'artist':
+                continue
+            
+            # These are release-specific credit types
+            if rel_type in ['producer', 'engineer', 'mix', 'mastering', 'recording', 
+                           'editor', 'balance', 'audio director', 'liner notes',
+                           'art direction', 'design', 'photography']:
+                artist = relation.get('artist', {})
+                if artist and artist.get('name'):
+                    credits.append({
+                        'name': artist['name'],
+                        'mbid': artist.get('id'),
+                        'role': rel_type
+                    })
+        
+        return credits
+    
+    # ========================================================================
+    # LEGACY METHOD: Keep for backwards compatibility
+    # ========================================================================
+    
+    def link_performers_to_release(self, conn, release_id, mb_recording, release_details):
+        """
+        DEPRECATED: Use add_performers_to_recording() for performers,
+        and link_release_credits() for producers/engineers.
+        
+        This method is kept for backwards compatibility but now just
+        extracts release credits (non-performers).
+        """
+        return self.link_release_credits(conn, release_id, mb_recording, release_details)
+    
+    def link_performers_to_recording(self, conn, recording_id, recording_data):
+        """
+        LEGACY METHOD - Now wraps add_performers_to_recording()
+        
+        Args:
+            conn: Database connection
+            recording_id: Our database recording ID
+            recording_data: MusicBrainz recording data
+            
+        Returns:
+            Number of performers linked
+        """
+        return self.add_performers_to_recording(
+            conn, recording_id, recording_data, source_release_title=None
+        )
+    
+    # ========================================================================
+    # Data extraction methods
+    # ========================================================================
     
     def _extract_performers_from_recording(self, recording_data):
-        """Extract performers from recording data (legacy method)"""
+        """Extract performers from recording data"""
         performers = []
         
         # Get artist credits
@@ -384,42 +464,8 @@ class PerformerImporter:
                 for a in artists_from_credits
             ]
     
-    def _extract_leader_info(self, mb_recording, release_details):
-        """
-        Extract leader information from artist credits
-        
-        Returns:
-            Tuple of (leader_mbids set, leader_names set)
-        """
-        leader_mbids = set()
-        leader_names = set()
-        
-        # From recording
-        if mb_recording:
-            artist_credits = mb_recording.get('artist-credit') or []
-            for credit in artist_credits:
-                if isinstance(credit, dict) and 'artist' in credit:
-                    artist = credit['artist']
-                    if artist.get('id'):
-                        leader_mbids.add(artist['id'])
-                    if artist.get('name'):
-                        leader_names.add(artist['name'].lower())
-        
-        # From release
-        if release_details:
-            artist_credits = release_details.get('artist-credit') or []
-            for credit in artist_credits:
-                if isinstance(credit, dict) and 'artist' in credit:
-                    artist = credit['artist']
-                    if artist.get('id'):
-                        leader_mbids.add(artist['id'])
-                    if artist.get('name'):
-                        leader_names.add(artist['name'].lower())
-        
-        return leader_mbids, leader_names
-    
     def _extract_leader_info_from_recording(self, recording_data):
-        """Extract leader info from recording data (legacy method)"""
+        """Extract leader info from recording data"""
         leader_mbids = set()
         leader_names = set()
         
@@ -437,14 +483,6 @@ class PerformerImporter:
     def _determine_role(self, performer_data, leader_mbids, leader_names):
         """
         Determine the role (leader/sideman/other) for a performer
-        
-        Args:
-            performer_data: Dict with performer info
-            leader_mbids: Set of leader MusicBrainz IDs
-            leader_names: Set of leader names (lowercase)
-            
-        Returns:
-            Role string: 'leader', 'sideman', or 'other'
         """
         performer_role = performer_data.get('role', 'performer')
         performer_mbid = performer_data.get('mbid')
@@ -471,12 +509,7 @@ class PerformerImporter:
     
     def _ensure_leader_exists(self, cur, entity_id, table_name):
         """
-        Ensure at least one leader exists for a recording/release
-        
-        Args:
-            cur: Database cursor
-            entity_id: Recording or release ID
-            table_name: 'recording_performers' or 'release_performers'
+        Ensure at least one leader exists for a recording
         """
         id_column = 'recording_id' if table_name == 'recording_performers' else 'release_id'
         
@@ -486,8 +519,10 @@ class PerformerImporter:
             WHERE {id_column} = %s AND role = 'leader'
         """, (entity_id,))
         
-        if cur.fetchone()['leader_count'] == 0:
-            logger.debug(f"  No leaders assigned - marking first performer as leader")
+        leader_count = cur.fetchone()['leader_count']
+        
+        if leader_count == 0:
+            logger.debug(f"      No leaders assigned - marking first performer as leader")
             cur.execute(f"""
                 UPDATE {table_name}
                 SET role = 'leader'
@@ -501,63 +536,53 @@ class PerformerImporter:
             """, (entity_id,))
     
     def _log_performers_dry_run(self, performers, leader_mbids, leader_names):
-        """Log performer info for dry-run mode"""
-        logger.info(f"  [DRY RUN] Performers ({len(performers)}):")
+        """Log performer info in dry-run mode"""
+        logger.info(f"  [DRY RUN] Would add {len(performers)} performers:")
         for p in performers:
             role = self._determine_role(p, leader_mbids, leader_names)
-            instruments = ', '.join(p['instruments']) if p['instruments'] else 'no instrument'
+            instruments = ', '.join(p.get('instruments', [])) or 'no instrument'
             logger.info(f"    - {p['name']} ({role}) - {instruments}")
     
     # ========================================================================
     # Parsing methods
     # ========================================================================
     
+    def fetch_release_credits(self, release_id):
+        """Fetch detailed credits from a release"""
+        try:
+            return self.mb_searcher.get_release_details(release_id)
+        except Exception as e:
+            logger.warning(f"Error fetching release credits: {e}")
+            return None
+    
     def parse_artist_credits(self, artist_credits):
-        """
-        Parse MusicBrainz artist credits into a list of artists
-        
-        Args:
-            artist_credits: List of artist credit dicts from MusicBrainz
-            
-        Returns:
-            List of dicts with keys: name, mbid, sort_name
-        """
+        """Parse artist credits to extract artist info"""
         if not artist_credits:
             return []
         
         artists = []
         for credit in artist_credits:
             if isinstance(credit, dict) and 'artist' in credit:
-                artist = credit.get('artist')
-                if isinstance(artist, dict):
-                    artists.append({
-                        'name': artist.get('name'),
-                        'mbid': artist.get('id'),
-                        'sort_name': artist.get('sort-name')
-                    })
+                artist = credit['artist']
+                artists.append({
+                    'name': artist.get('name'),
+                    'mbid': artist.get('id'),
+                    'sort_name': artist.get('sort-name')
+                })
         
         return artists
     
     def parse_artist_relationships(self, relations):
-        """
-        Parse MusicBrainz artist relationships to extract performer and instrument info
-        
-        Args:
-            relations: List of relationship dicts from MusicBrainz
-            
-        Returns:
-            List of dicts with keys: name, mbid, instruments (list), role
-        """
+        """Parse MusicBrainz artist relationships to extract performer info"""
         if not relations:
             return []
         
         performers = []
         
         for relation in relations:
-            # Skip None or non-dict relations
             if not relation or not isinstance(relation, dict):
                 continue
-                
+            
             rel_type = relation.get('type', 'unknown')
             target_type = relation.get('target-type', 'unknown')
             
@@ -571,7 +596,7 @@ class PerformerImporter:
             artist = relation.get('artist')
             if not artist or not isinstance(artist, dict):
                 continue
-                
+            
             artist_name = artist.get('name')
             artist_mbid = artist.get('id')
             
@@ -604,16 +629,7 @@ class PerformerImporter:
         return performers
     
     def parse_release_artist_credits(self, release_data, target_recording_id=None):
-        """
-        Parse artist credits from a release, optionally for a specific recording
-        
-        Args:
-            release_data: MusicBrainz release data
-            target_recording_id: If provided, only get credits for this recording
-            
-        Returns:
-            List of performer dicts
-        """
+        """Parse artist credits from a release"""
         performers = []
         
         # Check release-level relationships if not looking for specific recording
@@ -625,11 +641,11 @@ class PerformerImporter:
                     return release_performers
         
         # Check track-level credits
-        media = release_data.get('media') or []  # Handle None explicitly
+        media = release_data.get('media') or []
         for medium in media:
             if not medium or not isinstance(medium, dict):
                 continue
-            tracks = medium.get('tracks') or []  # Handle None explicitly
+            tracks = medium.get('tracks') or []
             for track in tracks:
                 if not track or not isinstance(track, dict):
                     continue
@@ -670,17 +686,7 @@ class PerformerImporter:
     # ========================================================================
     
     def get_or_create_performer(self, conn, artist_name, artist_mbid=None):
-        """
-        Get existing performer or create new one
-        
-        Args:
-            conn: Database connection
-            artist_name: Performer name
-            artist_mbid: MusicBrainz artist ID (optional)
-            
-        Returns:
-            Performer ID or None
-        """
+        """Get existing performer or create new one"""
         with conn.cursor() as cur:
             # Try to find by MusicBrainz ID first
             if artist_mbid:
@@ -721,16 +727,7 @@ class PerformerImporter:
             return performer_id
     
     def get_or_create_instrument(self, conn, instrument_name):
-        """
-        Get existing instrument or create new one
-        
-        Args:
-            conn: Database connection
-            instrument_name: Instrument name
-            
-        Returns:
-            Instrument ID or None
-        """
+        """Get existing instrument or create new one"""
         with conn.cursor() as cur:
             cur.execute("""
                 SELECT id FROM instruments
@@ -758,14 +755,7 @@ class PerformerImporter:
             return instrument_id
     
     def link_performer_instrument(self, conn, performer_id, instrument_id):
-        """
-        Link a performer to an instrument in performer_instruments table
-        
-        Args:
-            conn: Database connection
-            performer_id: Performer ID
-            instrument_id: Instrument ID
-        """
+        """Link a performer to an instrument in performer_instruments table"""
         if self.dry_run:
             return
         
