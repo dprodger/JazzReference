@@ -6,6 +6,7 @@
 //  UPDATED: Replaced alert with toast notification for song queue confirmation
 //  FIXED: Broken up body to avoid type-checker timeout
 //  UPDATED: Grouped Structure, Learn More, and References into collapsible Summary Information section
+//  FIXED: Recording sort order now consistently passed to all API calls
 //
 
 import SwiftUI
@@ -88,8 +89,8 @@ struct SongDetailView: View {
         isLoading = true
         Task {
             let networkManager = NetworkManager()
-            // OPTIMIZED: Single API call now includes transcriptions
-            let fetchedSong = await networkManager.fetchSongDetail(id: currentSongId)
+            // FIXED: Pass sort order to maintain user's preference when swiping between songs
+            let fetchedSong = await networkManager.fetchSongDetail(id: currentSongId, sortBy: recordingSortOrder)
             await MainActor.run {
                 song = fetchedSong
                 transcriptions = fetchedSong?.transcriptions ?? []
@@ -389,7 +390,7 @@ struct SongDetailView: View {
                         // Reload song with new sort order
                         Task {
                             isLoading = true
-                            if let updatedSong = await NetworkManager().fetchSongDetail(id: songId, sortBy: sortOrder) {
+                            if let updatedSong = await NetworkManager().fetchSongDetail(id: currentSongId, sortBy: sortOrder) {
                                 song = updatedSong
                             }
                             isLoading = false
@@ -418,73 +419,63 @@ struct SongDetailView: View {
     private var loadingView: some View {
         VStack {
             Spacer()
-            ProgressView("Loading...")
-                .tint(JazzTheme.burgundy)
+            ProgressView()
+                .progressViewStyle(CircularProgressViewStyle(tint: JazzTheme.burgundy))
+                .scaleEffect(1.5)
             Spacer()
         }
         .frame(maxWidth: .infinity, minHeight: 300)
     }
     
     private var notFoundView: some View {
-        VStack {
-            Spacer()
-            Text("Song not found")
-                .font(.title3)
+        VStack(spacing: 16) {
+            Image(systemName: "music.note.slash")
+                .font(.system(size: 60))
                 .foregroundColor(JazzTheme.smokeGray)
-            Spacer()
+            Text("Song not found")
+                .font(.headline)
+                .foregroundColor(JazzTheme.charcoal)
         }
         .frame(maxWidth: .infinity, minHeight: 300)
-        .background(JazzTheme.backgroundLight)
     }
     
-    @ToolbarContentBuilder
-    private var toolbarContent: some ToolbarContent {
-        if repertoireManager.isShowingAllSongs && song != nil {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button(action: {
-                    showAddToRepertoireSheet = true
-                }) {
-                    Image(systemName: "plus.circle")
-                        .foregroundColor(.white)
-                }
-                .disabled(isAddingToRepertoire)
-            }
-        }
-    }
-    
-    // MARK: - Swipe Gesture with Visual Feedback
+    // MARK: - Swipe Gesture
     
     private var swipeGesture: some Gesture {
         DragGesture(minimumDistance: 50)
             .updating($dragOffset) { value, state, _ in
-                // Only track horizontal drags that don't start from the left edge
-                // (to avoid conflict with iOS back gesture)
-                let isHorizontalDrag = abs(value.translation.width) > abs(value.translation.height)
-                let startedFromLeftEdge = value.startLocation.x < 50 // iOS back gesture zone
-                
-                if isHorizontalDrag && !startedFromLeftEdge {
+                // Only update state if navigation is possible in that direction
+                if value.translation.width > 0 && canNavigatePrevious {
+                    state = value.translation.width
+                } else if value.translation.width < 0 && canNavigateNext {
                     state = value.translation.width
                 }
             }
             .onEnded { value in
-                // Ignore gestures that started from the left edge (system back gesture)
-                let startedFromLeftEdge = value.startLocation.x < 50
+                let threshold: CGFloat = 100
                 
-                if !startedFromLeftEdge && abs(value.translation.width) > abs(value.translation.height) {
-                    if value.translation.width < -50 && canNavigateNext {
-                        withAnimation(.easeInOut(duration: 0.3)) {
-                            navigateToNext()
-                        }
-                    } else if value.translation.width > 50 && canNavigatePrevious {
-                        withAnimation(.easeInOut(duration: 0.3)) {
-                            navigateToPrevious()
-                        }
-                    }
+                if value.translation.width > threshold && canNavigatePrevious {
+                    // Swipe right - go to previous
+                    navigateToPrevious()
+                } else if value.translation.width < -threshold && canNavigateNext {
+                    // Swipe left - go to next
+                    navigateToNext()
                 }
             }
     }
     
-    // MARK: - Navigation Arrow Indicator
+    // MARK: - Toolbar Content
+    
+    @ToolbarContentBuilder
+    private var toolbarContent: some ToolbarContent {
+        ToolbarItem(placement: .navigationBarTrailing) {
+            Button(action: { showAddToRepertoireSheet = true }) {
+                Image(systemName: "plus.circle")
+            }
+        }
+    }
+    
+    // MARK: - Navigation Arrow
     
     private func navigationArrow(direction: NavigationDirection, isVisible: Bool) -> some View {
         Image(systemName: direction == .left ? "chevron.left" : "chevron.right")
@@ -557,8 +548,8 @@ struct SongDetailView: View {
         #endif
         
         let networkManager = NetworkManager()
-        // OPTIMIZED: Single API call now includes transcriptions
-        let fetchedSong = await networkManager.fetchSongDetail(id: currentSongId)
+        // FIXED: Pass sort order to maintain user's preference when returning to view
+        let fetchedSong = await networkManager.fetchSongDetail(id: currentSongId, sortBy: recordingSortOrder)
         await MainActor.run {
             song = fetchedSong
             transcriptions = fetchedSong?.transcriptions ?? []
@@ -707,4 +698,3 @@ struct AuthoritativeRecordingCard: View {
             .environmentObject(RepertoireManager())
     }
 }
-    
