@@ -481,6 +481,43 @@ class SpotifyMatcher:
         
         return score
     
+    def is_substring_title_match(self, title1: str, title2: str) -> bool:
+        """
+        Check if one normalized title is a complete substring of the other.
+        
+        This is a fallback matching strategy used when track positions match
+        but fuzzy matching doesn't meet the threshold. This handles cases like:
+        - "An Affair to Remember" vs "An Affair to Remember - From the 20th Century-Fox Film"
+        - "Stella By Starlight" vs "Stella By Starlight (From 'The Uninvited')"
+        
+        To minimize false positives, we require:
+        - The shorter title is at least 4 characters
+        - The shorter title appears as a complete substring in the longer one
+        
+        Args:
+            title1: First title
+            title2: Second title
+            
+        Returns:
+            True if one title is fully contained in the other
+        """
+        if not title1 or not title2:
+            return False
+        
+        norm1 = self.normalize_for_comparison(title1)
+        norm2 = self.normalize_for_comparison(title2)
+        
+        # Determine shorter and longer
+        shorter = norm1 if len(norm1) <= len(norm2) else norm2
+        longer = norm2 if len(norm1) <= len(norm2) else norm1
+        
+        # Require minimum length to avoid false positives with very short titles
+        if len(shorter) < 4:
+            return False
+        
+        # Check if shorter is a complete substring of longer
+        return shorter in longer
+    
     def validate_match(self, spotify_track: dict, expected_song: str, 
                       expected_artist: str, expected_album: str) -> tuple:
         """
@@ -1754,7 +1791,7 @@ class SpotifyMatcher:
             
         Returns:
             List of recording dicts with 'recording_id', 'song_title', 
-            'track_number', 'spotify_track_id' (existing if any)
+            'disc_number', 'track_number', 'spotify_track_id' (existing if any)
         """
         with get_db_connection() as conn:
             with conn.cursor() as cur:
@@ -1762,6 +1799,7 @@ class SpotifyMatcher:
                     SELECT 
                         rr.recording_id,
                         s.title as song_title,
+                        rr.disc_number,
                         rr.track_number,
                         rr.spotify_track_id
                     FROM recording_releases rr
@@ -1769,17 +1807,20 @@ class SpotifyMatcher:
                     JOIN songs s ON rec.song_id = s.id
                     WHERE rr.release_id = %s
                       AND rec.song_id = %s
-                    ORDER BY rr.track_number
+                    ORDER BY rr.disc_number, rr.track_number
                 """, (release_id, song_id))
                 return cur.fetchall()
     
-    def match_track_to_recording(self, song_title: str, spotify_tracks: List[dict]) -> Optional[dict]:
+    def match_track_to_recording(self, song_title: str, spotify_tracks: List[dict],
+                                   expected_disc: int = None, expected_track: int = None) -> Optional[dict]:
         """
         Find the best matching Spotify track for a song title
         
         Args:
             song_title: The song title to match
             spotify_tracks: List of track dicts from get_album_tracks()
+            expected_disc: Expected disc number (optional, for position-based fallback)
+            expected_track: Expected track number (optional, for position-based fallback)
             
         Returns:
             Best matching track dict or None if no good match
@@ -1787,6 +1828,7 @@ class SpotifyMatcher:
         best_match = None
         best_score = 0
         
+        # First pass: standard fuzzy matching
         for track in spotify_tracks:
             score = self.calculate_similarity(song_title, track['name'])
             
@@ -1796,6 +1838,20 @@ class SpotifyMatcher:
         
         if best_match:
             self.logger.debug(f"      Track match: '{song_title}' → '{best_match['name']}' ({best_score}%)")
+            return best_match
+        
+        # Fallback: if positions provided and no fuzzy match, try position-based substring match
+        # This handles cases like "An Affair to Remember" vs 
+        # "An Affair to Remember - From the 20th Century-Fox Film, An Affair To Remember"
+        if expected_disc is not None and expected_track is not None:
+            for track in spotify_tracks:
+                # Check if track position matches exactly
+                if track.get('disc_number') == expected_disc and track.get('track_number') == expected_track:
+                    # Position matches - try substring matching
+                    if self.is_substring_title_match(song_title, track['name']):
+                        self.logger.debug(f"      Position+substring match: '{song_title}' → '{track['name']}' "
+                                        f"(disc {expected_disc}, track {expected_track})")
+                        return track
         
         return best_match
     
@@ -1866,8 +1922,13 @@ class SpotifyMatcher:
                 any_matched = True  # Consider already-matched as success
                 continue
             
-            # Match song title to a track
-            matched_track = self.match_track_to_recording(song_title, spotify_tracks)
+            # Match song title to a track, passing position info for fallback matching
+            matched_track = self.match_track_to_recording(
+                song_title, 
+                spotify_tracks,
+                expected_disc=recording.get('disc_number'),
+                expected_track=recording.get('track_number')
+            )
             
             if matched_track:
                 self.update_recording_release_track_id(
