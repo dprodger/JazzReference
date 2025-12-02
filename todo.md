@@ -103,6 +103,8 @@ Data problems:
 2025-12-02 13:22:16,361 - INFO - [80/88] The Complete Decca Singles Vol. 4: 1950–1955 (Ella Fitzgerald, 2017) - ✗ Album matched but track not found (possible false positive)
 
 
+* Get rid of Recording-level performers and spotify links
+* add Apple authentication and whatever else was on the auth path.
 
 
 

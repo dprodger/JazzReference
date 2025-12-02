@@ -1,17 +1,23 @@
 """
 Spotify Track Matching Utilities
-Core business logic for matching recordings to Spotify tracks
+Core business logic for matching releases to Spotify albums
+
+UPDATED: Recording-Centric Performer Architecture
+- Spotify data (album art, URLs) is stored on RELEASES, not recordings
+- Recordings have a default_release_id pointing to the best release for display
+- The match_releases() method is the primary entry point
 
 This module provides the SpotifyMatcher class which handles:
 - Spotify API authentication and token management
-- Fuzzy matching and validation of tracks
-- Album artwork extraction
-- Database updates for recordings
+- Fuzzy matching and validation of albums and tracks
+- Album artwork extraction (stored on releases)
+- Database updates for releases and recording_releases
+- Setting default_release_id on recordings
 - Caching of API responses to minimize rate limiting
 - Intelligent rate limit handling with exponential backoff
 
 Used by:
-- scripts/match_spotify_tracks.py (CLI interface)
+- scripts/match_spotify_releases.py (CLI interface)
 - song_research.py (background worker)
 """
 
@@ -893,19 +899,44 @@ class SpotifyMatcher:
         """
         Get all recordings for a song, optionally filtered by artist
         
+        UPDATED: Recording-Centric Architecture
+        - Spotify URL now comes from the best release (via default_release_id or subquery)
+        - Performers come from recording_performers table
+        
         Returns:
             List of recording dicts with 'id', 'album_title', 'recording_year',
-            'spotify_url', 'performers' (list with 'name' and 'role')
+            'spotify_url' (from best release), 'performers' (list with 'name' and 'role')
         """
         with get_db_connection() as conn:
             with conn.cursor() as cur:
-                # Base query
+                # Base query - get Spotify URL from default release or best available
                 query = """
                     SELECT 
                         r.id,
                         r.album_title,
                         r.recording_year,
-                        r.spotify_url,
+                        -- Get Spotify URL from default release, or best available release
+                        COALESCE(
+                            (SELECT COALESCE(rr.spotify_track_url, rel.spotify_album_url)
+                             FROM releases rel
+                             WHERE rel.id = r.default_release_id
+                               AND (rel.spotify_album_url IS NOT NULL OR EXISTS (
+                                   SELECT 1 FROM recording_releases rr2 
+                                   WHERE rr2.release_id = rel.id 
+                                     AND rr2.recording_id = r.id 
+                                     AND rr2.spotify_track_url IS NOT NULL
+                               ))
+                            ),
+                            (SELECT COALESCE(rr.spotify_track_url, rel.spotify_album_url)
+                             FROM recording_releases rr
+                             JOIN releases rel ON rr.release_id = rel.id
+                             WHERE rr.recording_id = r.id 
+                               AND (rr.spotify_track_url IS NOT NULL OR rel.spotify_album_url IS NOT NULL)
+                             ORDER BY 
+                               CASE WHEN rr.spotify_track_url IS NOT NULL THEN 0 ELSE 1 END,
+                               rel.release_year DESC NULLS LAST
+                             LIMIT 1)
+                        ) as spotify_url,
                         json_agg(
                             json_build_object(
                                 'name', p.name,
@@ -914,7 +945,7 @@ class SpotifyMatcher:
                             ) ORDER BY 
                                 CASE rp.role 
                                     WHEN 'leader' THEN 1 
-                                    WHEN 'member' THEN 2 
+                                    WHEN 'sideman' THEN 2 
                                     ELSE 3 
                                 END,
                                 p.name
@@ -941,7 +972,7 @@ class SpotifyMatcher:
                     params.append(self.artist_filter)
                 
                 query += """
-                    GROUP BY r.id, r.album_title, r.recording_year, r.spotify_url
+                    GROUP BY r.id, r.album_title, r.recording_year, r.default_release_id
                     ORDER BY r.recording_year
                 """
                 
@@ -949,15 +980,24 @@ class SpotifyMatcher:
                 return cur.fetchall()
     
     def get_recordings_without_images(self) -> List[dict]:
-        """Get recordings with Spotify URL but no album artwork"""
+        """
+        DEPRECATED: Album artwork is now stored on releases, not recordings.
+        
+        Use get_releases_without_artwork() instead.
+        """
+        self.logger.warning("get_recordings_without_images() is deprecated - artwork now stored on releases")
+        return []
+    
+    def get_releases_without_artwork(self) -> List[dict]:
+        """Get releases with Spotify URL but no cover artwork"""
         with get_db_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute("""
-                    SELECT id, album_title, spotify_url
-                    FROM recordings
-                    WHERE spotify_url IS NOT NULL
-                      AND album_art_medium IS NULL
-                    ORDER BY album_title
+                    SELECT id, title, spotify_album_url, spotify_album_id
+                    FROM releases
+                    WHERE spotify_album_url IS NOT NULL
+                      AND cover_art_medium IS NULL
+                    ORDER BY title
                 """)
                 return cur.fetchall()
     
@@ -974,71 +1014,24 @@ class SpotifyMatcher:
         return None
     
     def update_recording_artwork(self, conn, recording_id: str, album_art: dict):
-        """Update recording with album artwork only"""
-        if self.dry_run:
-            self.logger.info(f"    [DRY RUN] Would update with album artwork")
-            return
+        """
+        DEPRECATED: Album artwork is now stored on releases, not recordings.
         
-        with conn.cursor() as cur:
-            cur.execute("""
-                UPDATE recordings
-                SET album_art_small = %s,
-                    album_art_medium = %s,
-                    album_art_large = %s,
-                    updated_at = CURRENT_TIMESTAMP
-                WHERE id = %s
-            """, (
-                album_art.get('small'),
-                album_art.get('medium'),
-                album_art.get('large'),
-                recording_id
-            ))
-            
-            conn.commit()
-            self.logger.info(f"    ✓ Updated with album artwork")
-            self.stats['recordings_updated'] += 1
+        This method is kept for backwards compatibility but does nothing.
+        Use update_release_spotify_data() instead.
+        """
+        self.logger.warning("update_recording_artwork() is deprecated - artwork now stored on releases")
     
     def update_recording_spotify_url(self, conn, recording_id: str, spotify_data: dict, 
                                      album: str = None, artist: str = None, year: int = None,
                                      index: int = None, total: int = None):
-        """Update recording with Spotify URL, track ID, and album artwork"""
-        if self.dry_run:
-            self.logger.info(f"    [DRY RUN] Would update recording with: {spotify_data['url']}")
-            if spotify_data.get('album_art', {}).get('medium'):
-                self.logger.info(f"    [DRY RUN] Would add album artwork")
-            return
+        """
+        DEPRECATED: Spotify URL and artwork are now stored on releases, not recordings.
         
-        with conn.cursor() as cur:
-            track_id = spotify_data.get('id')
-            album_art = spotify_data.get('album_art', {})
-            
-            cur.execute("""
-                UPDATE recordings
-                SET spotify_url = %s,
-                    spotify_track_id = %s,
-                    album_art_small = %s,
-                    album_art_medium = %s,
-                    album_art_large = %s,
-                    updated_at = CURRENT_TIMESTAMP
-                WHERE id = %s
-            """, (
-                spotify_data['url'],
-                track_id,
-                album_art.get('small'),
-                album_art.get('medium'),
-                album_art.get('large'),
-                recording_id
-            ))
-            
-            conn.commit()
-            
-            # Consolidated INFO log with context if available
-            if index and total and album:
-                self.logger.info(f"[{index}/{total}] {album} ({artist or 'Unknown'}, {year or 'Unknown'}) - ✓ Updated with Spotify URL and album artwork")
-            else:
-                self.logger.info(f"    ✓ Updated with Spotify URL and album artwork")
-            
-            self.stats['recordings_updated'] += 1
+        This method is kept for backwards compatibility but does nothing.
+        Use update_release_spotify_data() and match_releases() instead.
+        """
+        self.logger.warning("update_recording_spotify_url() is deprecated - use match_releases() instead")
     
     def match_recordings(self, song_identifier: str) -> Dict[str, Any]:
         """
@@ -1055,120 +1048,24 @@ class SpotifyMatcher:
                 'error': str (if failed)
             }
         """
-
-        """
-        self.logger.warning(f"TEMPORARILY BYPASSING SPOTIFY")
-        return {
-            'success': False,
-            'error': "TEMPORARILY BYPASSING SPOTIFY",
-            'stats': self.stats
-        }
-        """
+        # DEPRECATED: Redirect to match_releases
+        self.logger.warning("match_recordings() is deprecated - redirecting to match_releases()")
+        self.logger.info("Spotify data is now stored on releases, not recordings.")
+        self.logger.info("Use match_releases() directly for better results.")
+        self.logger.info("")
         
-        try:
-            # Find the song
-            if song_identifier.startswith('song-') or len(song_identifier) == 36:
-                song = self.find_song_by_id(song_identifier)
-            else:
-                song = self.find_song_by_name(song_identifier)
-            
-            if not song:
-                return {
-                    'success': False,
-                    'error': 'Song not found'
-                }
-            
-            self.logger.info(f"Song: {song['title']}")
-            self.logger.info(f"Composer: {song['composer']}")
-            self.logger.info(f"Database ID: {song['id']}")
-            if self.artist_filter:
-                self.logger.info(f"Filtering to recordings by: {self.artist_filter}")
-            self.logger.info("")
-            
-            # Get recordings
-            recordings = self.get_recordings_for_song(song['id'])
-            
-            if not recordings:
-                return {
-                    'success': False,
-                    'song': song,
-                    'error': 'No recordings found for this song'
-                }
-            
-            self.logger.info(f"Found {len(recordings)} recordings to process")
-            self.logger.info("")
-            
-            # Process each recording
-            # CRITICAL: Open connection for EACH recording to avoid holding connections during Spotify API calls
-            for i, recording in enumerate(recordings, 1):
-                self.stats['recordings_processed'] += 1
-                
-                album = recording['album_title'] or 'Unknown Album'
-                year = recording['recording_year']
-                
-                # Get primary artist
-                performers = recording.get('performers') or []
-                leaders = [p['name'] for p in performers if p['role'] == 'leader']
-                artist_name = leaders[0] if leaders else (
-                    performers[0]['name'] if performers else None
-                )
-                
-                # Log details at DEBUG level
-                self.logger.debug(f"[{i}/{len(recordings)}] {album}")
-                self.logger.debug(f"    Artist: {artist_name or 'Unknown'}")
-                self.logger.debug(f"    Year: {year or 'Unknown'}")
-                
-                # Check if already has Spotify URL
-                if recording['spotify_url']:
-                    self.logger.info(f"[{i}/{len(recordings)}] {album} ({artist_name or 'Unknown'}, {year or 'Unknown'}) - ⊙ Already has Spotify URL, skipping")
-                    self.stats['recordings_skipped'] += 1
-                    continue
-                
-                # Search Spotify WITHOUT holding a database connection
-                spotify_match = self.search_spotify_track(
-                    song['title'],
-                    album,
-                    artist_name,
-                    year
-                )
-                
-                if spotify_match:
-                    self.stats['recordings_with_spotify'] += 1
-                    # Open connection ONLY for this update, then close immediately
-                    with get_db_connection() as conn:
-                        self.update_recording_spotify_url(
-                            conn,
-                            recording['id'],
-                            spotify_match,
-                            album,
-                            artist_name,
-                            year,
-                            i,
-                            len(recordings)
-                        )
-                        # Connection automatically committed and closed here
-                else:
-                    self.logger.info(f"[{i}/{len(recordings)}] {album} ({artist_name or 'Unknown'}, {year or 'Unknown'}) - ✗ No valid Spotify match found")
-                    self.stats['recordings_no_match'] += 1
-            
-            return {
-                'success': True,
-                'song': song,
-                'stats': self.stats
-            }
-            
-        except Exception as e:
-            self.logger.error(f"Error matching recordings: {e}", exc_info=True)
-            return {
-                'success': False,
-                'error': str(e),
-                'stats': self.stats
-            }
+        return self.match_releases(song_identifier)
     
     def backfill_images(self):
-        """Main method to backfill album artwork for existing recordings"""
+        """
+        UPDATED: Backfill cover artwork for releases (not recordings).
+        
+        Album artwork is now stored on releases, not recordings.
+        This method fetches artwork for releases that have a Spotify album ID
+        but are missing cover art.
+        """
         self.logger.info("="*80)
-        self.logger.info("Spotify Album Artwork Backfill")
+        self.logger.info("Spotify Cover Artwork Backfill (Releases)")
         self.logger.info("="*80)
         
         if self.dry_run:
@@ -1176,45 +1073,43 @@ class SpotifyMatcher:
         
         self.logger.info("")
         
-        # Get recordings without images
-        recordings = self.get_recordings_without_images()
+        # Get releases without images
+        releases = self.get_releases_without_artwork()
         
-        if not recordings:
-            self.logger.info("No recordings found that need album artwork")
+        if not releases:
+            self.logger.info("No releases found that need cover artwork")
             return True
         
-        self.logger.info(f"Found {len(recordings)} recordings to process")
+        self.logger.info(f"Found {len(releases)} releases to process")
         self.logger.info("")
         
-        # Process each recording
+        # Process each release
         with get_db_connection() as conn:
-            for i, recording in enumerate(recordings, 1):
-                self.stats['recordings_processed'] += 1
+            for i, release in enumerate(releases, 1):
+                self.stats['releases_processed'] += 1
                 
-                album = recording['album_title'] or 'Unknown Album'
-                spotify_url = recording['spotify_url']
+                title = release['title'] or 'Unknown Album'
+                album_id = release['spotify_album_id']
                 
-                self.logger.info(f"[{i}/{len(recordings)}] {album}")
-                self.logger.info(f"    URL: {spotify_url[:50]}...")
+                self.logger.info(f"[{i}/{len(releases)}] {title}")
+                self.logger.info(f"    Album ID: {album_id}")
                 
-                # Extract track ID from URL
-                track_id = self.extract_track_id_from_url(spotify_url)
-                if not track_id:
-                    self.logger.warning(f"    ✗ Could not extract track ID from URL")
+                if not album_id:
+                    self.logger.warning(f"    ✗ No Spotify album ID")
                     self.stats['errors'] += 1
                     continue
                 
-                # Get track details (with caching)
-                track_data = self.get_track_details(track_id)
+                # Get album details (with caching)
+                album_data = self.get_album_details(album_id)
                 
-                if not track_data:
-                    self.logger.warning(f"    ✗ Could not fetch track details from Spotify")
+                if not album_data:
+                    self.logger.warning(f"    ✗ Could not fetch album details from Spotify")
                     self.stats['errors'] += 1
                     continue
                 
                 # Extract album artwork
                 album_art = {}
-                images = track_data.get('album', {}).get('images', [])
+                images = album_data.get('images', [])
                 
                 for image in images:
                     height = image.get('height', 0)
@@ -1226,26 +1121,99 @@ class SpotifyMatcher:
                         album_art['small'] = image['url']
                 
                 if not album_art:
-                    self.logger.warning(f"    ✗ No album artwork found in track data")
+                    self.logger.warning(f"    ✗ No cover artwork found in album data")
                     self.stats['errors'] += 1
                     continue
                 
-                # Update recording
-                self.update_recording_artwork(conn, recording['id'], album_art)
+                # Update release
+                self.update_release_artwork(conn, release['id'], album_art)
         
         # Print summary
         self.logger.info("")
         self.logger.info("="*80)
         self.logger.info("BACKFILL SUMMARY")
         self.logger.info("="*80)
-        self.logger.info(f"Recordings processed: {self.stats['recordings_processed']}")
-        self.logger.info(f"Recordings updated:   {self.stats['recordings_updated']}")
-        self.logger.info(f"Errors:               {self.stats['errors']}")
-        self.logger.info(f"Cache hits:           {self.stats['cache_hits']}")
-        self.logger.info(f"API calls:            {self.stats['api_calls']}")
+        self.logger.info(f"Releases processed: {self.stats['releases_processed']}")
+        self.logger.info(f"Releases updated:   {self.stats['releases_updated']}")
+        self.logger.info(f"Errors:             {self.stats['errors']}")
+        self.logger.info(f"Cache hits:         {self.stats['cache_hits']}")
+        self.logger.info(f"API calls:          {self.stats['api_calls']}")
         self.logger.info("="*80)
         
         return True
+    
+    def update_release_artwork(self, conn, release_id: str, album_art: dict):
+        """Update release with cover artwork only"""
+        if self.dry_run:
+            self.logger.info(f"    [DRY RUN] Would update with cover artwork")
+            return
+        
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE releases
+                SET cover_art_small = %s,
+                    cover_art_medium = %s,
+                    cover_art_large = %s,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = %s
+            """, (
+                album_art.get('small'),
+                album_art.get('medium'),
+                album_art.get('large'),
+                release_id
+            ))
+            
+            conn.commit()
+            self.logger.info(f"    ✓ Updated with cover artwork")
+            self.stats['releases_updated'] += 1
+    
+    def get_album_details(self, album_id: str) -> Optional[dict]:
+        """
+        Fetch album details from Spotify
+        
+        Args:
+            album_id: Spotify album ID
+            
+        Returns:
+            Album dict or None if failed
+        """
+        # Check cache first
+        cache_path = self._get_album_cache_path(f"{album_id}_details")
+        cached_result = self._load_from_cache(cache_path)
+        
+        if cached_result is not _CACHE_MISS:
+            return cached_result
+        
+        token = self.get_spotify_auth_token()
+        if not token:
+            return None
+        
+        try:
+            response = self._make_api_request(
+                'get',
+                f'https://api.spotify.com/v1/albums/{album_id}',
+                headers={'Authorization': f'Bearer {token}'},
+                timeout=10
+            )
+            
+            response.raise_for_status()
+            data = response.json()
+            
+            self.stats['api_calls'] += 1
+            self.last_made_api_call = True
+            
+            self._save_to_cache(cache_path, data)
+            return data
+            
+        except SpotifyRateLimitError as e:
+            self.logger.error(f"Rate limit exceeded fetching album: {e}")
+            return None
+        except requests.exceptions.HTTPError as e:
+            self.logger.error(f"Spotify API error fetching album: {e}")
+            return None
+        except Exception as e:
+            self.logger.error(f"Error fetching album: {e}")
+            return None
     
     def print_summary(self):
         """Print summary of matching statistics"""
@@ -1497,6 +1465,10 @@ class SpotifyMatcher:
         Get all releases for a song (via recording_releases junction),
         optionally filtered by artist
         
+        UPDATED: Recording-Centric Architecture
+        - Performers now come from recording_performers (not release_performers)
+        - release_performers is now for release-specific credits (producers, etc.)
+        
         Returns:
             List of release dicts with 'id', 'title', 'artist_credit', 'release_year',
             'spotify_album_url', 'performers' (list with 'name' and 'role')
@@ -1510,7 +1482,8 @@ class SpotifyMatcher:
                         rel.artist_credit,
                         rel.release_year,
                         rel.spotify_album_url,
-                        json_agg(
+                        -- Get performers from the linked recording (not from release)
+                        (SELECT json_agg(
                             json_build_object(
                                 'name', p.name,
                                 'role', rp.role,
@@ -1522,13 +1495,15 @@ class SpotifyMatcher:
                                     ELSE 3 
                                 END,
                                 p.name
-                        ) FILTER (WHERE p.id IS NOT NULL) as performers
+                        )
+                        FROM recording_performers rp
+                        JOIN performers p ON rp.performer_id = p.id
+                        LEFT JOIN instruments i ON rp.instrument_id = i.id
+                        WHERE rp.recording_id = rr.recording_id
+                        ) as performers
                     FROM releases rel
                     JOIN recording_releases rr ON rel.id = rr.release_id
                     JOIN recordings rec ON rr.recording_id = rec.id
-                    LEFT JOIN release_performers rp ON rel.id = rp.release_id
-                    LEFT JOIN performers p ON rp.performer_id = p.id
-                    LEFT JOIN instruments i ON rp.instrument_id = i.id
                     WHERE rec.song_id = %s
                 """
                 
@@ -1537,16 +1512,16 @@ class SpotifyMatcher:
                     query += """
                         AND EXISTS (
                             SELECT 1 
-                            FROM release_performers rp2
+                            FROM recording_performers rp2
                             JOIN performers p2 ON rp2.performer_id = p2.id
-                            WHERE rp2.release_id = rel.id
+                            WHERE rp2.recording_id = rec.id
                             AND LOWER(p2.name) = LOWER(%s)
                         )
                     """
                     params.append(self.artist_filter)
                 
                 query += """
-                    GROUP BY rel.id, rel.title, rel.artist_credit, rel.release_year, rel.spotify_album_url
+                    GROUP BY rel.id, rel.title, rel.artist_credit, rel.release_year, rel.spotify_album_url, rr.recording_id
                     ORDER BY rel.release_year
                 """
                 
@@ -1593,6 +1568,53 @@ class SpotifyMatcher:
                 self.logger.info(f"    ✓ Updated with Spotify URL and cover artwork")
             
             self.stats['releases_updated'] += 1
+    
+    def update_recording_default_release(self, conn, song_id: str, release_id: str):
+        """
+        Update recordings linked to a release to set it as their default_release.
+        
+        This is called when a release is successfully matched to Spotify.
+        Only updates recordings that don't already have a default_release_id,
+        or if the new release has better data (has Spotify).
+        
+        Args:
+            conn: Database connection
+            song_id: Our song ID (to filter recordings)
+            release_id: Release ID to set as default
+        """
+        if self.dry_run:
+            self.logger.debug(f"    [DRY RUN] Would set default_release_id for linked recordings")
+            return
+        
+        with conn.cursor() as cur:
+            # Update recordings that:
+            # 1. Are linked to this release
+            # 2. Are for this song
+            # 3. Either have no default_release_id OR their current default has no Spotify
+            cur.execute("""
+                UPDATE recordings r
+                SET default_release_id = %s,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE r.song_id = %s
+                  AND EXISTS (
+                      SELECT 1 FROM recording_releases rr 
+                      WHERE rr.recording_id = r.id AND rr.release_id = %s
+                  )
+                  AND (
+                      r.default_release_id IS NULL
+                      OR NOT EXISTS (
+                          SELECT 1 FROM releases rel 
+                          WHERE rel.id = r.default_release_id 
+                            AND rel.spotify_album_id IS NOT NULL
+                      )
+                  )
+            """, (release_id, song_id, release_id))
+            
+            updated_count = cur.rowcount
+            if updated_count > 0:
+                self.logger.debug(f"    Set default_release_id on {updated_count} recording(s)")
+            else:
+                self.logger.debug(f"    No recordings needed default_release_id update (already set)")
     
     def match_releases(self, song_identifier: str) -> Dict[str, Any]:
         """
@@ -1666,6 +1688,15 @@ class SpotifyMatcher:
                 if release['spotify_album_url']:
                     self.logger.info(f"[{i}/{len(releases)}] {title} ({artist_name or 'Unknown'}, {year or 'Unknown'}) - ⊙ Already has Spotify URL, skipping")
                     self.stats['releases_skipped'] += 1
+                    
+                    # Still set this as default release for linked recordings that need one
+                    # (releases with Spotify are good candidates for default)
+                    with get_db_connection() as conn:
+                        self.update_recording_default_release(
+                            conn,
+                            song['id'],
+                            release['id']
+                        )
                     continue
                 
                 # Search Spotify for album (with song title for track verification fallback)
@@ -1694,6 +1725,14 @@ class SpotifyMatcher:
                                 year,
                                 i,
                                 len(releases)
+                            )
+                            
+                            # NEW: Set this as the default release for linked recordings
+                            # (only if they don't already have a better default)
+                            self.update_recording_default_release(
+                                conn,
+                                song['id'],
+                                release['id']
                             )
                         else:
                             # Album matched but no track found - likely false positive
