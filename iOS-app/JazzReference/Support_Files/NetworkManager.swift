@@ -319,7 +319,7 @@ class NetworkManager: ObservableObject {
         }
     }
     
-    // MARK: - NEW: Add Song to Repertoire
+    // MARK: - Add Song to Repertoire
     
     /// Add a song to a repertoire
     /// - Parameters:
@@ -514,10 +514,8 @@ class NetworkManager: ObservableObject {
     // This will hit the backend with: GET /api/songs/{id}?sort=authority
     //                              or: GET /api/songs/{id}?sort=year
     //                              or: GET /api/songs/{id}?sort=canonical
-}
-// MARK: - NetworkManager Extensions for Solo Transcriptions
-
-extension NetworkManager {
+    
+    // MARK: - Solo Transcriptions
     
     func fetchSongTranscriptions(songId: String) async -> [SoloTranscription] {
         #if DEBUG
@@ -590,51 +588,9 @@ extension NetworkManager {
             return nil
         }
     }
-}
-
-// MARK: - Preview Mode Extension for Sync Methods
-
-#if DEBUG
-extension NetworkManager {
-    func fetchSongTranscriptionsSync(songId: String) -> [SoloTranscription] {
-        if Self.isPreviewMode {
-            return [.preview1, .preview2]
-        }
-        return []
-    }
     
-    func fetchRecordingTranscriptionsSync(recordingId: String) -> [SoloTranscription] {
-        if Self.isPreviewMode {
-            return [.preview1]
-        }
-        return []
-    }
+    // MARK: - Recordings
     
-    func fetchTranscriptionDetailSync(id: String) -> SoloTranscription? {
-        if Self.isPreviewMode {
-            switch id {
-            case "preview-transcription-1":
-                return .preview1
-            case "preview-transcription-2":
-                return .preview2
-            case "preview-transcription-3":
-                return .previewMinimal
-            default:
-                return .preview1
-            }
-        }
-        return nil
-    }
-    
-    
-    // MARK: - NetworkManager Extension for Recordings
-    // Add this to the NetworkManager class in Support_Files/NetworkManager.swift
-
-    // Add this property to NetworkManager class:
-    // @Published var recordings: [Recording] = []
-
-    // Add this method to NetworkManager class:
-
     /// Fetch recordings with optional search query
     /// Search matches against artist name, album title, or song title
     /// - Parameter searchQuery: Optional search string
@@ -678,5 +634,38 @@ extension NetworkManager {
             }
         }
     }
+    
+    // MARK: - Preview Mode (DEBUG only)
+    
+    #if DEBUG
+    func fetchSongTranscriptionsSync(songId: String) -> [SoloTranscription] {
+        if Self.isPreviewMode {
+            return [.preview1, .preview2]
+        }
+        return []
+    }
+    
+    func fetchRecordingTranscriptionsSync(recordingId: String) -> [SoloTranscription] {
+        if Self.isPreviewMode {
+            return [.preview1]
+        }
+        return []
+    }
+    
+    func fetchTranscriptionDetailSync(id: String) -> SoloTranscription? {
+        if Self.isPreviewMode {
+            switch id {
+            case "preview-transcription-1":
+                return .preview1
+            case "preview-transcription-2":
+                return .preview2
+            case "preview-transcription-3":
+                return .previewMinimal
+            default:
+                return .preview1
+            }
+        }
+        return nil
+    }
+    #endif
 }
-#endif
