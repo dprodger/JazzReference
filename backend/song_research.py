@@ -8,6 +8,7 @@ It uses:
 """
 
 import logging
+import os
 from typing import Dict, Any
 
 from mb_release_importer import MBReleaseImporter
@@ -53,8 +54,11 @@ def research_song(song_id: str, song_name: str) -> Dict[str, Any]:
         # MBReleaseImporter uses MusicBrainzSearcher internally which has caching
         importer = MBReleaseImporter(dry_run=False, logger=logger)
         
+        # Get import limit from environment variable, default to 100
+        mb_import_limit = int(os.environ.get('MB_IMPORT_LIMIT', 100))
+        
         logger.info("Importing MusicBrainz releases...")
-        mb_result = importer.import_releases(str(song_id), 500)
+        mb_result = importer.import_releases(str(song_id), mb_import_limit)
         
         if not mb_result['success']:
             error = mb_result.get('error', 'Unknown error')
