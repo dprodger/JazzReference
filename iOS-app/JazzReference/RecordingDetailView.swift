@@ -638,30 +638,33 @@ struct RecordingDetailView: View {
         }
     }
     
-    /// Auto-select the first release that has album art, preferring one with Spotify
-    /// Uses same sorting as Recording.sortedReleases (and songs.py) to ensure consistency
+    /// Auto-select the default release from the API, falling back to first release with art
     private func autoSelectFirstRelease() {
         guard let releases = recording?.releases, !releases.isEmpty else { return }
         
-        // Sort releases to match songs.py best_cover_art_* logic:
-        // spotify_album_id IS NOT NULL, ORDER BY release_year DESC
+        // Prefer the API's default_release_id - this is computed server-side
+        // to match the best_cover_art_* and best_spotify_url logic
+        if let defaultId = recording?.defaultReleaseId,
+           releases.contains(where: { $0.id == defaultId }) {
+            selectedReleaseId = defaultId
+            return
+        }
+        
+        // Fallback: Sort and pick the first release with Spotify and cover art
         let sorted = releases.sorted { r1, r2 in
-            // First: releases with Spotify come first
             let r1HasSpotify = r1.spotifyAlbumId != nil
             let r2HasSpotify = r2.spotifyAlbumId != nil
             if r1HasSpotify != r2HasSpotify {
                 return r1HasSpotify && !r2HasSpotify
             }
-            // Second: sort by year DESCENDING (newest first) to match songs.py
             switch (r1.releaseYear, r2.releaseYear) {
             case (nil, nil): return false
-            case (nil, _): return false  // nil years go last
+            case (nil, _): return false
             case (_, nil): return true
-            case let (y1?, y2?): return y1 > y2  // DESCENDING - newest first
+            case let (y1?, y2?): return y1 > y2
             }
         }
         
-        // Select the first release with Spotify and cover art (matches bestAlbumArt* logic)
         if let releaseWithSpotifyAndArt = sorted.first(where: {
             $0.spotifyAlbumId != nil && ($0.coverArtLarge != nil || $0.coverArtMedium != nil)
         }) {
@@ -669,16 +672,13 @@ struct RecordingDetailView: View {
             return
         }
         
-        // Fall back to first release with cover art
         if let releaseWithArt = sorted.first(where: { $0.coverArtLarge != nil || $0.coverArtMedium != nil }) {
             selectedReleaseId = releaseWithArt.id
             return
         }
         
-        // Fall back to first release
         selectedReleaseId = sorted.first?.id
     }
-    
     // MARK: - Learn More Section (Collapsible)
     
     @ViewBuilder
