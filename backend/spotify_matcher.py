@@ -146,8 +146,8 @@ class SpotifyMatcher:
         failure_cache_dir = self.client.cache_dir / 'track_failures'
         failure_cache_dir.mkdir(parents=True, exist_ok=True)
         
-        # Create a deterministic filename from the three IDs
-        filename = f"fail_{song_id}_{release_id}_{spotify_album_id}.json"
+        # Create a deterministic filename from the three IDs (convert UUIDs to strings)
+        filename = f"fail_{str(song_id)}_{str(release_id)}_{str(spotify_album_id)}.json"
         return failure_cache_dir / filename
     
     def _is_track_match_cached_failure(self, song_id: str, release_id: str,
@@ -184,9 +184,9 @@ class SpotifyMatcher:
         try:
             with open(cache_path, 'w') as f:
                 json.dump({
-                    'song_id': song_id,
-                    'release_id': release_id,
-                    'spotify_album_id': spotify_album_id,
+                    'song_id': str(song_id),
+                    'release_id': str(release_id),
+                    'spotify_album_id': str(spotify_album_id),
                     'song_title': song_title,
                     'result': 'no_track_match'
                 }, f)
