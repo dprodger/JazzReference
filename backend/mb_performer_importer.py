@@ -7,6 +7,11 @@ UPDATED: Recording-Centric Performer Architecture
 - release_performers is kept for release-specific credits only (producers, engineers)
 - New add_performers_to_recording() method aggregates performers from all releases
 - Special logging when adding performers to recordings that already have performers
+
+PERFORMANCE OPTIMIZATION (2025-12):
+- Batch fetches performer lookups (by MBID and name) in single queries
+- Batch fetches existing performer links in single query
+- Eliminates per-performer database round trips for "already linked" checks
 """
 
 import logging
@@ -111,6 +116,11 @@ class PerformerImporter:
     UPDATED: Recording-Centric Architecture
     - Primary method is now add_performers_to_recording()
     - link_performers_to_release() kept for release-specific credits only
+    
+    PERFORMANCE OPTIMIZED (2025-12):
+    - Batch lookup for performers (by MBID and name)
+    - Batch lookup for existing performer links
+    - Minimal database round-trips per recording
     """
     
     def __init__(self, dry_run=False):
@@ -124,7 +134,7 @@ class PerformerImporter:
         }
     
     # ========================================================================
-    # PRIMARY METHOD: Add performers to recordings
+    # PRIMARY METHOD: Add performers to recordings (OPTIMIZED)
     # ========================================================================
     
     def add_performers_to_recording(self, conn, recording_id, recording_data, 
@@ -136,8 +146,10 @@ class PerformerImporter:
         It implements the maximalist approach: any performer found on any release
         gets added to the recording.
         
-        SPECIAL LOGGING: When adding performers to a recording that already has
-        performers, logs to performer_additions.log for manual review.
+        PERFORMANCE OPTIMIZED (2025-12):
+        - Batch fetches all performer lookups in 2 queries (by MBID, by name)
+        - Batch fetches all existing performer-recording links in 1 query
+        - Per-performer queries only for NEW performers that need creation
         
         Args:
             conn: Database connection
@@ -172,38 +184,65 @@ class PerformerImporter:
         # Check how many performers already exist for this recording
         existing_performer_count = self._get_recording_performer_count(conn, recording_id)
         
+        # =======================================================================
+        # PERFORMANCE OPTIMIZATION: Batch lookup all performers at once
+        # =======================================================================
+        
+        # Collect all MBIDs and names to look up
+        mbids_to_lookup = [p.get('mbid') for p in performers_to_add if p.get('mbid')]
+        names_to_lookup = [p.get('name') for p in performers_to_add if p.get('name')]
+        
+        # Batch fetch existing performers (single query for MBIDs, single for names)
+        performer_cache = self._batch_get_performers(conn, mbids_to_lookup, names_to_lookup)
+        
+        # Batch fetch existing performer links for this recording (single query)
+        existing_links = self._batch_get_recording_performer_links(
+            conn, recording_id, list(performer_cache.values())
+        )
+        
+        # =======================================================================
+        # Now process performers using cached data
+        # =======================================================================
+        
         new_performers_added = 0
         new_performer_names = []
         
         with conn.cursor() as cur:
             for performer_data in performers_to_add:
-                performer_id = self.get_or_create_performer(
-                    conn,
-                    performer_data['name'],
-                    performer_data.get('mbid')
-                )
+                performer_mbid = performer_data.get('mbid')
+                performer_name = performer_data.get('name')
+                
+                # Try to get from cache first
+                performer_id = None
+                cache_key = None
+                
+                if performer_mbid and f"mbid:{performer_mbid}" in performer_cache:
+                    cache_key = f"mbid:{performer_mbid}"
+                    performer_id = performer_cache[cache_key]
+                elif performer_name and f"name:{performer_name.lower()}" in performer_cache:
+                    cache_key = f"name:{performer_name.lower()}"
+                    performer_id = performer_cache[cache_key]
+                
+                if not performer_id:
+                    # Need to create this performer (not in DB)
+                    performer_id = self._create_performer(conn, performer_name, performer_mbid)
+                    if performer_id:
+                        # Add to cache for future lookups in this batch
+                        if performer_mbid:
+                            performer_cache[f"mbid:{performer_mbid}"] = performer_id
+                        if performer_name:
+                            performer_cache[f"name:{performer_name.lower()}"] = performer_id
                 
                 if not performer_id:
                     continue
                 
-                # Check if already linked to this recording
-                cur.execute("""
-                    SELECT COUNT(*) as count
-                    FROM recording_performers
-                    WHERE recording_id = %s AND performer_id = %s
-                """, (recording_id, performer_id))
-                
-                if cur.fetchone()['count'] > 0:
-                    logger.debug(f"  Skipping {performer_data['name']} - already linked")
+                # Check if already linked (using pre-fetched data)
+                if performer_id in existing_links:
+                    logger.debug(f"  Skipping {performer_name} - already linked")
                     continue
                 
                 # This is a NEW performer for this recording
-                # Determine role
-                db_role = self._determine_role(
-                    performer_data, leader_mbids, leader_names
-                )
-                
-                # Process instruments
+                db_role = self._determine_role(performer_data, leader_mbids, leader_names)
                 instruments = performer_data.get('instruments') or []
                 
                 if instruments:
@@ -221,7 +260,9 @@ class PerformerImporter:
                             
                             self.link_performer_instrument(conn, performer_id, instrument_id)
                             new_performers_added += 1
-                            new_performer_names.append(f"{performer_data['name']} ({instrument_name})")
+                            new_performer_names.append(f"{performer_name} ({instrument_name})")
+                            # Add to existing_links to prevent duplicate inserts
+                            existing_links.add(performer_id)
                 else:
                     cur.execute("""
                         INSERT INTO recording_performers (
@@ -231,7 +272,8 @@ class PerformerImporter:
                         ON CONFLICT DO NOTHING
                     """, (recording_id, performer_id, db_role))
                     new_performers_added += 1
-                    new_performer_names.append(performer_data['name'])
+                    new_performer_names.append(performer_name)
+                    existing_links.add(performer_id)
             
             # Ensure at least one leader
             if new_performers_added > 0:
@@ -246,6 +288,141 @@ class PerformerImporter:
             self.stats['recordings_with_new_performers'] += 1
         
         return new_performers_added
+    
+    # ========================================================================
+    # BATCH LOOKUP METHODS (Performance optimization)
+    # ========================================================================
+    
+    def _batch_get_performers(self, conn, mbids: list, names: list) -> dict:
+        """
+        Batch fetch performers by MBIDs and names.
+        
+        OPTIMIZATION: Two queries total instead of 2 per performer.
+        
+        Args:
+            conn: Database connection
+            mbids: List of MusicBrainz IDs to look up
+            names: List of performer names to look up
+            
+        Returns:
+            Dict mapping cache keys to performer IDs:
+            - "mbid:{mbid}" -> performer_id
+            - "name:{lowercase_name}" -> performer_id
+        """
+        result = {}
+        
+        with conn.cursor() as cur:
+            # Batch lookup by MBID (most reliable)
+            if mbids:
+                cur.execute("""
+                    SELECT id, musicbrainz_id 
+                    FROM performers 
+                    WHERE musicbrainz_id = ANY(%s)
+                """, (mbids,))
+                for row in cur.fetchall():
+                    result[f"mbid:{row['musicbrainz_id']}"] = row['id']
+            
+            # Batch lookup by name (case-insensitive) - look up all names
+            # Some performers might be found by name but not MBID
+            if names:
+                cur.execute("""
+                    SELECT id, LOWER(name) as name_lower
+                    FROM performers 
+                    WHERE LOWER(name) = ANY(%s)
+                """, ([n.lower() for n in names if n],))
+                for row in cur.fetchall():
+                    result[f"name:{row['name_lower']}"] = row['id']
+        
+        return result
+    
+    def _batch_get_recording_performer_links(self, conn, recording_id: str, 
+                                              performer_ids: list) -> set:
+        """
+        Batch fetch existing performer links for a recording.
+        
+        OPTIMIZATION: Single query instead of one per performer.
+        
+        Args:
+            conn: Database connection
+            recording_id: Recording ID to check
+            performer_ids: List of performer IDs to check
+            
+        Returns:
+            Set of performer IDs that are already linked to this recording
+        """
+        if not performer_ids or not recording_id:
+            return set()
+        
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT DISTINCT performer_id
+                FROM recording_performers
+                WHERE recording_id = %s AND performer_id = ANY(%s)
+            """, (recording_id, performer_ids))
+            
+            return {row['performer_id'] for row in cur.fetchall()}
+    
+    def _create_performer(self, conn, name: str, mbid: str = None) -> str:
+        """
+        Create a new performer in the database.
+        
+        Called only when batch lookup confirms performer doesn't exist.
+        Uses savepoint to handle potential conflicts gracefully.
+        
+        Args:
+            conn: Database connection
+            name: Performer name
+            mbid: Optional MusicBrainz ID
+            
+        Returns:
+            New performer ID, or None on failure
+        """
+        if self.dry_run:
+            logger.info(f"  [DRY RUN] Would create performer: {name}")
+            return None
+        
+        with conn.cursor() as cur:
+            # Use savepoint for atomic insert attempt
+            cur.execute("SAVEPOINT create_performer")
+            try:
+                cur.execute("""
+                    INSERT INTO performers (name, musicbrainz_id)
+                    VALUES (%s, %s)
+                    RETURNING id
+                """, (name, mbid))
+                
+                result = cur.fetchone()
+                cur.execute("RELEASE SAVEPOINT create_performer")
+                if result:
+                    logger.info(f"  Created performer: {name}")
+                    self.stats['performers_created'] += 1
+                    return result['id']
+            except Exception as e:
+                # Rollback to savepoint and try to find existing performer
+                cur.execute("ROLLBACK TO SAVEPOINT create_performer")
+                logger.debug(f"  INSERT failed for {name}, looking up: {e}")
+                
+                # Try to find by MBID first
+                if mbid:
+                    cur.execute("""
+                        SELECT id FROM performers WHERE musicbrainz_id = %s
+                    """, (mbid,))
+                    result = cur.fetchone()
+                    if result:
+                        return result['id']
+                
+                # Try to find by name
+                cur.execute("""
+                    SELECT id FROM performers WHERE LOWER(name) = LOWER(%s)
+                """, (name,))
+                result = cur.fetchone()
+                if result:
+                    return result['id']
+        
+        return None    
+    # ========================================================================
+    # Helper methods for performer counts and logging
+    # ========================================================================
     
     def _get_recording_performer_count(self, conn, recording_id):
         """Get the current count of performers for a recording"""
@@ -350,26 +527,23 @@ class PerformerImporter:
                 if cur.fetchone()['count'] > 0:
                     continue
                 
-                # Add release credit
+                # Add the credit
                 cur.execute("""
-                    INSERT INTO release_performers (
-                        release_id, performer_id, role
-                    )
+                    INSERT INTO release_performers (release_id, performer_id, role)
                     VALUES (%s, %s, %s)
                     ON CONFLICT DO NOTHING
                 """, (release_id, performer_id, credit['role']))
+                
                 credits_linked += 1
         
         return credits_linked
     
     def _extract_release_credits(self, release_details):
-        """
-        Extract non-performer credits from release data.
-        Only returns producers, engineers, etc. - NOT performing musicians.
-        """
+        """Extract non-performer credits from release data"""
         credits = []
         
         relations = release_details.get('relations') or []
+        
         for relation in relations:
             if not relation or not isinstance(relation, dict):
                 continue
@@ -377,26 +551,29 @@ class PerformerImporter:
             rel_type = relation.get('type', '')
             target_type = relation.get('target-type', '')
             
-            # Only process artist relationships that are NOT instruments/vocals
+            # Only process artist relationships
             if target_type != 'artist':
                 continue
             
-            # These are release-specific credit types
-            if rel_type in ['producer', 'engineer', 'mix', 'mastering', 'recording', 
-                           'editor', 'balance', 'audio director', 'liner notes',
-                           'art direction', 'design', 'photography']:
-                artist = relation.get('artist', {})
-                if artist and artist.get('name'):
-                    credits.append({
-                        'name': artist['name'],
-                        'mbid': artist.get('id'),
-                        'role': rel_type
-                    })
+            # Only process non-performer roles
+            if rel_type not in ['producer', 'engineer', 'mix', 'mastering', 
+                               'recording', 'programming']:
+                continue
+            
+            artist = relation.get('artist')
+            if not artist or not isinstance(artist, dict):
+                continue
+            
+            credits.append({
+                'name': artist.get('name'),
+                'mbid': artist.get('id'),
+                'role': rel_type
+            })
         
         return credits
     
     # ========================================================================
-    # LEGACY METHOD: Keep for backwards compatibility
+    # LEGACY METHODS (kept for backwards compatibility)
     # ========================================================================
     
     def link_performers_to_release(self, conn, release_id, mb_recording, release_details):
@@ -548,7 +725,7 @@ class PerformerImporter:
     # ========================================================================
     
     def fetch_release_credits(self, release_id):
-        """Fetch detailed credits from a release"""
+        """Fetch release credits from MusicBrainz"""
         try:
             return self.mb_searcher.get_release_details(release_id)
         except Exception as e:
