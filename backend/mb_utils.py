@@ -570,11 +570,12 @@ class MusicBrainzSearcher:
         # Fetch from API with retry logic
         for attempt in range(max_retries):
             try:
-                # Progressive delay based on attempt number
+                # Exponential backoff: 2s, 4s, 8s...
                 if attempt > 0:
-                    sleep_time = 2.0 + (attempt * 1.5)
-                    logger.info(f"  Retry attempt {attempt + 1}/{max_retries} after {sleep_time}s delay...")
-                    time.sleep(sleep_time)
+                    backoff_time = 2 ** (attempt + 1)
+                    logger.warning(f"BACKOFF: MusicBrainz artist fetch retry {attempt + 1}/{max_retries}, "
+                                   f"waiting {backoff_time}s before retry (mb_id={mb_id})")
+                    time.sleep(backoff_time)
                 
                 # Rate limiting for first attempt
                 if attempt == 0:
@@ -615,21 +616,21 @@ class MusicBrainzSearcher:
                     return None
                     
             except requests.exceptions.ConnectionError as e:
-                logger.warning(f"Connection error (attempt {attempt + 1}/{max_retries}): {e}")
+                logger.warning(f"BACKOFF: Connection error on artist fetch (attempt {attempt + 1}/{max_retries}): {e}")
                 if attempt < max_retries - 1:
                     continue
-                logger.error("All retry attempts failed - connection error")
+                logger.error(f"All retry attempts failed - connection error (mb_id={mb_id})")
                 return None
             except requests.exceptions.Timeout as e:
-                logger.warning(f"Timeout error (attempt {attempt + 1}/{max_retries}): {e}")
+                logger.warning(f"BACKOFF: Timeout on artist fetch (attempt {attempt + 1}/{max_retries}): {e}")
                 if attempt < max_retries - 1:
                     continue
-                logger.error("All retry attempts failed - timeout")
+                logger.error(f"All retry attempts failed - timeout (mb_id={mb_id})")
                 return None
             except Exception as e:
                 logger.error(f"Error fetching artist details from MusicBrainz: {e}")
                 if attempt < max_retries - 1:
-                    logger.warning("Retrying after unexpected error...")
+                    logger.warning("BACKOFF: Retrying after unexpected error...")
                     continue
                 return None
         
@@ -658,11 +659,12 @@ class MusicBrainzSearcher:
         # Fetch from API with retry logic
         for attempt in range(max_retries):
             try:
-                # Progressive delay based on attempt number
+                # Exponential backoff: 2s, 4s, 8s...
                 if attempt > 0:
-                    sleep_time = 2.0 + (attempt * 1.5)
-                    logger.info(f"  Retry attempt {attempt + 1}/{max_retries} after {sleep_time}s delay...")
-                    time.sleep(sleep_time)
+                    backoff_time = 2 ** (attempt + 1)
+                    logger.warning(f"BACKOFF: MusicBrainz work fetch retry {attempt + 1}/{max_retries}, "
+                                   f"waiting {backoff_time}s before retry (work_id={work_id})")
+                    time.sleep(backoff_time)
                 
                 # Rate limiting for first attempt
                 if attempt == 0:
@@ -703,21 +705,21 @@ class MusicBrainzSearcher:
                     return None
                     
             except requests.exceptions.ConnectionError as e:
-                logger.warning(f"Connection error (attempt {attempt + 1}/{max_retries}): {e}")
+                logger.warning(f"BACKOFF: Connection error on work fetch (attempt {attempt + 1}/{max_retries}): {e}")
                 if attempt < max_retries - 1:
                     continue
-                logger.error("All retry attempts failed - connection error")
+                logger.error(f"All retry attempts failed - connection error (work_id={work_id})")
                 return None
             except requests.exceptions.Timeout as e:
-                logger.warning(f"Timeout error (attempt {attempt + 1}/{max_retries}): {e}")
+                logger.warning(f"BACKOFF: Timeout on work fetch (attempt {attempt + 1}/{max_retries}): {e}")
                 if attempt < max_retries - 1:
                     continue
-                logger.error("All retry attempts failed - timeout")
+                logger.error(f"All retry attempts failed - timeout (work_id={work_id})")
                 return None
             except Exception as e:
                 logger.error(f"Error fetching work recordings from MusicBrainz: {e}")
                 if attempt < max_retries - 1:
-                    logger.warning("Retrying after unexpected error...")
+                    logger.warning("BACKOFF: Retrying after unexpected error...")
                     continue
                 return None
         
@@ -746,11 +748,12 @@ class MusicBrainzSearcher:
         # Fetch from API with retry logic
         for attempt in range(max_retries):
             try:
-                # Progressive delay based on attempt number
+                # Exponential backoff: 2s, 4s, 8s...
                 if attempt > 0:
-                    sleep_time = 2.0 + (attempt * 1.5)
-                    logger.info(f"  Retry attempt {attempt + 1}/{max_retries} after {sleep_time}s delay...")
-                    time.sleep(sleep_time)
+                    backoff_time = 2 ** (attempt + 1)
+                    logger.warning(f"BACKOFF: MusicBrainz recording fetch retry {attempt + 1}/{max_retries}, "
+                                   f"waiting {backoff_time}s before retry (recording_id={recording_id})")
+                    time.sleep(backoff_time)
                 
                 # Rate limiting for first attempt
                 if attempt == 0:
@@ -791,33 +794,34 @@ class MusicBrainzSearcher:
                     return None
                     
             except requests.exceptions.ConnectionError as e:
-                logger.warning(f"Connection error (attempt {attempt + 1}/{max_retries}): {e}")
+                logger.warning(f"BACKOFF: Connection error on recording fetch (attempt {attempt + 1}/{max_retries}): {e}")
                 if attempt < max_retries - 1:
                     continue
-                logger.error("All retry attempts failed - connection error")
+                logger.error(f"All retry attempts failed - connection error (recording_id={recording_id})")
                 return None
             except requests.exceptions.Timeout as e:
-                logger.warning(f"Timeout error (attempt {attempt + 1}/{max_retries}): {e}")
+                logger.warning(f"BACKOFF: Timeout on recording fetch (attempt {attempt + 1}/{max_retries}): {e}")
                 if attempt < max_retries - 1:
                     continue
-                logger.error("All retry attempts failed - timeout")
+                logger.error(f"All retry attempts failed - timeout (recording_id={recording_id})")
                 return None
             except Exception as e:
                 logger.error(f"Error fetching recording details from MusicBrainz: {e}")
                 if attempt < max_retries - 1:
-                    logger.warning("Retrying after unexpected error...")
+                    logger.warning("BACKOFF: Retrying after unexpected error...")
                     continue
                 return None
         
         return None
     
         
-    def get_release_details(self, release_id):
+    def get_release_details(self, release_id, max_retries=3):
         """
         Get detailed information about a MusicBrainz release
         
         Args:
             release_id: MusicBrainz release ID
+            max_retries: Maximum number of retry attempts (default 3)
             
         Returns:
             Dict with release details, or None if not found
@@ -831,38 +835,82 @@ class MusicBrainzSearcher:
                 self.last_made_api_call = False
                 return cached.get('data')
         
-        # Fetch from API
-        self.last_made_api_call = True
-        self.rate_limit()
+        # Fetch from API with retry logic
+        for attempt in range(max_retries):
+            try:
+                # Exponential backoff: 2s, 4s, 8s...
+                if attempt > 0:
+                    backoff_time = 2 ** (attempt + 1)
+                    logger.warning(f"BACKOFF: MusicBrainz release fetch retry {attempt + 1}/{max_retries}, "
+                                   f"waiting {backoff_time}s before retry (release_id={release_id})")
+                    time.sleep(backoff_time)
+                
+                # Rate limiting for first attempt
+                if attempt == 0:
+                    self.last_made_api_call = True
+                    self.rate_limit()
+                
+                url = f"https://musicbrainz.org/ws/2/release/{release_id}"
+                params = {
+                    'inc': 'artist-credits+recordings+artist-rels',
+                    'fmt': 'json'
+                }
+                
+                logger.debug(f"Fetching MusicBrainz release details: {release_id}")
+                
+                response = self.session.get(url, params=params, timeout=15)
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    # Cache the successful result
+                    self._save_to_cache(cache_path, data)
+                    return data
+                elif response.status_code == 404:
+                    # Cache the negative result (404 is not transient)
+                    self._save_to_cache(cache_path, None)
+                    logger.warning(f"Release not found in MusicBrainz: {release_id}")
+                    return None
+                elif response.status_code == 503:
+                    # Service unavailable - retry
+                    logger.warning(f"MusicBrainz service unavailable (503), will retry...")
+                    if attempt < max_retries - 1:
+                        continue
+                    logger.error("All retry attempts failed (503)")
+                    return None
+                elif response.status_code == 429:
+                    # Rate limited - use longer backoff
+                    logger.warning(f"BACKOFF: MusicBrainz rate limit (429), will retry with longer delay...")
+                    if attempt < max_retries - 1:
+                        time.sleep(5)  # Extra delay for rate limiting
+                        continue
+                    logger.error("All retry attempts failed (429 rate limit)")
+                    return None
+                else:
+                    logger.error(f"MusicBrainz API error {response.status_code}")
+                    if attempt < max_retries - 1:
+                        continue
+                    return None
+                    
+            except requests.exceptions.ConnectionError as e:
+                logger.warning(f"BACKOFF: Connection error on release fetch (attempt {attempt + 1}/{max_retries}): {e}")
+                if attempt < max_retries - 1:
+                    continue
+                logger.error(f"All retry attempts failed - connection error (release_id={release_id})")
+                return None
+            except requests.exceptions.Timeout as e:
+                logger.warning(f"BACKOFF: Timeout on release fetch (attempt {attempt + 1}/{max_retries}): {e}")
+                if attempt < max_retries - 1:
+                    continue
+                logger.error(f"All retry attempts failed - timeout (release_id={release_id})")
+                return None
+            except Exception as e:
+                logger.error(f"Error fetching release details from MusicBrainz: {e}")
+                if attempt < max_retries - 1:
+                    logger.warning(f"BACKOFF: Retrying after unexpected error...")
+                    continue
+                return None
         
-        try:
-            url = f"https://musicbrainz.org/ws/2/release/{release_id}"
-            params = {
-                'inc': 'artist-credits+recordings+artist-rels',
-                'fmt': 'json'
-            }
-            
-            logger.debug(f"Fetching MusicBrainz release details: {release_id}")
-            
-            response = self.session.get(url, params=params, timeout=10)
-            
-            if response.status_code == 404:
-                # Cache the negative result
-                self._save_to_cache(cache_path, None)
-                return None
-            elif response.status_code != 200:
-                return None
-            
-            data = response.json()
-            
-            # Cache the result
-            self._save_to_cache(cache_path, data)
-            
-            return data
-            
-        except Exception as e:
-            logger.error(f"Error fetching release details from MusicBrainz: {e}")
-            return None
+        return None
     
     def clear_cache(self, search_only=False):
         """
