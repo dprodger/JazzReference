@@ -460,11 +460,16 @@ class MBReleaseImporter:
         """
         Get existing recording or create new one
         
+        IMPORTANT: For MusicBrainz imports, we ONLY match by MusicBrainz recording ID.
+        Album title matching is NOT reliable because different artists can have
+        albums with the same title (e.g., Grant Green's "Born to Be Blue" vs 
+        Freddie Hubbard's "Born to Be Blue").
+        
         Args:
             conn: Database connection
             song_id: Song ID
-            mb_recording_id: MusicBrainz recording ID
-            album_title: Album title
+            mb_recording_id: MusicBrainz recording ID (unique identifier)
+            album_title: Album title (for display/storage only, NOT for matching)
             release_year: Year of release
             formatted_date: Formatted date string
             
@@ -472,7 +477,8 @@ class MBReleaseImporter:
             Recording ID or None
         """
         with conn.cursor() as cur:
-            # Try to find by MusicBrainz ID first
+            # Match ONLY by MusicBrainz ID - this is the unique identifier
+            # DO NOT fall back to album title matching as it causes cross-artist contamination
             cur.execute("""
                 SELECT id FROM recordings
                 WHERE musicbrainz_id = %s
@@ -482,24 +488,6 @@ class MBReleaseImporter:
             if result:
                 self.logger.debug(f"  Recording exists (by MB ID)")
                 self.stats['recordings_existing'] += 1
-                return result['id']
-            
-            # Try to find by song_id + album_title
-            cur.execute("""
-                SELECT id FROM recordings
-                WHERE song_id = %s AND album_title = %s
-            """, (song_id, album_title))
-            result = cur.fetchone()
-            
-            if result:
-                self.logger.debug(f"  Recording exists (by album title)")
-                self.stats['recordings_existing'] += 1
-                # Update with MusicBrainz ID if missing
-                cur.execute("""
-                    UPDATE recordings
-                    SET musicbrainz_id = %s, updated_at = CURRENT_TIMESTAMP
-                    WHERE id = %s AND musicbrainz_id IS NULL
-                """, (mb_recording_id, result['id']))
                 return result['id']
             
             # Create new recording
