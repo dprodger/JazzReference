@@ -48,7 +48,7 @@ logger = logging.getLogger(__name__)
 class AuthorityRecommendationMatcher:
     """Matches authority recommendations to recordings in the database"""
     
-    def __init__(self, dry_run: bool = True, min_confidence: str = 'medium',
+    def __init__(self, dry_run: bool = False, min_confidence: str = 'medium',
                  song_name: Optional[str] = None):
         self.dry_run = dry_run
         self.min_confidence = min_confidence
@@ -494,14 +494,14 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Preview matches without updating (default)
+  # Match and update with medium confidence (default)
+  python match_authority_recommendations.py
+  
+  # Preview matches without updating
   python match_authority_recommendations.py --dry-run
   
   # Match and update with high confidence threshold
-  python match_authority_recommendations.py --live --min-confidence high
-  
-  # Match with medium confidence (more matches)
-  python match_authority_recommendations.py --live --min-confidence medium
+  python match_authority_recommendations.py --min-confidence high
   
   # Process only first 10 recommendations
   python match_authority_recommendations.py --limit 10
@@ -522,14 +522,7 @@ Confidence Levels:
     parser.add_argument(
         '--dry-run',
         action='store_true',
-        default=True,
-        help='Preview matches without updating database (default)'
-    )
-    
-    parser.add_argument(
-        '--live',
-        action='store_true',
-        help='Actually update the database (overrides --dry-run)'
+        help='Preview matches without updating database'
     )
     
     parser.add_argument(
@@ -565,7 +558,7 @@ Confidence Levels:
         logging.getLogger().setLevel(logging.DEBUG)
     
     # Determine dry_run mode
-    dry_run = not args.live
+    dry_run = args.dry_run
     
     # Create matcher and run
     matcher = AuthorityRecommendationMatcher(
