@@ -122,6 +122,17 @@ class SpotifyMatcher:
             self.min_album_similarity = 55
             self.min_track_similarity = 75
     
+    def _aggregate_client_stats(self):
+        """
+        Aggregate statistics from the SpotifyClient into the matcher's stats.
+        
+        The client tracks cache_hits internally when loading from cache.
+        This method synchronizes those stats before returning results.
+        """
+        self.stats['cache_hits'] = self.client.stats.get('cache_hits', 0)
+        self.stats['rate_limit_hits'] = self.client.stats.get('rate_limit_hits', 0)
+        self.stats['rate_limit_waits'] = self.client.stats.get('rate_limit_waits', 0)
+    
     # ========================================================================
     # DELEGATED PROPERTIES (for backwards compatibility)
     # ========================================================================
@@ -988,6 +999,7 @@ class SpotifyMatcher:
                     self.logger.info(f"[{i}/{len(releases)}] {title} ({artist_name or 'Unknown'}, {year or 'Unknown'}) - ✗ No valid Spotify match found")
                     self.stats['releases_no_match'] += 1
             
+            self._aggregate_client_stats()
             return {
                 'success': True,
                 'song': song,
@@ -996,6 +1008,7 @@ class SpotifyMatcher:
             
         except Exception as e:
             self.logger.error(f"Error matching releases: {e}", exc_info=True)
+            self._aggregate_client_stats()
             return {
                 'success': False,
                 'error': str(e),
@@ -1216,6 +1229,9 @@ class SpotifyMatcher:
                 # Update release
                 self.update_release_artwork(conn, release['id'], album_art)
         
+        # Aggregate client stats before printing summary
+        self._aggregate_client_stats()
+        
         # Print summary
         self.logger.info("")
         self.logger.info("="*80)
@@ -1232,6 +1248,9 @@ class SpotifyMatcher:
     
     def print_summary(self):
         """Print summary of matching statistics"""
+        # Aggregate client stats before printing
+        self._aggregate_client_stats()
+        
         self.logger.info("\n" + "=" * 70)
         self.logger.info("SPOTIFY MATCHING SUMMARY")
         self.logger.info("=" * 70)
