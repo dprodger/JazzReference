@@ -56,7 +56,7 @@ def research_song(song_id: str, song_name: str) -> Dict[str, Any]:
         
         # Get import limit from environment variable, default to 100
         mb_import_limit = int(os.environ.get('MB_IMPORT_LIMIT', 100))
-        logger.info("Importing MusicBrainz releases...; limiting to {mb_import_limit}")
+        logger.info(f"Importing MusicBrainz releases...; limiting to {mb_import_limit}")
         mb_result = importer.import_releases(str(song_id), mb_import_limit)
         
         if not mb_result['success']:
