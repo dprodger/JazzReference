@@ -9,15 +9,53 @@ struct CurrentSong: Codable {
     }
 }
 
+struct ResearchProgress: Codable {
+    let phase: String
+    let current: Int
+    let total: Int
+    
+    /// Human-readable description of the current phase
+    var phaseDescription: String {
+        switch phase {
+        case "musicbrainz_recording_import":
+            return "Importing MusicBrainz recordings"
+        case "spotify_track_match":
+            return "Matching Spotify tracks"
+        default:
+            return phase.replacingOccurrences(of: "_", with: " ").capitalized
+        }
+    }
+    
+    /// Short label for the phase
+    var phaseLabel: String {
+        switch phase {
+        case "musicbrainz_recording_import":
+            return "MusicBrainz"
+        case "spotify_track_match":
+            return "Spotify"
+        default:
+            return phase
+        }
+    }
+    
+    /// Progress as a fraction (0.0 to 1.0)
+    var progressFraction: Double {
+        guard total > 0 else { return 0 }
+        return Double(current) / Double(total)
+    }
+}
+
 struct QueueStatus: Codable {
     let queueSize: Int
     let workerActive: Bool
     let currentSong: CurrentSong?
+    let progress: ResearchProgress?
     
     enum CodingKeys: String, CodingKey {
         case queueSize = "queue_size"
         case workerActive = "worker_active"
         case currentSong = "current_song"
+        case progress
     }
 }
 

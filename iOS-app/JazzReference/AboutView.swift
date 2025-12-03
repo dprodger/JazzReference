@@ -11,6 +11,7 @@ struct AboutView: View {
     @State private var queueSize: Int = 0
     @State private var workerActive: Bool = false
     @State private var currentSongName: String? = nil
+    @State private var progress: ResearchProgress? = nil
     @State private var isLoadingQueue: Bool = true
     
     let networkManager = NetworkManager()
@@ -99,6 +100,40 @@ struct AboutView: View {
                                     .foregroundColor(.white.opacity(0.7))
                                     .italic()
                             }
+                            
+                            // Progress indicator
+                            if let progress = progress {
+                                VStack(spacing: 4) {
+                                    // Phase label with progress count
+                                    HStack(spacing: 4) {
+                                        Text(progress.phaseLabel)
+                                            .font(.caption2)
+                                            .foregroundColor(.white.opacity(0.7))
+                                        
+                                        Text("\(progress.current)/\(progress.total)")
+                                            .font(.caption2)
+                                            .foregroundColor(.white.opacity(0.9))
+                                            .fontWeight(.medium)
+                                    }
+                                    
+                                    // Progress bar
+                                    GeometryReader { geometry in
+                                        ZStack(alignment: .leading) {
+                                            // Background track
+                                            RoundedRectangle(cornerRadius: 2)
+                                                .fill(Color.white.opacity(0.2))
+                                                .frame(height: 4)
+                                            
+                                            // Progress fill
+                                            RoundedRectangle(cornerRadius: 2)
+                                                .fill(Color.white.opacity(0.8))
+                                                .frame(width: geometry.size.width * progress.progressFraction, height: 4)
+                                        }
+                                    }
+                                    .frame(height: 4)
+                                }
+                                .padding(.top, 4)
+                            }
                         }
                     }
                 }
@@ -146,6 +181,7 @@ struct AboutView: View {
             queueSize = status.queueSize
             workerActive = status.workerActive
             currentSongName = status.currentSong?.songName
+            progress = status.progress
         }
         isLoadingQueue = false
     }
