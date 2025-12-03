@@ -60,11 +60,13 @@ def refresh_song_data(song_id):
 def get_queue_status():
     """Get the current status of the research queue"""
     current_song = research_queue.get_current_song()
+    current_progress = research_queue.get_current_progress()
     
     response = {
         'queue_size': research_queue.get_queue_size(),
         'worker_active': research_queue._worker_running,
-        'current_song': current_song
+        'current_song': current_song,
+        'progress': current_progress
     }
     
     return jsonify(response)

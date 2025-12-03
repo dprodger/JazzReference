@@ -21,6 +21,15 @@ _worker_thread: Optional[threading.Thread] = None
 _current_song: Optional[dict] = None
 _current_song_lock = threading.Lock()
 
+# Progress tracking for current research operation
+# Phase names for research stages
+PHASE_IDLE = 'idle'
+PHASE_MB_RECORDING_IMPORT = 'musicbrainz_recording_import'
+PHASE_SPOTIFY_TRACK_MATCH = 'spotify_track_match'
+
+_current_progress: Optional[dict] = None
+_progress_lock = threading.Lock()
+
 
 def add_song_to_queue(song_id: str, song_name: str) -> bool:
     """
@@ -77,6 +86,42 @@ def get_queued_songs() -> list[dict]:
     # Note: This is not thread-safe for modification, but safe for reading
     with research_queue.mutex:
         return list(research_queue.queue)
+
+
+def update_progress(phase: str, current: int = 0, total: int = 0) -> None:
+    """
+    Update the current research progress
+    
+    Args:
+        phase: Current phase (use PHASE_* constants)
+        current: Current item number in the loop (1-indexed)
+        total: Total items in the loop
+    """
+    global _current_progress
+    with _progress_lock:
+        _current_progress = {
+            'phase': phase,
+            'current': current,
+            'total': total
+        }
+
+
+def clear_progress() -> None:
+    """Clear the current progress (called when research completes)"""
+    global _current_progress
+    with _progress_lock:
+        _current_progress = None
+
+
+def get_current_progress() -> Optional[dict]:
+    """
+    Get the current research progress
+    
+    Returns:
+        Dict with 'phase', 'current', 'total' if research is active, None otherwise
+    """
+    with _progress_lock:
+        return _current_progress.copy() if _current_progress else None
 
 
 def start_worker(research_function):
@@ -178,9 +223,10 @@ def _worker_loop(research_function):
                 except Exception as e:
                     logger.error(f"Error researching song {song_id}: {e}", exc_info=True)
                 finally:
-                    # Clear current song
+                    # Clear current song and progress
                     with _current_song_lock:
                         _current_song = None
+                    clear_progress()
                 
                 # Mark task as done
                 research_queue.task_done()

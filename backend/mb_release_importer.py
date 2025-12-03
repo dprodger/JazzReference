@@ -43,7 +43,9 @@ class MBReleaseImporter:
     - Releases only get release-specific credits (producers, engineers)
     """
     
-    def __init__(self, dry_run: bool = False, force_refresh: bool = False, logger: Optional[logging.Logger] = None):
+    def __init__(self, dry_run: bool = False, force_refresh: bool = False, 
+                 logger: Optional[logging.Logger] = None,
+                 progress_callback: Optional[callable] = None):
         """
         Initialize the importer
         
@@ -51,10 +53,12 @@ class MBReleaseImporter:
             dry_run: If True, don't make database changes
             force_refresh: If True, bypass MusicBrainz cache
             logger: Optional logger instance (creates one if not provided)
+            progress_callback: Optional callback(phase, current, total) for progress tracking
         """
         self.dry_run = dry_run
         self.force_refresh = force_refresh
         self.logger = logger or logging.getLogger(__name__)
+        self.progress_callback = progress_callback
         self.mb_searcher = MusicBrainzSearcher(force_refresh=force_refresh)
         self.performer_importer = PerformerImporter(dry_run=dry_run)
         self.stats = {
@@ -192,6 +196,10 @@ class MBReleaseImporter:
             for i, mb_recording in enumerate(recordings, 1):
                 recording_title = mb_recording.get('title', 'Unknown')
                 self.logger.info(f"\n[{i}/{len(recordings)}] Processing: {recording_title}")
+                
+                # Report progress via callback
+                if self.progress_callback:
+                    self.progress_callback('musicbrainz_recording_import', i, len(recordings))
                 
                 try:
                     self._process_recording_fast(

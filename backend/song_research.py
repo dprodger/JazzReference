@@ -15,6 +15,7 @@ from mb_release_importer import MBReleaseImporter
 from spotify_utils import SpotifyMatcher
 from db_utils import get_db_connection
 from mb_utils import MusicBrainzSearcher, update_song_composer, update_song_wikipedia_url
+import research_queue
 
 logger = logging.getLogger(__name__)
 
@@ -49,10 +50,18 @@ def research_song(song_id: str, song_name: str) -> Dict[str, Any]:
     """
     logger.info(f"Starting research for song {song_id} / {song_name}")
     
+    # Create a progress callback that updates the research_queue progress state
+    def progress_callback(phase: str, current: int, total: int):
+        research_queue.update_progress(phase, current, total)
+    
     try:
         # Step 1: Import MusicBrainz releases
         # MBReleaseImporter uses MusicBrainzSearcher internally which has caching
-        importer = MBReleaseImporter(dry_run=False, logger=logger)
+        importer = MBReleaseImporter(
+            dry_run=False, 
+            logger=logger,
+            progress_callback=progress_callback
+        )
         
         # Get import limit from environment variable, default to 100
         mb_import_limit = int(os.environ.get('MB_IMPORT_LIMIT', 100))
@@ -94,7 +103,12 @@ def research_song(song_id: str, song_name: str) -> Dict[str, Any]:
         # Step 2: Match Spotify releases and tracks
         # SpotifyMatcher uses default cache settings: 30 days expiration, no force_refresh
         # This minimizes API calls and speeds up repeated research operations
-        matcher = SpotifyMatcher(dry_run=False, strict_mode=True, logger=logger)
+        matcher = SpotifyMatcher(
+            dry_run=False, 
+            strict_mode=True, 
+            logger=logger,
+            progress_callback=progress_callback
+        )
         
         logger.info("Matching Spotify releases...")
         spotify_result = matcher.match_releases(str(song_id))

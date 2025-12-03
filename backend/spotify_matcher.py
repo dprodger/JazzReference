@@ -61,7 +61,8 @@ class SpotifyMatcher:
     
     def __init__(self, dry_run=False, strict_mode=False, force_refresh=False, 
                  artist_filter=False, cache_days=30, logger=None, 
-                 rate_limit_delay=0.2, max_retries=3):
+                 rate_limit_delay=0.2, max_retries=3,
+                 progress_callback=None):
         """
         Initialize Spotify Matcher
         
@@ -74,11 +75,13 @@ class SpotifyMatcher:
             force_refresh: If True, always fetch fresh data ignoring cache
             rate_limit_delay: Base delay between API calls (seconds)
             max_retries: Maximum number of retries for rate-limited requests
+            progress_callback: Optional callback(phase, current, total) for progress tracking
         """
         self.dry_run = dry_run
         self.artist_filter = artist_filter
         self.strict_mode = strict_mode
         self.logger = logger or logging.getLogger(__name__)
+        self.progress_callback = progress_callback
         
         # Initialize the API client
         self.client = SpotifyClient(
@@ -981,6 +984,10 @@ class SpotifyMatcher:
             # Process each release
             for i, release in enumerate(releases, 1):
                 self.stats['releases_processed'] += 1
+                
+                # Report progress via callback
+                if self.progress_callback:
+                    self.progress_callback('spotify_track_match', i, len(releases))
                 
                 title = release['title'] or 'Unknown Album'
                 year = release['release_year']
