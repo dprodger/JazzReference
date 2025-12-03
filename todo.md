@@ -106,7 +106,11 @@ Data problems:
 * Get rid of Recording-level performers and spotify links
 * add Apple authentication and whatever else was on the auth path.
 
+* Pull release imagery from MusicBraizn
+* use date of artist-credits to dictate the recording date?
+* SongDetailView recording List showing different release metadata than RecordingDetailView
 
+* match_spotify taking a recording_id to look for just that recording & releases
 
 
 Overall approach:

@@ -264,10 +264,11 @@ class ContaminatedRecordingRepairer:
         """Find and repair contaminated recordings for a song"""
         logger.info(f"Checking song: {song_identifier}")
         
-        contaminated_recordings = []
         song_id = None
         song_title = None
+        composer_names = set()
         
+        # First, look up the song
         with get_db_connection() as conn:
             with conn.cursor() as cur:
                 # Find the song (including composer)
@@ -289,28 +290,9 @@ class ContaminatedRecordingRepairer:
                 logger.info(f"  {song_title} (ID: {song_id})")
                 if composer_names:
                     logger.debug(f"  Composer(s): {composer}")
-                
-                # Get all recordings for this song
-                cur.execute("""
-                    SELECT r.id, r.album_title, r.musicbrainz_id, r.recording_year
-                    FROM recordings r
-                    WHERE r.song_id = %s
-                    ORDER BY r.album_title
-                """, (song_id,))
-                
-                recordings = cur.fetchall()
-                logger.debug(f"  Found {len(recordings)} recordings")
-                
-                for recording in recordings:
-                    self.stats['recordings_checked'] += 1
-                    result = self._check_and_repair_recording(conn, dict(recording), song_title, composer_names)
-                    if result.get('is_contaminated'):
-                        contaminated_recordings.append(result)
-                    elif result.get('was_false_positive'):
-                        self.stats['false_positives_avoided'] += 1
-                
-                if not self.dry_run and contaminated_recordings:
-                    conn.commit()
+        
+        # Process the song using the batch approach
+        contaminated_recordings = self._process_single_song(song_id, song_title, composer_names)
         
         return {
             'song': {'id': song_id, 'title': song_title},
@@ -340,63 +322,52 @@ class ContaminatedRecordingRepairer:
         all_contaminated = []
         songs_with_issues = []
         
+        # First, get list of all songs (quick query, close connection immediately)
+        songs = []
         with get_db_connection() as conn:
             with conn.cursor() as cur:
-                # Get all songs that have recordings
                 cur.execute("""
                     SELECT DISTINCT s.id, s.title, s.composer
                     FROM songs s
                     JOIN recordings r ON r.song_id = s.id
                     ORDER BY s.title
                 """)
-                
                 songs = cur.fetchall()
-                total_songs = len(songs)
-                logger.info(f"Found {total_songs} songs with recordings")
-                logger.info("")
+        
+        total_songs = len(songs)
+        logger.info(f"Found {total_songs} songs with recordings")
+        logger.info("")
+        
+        # Process each song with its own short-lived connection
+        for i, song in enumerate(songs, 1):
+            song_id = song['id']
+            song_title = song['title']
+            composer = song.get('composer', '')
+            composer_names = extract_composer_names(composer) if composer else set()
+            
+            logger.info(f"[{i}/{total_songs}] {song_title} Processing")
+            self.stats['songs_checked'] += 1
+            
+            try:
+                song_contaminated = self._process_single_song(
+                    song_id, song_title, composer_names
+                )
                 
-                for i, song in enumerate(songs, 1):
-                    song_id = song['id']
-                    song_title = song['title']
-                    composer = song.get('composer', '')
-                    composer_names = extract_composer_names(composer) if composer else set()
+                if song_contaminated:
+                    all_contaminated.extend(song_contaminated)
+                    songs_with_issues.append({
+                        'song': song_title,
+                        'count': len(song_contaminated)
+                    })
+                    logger.info(f"[{i}/{total_songs}] {song_title}: {len(song_contaminated)} contaminated recording(s)")
+                elif i % 50 == 0:
+                    # Progress update every 50 songs
+                    logger.info(f"[{i}/{total_songs}] Progress: checked {self.stats['recordings_checked']} recordings...")
                     
-                    self.stats['songs_checked'] += 1
-                    
-                    # Get all recordings for this song
-                    cur.execute("""
-                        SELECT r.id, r.album_title, r.musicbrainz_id, r.recording_year
-                        FROM recordings r
-                        WHERE r.song_id = %s
-                        ORDER BY r.album_title
-                    """, (song_id,))
-                    
-                    recordings = cur.fetchall()
-                    song_contaminated = []
-                    
-                    for recording in recordings:
-                        self.stats['recordings_checked'] += 1
-                        result = self._check_and_repair_recording(conn, dict(recording), song_title, composer_names)
-                        if result.get('is_contaminated'):
-                            song_contaminated.append(result)
-                            all_contaminated.append(result)
-                        elif result.get('was_false_positive'):
-                            self.stats['false_positives_avoided'] += 1
-                    
-                    if song_contaminated:
-                        songs_with_issues.append({
-                            'song': song_title,
-                            'count': len(song_contaminated)
-                        })
-                        logger.info(f"[{i}/{total_songs}] {song_title}: {len(song_contaminated)} contaminated recording(s)")
-                    elif i % 50 == 0:
-                        # Progress update every 50 songs
-                        logger.info(f"[{i}/{total_songs}] Progress: checked {self.stats['recordings_checked']} recordings...")
-                
-                if not self.dry_run and all_contaminated:
-                    conn.commit()
-                    logger.info("")
-                    logger.info("✓ Changes committed to database")
+            except Exception as e:
+                self.stats['errors'] += 1
+                logger.error(f"[{i}/{total_songs}] Error processing {song_title}: {e}")
+                continue
         
         return {
             'contaminated_recordings': all_contaminated,
@@ -404,100 +375,145 @@ class ContaminatedRecordingRepairer:
             'stats': self.stats
         }
     
-    def _check_and_repair_recording(self, conn, recording: Dict, song_title: str,
-                                     composer_names: Set[str] = None) -> Dict:
-        """Check a recording for contamination and repair if needed"""
+    def _process_single_song(self, song_id: str, song_title: str, 
+                              composer_names: Set[str]) -> List[Dict]:
+        """Process a single song with its own database connection using batch queries"""
+        song_contaminated = []
+        
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                # Query 1: Get all recordings for this song
+                cur.execute("""
+                    SELECT r.id, r.album_title, r.musicbrainz_id, r.recording_year
+                    FROM recordings r
+                    WHERE r.song_id = %s
+                """, (song_id,))
+                recordings = cur.fetchall()
+                
+                if not recordings:
+                    return []
+                
+                recording_ids = [r['id'] for r in recordings]
+                
+                # Query 2: Get all performers for all recordings in one query
+                cur.execute("""
+                    SELECT rp.recording_id, p.name
+                    FROM recording_performers rp
+                    JOIN performers p ON p.id = rp.performer_id
+                    WHERE rp.recording_id = ANY(%s)
+                """, (recording_ids,))
+                
+                # Group performers by recording_id
+                performers_by_recording = {}
+                for row in cur.fetchall():
+                    rec_id = row['recording_id']
+                    if rec_id not in performers_by_recording:
+                        performers_by_recording[rec_id] = []
+                    performers_by_recording[rec_id].append(row['name'])
+                
+                # Query 3: Get all releases for all recordings in one query
+                cur.execute("""
+                    SELECT DISTINCT rr.recording_id, rel.artist_credit
+                    FROM recording_releases rr
+                    JOIN releases rel ON rel.id = rr.release_id
+                    WHERE rr.recording_id = ANY(%s)
+                """, (recording_ids,))
+                
+                # Group artist credits by recording_id
+                credits_by_recording = {}
+                for row in cur.fetchall():
+                    rec_id = row['recording_id']
+                    if rec_id not in credits_by_recording:
+                        credits_by_recording[rec_id] = set()
+                    if row['artist_credit']:
+                        credits_by_recording[rec_id].add(row['artist_credit'])
+                
+                # Now process each recording using the pre-fetched data
+                for recording in recordings:
+                    self.stats['recordings_checked'] += 1
+                    recording_id = recording['id']
+                    
+                    performer_names = performers_by_recording.get(recording_id, [])
+                    artist_credits = credits_by_recording.get(recording_id, set())
+                    
+                    result = self._check_recording_contamination(
+                        recording, song_title, composer_names,
+                        performer_names, artist_credits
+                    )
+                    
+                    if result.get('is_contaminated'):
+                        # Need to delete this recording
+                        if not self.dry_run:
+                            self._delete_recording(conn, recording_id, recording['album_title'])
+                        else:
+                            logger.info(f"   [DRY RUN] Would delete recording: {recording['album_title'][:50]}")
+                        song_contaminated.append(result)
+                    elif result.get('was_false_positive'):
+                        self.stats['false_positives_avoided'] += 1
+                
+                if not self.dry_run and song_contaminated:
+                    conn.commit()
+        
+        return song_contaminated
+    
+    def _check_recording_contamination(self, recording: Dict, song_title: str,
+                                        composer_names: Set[str],
+                                        performer_names: List[str],
+                                        artist_credits: Set[str]) -> Dict:
+        """Check a recording for contamination using pre-fetched data"""
         recording_id = recording['id']
         album_title = recording.get('album_title', 'Unknown')
         mb_id = recording.get('musicbrainz_id')
-        composer_names = composer_names or set()
         
-        with conn.cursor() as cur:
-            # Get performers for this recording
-            cur.execute("""
-                SELECT DISTINCT p.name
-                FROM recording_performers rp
-                JOIN performers p ON p.id = rp.performer_id
-                WHERE rp.recording_id = %s
-            """, (recording_id,))
-            performer_names = [row['name'] for row in cur.fetchall()]
-            
-            # Get all releases linked to this recording with their artist credits
-            cur.execute("""
-                SELECT DISTINCT rel.id, rel.title, rel.artist_credit, rel.musicbrainz_release_id
-                FROM recording_releases rr
-                JOIN releases rel ON rel.id = rr.release_id
-                WHERE rr.recording_id = %s
-                ORDER BY rel.title
-            """, (recording_id,))
-            
-            releases = [dict(row) for row in cur.fetchall()]
-            
-            # Collect all artist credits
-            all_artist_credits = set()
-            for release in releases:
-                if release.get('artist_credit'):
-                    all_artist_credits.add(release['artist_credit'])
-            
-            # Extract primary artists (filtering out compilations)
-            primary_artists = extract_primary_artists(all_artist_credits)
-            
-            # Filter out composers (it's normal for releases to be credited to composer)
-            primary_artists_filtered = filter_out_composers(primary_artists, composer_names)
-            
-            # Check if this is actual contamination
-            is_contaminated = False
-            was_false_positive = False
-            
-            if len(all_artist_credits) > 1:
-                if len(primary_artists) == 0:
-                    logger.debug(f"✓ OK (all compilations): {album_title}")
-                elif len(primary_artists_filtered) == 0:
-                    was_false_positive = True
-                    logger.debug(f"✓ OK (composer credits only): {album_title}")
-                elif len(primary_artists_filtered) == 1:
-                    was_false_positive = True
-                    logger.debug(f"✓ OK (single artist + composer/compilations): {album_title}")
-                elif are_same_artist(primary_artists_filtered):
-                    was_false_positive = True
-                    logger.debug(f"✓ OK (same artist variants): {album_title}")
-                elif is_collaboration(all_artist_credits, primary_artists_filtered):
-                    was_false_positive = True
-                    logger.debug(f"✓ OK (collaboration): {album_title}")
-                elif performers_match_single_artist(performer_names, primary_artists_filtered):
-                    was_false_positive = True
-                    logger.debug(f"✓ OK (performers match single artist): {album_title}")
-                else:
-                    is_contaminated = True
-            
-            result = {
-                'recording_id': recording_id,
-                'album_title': album_title,
-                'song_title': song_title,
-                'musicbrainz_id': mb_id,
-                'releases': releases,
-                'all_artist_credits': list(all_artist_credits),
-                'primary_artists': list(primary_artists_filtered),
-                'is_contaminated': is_contaminated,
-                'was_false_positive': was_false_positive
-            }
-            
-            if is_contaminated:
-                self.stats['recordings_contaminated'] += 1
-                logger.warning(f"⚠️  CONTAMINATED: {album_title}")
-                logger.warning(f"   Recording ID: {recording_id}")
-                logger.warning(f"   MB ID: {mb_id}")
-                logger.warning(f"   Primary artists (after filtering): {primary_artists_filtered}")
-                logger.warning(f"   All credits: {all_artist_credits}")
-                
-                if not self.dry_run:
-                    self._delete_recording(conn, recording_id, album_title)
-                else:
-                    logger.info(f"   [DRY RUN] Would delete this recording and its links")
-                
-                logger.info("")
-            
-            return result
+        # Extract primary artists (filtering out compilations)
+        primary_artists = extract_primary_artists(artist_credits)
+        
+        # Filter out composers
+        primary_artists_filtered = filter_out_composers(primary_artists, composer_names)
+        
+        # Check if this is actual contamination
+        is_contaminated = False
+        was_false_positive = False
+        
+        if len(artist_credits) > 1:
+            if len(primary_artists) == 0:
+                pass  # All compilations - OK
+            elif len(primary_artists_filtered) == 0:
+                was_false_positive = True
+            elif len(primary_artists_filtered) == 1:
+                was_false_positive = True
+            elif are_same_artist(primary_artists_filtered):
+                was_false_positive = True
+            elif is_collaboration(artist_credits, primary_artists_filtered):
+                was_false_positive = True
+            elif performers_match_single_artist(performer_names, primary_artists_filtered):
+                was_false_positive = True
+            else:
+                is_contaminated = True
+        
+        result = {
+            'recording_id': recording_id,
+            'album_title': album_title,
+            'song_title': song_title,
+            'musicbrainz_id': mb_id,
+            'all_artist_credits': list(artist_credits),
+            'primary_artists': list(primary_artists_filtered),
+            'performers': performer_names,
+            'is_contaminated': is_contaminated,
+            'was_false_positive': was_false_positive
+        }
+        
+        if is_contaminated:
+            self.stats['recordings_contaminated'] += 1
+            logger.warning(f"⚠️  CONTAMINATED: {album_title}")
+            logger.warning(f"   Recording ID: {recording_id}")
+            logger.warning(f"   MB ID: {mb_id}")
+            logger.warning(f"   Primary artists: {primary_artists_filtered}")
+            logger.warning(f"   All credits: {artist_credits}")
+            logger.warning(f"   Performers: {performer_names[:5]}{'...' if len(performer_names) > 5 else ''}")
+            logger.warning("")
+        
+        return result
     
     def _delete_recording(self, conn, recording_id: str, album_title: str):
         """Delete a contaminated recording and its links"""
