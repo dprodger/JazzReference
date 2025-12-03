@@ -203,7 +203,7 @@ class MBReleaseImporter:
                     )
                     self.stats['recordings_found'] += 1
                 except Exception as e:
-                    self.logger.error(f"  Error processing recording: {e}")
+                    self.logger.error(f"  Error processing recording: {e}", exc_info=True)
                     self.stats['errors'] += 1
                     # Rollback the failed transaction so subsequent operations can proceed
                     try:
@@ -826,11 +826,29 @@ class MBReleaseImporter:
                 artist_credit += credit
         
         # Extract release date
-        release_date = mb_release.get('date', '')
+        # MusicBrainz returns dates in various formats: "2004-05-17", "2004-05", or "2004"
+        # PostgreSQL DATE type requires full YYYY-MM-DD format
+        release_date_raw = mb_release.get('date', '')
+        release_date = None
         release_year = None
-        if release_date and len(release_date) >= 4:
+        
+        if release_date_raw and len(release_date_raw) >= 4:
             try:
-                release_year = int(release_date[:4])
+                release_year = int(release_date_raw[:4])
+                
+                # Normalize date to YYYY-MM-DD format for PostgreSQL
+                if len(release_date_raw) == 4:
+                    # Year only: "2004" -> "2004-01-01"
+                    release_date = f"{release_date_raw}-01-01"
+                elif len(release_date_raw) == 7:
+                    # Year-month: "2004-05" -> "2004-05-01"
+                    release_date = f"{release_date_raw}-01"
+                elif len(release_date_raw) >= 10:
+                    # Full date: "2004-05-17" (may have time component, truncate)
+                    release_date = release_date_raw[:10]
+                else:
+                    # Unknown format, don't store
+                    release_date = None
             except (ValueError, TypeError):
                 pass
         
@@ -870,7 +888,7 @@ class MBReleaseImporter:
             'title': mb_release.get('title'),
             'artist_credit': artist_credit.strip() or None,
             'disambiguation': mb_release.get('disambiguation') or None,
-            'release_date': release_date or None,  # Convert empty string to None
+            'release_date': release_date,  # Already normalized to YYYY-MM-DD or None
             'release_year': release_year,
             'country': country or None,
             'label': label,
