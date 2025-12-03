@@ -1,0 +1,1252 @@
+"""
+Spotify Track Matching Utilities
+Core business logic for matching releases to Spotify albums
+
+UPDATED: Recording-Centric Performer Architecture
+- Spotify data (album art, URLs) is stored on RELEASES, not recordings
+- Recordings have a default_release_id pointing to the best release for display
+- The match_releases() method is the primary entry point
+
+This module provides the SpotifyMatcher class which handles:
+- Spotify API authentication and token management
+- Fuzzy matching and validation of albums and tracks
+- Album artwork extraction (stored on releases)
+- Database updates for releases and recording_releases
+- Setting default_release_id on recordings
+- Caching of API responses to minimize rate limiting
+- Intelligent rate limit handling with exponential backoff
+
+Used by:
+- scripts/match_spotify_releases.py (CLI interface)
+- song_research.py (background worker)
+"""
+
+import re
+import logging
+from typing import Dict, Any, Optional, List
+import requests
+
+from db_utils import get_db_connection
+
+from spotify_client import SpotifyClient, SpotifyRateLimitError, _CACHE_MISS
+from spotify_matching import (
+    strip_ensemble_suffix,
+    normalize_for_comparison,
+    calculate_similarity,
+    is_substring_title_match,
+    extract_primary_artist,
+    validate_track_match,
+    validate_album_match,
+)
+from spotify_db import (
+    find_song_by_name,
+    find_song_by_id,
+    get_recordings_for_song,
+    get_releases_for_song,
+    get_releases_without_artwork,
+    get_recordings_for_release,
+    update_release_spotify_data,
+    update_release_artwork,
+    update_recording_release_track_id,
+    update_recording_default_release,
+)
+
+logger = logging.getLogger(__name__)
+
+
+class SpotifyMatcher:
+    """
+    Handles matching recordings to Spotify tracks with fuzzy validation and caching
+    """
+    
+    def __init__(self, dry_run=False, strict_mode=False, force_refresh=False, 
+                 artist_filter=False, cache_days=30, logger=None, 
+                 rate_limit_delay=0.2, max_retries=3):
+        """
+        Initialize Spotify Matcher
+        
+        Args:
+            dry_run: If True, show what would be matched without making changes
+            artist_filter: Filter to recordings by specific artist
+            strict_mode: If True, use stricter validation thresholds (recommended)
+            logger: Optional logger instance (uses module logger if not provided)
+            cache_days: Number of days before cache is considered stale
+            force_refresh: If True, always fetch fresh data ignoring cache
+            rate_limit_delay: Base delay between API calls (seconds)
+            max_retries: Maximum number of retries for rate-limited requests
+        """
+        self.dry_run = dry_run
+        self.artist_filter = artist_filter
+        self.strict_mode = strict_mode
+        self.logger = logger or logging.getLogger(__name__)
+        
+        # Initialize the API client
+        self.client = SpotifyClient(
+            cache_days=cache_days,
+            force_refresh=force_refresh,
+            rate_limit_delay=rate_limit_delay,
+            max_retries=max_retries,
+            logger=self.logger
+        )
+        
+        # Stats - updated for releases and tracks
+        self.stats = {
+            'recordings_processed': 0,
+            'recordings_with_spotify': 0,
+            'recordings_updated': 0,
+            'recordings_no_match': 0,
+            'recordings_skipped': 0,
+            'recordings_rejected': 0,
+            'releases_processed': 0,
+            'releases_with_spotify': 0,
+            'releases_updated': 0,
+            'releases_no_match': 0,
+            'releases_skipped': 0,
+            'tracks_matched': 0,
+            'tracks_skipped': 0,
+            'tracks_no_match': 0,
+            'errors': 0,
+            'cache_hits': 0,
+            'api_calls': 0,
+            'rate_limit_hits': 0,
+            'rate_limit_waits': 0
+        }
+        
+        # Validation thresholds
+        if strict_mode:
+            self.min_artist_similarity = 75
+            self.min_album_similarity = 65
+            self.min_track_similarity = 85
+        else:
+            self.min_artist_similarity = 65
+            self.min_album_similarity = 55
+            self.min_track_similarity = 75
+    
+    # ========================================================================
+    # DELEGATED PROPERTIES (for backwards compatibility)
+    # ========================================================================
+    
+    @property
+    def last_made_api_call(self):
+        return self.client.last_made_api_call
+    
+    @last_made_api_call.setter
+    def last_made_api_call(self, value):
+        self.client.last_made_api_call = value
+    
+    # ========================================================================
+    # MATCHING HELPER METHODS
+    # ========================================================================
+    
+    def normalize_for_comparison(self, text: str) -> str:
+        """Normalize text for fuzzy comparison"""
+        return normalize_for_comparison(text)
+    
+    def calculate_similarity(self, text1: str, text2: str) -> float:
+        """Calculate similarity between two strings"""
+        return calculate_similarity(text1, text2)
+    
+    def is_substring_title_match(self, title1: str, title2: str) -> bool:
+        """Check if one normalized title is a complete substring of the other"""
+        return is_substring_title_match(title1, title2)
+    
+    def extract_primary_artist(self, artist_credit: str) -> str:
+        """Extract the primary artist from a MusicBrainz artist_credit string"""
+        return extract_primary_artist(artist_credit)
+    
+    def validate_match(self, spotify_track: dict, expected_song: str, 
+                      expected_artist: str, expected_album: str) -> tuple:
+        """Validate that a Spotify track result actually matches what we're looking for"""
+        return validate_track_match(
+            spotify_track, expected_song, expected_artist, expected_album,
+            self.min_track_similarity, self.min_artist_similarity, self.min_album_similarity
+        )
+    
+    def validate_album_match(self, spotify_album: dict, expected_album: str, 
+                            expected_artist: str, song_title: str = None) -> tuple:
+        """Validate that a Spotify album result actually matches what we're looking for"""
+        return validate_album_match(
+            spotify_album, expected_album, expected_artist,
+            self.min_album_similarity, self.min_artist_similarity,
+            song_title=song_title,
+            verify_track_callback=self.verify_album_contains_track
+        )
+    
+    def verify_album_contains_track(self, album_id: str, song_title: str) -> bool:
+        """
+        Verify that a Spotify album contains a track matching the song title.
+        
+        Used as a fallback validation when artist matching fails but album
+        similarity is high. This handles compilation albums, "Various Artists",
+        and artist name variations.
+        
+        Args:
+            album_id: Spotify album ID
+            song_title: Song title to search for in the album
+            
+        Returns:
+            True if a matching track was found, False otherwise
+        """
+        tracks = self.get_album_tracks(album_id)
+        if not tracks:
+            return False
+        
+        for track in tracks:
+            similarity = self.calculate_similarity(song_title, track['name'])
+            if similarity >= self.min_track_similarity:
+                self.logger.debug(f"      Track verification passed: '{track['name']}' ({similarity}%)")
+                return True
+        
+        return False
+    
+    # ========================================================================
+    # DATABASE METHODS (delegated)
+    # ========================================================================
+    
+    def find_song_by_name(self, song_name: str) -> Optional[dict]:
+        """Look up song by name"""
+        return find_song_by_name(song_name)
+    
+    def find_song_by_id(self, song_id: str) -> Optional[dict]:
+        """Look up song by ID"""
+        return find_song_by_id(song_id)
+    
+    def get_recordings_for_song(self, song_id: str) -> List[dict]:
+        """Get all recordings for a song, optionally filtered by artist"""
+        return get_recordings_for_song(song_id, self.artist_filter)
+    
+    def get_releases_for_song(self, song_id: str) -> List[dict]:
+        """Get all releases for a song, optionally filtered by artist"""
+        return get_releases_for_song(song_id, self.artist_filter)
+    
+    def get_releases_without_artwork(self) -> List[dict]:
+        """Get releases with Spotify URL but no cover artwork"""
+        return get_releases_without_artwork()
+    
+    def get_recordings_for_release(self, song_id: str, release_id: str) -> List[dict]:
+        """Get recordings linked to a specific release for a specific song"""
+        return get_recordings_for_release(song_id, release_id)
+    
+    def update_release_spotify_data(self, conn, release_id: str, spotify_data: dict,
+                                    release_title: str = None, artist: str = None,
+                                    year: int = None, index: int = None, total: int = None):
+        """Update release with Spotify album URL, ID, and cover artwork"""
+        update_release_spotify_data(conn, release_id, spotify_data, 
+                                   dry_run=self.dry_run, log=self.logger)
+        
+        if not self.dry_run:
+            if index and total and release_title:
+                self.logger.info(f"[{index}/{total}] {release_title} ({artist or 'Unknown'}, {year or 'Unknown'}) - ✓ Updated with Spotify URL and cover artwork")
+            else:
+                self.logger.info(f"    ✓ Updated with Spotify URL and cover artwork")
+            
+            self.stats['releases_updated'] += 1
+    
+    def update_release_artwork(self, conn, release_id: str, album_art: dict):
+        """Update release with cover artwork only"""
+        update_release_artwork(conn, release_id, album_art, 
+                              dry_run=self.dry_run, log=self.logger)
+        if not self.dry_run:
+            self.logger.info(f"    ✓ Updated with cover artwork")
+            self.stats['releases_updated'] += 1
+    
+    def update_recording_release_track_id(self, conn, recording_id: str, release_id: str,
+                                          track_id: str, track_url: str):
+        """Update the recording_releases junction table with Spotify track info"""
+        update_recording_release_track_id(conn, recording_id, release_id, track_id, track_url,
+                                         dry_run=self.dry_run, log=self.logger)
+    
+    def update_recording_default_release(self, conn, song_id: str, release_id: str):
+        """Update recordings linked to a release to set it as their default_release"""
+        update_recording_default_release(conn, song_id, release_id,
+                                        dry_run=self.dry_run, log=self.logger)
+    
+    # ========================================================================
+    # DEPRECATED METHODS (kept for backwards compatibility)
+    # ========================================================================
+    
+    def get_recordings_without_images(self) -> List[dict]:
+        """
+        DEPRECATED: Album artwork is now stored on releases, not recordings.
+        
+        Use get_releases_without_artwork() instead.
+        """
+        self.logger.warning("get_recordings_without_images() is deprecated - artwork now stored on releases")
+        return []
+    
+    def update_recording_artwork(self, conn, recording_id: str, album_art: dict):
+        """
+        DEPRECATED: Album artwork is now stored on releases, not recordings.
+        
+        This method is kept for backwards compatibility but does nothing.
+        Use update_release_spotify_data() instead.
+        """
+        self.logger.warning("update_recording_artwork() is deprecated - artwork now stored on releases")
+    
+    def update_recording_spotify_url(self, conn, recording_id: str, spotify_data: dict, 
+                                     album: str = None, artist: str = None, year: int = None,
+                                     index: int = None, total: int = None):
+        """
+        DEPRECATED: Spotify URL and artwork are now stored on releases, not recordings.
+        
+        This method is kept for backwards compatibility but does nothing.
+        Use update_release_spotify_data() and match_releases() instead.
+        """
+        self.logger.warning("update_recording_spotify_url() is deprecated - use match_releases() instead")
+    
+    def match_recordings(self, song_identifier: str) -> Dict[str, Any]:
+        """
+        Main method to match Spotify tracks for a song's recordings
+        
+        Args:
+            song_identifier: Song name or database ID
+            
+        Returns:
+            dict: {
+                'success': bool,
+                'song': dict (if found),
+                'stats': dict,
+                'error': str (if failed)
+            }
+        """
+        # DEPRECATED: Redirect to match_releases
+        self.logger.warning("match_recordings() is deprecated - redirecting to match_releases()")
+        self.logger.info("Spotify data is now stored on releases, not recordings.")
+        self.logger.info("Use match_releases() directly for better results.")
+        self.logger.info("")
+        
+        return self.match_releases(song_identifier)
+    
+    # ========================================================================
+    # SPOTIFY API METHODS
+    # ========================================================================
+    
+    def get_spotify_auth_token(self) -> Optional[str]:
+        """Get a valid Spotify access token"""
+        return self.client.get_spotify_auth_token()
+    
+    def extract_track_id_from_url(self, spotify_url: str) -> Optional[str]:
+        """Extract Spotify track ID from URL"""
+        if not spotify_url:
+            return None
+        
+        # Spotify URL format: https://open.spotify.com/track/{track_id}
+        match = re.search(r'spotify\.com/track/([a-zA-Z0-9]+)', spotify_url)
+        if match:
+            return match.group(1)
+        
+        return None
+    
+    def get_track_details(self, track_id: str) -> Optional[dict]:
+        """
+        Get detailed information about a Spotify track by ID with caching
+        
+        Args:
+            track_id: Spotify track ID
+            
+        Returns:
+            Track data dict or None if not found
+        """
+        # Check cache first
+        cache_path = self.client._get_track_cache_path(track_id)
+        cached_data = self.client._load_from_cache(cache_path)
+        
+        if cached_data is not _CACHE_MISS:
+            # Cache hit - return cached data (which might be None for "not found")
+            return cached_data
+        
+        # Not in cache or cache expired - fetch from API
+        token = self.client.get_spotify_auth_token()
+        if not token:
+            return None
+        
+        try:
+            response = self.client._make_api_request(
+                'get',
+                f'https://api.spotify.com/v1/tracks/{track_id}',
+                headers={'Authorization': f'Bearer {token}'},
+                timeout=10
+            )
+            
+            response.raise_for_status()
+            data = response.json()
+            
+            # Track API call
+            self.stats['api_calls'] += 1
+            self.client.last_made_api_call = True
+            
+            # Save to cache
+            self.client._save_to_cache(cache_path, data)
+            
+            return data
+            
+        except SpotifyRateLimitError as e:
+            self.logger.error(f"Rate limit exceeded fetching track details: {e}")
+            return None
+        except requests.exceptions.HTTPError as e:
+            if e.response.status_code == 404:
+                # Cache the "not found" result
+                self.client._save_to_cache(cache_path, None)
+                return None
+            self.logger.error(f"Spotify API error: {e}")
+            return None
+        except requests.exceptions.RequestException as e:
+            self.logger.error(f"Failed to fetch track details: {e}")
+            return None
+    
+    def get_album_details(self, album_id: str) -> Optional[dict]:
+        """
+        Fetch album details from Spotify
+        
+        Args:
+            album_id: Spotify album ID
+            
+        Returns:
+            Album dict or None if failed
+        """
+        # Check cache first
+        cache_path = self.client._get_album_cache_path(f"{album_id}_details")
+        cached_result = self.client._load_from_cache(cache_path)
+        
+        if cached_result is not _CACHE_MISS:
+            return cached_result
+        
+        token = self.client.get_spotify_auth_token()
+        if not token:
+            return None
+        
+        try:
+            response = self.client._make_api_request(
+                'get',
+                f'https://api.spotify.com/v1/albums/{album_id}',
+                headers={'Authorization': f'Bearer {token}'},
+                timeout=10
+            )
+            
+            response.raise_for_status()
+            data = response.json()
+            
+            self.stats['api_calls'] += 1
+            self.client.last_made_api_call = True
+            
+            self.client._save_to_cache(cache_path, data)
+            return data
+            
+        except SpotifyRateLimitError as e:
+            self.logger.error(f"Rate limit exceeded fetching album: {e}")
+            return None
+        except requests.exceptions.HTTPError as e:
+            self.logger.error(f"Spotify API error fetching album: {e}")
+            return None
+        except Exception as e:
+            self.logger.error(f"Error fetching album: {e}")
+            return None
+    
+    def get_album_tracks(self, album_id: str) -> Optional[List[dict]]:
+        """
+        Fetch tracks from a Spotify album
+        
+        Args:
+            album_id: Spotify album ID
+            
+        Returns:
+            List of track dicts with 'id', 'name', 'track_number', 'disc_number', 'url'
+            or None if failed
+        """
+        # Check cache first
+        cache_path = self.client._get_album_cache_path(album_id)
+        cached_result = self.client._load_from_cache(cache_path)
+        
+        if cached_result is not _CACHE_MISS:
+            return cached_result
+        
+        token = self.client.get_spotify_auth_token()
+        if not token:
+            return None
+        
+        try:
+            response = self.client._make_api_request(
+                'get',
+                f'https://api.spotify.com/v1/albums/{album_id}/tracks',
+                headers={'Authorization': f'Bearer {token}'},
+                params={'limit': 50},
+                timeout=10
+            )
+            
+            response.raise_for_status()
+            data = response.json()
+            
+            self.stats['api_calls'] += 1
+            self.client.last_made_api_call = True
+            
+            tracks = []
+            for item in data.get('items', []):
+                tracks.append({
+                    'id': item['id'],
+                    'name': item['name'],
+                    'track_number': item['track_number'],
+                    'disc_number': item['disc_number'],
+                    'url': item['external_urls']['spotify']
+                })
+            
+            self.client._save_to_cache(cache_path, tracks)
+            return tracks
+            
+        except SpotifyRateLimitError as e:
+            self.logger.error(f"Rate limit exceeded fetching album tracks: {e}")
+            return None
+        except requests.exceptions.HTTPError as e:
+            self.logger.error(f"Spotify API error fetching album tracks: {e}")
+            return None
+        except Exception as e:
+            self.logger.error(f"Error fetching album tracks: {e}")
+            return None
+    
+    def search_spotify_track(self, song_title: str, album_title: str, 
+                            artist_name: str = None, year: int = None) -> Optional[dict]:
+        """
+        Search Spotify for a track with fuzzy validation and progressive search strategy.
+        Uses caching to minimize API calls.
+        
+        Args:
+            song_title: Song title to search for
+            album_title: Album title
+            artist_name: Artist name (optional, but recommended)
+            year: Recording year (optional)
+            
+        Returns:
+            dict with 'url', 'id', 'artists', 'album', 'album_art', 'similarity_scores'
+            or None if no valid match found
+        """
+        # Check cache first
+        cache_path = self.client._get_search_cache_path(song_title, album_title, artist_name, year)
+        cached_result = self.client._load_from_cache(cache_path)
+        
+        if cached_result is not _CACHE_MISS:
+            # Cache hit - return cached result (which might be None for "no match found")
+            return cached_result
+        
+        # Not in cache - perform search
+        token = self.client.get_spotify_auth_token()
+        if not token:
+            self.client._save_to_cache(cache_path, None)
+            return None
+        
+        # Progressive search strategy
+        # Start with specific queries, fall back to broader searches
+        search_strategies = []
+        
+        # Check if we should try a stripped artist name as fallback
+        stripped_artist = strip_ensemble_suffix(artist_name) if artist_name else None
+        has_stripped_fallback = stripped_artist and stripped_artist != artist_name
+        
+        if artist_name and year:
+            search_strategies.append({
+                'query': f'track:"{song_title}" artist:"{artist_name}" album:"{album_title}" year:{year}',
+                'description': 'exact track, artist, album, and year'
+            })
+        
+        if artist_name:
+            search_strategies.append({
+                'query': f'track:"{song_title}" artist:"{artist_name}" album:"{album_title}"',
+                'description': 'exact track, artist, and album'
+            })
+            search_strategies.append({
+                'query': f'track:"{song_title}" artist:"{artist_name}"',
+                'description': 'exact track and artist'
+            })
+        
+        # Fallback: try with ensemble suffix stripped (e.g., "Bill Evans Trio" -> "Bill Evans")
+        if has_stripped_fallback:
+            search_strategies.append({
+                'query': f'track:"{song_title}" artist:"{stripped_artist}" album:"{album_title}"',
+                'description': f'exact track, stripped artist ({stripped_artist}), and album'
+            })
+            search_strategies.append({
+                'query': f'track:"{song_title}" artist:"{stripped_artist}"',
+                'description': f'exact track and stripped artist ({stripped_artist})'
+            })
+        
+        search_strategies.append({
+            'query': f'track:"{song_title}" album:"{album_title}"',
+            'description': 'exact track and album'
+        })
+        
+        search_strategies.append({
+            'query': f'track:"{song_title}"',
+            'description': 'exact track only'
+        })
+        
+        # Try each search strategy until we get a valid match
+        for strategy in search_strategies:
+            try:
+                self.logger.debug(f"  → Trying: {strategy['description']}")
+                
+                response = self.client._make_api_request(
+                    'get',
+                    'https://api.spotify.com/v1/search',
+                    headers={'Authorization': f'Bearer {token}'},
+                    params={
+                        'q': strategy['query'],
+                        'type': 'track',
+                        'limit': 5  # Get top 5 results for validation
+                    },
+                    timeout=10
+                )
+                
+                response.raise_for_status()
+                data = response.json()
+                
+                # Track API call
+                self.stats['api_calls'] += 1
+                self.client.last_made_api_call = True
+                
+                tracks = data.get('tracks', {}).get('items', [])
+                
+                if tracks:
+                    self.logger.debug(f"    Found {len(tracks)} candidates")
+                    
+                    # Try to validate each candidate
+                    for i, track in enumerate(tracks):
+                        is_valid, reason, scores = self.validate_match(
+                            track, song_title, artist_name or '', album_title
+                        )
+                        
+                        if is_valid:
+                            # Extract album artwork URLs
+                            album_art = {}
+                            images = track['album'].get('images', [])
+                            
+                            for image in images:
+                                height = image.get('height', 0)
+                                if height >= 600:
+                                    album_art['large'] = image['url']
+                                elif height >= 300:
+                                    album_art['medium'] = image['url']
+                                elif height >= 64:
+                                    album_art['small'] = image['url']
+                            
+                            # Build result
+                            track_artists = [a['name'] for a in track['artists']]
+                            track_album = track['album']['name']
+                            
+                            result = {
+                                'url': track['external_urls']['spotify'],
+                                'id': track['id'],
+                                'artists': track_artists,
+                                'album': track_album,
+                                'album_art': album_art,
+                                'similarity_scores': scores
+                            }
+                            
+                            # Cache successful result
+                            self.client._save_to_cache(cache_path, result)
+                            
+                            self.logger.debug(f"    ✓ Valid match found (candidate #{i+1})")
+                            return result
+                        else:
+                            self.logger.debug(f"    ✗ Candidate #{i+1} rejected: {reason}")
+                            self.logger.debug(f"       Expected: '{song_title}' by {artist_name} on '{album_title}'")
+                            self.logger.debug(f"       Found: '{scores['spotify_song']}' by {scores['spotify_artist']} on '{scores['spotify_album']}'")
+                            if scores.get('artist_best_individual'):
+                                self.logger.debug(f"       Artist match scores - Individual: {scores['artist_best_individual']}%, Full string: {scores['artist_full_string']}%")
+                            if scores['album']:
+                                self.logger.debug(f"       Album similarity: {scores['album']}%")
+                    
+                    self.logger.debug(f"    ✗ No valid matches with {strategy['description']}")
+                else:
+                    self.logger.debug(f"    ✗ No results with {strategy['description']}")
+                    
+            except SpotifyRateLimitError as e:
+                self.logger.error(f"Rate limit exceeded during search: {e}")
+                # Don't cache rate limit errors - might succeed later
+                return None
+            except requests.exceptions.HTTPError as e:
+                if e.response.status_code == 401:
+                    self.client.access_token = None
+                    self.logger.warning("Spotify token expired, will refresh on next request")
+                    # Don't cache auth failures
+                    return None
+                self.logger.error(f"Spotify search failed: {e}")
+                # Don't cache errors
+                return None
+            except Exception as e:
+                self.logger.error(f"Error searching Spotify: {e}")
+                # Don't cache errors
+                return None
+        
+        self.logger.debug(f"    ✗ No valid Spotify matches found after trying all strategies")
+        
+        # Cache the "no match" result
+        self.client._save_to_cache(cache_path, None)
+        
+        return None
+    
+    def search_spotify_album(self, album_title: str, artist_name: str = None, 
+                              song_title: str = None) -> Optional[dict]:
+        """
+        Search Spotify for an album with fuzzy validation.
+        
+        Args:
+            album_title: Album title to search for
+            artist_name: Artist name (optional, but recommended)
+            song_title: Song title for track verification fallback (optional).
+                       When provided, albums with high similarity but low artist
+                       match can still be accepted if they contain this track.
+            
+        Returns:
+            dict with 'url', 'id', 'artists', 'name', 'album_art', 'similarity_scores'
+            or None if no valid match found
+        """
+        # Check cache first (reuse search cache with 'album' prefix)
+        cache_path = self.client._get_search_cache_path('album', album_title, artist_name)
+        cached_result = self.client._load_from_cache(cache_path)
+        
+        if cached_result is not _CACHE_MISS:
+            return cached_result
+        
+        token = self.client.get_spotify_auth_token()
+        if not token:
+            self.client._save_to_cache(cache_path, None)
+            return None
+        
+        # Progressive search strategy
+        search_strategies = []
+        
+        if artist_name:
+            search_strategies.append({
+                'query': f'album:"{album_title}" artist:"{artist_name}"',
+                'description': 'exact album and artist'
+            })
+            search_strategies.append({
+                'query': f'"{album_title}" "{artist_name}"',
+                'description': 'quoted album and artist'
+            })
+            
+            # Try with ensemble suffix stripped (e.g., "Bill Evans Trio" -> "Bill Evans")
+            stripped_artist = strip_ensemble_suffix(artist_name)
+            if stripped_artist != artist_name:
+                search_strategies.append({
+                    'query': f'album:"{album_title}" artist:"{stripped_artist}"',
+                    'description': f'exact album with stripped artist ({stripped_artist})'
+                })
+                search_strategies.append({
+                    'query': f'"{album_title}" "{stripped_artist}"',
+                    'description': f'quoted album with stripped artist ({stripped_artist})'
+                })
+        
+        search_strategies.append({
+            'query': f'album:"{album_title}"',
+            'description': 'exact album only'
+        })
+        
+        for strategy in search_strategies:
+            try:
+                self.logger.debug(f"  → Trying: {strategy['description']}")
+                
+                response = self.client._make_api_request(
+                    'get',
+                    'https://api.spotify.com/v1/search',
+                    headers={'Authorization': f'Bearer {token}'},
+                    params={
+                        'q': strategy['query'],
+                        'type': 'album',
+                        'limit': 5
+                    },
+                    timeout=10
+                )
+                
+                response.raise_for_status()
+                data = response.json()
+                
+                self.stats['api_calls'] += 1
+                self.client.last_made_api_call = True
+                
+                albums = data.get('albums', {}).get('items', [])
+                
+                if albums:
+                    self.logger.debug(f"    Found {len(albums)} candidates")
+                    
+                    # Evaluate ALL candidates first, collect results
+                    candidate_results = []
+                    for i, album in enumerate(albums):
+                        is_valid, reason, scores = self.validate_album_match(
+                            album, album_title, artist_name or '', song_title
+                        )
+                        candidate_results.append({
+                            'index': i,
+                            'album': album,
+                            'is_valid': is_valid,
+                            'reason': reason,
+                            'scores': scores
+                        })
+                    
+                    # Log summary of ALL candidates
+                    self.logger.debug(f"    --- Candidate Summary ---")
+                    for cr in candidate_results:
+                        status = "✓" if cr['is_valid'] else "✗"
+                        album_sim = cr['scores'].get('album', 0)
+                        artist_sim = cr['scores'].get('artist', 0)
+                        spotify_album = cr['scores'].get('spotify_album', '')
+                        self.logger.debug(f"    {status} #{cr['index']+1}: '{spotify_album}' "
+                                        f"(album: {album_sim:.0f}%, artist: {artist_sim:.0f}%)")
+                    self.logger.debug(f"    -------------------------")
+                    
+                    # Now select first valid match
+                    for cr in candidate_results:
+                        if cr['is_valid']:
+                            album = cr['album']
+                            scores = cr['scores']
+                            
+                            # Log the match details
+                            self.logger.debug(f"       Matched: '{scores.get('spotify_album', '')}' by {scores.get('spotify_artist', '')}")
+                            self.logger.debug(f"       Album similarity: {scores.get('album', 0):.1f}% (substring: {scores.get('album_is_substring', False)})")
+                            self.logger.debug(f"       Artist similarity: {scores.get('artist', 0):.1f}% (substring: {scores.get('artist_is_substring', False)})")
+                            
+                            # Extract album artwork
+                            album_art = {}
+                            images = album.get('images', [])
+                            
+                            for image in images:
+                                height = image.get('height', 0)
+                                if height >= 600:
+                                    album_art['large'] = image['url']
+                                elif height >= 300:
+                                    album_art['medium'] = image['url']
+                                elif height >= 64:
+                                    album_art['small'] = image['url']
+                            
+                            album_artists = [a['name'] for a in album['artists']]
+                            
+                            result = {
+                                'url': album['external_urls']['spotify'],
+                                'id': album['id'],
+                                'artists': album_artists,
+                                'name': album['name'],
+                                'album_art': album_art,
+                                'similarity_scores': scores
+                            }
+                            
+                            self.client._save_to_cache(cache_path, result)
+                            self.logger.debug(f"    ✓ Valid match found (candidate #{cr['index']+1})")
+                            return result
+                    
+                    self.logger.debug(f"    ✗ No valid matches with {strategy['description']}")
+                else:
+                    self.logger.debug(f"    ✗ No results with {strategy['description']}")
+                 
+            except SpotifyRateLimitError as e:
+                self.logger.error(f"Rate limit exceeded during search: {e}")
+                return None
+            except requests.exceptions.HTTPError as e:
+                if e.response.status_code == 401:
+                    self.client.access_token = None
+                    return None
+                self.logger.error(f"Spotify search failed: {e}")
+                return None
+            except Exception as e:
+                self.logger.error(f"Error searching Spotify: {e}")
+                return None
+        
+        self.logger.debug(f"    ✗ No valid Spotify matches found after trying all strategies")
+        self.client._save_to_cache(cache_path, None)
+        return None
+    
+    # ========================================================================
+    # MAIN ORCHESTRATION METHODS
+    # ========================================================================
+    
+    def match_releases(self, song_identifier: str) -> Dict[str, Any]:
+        """
+        Main method to match Spotify albums for a song's releases
+        
+        Args:
+            song_identifier: Song name or database ID
+            
+        Returns:
+            dict: {
+                'success': bool,
+                'song': dict (if found),
+                'stats': dict,
+                'error': str (if failed)
+            }
+        """
+        try:
+            # Find the song
+            if song_identifier.startswith('song-') or len(song_identifier) == 36:
+                song = self.find_song_by_id(song_identifier)
+            else:
+                song = self.find_song_by_name(song_identifier)
+            
+            if not song:
+                return {
+                    'success': False,
+                    'error': 'Song not found'
+                }
+            
+            self.logger.info(f"Song: {song['title']}")
+            self.logger.info(f"Composer: {song['composer']}")
+            self.logger.info(f"Database ID: {song['id']}")
+            if song.get('alt_titles'):
+                self.logger.info(f"Alt titles: {song['alt_titles']}")
+            if self.artist_filter:
+                self.logger.info(f"Filtering to releases by: {self.artist_filter}")
+            self.logger.info("")
+            
+            # Get releases
+            releases = self.get_releases_for_song(song['id'])
+            
+            if not releases:
+                return {
+                    'success': False,
+                    'song': song,
+                    'error': 'No releases found for this song'
+                }
+            
+            self.logger.info(f"Found {len(releases)} releases to process")
+            self.logger.info("")
+            
+            # Process each release
+            for i, release in enumerate(releases, 1):
+                self.stats['releases_processed'] += 1
+                
+                title = release['title'] or 'Unknown Album'
+                year = release['release_year']
+                
+                # Get artist - prefer artist_credit, fall back to performers
+                # Use extract_primary_artist to avoid overly long search queries
+                artist_credit = release.get('artist_credit')
+                artist_name = self.extract_primary_artist(artist_credit) if artist_credit else None
+                
+                if not artist_name:
+                    performers = release.get('performers') or []
+                    leaders = [p['name'] for p in performers if p.get('role') == 'leader']
+                    artist_name = leaders[0] if leaders else (
+                        performers[0]['name'] if performers else None
+                    )
+                
+                self.logger.debug(f"[{i}/{len(releases)}] {title}")
+                self.logger.debug(f"    Artist: {artist_name or 'Unknown'}")
+                self.logger.debug(f"    Year: {year or 'Unknown'}")
+                
+                # Check if already has Spotify URL
+                if release['spotify_album_url']:
+                    self.logger.info(f"[{i}/{len(releases)}] {title} ({artist_name or 'Unknown'}, {year or 'Unknown'}) - ⊙ Already has Spotify URL, skipping")
+                    self.stats['releases_skipped'] += 1
+                    
+                    # Still set this as default release for linked recordings that need one
+                    # (releases with Spotify are good candidates for default)
+                    with get_db_connection() as conn:
+                        self.update_recording_default_release(
+                            conn,
+                            song['id'],
+                            release['id']
+                        )
+                    continue
+                
+                # Search Spotify for album (with song title for track verification fallback)
+                spotify_match = self.search_spotify_album(title, artist_name, song['title'])
+                
+                if spotify_match:
+                    with get_db_connection() as conn:
+                        # First try to match tracks - this validates the album match
+                        track_matched = self.match_tracks_for_release(
+                            conn,
+                            song['id'],
+                            release['id'],
+                            spotify_match['id'],
+                            song['title'],
+                            alt_titles=song.get('alt_titles')
+                        )
+                        
+                        if track_matched:
+                            # Only store album data if track was found (validates album match)
+                            self.stats['releases_with_spotify'] += 1
+                            self.update_release_spotify_data(
+                                conn,
+                                release['id'],
+                                spotify_match,
+                                title,
+                                artist_name,
+                                year,
+                                i,
+                                len(releases)
+                            )
+                            
+                            # NEW: Set this as the default release for linked recordings
+                            # (only if they don't already have a better default)
+                            self.update_recording_default_release(
+                                conn,
+                                song['id'],
+                                release['id']
+                            )
+                        else:
+                            # Album matched but no track found - likely false positive
+                            self.logger.info(f"[{i}/{len(releases)}] {title} ({artist_name or 'Unknown'}, {year or 'Unknown'}) - ✗ Album matched but track not found (possible false positive)")
+                            self.stats['releases_no_match'] += 1
+                else:
+                    self.logger.info(f"[{i}/{len(releases)}] {title} ({artist_name or 'Unknown'}, {year or 'Unknown'}) - ✗ No valid Spotify match found")
+                    self.stats['releases_no_match'] += 1
+            
+            return {
+                'success': True,
+                'song': song,
+                'stats': self.stats
+            }
+            
+        except Exception as e:
+            self.logger.error(f"Error matching releases: {e}", exc_info=True)
+            return {
+                'success': False,
+                'error': str(e),
+                'stats': self.stats
+            }
+    
+    def match_track_to_recording(self, song_title: str, spotify_tracks: List[dict],
+                                   expected_disc: int = None, expected_track: int = None,
+                                   alt_titles: List[str] = None) -> Optional[dict]:
+        """
+        Find the best matching Spotify track for a song title
+        
+        Args:
+            song_title: The song title to match
+            spotify_tracks: List of track dicts from get_album_tracks()
+            expected_disc: Expected disc number (optional, for position-based fallback)
+            expected_track: Expected track number (optional, for position-based fallback)
+            alt_titles: Alternative titles to try if primary title doesn't match
+            
+        Returns:
+            Best matching track dict or None if no good match
+        """
+        best_match = None
+        best_score = 0
+        
+        # First pass: standard fuzzy matching with primary title
+        for track in spotify_tracks:
+            score = self.calculate_similarity(song_title, track['name'])
+            
+            if score > best_score and score >= self.min_track_similarity:
+                best_score = score
+                best_match = track
+        
+        if best_match:
+            self.logger.debug(f"      Track match: '{song_title}' → '{best_match['name']}' ({best_score}%)")
+            return best_match
+        
+        # Second pass: try alternative titles
+        if alt_titles:
+            for alt_title in alt_titles:
+                for track in spotify_tracks:
+                    score = self.calculate_similarity(alt_title, track['name'])
+                    
+                    if score > best_score and score >= self.min_track_similarity:
+                        best_score = score
+                        best_match = track
+                
+                if best_match:
+                    self.logger.debug(f"      Track match via alt title: '{alt_title}' → '{best_match['name']}' ({best_score}%)")
+                    return best_match
+        
+        # Fallback: if positions provided and no fuzzy match, try position-based substring match
+        # This handles cases like "An Affair to Remember" vs 
+        # "An Affair to Remember - From the 20th Century-Fox Film, An Affair To Remember"
+        if expected_disc is not None and expected_track is not None:
+            for track in spotify_tracks:
+                # Check if track position matches exactly
+                if track.get('disc_number') == expected_disc and track.get('track_number') == expected_track:
+                    # Position matches - try substring matching with primary title
+                    if self.is_substring_title_match(song_title, track['name']):
+                        self.logger.debug(f"      Position+substring match: '{song_title}' → '{track['name']}' "
+                                        f"(disc {expected_disc}, track {expected_track})")
+                        return track
+                    
+                    # Also try substring matching with alt titles
+                    if alt_titles:
+                        for alt_title in alt_titles:
+                            if self.is_substring_title_match(alt_title, track['name']):
+                                self.logger.debug(f"      Position+substring match via alt title: '{alt_title}' → '{track['name']}' "
+                                                f"(disc {expected_disc}, track {expected_track})")
+                                return track
+        
+        return best_match
+    
+    def match_tracks_for_release(self, conn, song_id: str, release_id: str, 
+                                  spotify_album_id: str, song_title: str,
+                                  alt_titles: List[str] = None) -> bool:
+        """
+        Match Spotify tracks to recordings for a release
+        
+        After we've matched a release to a Spotify album, this method:
+        1. Fetches all tracks from the Spotify album
+        2. Gets our recordings linked to this release
+        3. Fuzzy matches the song title to find the right track
+        4. Updates the recording_releases junction table with the track ID
+        
+        Args:
+            conn: Database connection
+            song_id: Our song ID
+            release_id: Our release ID
+            spotify_album_id: Spotify album ID we matched to
+            song_title: The song title to search for
+            alt_titles: Alternative titles to try if primary doesn't match
+            
+        Returns:
+            bool: True if at least one track was matched, False otherwise
+        """
+        # Get tracks from Spotify album
+        spotify_tracks = self.get_album_tracks(spotify_album_id)
+        if not spotify_tracks:
+            self.logger.debug(f"    Could not fetch tracks for album {spotify_album_id}")
+            return False
+        
+        self.logger.debug(f"    Matching tracks ({len(spotify_tracks)} tracks in album)...")
+        
+        # Get our recordings for this release
+        recordings = self.get_recordings_for_release(song_id, release_id)
+        
+        any_matched = False
+        for recording in recordings:
+            # Skip if already has a track ID
+            if recording['spotify_track_id']:
+                self.logger.debug(f"      Recording already has track ID, skipping")
+                self.stats['tracks_skipped'] += 1
+                any_matched = True  # Consider already-matched as success
+                continue
+            
+            # Match song title to a track, passing position info for fallback matching
+            matched_track = self.match_track_to_recording(
+                song_title, 
+                spotify_tracks,
+                expected_disc=recording.get('disc_number'),
+                expected_track=recording.get('track_number'),
+                alt_titles=alt_titles
+            )
+            
+            if matched_track:
+                self.update_recording_release_track_id(
+                    conn,
+                    recording['recording_id'],
+                    release_id,
+                    matched_track['id'],
+                    matched_track['url']
+                )
+                self.stats['tracks_matched'] += 1
+                any_matched = True
+            else:
+                # Show what tracks are on the album to help debug
+                track_names = [t['name'] for t in spotify_tracks[:8]]
+                more = f"... (+{len(spotify_tracks) - 8} more)" if len(spotify_tracks) > 8 else ""
+                self.logger.debug(f"      No track match for '{song_title}'")
+                if alt_titles:
+                    self.logger.debug(f"      Also tried alt titles: {alt_titles}")
+                self.logger.debug(f"      Album tracks: {track_names}{more}")
+                self.stats['tracks_no_match'] += 1
+        
+        return any_matched
+    
+    def backfill_images(self):
+        """
+        UPDATED: Backfill cover artwork for releases (not recordings).
+        
+        Album artwork is now stored on releases, not recordings.
+        This method fetches artwork for releases that have a Spotify album ID
+        but are missing cover art.
+        """
+        self.logger.info("="*80)
+        self.logger.info("Spotify Cover Artwork Backfill (Releases)")
+        self.logger.info("="*80)
+        
+        if self.dry_run:
+            self.logger.info("*** DRY RUN MODE - No database changes will be made ***")
+        
+        self.logger.info("")
+        
+        # Get releases without images
+        releases = self.get_releases_without_artwork()
+        
+        if not releases:
+            self.logger.info("No releases found that need cover artwork")
+            return True
+        
+        self.logger.info(f"Found {len(releases)} releases to process")
+        self.logger.info("")
+        
+        # Process each release
+        with get_db_connection() as conn:
+            for i, release in enumerate(releases, 1):
+                self.stats['releases_processed'] += 1
+                
+                title = release['title'] or 'Unknown Album'
+                album_id = release['spotify_album_id']
+                
+                self.logger.info(f"[{i}/{len(releases)}] {title}")
+                self.logger.info(f"    Album ID: {album_id}")
+                
+                if not album_id:
+                    self.logger.warning(f"    ✗ No Spotify album ID")
+                    self.stats['errors'] += 1
+                    continue
+                
+                # Get album details (with caching)
+                album_data = self.get_album_details(album_id)
+                
+                if not album_data:
+                    self.logger.warning(f"    ✗ Could not fetch album details from Spotify")
+                    self.stats['errors'] += 1
+                    continue
+                
+                # Extract album artwork
+                album_art = {}
+                images = album_data.get('images', [])
+                
+                for image in images:
+                    height = image.get('height', 0)
+                    if height >= 600:
+                        album_art['large'] = image['url']
+                    elif height >= 300:
+                        album_art['medium'] = image['url']
+                    elif height >= 64:
+                        album_art['small'] = image['url']
+                
+                if not album_art:
+                    self.logger.warning(f"    ✗ No cover artwork found in album data")
+                    self.stats['errors'] += 1
+                    continue
+                
+                # Update release
+                self.update_release_artwork(conn, release['id'], album_art)
+        
+        # Print summary
+        self.logger.info("")
+        self.logger.info("="*80)
+        self.logger.info("BACKFILL SUMMARY")
+        self.logger.info("="*80)
+        self.logger.info(f"Releases processed: {self.stats['releases_processed']}")
+        self.logger.info(f"Releases updated:   {self.stats['releases_updated']}")
+        self.logger.info(f"Errors:             {self.stats['errors']}")
+        self.logger.info(f"Cache hits:         {self.stats['cache_hits']}")
+        self.logger.info(f"API calls:          {self.stats['api_calls']}")
+        self.logger.info("="*80)
+        
+        return True
+    
+    def print_summary(self):
+        """Print summary of matching statistics"""
+        self.logger.info("\n" + "=" * 70)
+        self.logger.info("SPOTIFY MATCHING SUMMARY")
+        self.logger.info("=" * 70)
+        self.logger.info(f"Recordings processed:      {self.stats['recordings_processed']}")
+        self.logger.info(f"Already had Spotify URL:   {self.stats['recordings_skipped']}")
+        self.logger.info(f"Newly matched:             {self.stats['recordings_updated']}")
+        self.logger.info(f"No match found:            {self.stats['recordings_no_match']}")
+        self.logger.info(f"Errors:                    {self.stats['errors']}")
+        self.logger.info("-" * 70)
+        self.logger.info(f"Total with Spotify:        {self.stats['recordings_with_spotify']}")
+        self.logger.info("-" * 70)
+        self.logger.info(f"API calls made:            {self.stats['api_calls']}")
+        self.logger.info(f"Cache hits:                {self.stats['cache_hits']}")
+        self.logger.info(f"Rate limit hits:           {self.stats['rate_limit_hits']}")
+        self.logger.info(f"Rate limit waits:          {self.stats['rate_limit_waits']}")
+        cache_hit_rate = (self.stats['cache_hits'] / (self.stats['api_calls'] + self.stats['cache_hits']) * 100) if (self.stats['api_calls'] + self.stats['cache_hits']) > 0 else 0
+        self.logger.info(f"Cache hit rate:            {cache_hit_rate:.1f}%")
+        self.logger.info("=" * 70)

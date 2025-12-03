@@ -1,0 +1,396 @@
+"""
+Spotify Database Operations
+
+All database queries and updates for Spotify matching.
+These functions interact with the Jazz Reference PostgreSQL database.
+"""
+
+import logging
+from typing import List, Optional
+
+from db_utils import get_db_connection
+
+logger = logging.getLogger(__name__)
+
+
+def find_song_by_name(song_name: str) -> Optional[dict]:
+    """Look up song by name"""
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT id, title, composer, alt_titles FROM songs WHERE LOWER(title) = LOWER(%s)",
+                (song_name,)
+            )
+            return cur.fetchone()
+
+
+def find_song_by_id(song_id: str) -> Optional[dict]:
+    """Look up song by ID"""
+    # Strip 'song-' prefix if present
+    if song_id.startswith('song-'):
+        song_id = song_id[5:]
+    
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT id, title, composer, alt_titles FROM songs WHERE id = %s",
+                (song_id,)
+            )
+            return cur.fetchone()
+
+
+def get_recordings_for_song(song_id: str, artist_filter: str = None) -> List[dict]:
+    """
+    Get all recordings for a song, optionally filtered by artist
+    
+    UPDATED: Recording-Centric Architecture
+    - Spotify URL now comes from the best release (via default_release_id or subquery)
+    - Performers come from recording_performers table
+    
+    Returns:
+        List of recording dicts with 'id', 'album_title', 'recording_year',
+        'spotify_url' (from best release), 'performers' (list with 'name' and 'role')
+    """
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            # Base query - get Spotify URL from default release or best available
+            query = """
+                SELECT 
+                    r.id,
+                    r.album_title,
+                    r.recording_year,
+                    -- Get Spotify URL from default release, or best available release
+                    COALESCE(
+                        (SELECT COALESCE(rr.spotify_track_url, rel.spotify_album_url)
+                         FROM releases rel
+                         LEFT JOIN recording_releases rr ON rr.release_id = rel.id AND rr.recording_id = r.id
+                         WHERE rel.id = r.default_release_id
+                           AND (rel.spotify_album_url IS NOT NULL OR EXISTS (
+                               SELECT 1 FROM recording_releases rr2 
+                               WHERE rr2.release_id = rel.id 
+                                 AND rr2.recording_id = r.id 
+                                 AND rr2.spotify_track_url IS NOT NULL
+                           ))
+                        ),
+                        (SELECT COALESCE(rr.spotify_track_url, rel.spotify_album_url)
+                         FROM recording_releases rr
+                         JOIN releases rel ON rr.release_id = rel.id
+                         WHERE rr.recording_id = r.id 
+                           AND (rr.spotify_track_url IS NOT NULL OR rel.spotify_album_url IS NOT NULL)
+                         ORDER BY 
+                           CASE WHEN rr.spotify_track_url IS NOT NULL THEN 0 ELSE 1 END,
+                           rel.release_year DESC NULLS LAST
+                         LIMIT 1)
+                    ) as spotify_url,
+                    json_agg(
+                        json_build_object(
+                            'name', p.name,
+                            'role', rp.role,
+                            'instrument', i.name
+                        ) ORDER BY 
+                            CASE rp.role 
+                                WHEN 'leader' THEN 1 
+                                WHEN 'sideman' THEN 2 
+                                ELSE 3 
+                            END,
+                            p.name
+                    ) FILTER (WHERE p.id IS NOT NULL) as performers
+                FROM recordings r
+                LEFT JOIN recording_performers rp ON r.id = rp.recording_id
+                LEFT JOIN performers p ON rp.performer_id = p.id
+                LEFT JOIN instruments i ON rp.instrument_id = i.id
+                WHERE r.song_id = %s
+            """
+            
+            # Add artist filter if specified
+            params = [song_id]
+            if artist_filter:
+                query += """
+                    AND EXISTS (
+                        SELECT 1 
+                        FROM recording_performers rp2
+                        JOIN performers p2 ON rp2.performer_id = p2.id
+                        WHERE rp2.recording_id = r.id
+                        AND LOWER(p2.name) = LOWER(%s)
+                    )
+                """
+                params.append(artist_filter)
+            
+            query += """
+                GROUP BY r.id, r.album_title, r.recording_year, r.default_release_id
+                ORDER BY r.recording_year
+            """
+            
+            cur.execute(query, params)
+            return cur.fetchall()
+
+
+def get_releases_for_song(song_id: str, artist_filter: str = None) -> List[dict]:
+    """
+    Get all releases for a song (via recording_releases junction),
+    optionally filtered by artist
+    
+    UPDATED: Recording-Centric Architecture
+    - Performers now come from recording_performers (not release_performers)
+    - release_performers is now for release-specific credits (producers, etc.)
+    
+    Returns:
+        List of release dicts with 'id', 'title', 'artist_credit', 'release_year',
+        'spotify_album_url', 'performers' (list with 'name' and 'role')
+    """
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            query = """
+                SELECT
+                    rel.id,
+                    rel.title,
+                    rel.artist_credit,
+                    rel.release_year,
+                    rel.spotify_album_url,
+                    -- Get performers from the linked recording (not from release)
+                    (SELECT json_agg(
+                        json_build_object(
+                            'name', p.name,
+                            'role', rp.role,
+                            'instrument', i.name
+                        ) ORDER BY 
+                            CASE rp.role 
+                                WHEN 'leader' THEN 1 
+                                WHEN 'sideman' THEN 2 
+                                ELSE 3 
+                            END,
+                            p.name
+                    )
+                    FROM recording_performers rp
+                    JOIN performers p ON rp.performer_id = p.id
+                    LEFT JOIN instruments i ON rp.instrument_id = i.id
+                    WHERE rp.recording_id = rr.recording_id
+                    ) as performers
+                FROM releases rel
+                JOIN recording_releases rr ON rel.id = rr.release_id
+                JOIN recordings rec ON rr.recording_id = rec.id
+                WHERE rec.song_id = %s
+            """
+            
+            params = [song_id]
+            if artist_filter:
+                query += """
+                    AND EXISTS (
+                        SELECT 1 
+                        FROM recording_performers rp2
+                        JOIN performers p2 ON rp2.performer_id = p2.id
+                        WHERE rp2.recording_id = rec.id
+                        AND LOWER(p2.name) = LOWER(%s)
+                    )
+                """
+                params.append(artist_filter)
+            
+            query += """
+                GROUP BY rel.id, rel.title, rel.artist_credit, rel.release_year, rel.spotify_album_url, rr.recording_id
+                ORDER BY rel.release_year
+            """
+            
+            cur.execute(query, params)
+            return cur.fetchall()
+
+
+def get_releases_without_artwork() -> List[dict]:
+    """Get releases with Spotify URL but no cover artwork"""
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT id, title, spotify_album_url, spotify_album_id
+                FROM releases
+                WHERE spotify_album_url IS NOT NULL
+                  AND cover_art_medium IS NULL
+                ORDER BY title
+            """)
+            return cur.fetchall()
+
+
+def get_recordings_for_release(song_id: str, release_id: str) -> List[dict]:
+    """
+    Get recordings linked to a specific release for a specific song
+    
+    Args:
+        song_id: Our database song ID
+        release_id: Our database release ID
+        
+    Returns:
+        List of recording dicts with 'recording_id', 'song_title', 
+        'disc_number', 'track_number', 'spotify_track_id' (existing if any)
+    """
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT 
+                    rr.recording_id,
+                    s.title as song_title,
+                    rr.disc_number,
+                    rr.track_number,
+                    rr.spotify_track_id
+                FROM recording_releases rr
+                JOIN recordings rec ON rr.recording_id = rec.id
+                JOIN songs s ON rec.song_id = s.id
+                WHERE rr.release_id = %s
+                  AND rec.song_id = %s
+                ORDER BY rr.disc_number, rr.track_number
+            """, (release_id, song_id))
+            return cur.fetchall()
+
+
+def update_release_spotify_data(conn, release_id: str, spotify_data: dict,
+                                dry_run: bool = False, log: logging.Logger = None):
+    """
+    Update release with Spotify album URL, ID, and cover artwork
+    
+    Args:
+        conn: Database connection
+        release_id: Our release ID
+        spotify_data: Dict with 'url', 'id', 'album_art' keys
+        dry_run: If True, don't actually update
+        log: Logger instance
+    """
+    log = log or logger
+    
+    if dry_run:
+        log.info(f"    [DRY RUN] Would update release with: {spotify_data['url']}")
+        if spotify_data.get('album_art', {}).get('medium'):
+            log.info(f"    [DRY RUN] Would add cover artwork")
+        return
+    
+    with conn.cursor() as cur:
+        album_id = spotify_data.get('id')
+        album_art = spotify_data.get('album_art', {})
+        
+        cur.execute("""
+            UPDATE releases
+            SET spotify_album_url = %s,
+                spotify_album_id = %s,
+                cover_art_small = %s,
+                cover_art_medium = %s,
+                cover_art_large = %s,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = %s
+        """, (
+            spotify_data['url'],
+            album_id,
+            album_art.get('small'),
+            album_art.get('medium'),
+            album_art.get('large'),
+            release_id
+        ))
+        
+        conn.commit()
+
+
+def update_release_artwork(conn, release_id: str, album_art: dict,
+                          dry_run: bool = False, log: logging.Logger = None):
+    """Update release with cover artwork only"""
+    log = log or logger
+    
+    if dry_run:
+        log.info(f"    [DRY RUN] Would update with cover artwork")
+        return
+    
+    with conn.cursor() as cur:
+        cur.execute("""
+            UPDATE releases
+            SET cover_art_small = %s,
+                cover_art_medium = %s,
+                cover_art_large = %s,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = %s
+        """, (
+            album_art.get('small'),
+            album_art.get('medium'),
+            album_art.get('large'),
+            release_id
+        ))
+        
+        conn.commit()
+
+
+def update_recording_release_track_id(conn, recording_id: str, release_id: str,
+                                      track_id: str, track_url: str,
+                                      dry_run: bool = False, log: logging.Logger = None):
+    """
+    Update the recording_releases junction table with Spotify track info
+    
+    Args:
+        conn: Database connection
+        recording_id: Our recording ID
+        release_id: Our release ID  
+        track_id: Spotify track ID
+        track_url: Spotify track URL
+        dry_run: If True, don't actually update
+        log: Logger instance
+    """
+    log = log or logger
+    
+    if dry_run:
+        log.debug(f"      [DRY RUN] Would update recording_releases with track: {track_id}")
+        return
+    
+    with conn.cursor() as cur:
+        cur.execute("""
+            UPDATE recording_releases
+            SET spotify_track_id = %s,
+                spotify_track_url = %s
+            WHERE recording_id = %s AND release_id = %s
+        """, (track_id, track_url, recording_id, release_id))
+        
+        conn.commit()
+
+
+def update_recording_default_release(conn, song_id: str, release_id: str,
+                                     dry_run: bool = False, log: logging.Logger = None):
+    """
+    Update recordings linked to a release to set it as their default_release.
+    
+    This is called when a release is successfully matched to Spotify.
+    Only updates recordings that don't already have a default_release_id,
+    or if the new release has better data (has Spotify).
+    
+    Args:
+        conn: Database connection
+        song_id: Our song ID (to filter recordings)
+        release_id: Release ID to set as default
+        dry_run: If True, don't actually update
+        log: Logger instance
+    """
+    log = log or logger
+    
+    if dry_run:
+        log.debug(f"    [DRY RUN] Would set default_release_id for linked recordings")
+        return
+    
+    with conn.cursor() as cur:
+        # Update recordings that:
+        # 1. Are linked to this release
+        # 2. Are for this song
+        # 3. Either have no default_release_id OR their current default has no Spotify
+        cur.execute("""
+            UPDATE recordings r
+            SET default_release_id = %s,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE r.song_id = %s
+              AND EXISTS (
+                  SELECT 1 FROM recording_releases rr 
+                  WHERE rr.recording_id = r.id AND rr.release_id = %s
+              )
+              AND (
+                  r.default_release_id IS NULL
+                  OR NOT EXISTS (
+                      SELECT 1 FROM releases rel 
+                      WHERE rel.id = r.default_release_id 
+                        AND rel.spotify_album_id IS NOT NULL
+                  )
+              )
+        """, (release_id, song_id, release_id))
+        
+        updated_count = cur.rowcount
+        if updated_count > 0:
+            log.debug(f"    Set default_release_id on {updated_count} recording(s)")
+        else:
+            log.debug(f"    No recordings needed default_release_id update (already set)")
