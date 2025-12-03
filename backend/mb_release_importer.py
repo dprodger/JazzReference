@@ -700,21 +700,25 @@ class MBReleaseImporter:
     
     def _create_release(self, conn, release_data: Dict[str, Any]) -> Optional[str]:
         """
-        Create a new release in the database
+        Create a new release in the database, or return existing ID if duplicate
         
         Args:
             conn: Database connection
             release_data: Parsed release data dict
             
         Returns:
-            New release ID or None
+            Release ID (new or existing) or None
         """
         # Get foreign key IDs
         format_id = self._get_or_create_format(conn, release_data.get('format_name'))
         status_id = self._get_status_id(release_data.get('status_name'))
         packaging_id = self._get_or_create_packaging(conn, release_data.get('packaging_name'))
         
+        mb_release_id = release_data.get('musicbrainz_release_id')
+        
         with conn.cursor() as cur:
+            # Use ON CONFLICT to handle race conditions where release was created
+            # between our pre-fetch check and now
             cur.execute("""
                 INSERT INTO releases (
                     musicbrainz_release_id, musicbrainz_release_group_id,
@@ -726,9 +730,11 @@ class MBReleaseImporter:
                     data_quality
                 )
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (musicbrainz_release_id) DO UPDATE SET
+                    musicbrainz_release_id = EXCLUDED.musicbrainz_release_id
                 RETURNING id
             """, (
-                release_data.get('musicbrainz_release_id'),
+                mb_release_id,
                 release_data.get('musicbrainz_release_group_id'),
                 release_data.get('title'),
                 release_data.get('artist_credit'),
@@ -826,28 +832,34 @@ class MBReleaseImporter:
                 artist_credit += credit
         
         # Extract release date
-        # MusicBrainz returns dates in various formats: "2004-05-17", "2004-05", or "2004"
-        # PostgreSQL DATE type requires full YYYY-MM-DD format
+        # MusicBrainz returns dates in various formats: "2004-05-17", "2004-05", "2004"
+        # Also can have unknown parts: "2017-??-29", "2004-??"
+        # PostgreSQL DATE type requires full YYYY-MM-DD format with valid values
         release_date_raw = mb_release.get('date', '')
         release_date = None
         release_year = None
         
         if release_date_raw and len(release_date_raw) >= 4:
             try:
-                release_year = int(release_date_raw[:4])
-                
-                # Normalize date to YYYY-MM-DD format for PostgreSQL
-                if len(release_date_raw) == 4:
+                # Check for unknown date markers (??) - if present, only use year
+                if '?' in release_date_raw:
+                    release_year = int(release_date_raw[:4])
+                    release_date = f"{release_year}-01-01"
+                elif len(release_date_raw) == 4:
                     # Year only: "2004" -> "2004-01-01"
+                    release_year = int(release_date_raw)
                     release_date = f"{release_date_raw}-01-01"
                 elif len(release_date_raw) == 7:
                     # Year-month: "2004-05" -> "2004-05-01"
+                    release_year = int(release_date_raw[:4])
                     release_date = f"{release_date_raw}-01"
                 elif len(release_date_raw) >= 10:
                     # Full date: "2004-05-17" (may have time component, truncate)
+                    release_year = int(release_date_raw[:4])
                     release_date = release_date_raw[:10]
                 else:
-                    # Unknown format, don't store
+                    # Unknown format, just extract year if possible
+                    release_year = int(release_date_raw[:4])
                     release_date = None
             except (ValueError, TypeError):
                 pass
