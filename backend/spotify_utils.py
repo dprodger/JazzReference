@@ -955,7 +955,7 @@ class SpotifyMatcher:
         with get_db_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    "SELECT id, title, composer FROM songs WHERE LOWER(title) = LOWER(%s)",
+                    "SELECT id, title, composer, alt_titles FROM songs WHERE LOWER(title) = LOWER(%s)",
                     (song_name,)
                 )
                 return cur.fetchone()
@@ -969,7 +969,7 @@ class SpotifyMatcher:
         with get_db_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    "SELECT id, title, composer FROM songs WHERE id = %s",
+                    "SELECT id, title, composer, alt_titles FROM songs WHERE id = %s",
                     (song_id,)
                 )
                 return cur.fetchone()
@@ -1404,12 +1404,42 @@ class SpotifyMatcher:
                 if albums:
                     self.logger.debug(f"    Found {len(albums)} candidates")
                     
+                    # Evaluate ALL candidates first, collect results
+                    candidate_results = []
                     for i, album in enumerate(albums):
                         is_valid, reason, scores = self.validate_album_match(
                             album, album_title, artist_name or '', song_title
                         )
-                        
-                        if is_valid:
+                        candidate_results.append({
+                            'index': i,
+                            'album': album,
+                            'is_valid': is_valid,
+                            'reason': reason,
+                            'scores': scores
+                        })
+                    
+                    # Log summary of ALL candidates
+                    self.logger.debug(f"    --- Candidate Summary ---")
+                    for cr in candidate_results:
+                        status = "✓" if cr['is_valid'] else "✗"
+                        album_sim = cr['scores'].get('album', 0)
+                        artist_sim = cr['scores'].get('artist', 0)
+                        spotify_album = cr['scores'].get('spotify_album', '')
+                        self.logger.debug(f"    {status} #{cr['index']+1}: '{spotify_album}' "
+                                        f"(album: {album_sim:.0f}%, artist: {artist_sim:.0f}%)")
+                    self.logger.debug(f"    -------------------------")
+                    
+                    # Now select first valid match
+                    for cr in candidate_results:
+                        if cr['is_valid']:
+                            album = cr['album']
+                            scores = cr['scores']
+                            
+                            # Log the match details
+                            self.logger.debug(f"       Matched: '{scores.get('spotify_album', '')}' by {scores.get('spotify_artist', '')}")
+                            self.logger.debug(f"       Album similarity: {scores.get('album', 0):.1f}% (substring: {scores.get('album_is_substring', False)})")
+                            self.logger.debug(f"       Artist similarity: {scores.get('artist', 0):.1f}% (substring: {scores.get('artist_is_substring', False)})")
+                            
                             # Extract album artwork
                             album_art = {}
                             images = album.get('images', [])
@@ -1435,17 +1465,13 @@ class SpotifyMatcher:
                             }
                             
                             self._save_to_cache(cache_path, result)
-                            self.logger.debug(f"    ✓ Valid match found (candidate #{i+1})")
+                            self.logger.debug(f"    ✓ Valid match found (candidate #{cr['index']+1})")
                             return result
-                        else:
-                            self.logger.debug(f"    ✗ Candidate #{i+1} rejected: {reason}")
-                            self.logger.debug(f"       Expected: '{album_title}' by {artist_name}")
-                            self.logger.debug(f"       Found: '{scores.get('spotify_album', '')}' by {scores.get('spotify_artist', '')}")
                     
                     self.logger.debug(f"    ✗ No valid matches with {strategy['description']}")
                 else:
                     self.logger.debug(f"    ✗ No results with {strategy['description']}")
-                    
+                 
             except SpotifyRateLimitError as e:
                 self.logger.error(f"Rate limit exceeded during search: {e}")
                 return None
@@ -1781,6 +1807,8 @@ class SpotifyMatcher:
             self.logger.info(f"Song: {song['title']}")
             self.logger.info(f"Composer: {song['composer']}")
             self.logger.info(f"Database ID: {song['id']}")
+            if song.get('alt_titles'):
+                self.logger.info(f"Alt titles: {song['alt_titles']}")
             if self.artist_filter:
                 self.logger.info(f"Filtering to releases by: {self.artist_filter}")
             self.logger.info("")
@@ -1847,7 +1875,8 @@ class SpotifyMatcher:
                             song['id'],
                             release['id'],
                             spotify_match['id'],
-                            song['title']
+                            song['title'],
+                            alt_titles=song.get('alt_titles')
                         )
                         
                         if track_matched:
@@ -1988,7 +2017,8 @@ class SpotifyMatcher:
                 return cur.fetchall()
     
     def match_track_to_recording(self, song_title: str, spotify_tracks: List[dict],
-                                   expected_disc: int = None, expected_track: int = None) -> Optional[dict]:
+                                   expected_disc: int = None, expected_track: int = None,
+                                   alt_titles: List[str] = None) -> Optional[dict]:
         """
         Find the best matching Spotify track for a song title
         
@@ -1997,6 +2027,7 @@ class SpotifyMatcher:
             spotify_tracks: List of track dicts from get_album_tracks()
             expected_disc: Expected disc number (optional, for position-based fallback)
             expected_track: Expected track number (optional, for position-based fallback)
+            alt_titles: Alternative titles to try if primary title doesn't match
             
         Returns:
             Best matching track dict or None if no good match
@@ -2004,7 +2035,7 @@ class SpotifyMatcher:
         best_match = None
         best_score = 0
         
-        # First pass: standard fuzzy matching
+        # First pass: standard fuzzy matching with primary title
         for track in spotify_tracks:
             score = self.calculate_similarity(song_title, track['name'])
             
@@ -2016,6 +2047,20 @@ class SpotifyMatcher:
             self.logger.debug(f"      Track match: '{song_title}' → '{best_match['name']}' ({best_score}%)")
             return best_match
         
+        # Second pass: try alternative titles
+        if alt_titles:
+            for alt_title in alt_titles:
+                for track in spotify_tracks:
+                    score = self.calculate_similarity(alt_title, track['name'])
+                    
+                    if score > best_score and score >= self.min_track_similarity:
+                        best_score = score
+                        best_match = track
+                
+                if best_match:
+                    self.logger.debug(f"      Track match via alt title: '{alt_title}' → '{best_match['name']}' ({best_score}%)")
+                    return best_match
+        
         # Fallback: if positions provided and no fuzzy match, try position-based substring match
         # This handles cases like "An Affair to Remember" vs 
         # "An Affair to Remember - From the 20th Century-Fox Film, An Affair To Remember"
@@ -2023,11 +2068,19 @@ class SpotifyMatcher:
             for track in spotify_tracks:
                 # Check if track position matches exactly
                 if track.get('disc_number') == expected_disc and track.get('track_number') == expected_track:
-                    # Position matches - try substring matching
+                    # Position matches - try substring matching with primary title
                     if self.is_substring_title_match(song_title, track['name']):
                         self.logger.debug(f"      Position+substring match: '{song_title}' → '{track['name']}' "
                                         f"(disc {expected_disc}, track {expected_track})")
                         return track
+                    
+                    # Also try substring matching with alt titles
+                    if alt_titles:
+                        for alt_title in alt_titles:
+                            if self.is_substring_title_match(alt_title, track['name']):
+                                self.logger.debug(f"      Position+substring match via alt title: '{alt_title}' → '{track['name']}' "
+                                                f"(disc {expected_disc}, track {expected_track})")
+                                return track
         
         return best_match
     
@@ -2058,7 +2111,8 @@ class SpotifyMatcher:
             conn.commit()
     
     def match_tracks_for_release(self, conn, song_id: str, release_id: str, 
-                                  spotify_album_id: str, song_title: str) -> bool:
+                                  spotify_album_id: str, song_title: str,
+                                  alt_titles: List[str] = None) -> bool:
         """
         Match Spotify tracks to recordings for a release
         
@@ -2074,6 +2128,7 @@ class SpotifyMatcher:
             release_id: Our release ID
             spotify_album_id: Spotify album ID we matched to
             song_title: The song title to search for
+            alt_titles: Alternative titles to try if primary doesn't match
             
         Returns:
             bool: True if at least one track was matched, False otherwise
@@ -2103,7 +2158,8 @@ class SpotifyMatcher:
                 song_title, 
                 spotify_tracks,
                 expected_disc=recording.get('disc_number'),
-                expected_track=recording.get('track_number')
+                expected_track=recording.get('track_number'),
+                alt_titles=alt_titles
             )
             
             if matched_track:
@@ -2121,6 +2177,8 @@ class SpotifyMatcher:
                 track_names = [t['name'] for t in spotify_tracks[:8]]
                 more = f"... (+{len(spotify_tracks) - 8} more)" if len(spotify_tracks) > 8 else ""
                 self.logger.debug(f"      No track match for '{song_title}'")
+                if alt_titles:
+                    self.logger.debug(f"      Also tried alt titles: {alt_titles}")
                 self.logger.debug(f"      Album tracks: {track_names}{more}")
                 self.stats['tracks_no_match'] += 1
         

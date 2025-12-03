@@ -1475,3 +1475,17 @@ COMMENT ON TABLE release_performers IS
 -- Verify dropped columns are gone:
 -- SELECT column_name FROM information_schema.columns 
 -- WHERE table_name = 'recordings' AND column_name IN ('spotify_track_id', 'album_art_small', 'album_art_medium', 'album_art_large', 'spotify_url');
+
+-- Migration: Add alternative titles to songs table
+-- Description: Adds alt_titles column to store alternative/variant titles for songs
+-- This helps with Spotify track matching when songs have different naming conventions
+-- Example: "Black and Blue" vs "(What Did I Do To Be So) Black and Blue"
+
+-- Add alt_titles column as a text array
+ALTER TABLE songs ADD COLUMN IF NOT EXISTS alt_titles TEXT[];
+
+-- Add comment for documentation
+COMMENT ON COLUMN songs.alt_titles IS 'Alternative titles for the song (for matching variations like "Black and Blue" vs "(What Did I Do To Be So) Black and Blue")';
+
+-- Create GIN index for efficient array searches (useful if we ever search by alt title)
+CREATE INDEX IF NOT EXISTS idx_songs_alt_titles ON songs USING GIN (alt_titles);
