@@ -13,6 +13,8 @@ struct AboutView: View {
     @State private var currentSongName: String? = nil
     @State private var progress: ResearchProgress? = nil
     @State private var isLoadingQueue: Bool = true
+    @State private var isRefreshing: Bool = false
+    @State private var rotationAngle: Double = 0
     
     let networkManager = NetworkManager()
     
@@ -74,7 +76,7 @@ struct AboutView: View {
                 
                 // Research Queue Status
                 VStack(spacing: 8) {
-                    if isLoadingQueue {
+                    if isLoadingQueue && !isRefreshing {
                         ProgressView()
                             .tint(.white)
                     } else {
@@ -82,10 +84,17 @@ struct AboutView: View {
                             Image(systemName: workerActive ? "arrow.triangle.2.circlepath" : "clock")
                                 .foregroundColor(.white.opacity(0.9))
                                 .font(.body)
+                                .rotationEffect(.degrees(isRefreshing ? rotationAngle : 0))
                             
                             Text("Research Queue: \(queueSize)")
                                 .font(.body)
                                 .foregroundColor(.white.opacity(0.9))
+                            
+                            if isRefreshing {
+                                ProgressView()
+                                    .tint(.white)
+                                    .scaleEffect(0.7)
+                            }
                         }
                         
                         if workerActive && queueSize > 0 {
@@ -135,6 +144,12 @@ struct AboutView: View {
                                 .padding(.top, 4)
                             }
                         }
+                        
+                        // Tap to refresh hint
+                        Text("Tap to refresh")
+                            .font(.caption2)
+                            .foregroundColor(.white.opacity(0.5))
+                            .padding(.top, 2)
                     }
                 }
                 .padding(.vertical, 16)
@@ -148,6 +163,11 @@ struct AboutView: View {
                         .stroke(Color.white.opacity(0.2), lineWidth: 1)
                 )
                 .shadow(color: .black.opacity(0.5), radius: 5, x: 0, y: 2)
+                .onTapGesture {
+                    Task {
+                        await refreshQueueStatus()
+                    }
+                }
                 
                 Spacer()
                 
@@ -184,6 +204,30 @@ struct AboutView: View {
             progress = status.progress
         }
         isLoadingQueue = false
+    }
+    
+    private func refreshQueueStatus() async {
+        guard !isRefreshing else { return }
+        
+        isRefreshing = true
+        
+        // Start rotation animation
+        withAnimation(.linear(duration: 1).repeatForever(autoreverses: false)) {
+            rotationAngle = 360
+        }
+        
+        if let status = await networkManager.fetchQueueStatus() {
+            queueSize = status.queueSize
+            workerActive = status.workerActive
+            currentSongName = status.currentSong?.songName
+            progress = status.progress
+        }
+        
+        // Stop animation
+        withAnimation(.linear(duration: 0.1)) {
+            rotationAngle = 0
+        }
+        isRefreshing = false
     }
 }
 
