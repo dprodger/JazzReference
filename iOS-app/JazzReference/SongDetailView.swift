@@ -316,7 +316,7 @@ struct SongDetailView: View {
             
             // Horizontal scrolling carousel
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 20) {
+                HStack(alignment: .top, spacing: 20) {
                     ForEach(song.recordings?.filter { hasAuthoritativeReference($0) } ?? []) { recording in
                         NavigationLink(destination: RecordingDetailView(recordingId: recording.id)) {
                             AuthoritativeRecordingCard(recording: recording)
@@ -327,7 +327,14 @@ struct SongDetailView: View {
                 .padding(.horizontal, 4)
             }
         }
-        .padding(.vertical, 12)
+        .padding(16)
+        .background(Color.white)
+        .cornerRadius(12)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(JazzTheme.smokeGray.opacity(0.3), lineWidth: 1)
+        )
+        .padding(.top, 8)
     }
     
     // MARK: - Body (broken into smaller chunks to avoid type-checker timeout)
@@ -653,7 +660,7 @@ struct AuthoritativeRecordingCard: View {
             .clipShape(RoundedRectangle(cornerRadius: 12))
             .shadow(color: .black.opacity(0.15), radius: 8, x: 0, y: 4)
             
-            // Recording Info
+            // Recording Info - fixed height for consistent card sizing
             VStack(alignment: .leading, spacing: 4) {
                 // Lead Artist
                 Text(leadArtist)
@@ -669,14 +676,12 @@ struct AuthoritativeRecordingCard: View {
                     .foregroundColor(JazzTheme.charcoal)
                     .lineLimit(2)
                 
-                // Year
-                if let year = recording.recordingYear {
-                    Text(String(year))
-                        .font(.caption)
-                        .foregroundColor(JazzTheme.smokeGray)
-                }
+                // Year (always reserve space)
+                Text(recording.recordingYear.map { String($0) } ?? " ")
+                    .font(.caption)
+                    .foregroundColor(JazzTheme.smokeGray)
             }
-            .frame(width: 180, alignment: .leading)
+            .frame(width: 180, height: 75, alignment: .topLeading)
         }
         .padding(12)
         .background(JazzTheme.cardBackground)
