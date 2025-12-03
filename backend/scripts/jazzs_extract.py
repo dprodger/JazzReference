@@ -731,22 +731,37 @@ class JazzStandardsRecommendationExtractor:
         
         return None
     
-    def get_songs_with_jazzstandards_url(self) -> List[Dict]:
+    def get_songs_with_jazzstandards_url(self, name_filter: Optional[str] = None) -> List[Dict]:
         """Fetch songs that have a JazzStandards URL in external_references"""
-        logger.info("Fetching songs with JazzStandards URLs...")
+        if name_filter:
+            logger.info(f"Fetching songs matching '{name_filter}'...")
+        else:
+            logger.info("Fetching songs with JazzStandards URLs...")
         
         try:
             with get_db_connection() as conn:
                 with conn.cursor() as cur:
-                    cur.execute("""
-                        SELECT 
-                            id,
-                            title,
-                            external_references
-                        FROM songs
-                        WHERE external_references ? 'jazzstandards'
-                        ORDER BY title
-                    """)
+                    if name_filter:
+                        cur.execute("""
+                            SELECT 
+                                id,
+                                title,
+                                external_references
+                            FROM songs
+                            WHERE external_references ? 'jazzstandards'
+                              AND title ILIKE %s
+                            ORDER BY title
+                        """, (f'%{name_filter}%',))
+                    else:
+                        cur.execute("""
+                            SELECT 
+                                id,
+                                title,
+                                external_references
+                            FROM songs
+                            WHERE external_references ? 'jazzstandards'
+                            ORDER BY title
+                        """)
                     
                     songs = []
                     for row in cur.fetchall():
@@ -893,7 +908,7 @@ class JazzStandardsRecommendationExtractor:
         
         return True
     
-    def run(self, limit: Optional[int] = None) -> bool:
+    def run(self, limit: Optional[int] = None, name_filter: Optional[str] = None) -> bool:
         """Main execution method"""
         logger.info("="*80)
         logger.info("EXTRACT JAZZSTANDARDS.COM RECOMMENDATIONS")
@@ -901,10 +916,12 @@ class JazzStandardsRecommendationExtractor:
         logger.info(f"Mode: {'DRY RUN' if self.dry_run else 'LIVE'}")
         logger.info(f"Force refresh: {self.force_refresh}")
         logger.info(f"Cache expiration: {self.cache_days} days")
+        if name_filter:
+            logger.info(f"Name filter: {name_filter}")
         logger.info("")
         
         # Get songs with JazzStandards URLs
-        songs = self.get_songs_with_jazzstandards_url()
+        songs = self.get_songs_with_jazzstandards_url(name_filter=name_filter)
         if not songs:
             logger.info("No songs with JazzStandards URLs found")
             return True
@@ -950,22 +967,26 @@ def main():
         epilog="""
 Examples:
   # Preview extraction without storing
-  python extract_jazzstandards_recommendations.py --dry-run
+  python jazzs_extract.py --dry-run
   
   # Extract and store recommendations
-  python extract_jazzstandards_recommendations.py
+  python jazzs_extract.py
   
   # Process only first 10 songs
-  python extract_jazzstandards_recommendations.py --limit 10
+  python jazzs_extract.py --limit 10
+  
+  # Process a single song by name (for debugging)
+  python jazzs_extract.py --name "Autumn Leaves"
+  python jazzs_extract.py --name "autumn" --debug
   
   # Force refresh cached pages
-  python extract_jazzstandards_recommendations.py --force-refresh
+  python jazzs_extract.py --force-refresh
   
   # Custom cache expiration (60 days)
-  python extract_jazzstandards_recommendations.py --cache-days 60
+  python jazzs_extract.py --cache-days 60
   
   # With debug logging
-  python extract_jazzstandards_recommendations.py --debug
+  python jazzs_extract.py --debug
         """
     )
     
@@ -1000,6 +1021,12 @@ Examples:
         help='Maximum number of songs to process'
     )
     
+    parser.add_argument(
+        '--name',
+        type=str,
+        help='Filter to a single song by name (case-insensitive partial match)'
+    )
+    
     args = parser.parse_args()
     
     # Set logging level
@@ -1014,7 +1041,7 @@ Examples:
     )
     
     try:
-        success = extractor.run(limit=args.limit)
+        success = extractor.run(limit=args.limit, name_filter=args.name)
         sys.exit(0 if success else 1)
     except KeyboardInterrupt:
         logger.info("\nProcess cancelled by user")
