@@ -205,9 +205,13 @@ class MBReleaseImporter:
                 except Exception as e:
                     self.logger.error(f"  Error processing recording: {e}")
                     self.stats['errors'] += 1
+                    # Rollback the failed transaction so subsequent operations can proceed
+                    try:
+                        conn.rollback()
+                    except Exception:
+                        pass  # Connection might already be closed
                     # Continue with next recording
                     continue
-        
         return {
             'success': True,
             'song': song,

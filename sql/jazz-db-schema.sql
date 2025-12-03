@@ -1489,3 +1489,8 @@ COMMENT ON COLUMN songs.alt_titles IS 'Alternative titles for the song (for matc
 
 -- Create GIN index for efficient array searches (useful if we ever search by alt title)
 CREATE INDEX IF NOT EXISTS idx_songs_alt_titles ON songs USING GIN (alt_titles);
+
+-- Add unique constraint on (recording_id, release_id)
+ALTER TABLE recording_releases 
+ADD CONSTRAINT recording_releases_recording_release_unique 
+UNIQUE (recording_id, release_id);
