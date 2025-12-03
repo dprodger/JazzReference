@@ -856,7 +856,7 @@ class MBReleaseImporter:
         country = None
         release_events = mb_release.get('release-events') or []
         if release_events:
-            area = release_events[0].get('area', {})
+            area = release_events[0].get('area') or {}  # Handle None explicitly
             country = area.get('iso-3166-1-codes', [None])[0] if area.get('iso-3166-1-codes') else area.get('name')
         if not country:
             country = mb_release.get('country')
@@ -867,7 +867,7 @@ class MBReleaseImporter:
         label_info = mb_release.get('label-info') or []
         if label_info:
             label_entry = label_info[0]
-            label_obj = label_entry.get('label', {})
+            label_obj = label_entry.get('label') or {}  # Handle None explicitly
             label = label_obj.get('name') if label_obj else None
             catalog_number = label_entry.get('catalog-number')
         
