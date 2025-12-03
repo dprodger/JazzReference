@@ -133,6 +133,67 @@ class SpotifyMatcher:
         self.stats['rate_limit_hits'] = self.client.stats.get('rate_limit_hits', 0)
         self.stats['rate_limit_waits'] = self.client.stats.get('rate_limit_waits', 0)
     
+    def _get_track_match_failure_cache_path(self, song_id: str, release_id: str, 
+                                            spotify_album_id: str) -> 'Path':
+        """
+        Get cache path for track match failure results.
+        
+        This caches the result of "album matched but track not found" to avoid
+        repeated DB queries on subsequent runs.
+        """
+        from pathlib import Path
+        # Use the client's cache directory structure
+        failure_cache_dir = self.client.cache_dir / 'track_failures'
+        failure_cache_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Create a deterministic filename from the three IDs
+        filename = f"fail_{song_id}_{release_id}_{spotify_album_id}.json"
+        return failure_cache_dir / filename
+    
+    def _is_track_match_cached_failure(self, song_id: str, release_id: str,
+                                       spotify_album_id: str) -> bool:
+        """
+        Check if we've already determined that track matching fails for this combination.
+        
+        Returns True if we have a cached "no match" result, False otherwise.
+        """
+        cache_path = self._get_track_match_failure_cache_path(song_id, release_id, spotify_album_id)
+        
+        if self.client.force_refresh:
+            return False
+        
+        if not cache_path.exists():
+            return False
+        
+        # Check if cache is still valid
+        if self.client._is_cache_valid(cache_path):
+            self.client.stats['cache_hits'] = self.client.stats.get('cache_hits', 0) + 1
+            self.logger.debug(f"    Track match failure cache hit")
+            return True
+        
+        return False
+    
+    def _cache_track_match_failure(self, song_id: str, release_id: str,
+                                   spotify_album_id: str, song_title: str) -> None:
+        """
+        Cache the fact that track matching failed for this song/release/album combination.
+        """
+        import json
+        cache_path = self._get_track_match_failure_cache_path(song_id, release_id, spotify_album_id)
+        
+        try:
+            with open(cache_path, 'w') as f:
+                json.dump({
+                    'song_id': song_id,
+                    'release_id': release_id,
+                    'spotify_album_id': spotify_album_id,
+                    'song_title': song_title,
+                    'result': 'no_track_match'
+                }, f)
+            self.logger.debug(f"    Cached track match failure")
+        except Exception as e:
+            self.logger.warning(f"    Failed to cache track match failure: {e}")
+    
     # ========================================================================
     # DELEGATED PROPERTIES (for backwards compatibility)
     # ========================================================================
@@ -944,21 +1005,21 @@ class SpotifyMatcher:
                 if release['spotify_album_url']:
                     self.logger.info(f"[{i}/{len(releases)}] {title} ({artist_name or 'Unknown'}, {year or 'Unknown'}) - ⊙ Already has Spotify URL, skipping")
                     self.stats['releases_skipped'] += 1
-                    
-                    # Still set this as default release for linked recordings that need one
-                    # (releases with Spotify are good candidates for default)
-                    with get_db_connection() as conn:
-                        self.update_recording_default_release(
-                            conn,
-                            song['id'],
-                            release['id']
-                        )
+                    # Note: default_release_id was set when this release was first matched
+                    # No need to check again - avoids unnecessary DB round-trip
                     continue
                 
                 # Search Spotify for album (with song title for track verification fallback)
                 spotify_match = self.search_spotify_album(title, artist_name, song['title'])
                 
                 if spotify_match:
+                    # Check if we already know track matching fails for this combination
+                    # This avoids opening a DB connection just to reach the same "no match" conclusion
+                    if self._is_track_match_cached_failure(song['id'], release['id'], spotify_match['id']):
+                        self.logger.info(f"[{i}/{len(releases)}] {title} ({artist_name or 'Unknown'}, {year or 'Unknown'}) - ✗ Album matched but track not found (cached)")
+                        self.stats['releases_no_match'] += 1
+                        continue
+                    
                     with get_db_connection() as conn:
                         # First try to match tracks - this validates the album match
                         track_matched = self.match_tracks_for_release(
@@ -992,7 +1053,10 @@ class SpotifyMatcher:
                                 release['id']
                             )
                         else:
-                            # Album matched but no track found - likely false positive
+                            # Album matched but no track found - cache this for future runs
+                            self._cache_track_match_failure(
+                                song['id'], release['id'], spotify_match['id'], song['title']
+                            )
                             self.logger.info(f"[{i}/{len(releases)}] {title} ({artist_name or 'Unknown'}, {year or 'Unknown'}) - ✗ Album matched but track not found (possible false positive)")
                             self.stats['releases_no_match'] += 1
                 else:
