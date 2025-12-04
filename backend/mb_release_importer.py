@@ -21,11 +21,168 @@ KEY ARCHITECTURE (UPDATED):
 
 import logging
 from datetime import datetime
-from typing import Optional, Dict, List, Any, Set
+from typing import Optional, Dict, List, Any, Set, Tuple
 
 from db_utils import get_db_connection
 from mb_performer_importer import PerformerImporter
 from mb_utils import MusicBrainzSearcher
+
+# Module-level logger for helper functions
+_logger = logging.getLogger(__name__)
+
+
+def parse_mb_date(date_str: str) -> Tuple[Optional[str], Optional[int], Optional[str]]:
+    """
+    Parse a MusicBrainz date string (YYYY, YYYY-MM, or YYYY-MM-DD).
+
+    Returns:
+        Tuple of (formatted_date, year, precision)
+        - formatted_date: Full date string for DB (YYYY-MM-DD, using 01 for unknown parts)
+        - year: Integer year
+        - precision: 'day', 'month', or 'year'
+    """
+    if not date_str:
+        return (None, None, None)
+
+    try:
+        if len(date_str) >= 10:
+            # Full date: YYYY-MM-DD
+            return (date_str[:10], int(date_str[:4]), 'day')
+        elif len(date_str) == 7:
+            # Month precision: YYYY-MM
+            return (f"{date_str}-01", int(date_str[:4]), 'month')
+        elif len(date_str) >= 4:
+            # Year only: YYYY
+            return (f"{date_str[:4]}-01-01", int(date_str[:4]), 'year')
+    except (ValueError, TypeError):
+        pass
+
+    return (None, None, None)
+
+
+def extract_recording_date_from_mb(mb_recording: Dict[str, Any],
+                                    logger: Optional[logging.Logger] = None) -> Dict[str, Any]:
+    """
+    Extract the best recording date from MusicBrainz recording data.
+
+    Priority:
+    1. Performer relation dates (actual session dates when all/most match)
+    2. MusicBrainz first-release-date (upper bound)
+
+    Args:
+        mb_recording: MusicBrainz recording data dict
+        logger: Optional logger for detailed diagnostics
+
+    Returns:
+        Dict with keys:
+        - recording_date: Formatted date string (YYYY-MM-DD)
+        - recording_year: Integer year
+        - recording_date_precision: 'day', 'month', or 'year'
+        - recording_date_source: 'mb_performer_relation' or 'mb_first_release'
+        - mb_first_release_date: Raw first-release-date from MB (for caching)
+    """
+    log = logger or _logger
+    recording_id = mb_recording.get('id', 'unknown')
+    recording_title = mb_recording.get('title', 'Unknown')
+
+    result = {
+        'recording_date': None,
+        'recording_year': None,
+        'recording_date_precision': None,
+        'recording_date_source': None,
+        'mb_first_release_date': None,
+    }
+
+    # Cache the first-release-date regardless of what we use
+    first_release_date = mb_recording.get('first-release-date')
+    if first_release_date:
+        result['mb_first_release_date'] = first_release_date
+
+    # Priority 1: Check performer relation dates
+    relations = mb_recording.get('relations', [])
+
+    # Count performers with and without dates
+    performers_with_dates = []
+    performers_without_dates = []
+
+    for rel in relations:
+        if rel.get('type') == 'instrument':
+            artist_name = rel.get('artist', {}).get('name', 'Unknown')
+            if rel.get('begin'):
+                performers_with_dates.append({
+                    'name': artist_name,
+                    'date': rel['begin']
+                })
+            else:
+                performers_without_dates.append(artist_name)
+
+    total_performers = len(performers_with_dates) + len(performers_without_dates)
+
+    if performers_with_dates:
+        session_dates = set(p['date'] for p in performers_with_dates)
+        session_years = set(d[:4] for d in session_dates if len(d) >= 4)
+
+        # Case 1: All performers with dates have the same date
+        if len(session_dates) == 1:
+            date_str = session_dates.pop()
+            formatted_date, year, precision = parse_mb_date(date_str)
+
+            if formatted_date:
+                # Log if some performers lack dates
+                if performers_without_dates:
+                    log.debug(
+                        f"  PARTIAL_SESSION_DATES: {len(performers_with_dates)}/{total_performers} "
+                        f"performers have date {date_str} for recording '{recording_title}' "
+                        f"[{recording_id}]. Missing: {performers_without_dates[:3]}{'...' if len(performers_without_dates) > 3 else ''}"
+                    )
+
+                result['recording_date'] = formatted_date
+                result['recording_year'] = year
+                result['recording_date_precision'] = precision
+                result['recording_date_source'] = 'mb_performer_relation'
+                return result
+
+        # Case 2: Multiple dates but all same year - use year only
+        elif len(session_years) == 1 and len(session_dates) > 1:
+            year = int(session_years.pop())
+            log.info(
+                f"  MULTI_SESSION_SAME_YEAR: Recording '{recording_title}' [{recording_id}] "
+                f"has {len(session_dates)} different dates in {year}: {sorted(session_dates)}"
+            )
+            result['recording_date'] = f"{year}-01-01"
+            result['recording_year'] = year
+            result['recording_date_precision'] = 'year'
+            result['recording_date_source'] = 'mb_performer_relation'
+            return result
+
+        # Case 3: Multiple dates across different years - log and use earliest
+        elif len(session_years) > 1:
+            log.warning(
+                f"  MULTI_YEAR_SESSION_DATES: Recording '{recording_title}' [{recording_id}] "
+                f"has dates spanning multiple years: {sorted(session_dates)}. Using earliest."
+            )
+            date_str = min(session_dates)
+            formatted_date, year, precision = parse_mb_date(date_str)
+
+            if formatted_date:
+                result['recording_date'] = formatted_date
+                result['recording_year'] = year
+                result['recording_date_precision'] = precision
+                result['recording_date_source'] = 'mb_performer_relation'
+                return result
+
+    # Priority 2: Use first-release-date as fallback
+    if first_release_date:
+        formatted_date, year, precision = parse_mb_date(first_release_date)
+
+        if formatted_date:
+            result['recording_date'] = formatted_date
+            result['recording_year'] = year
+            result['recording_date_precision'] = precision
+            result['recording_date_source'] = 'mb_first_release'
+            return result
+
+    return result
 
 
 class MBReleaseImporter:
@@ -377,31 +534,20 @@ class MBReleaseImporter:
             all_existing_links: Dict of our recording ID -> set of linked release IDs
         """
         mb_recording_id = mb_recording.get('id')
-        
+
         # Get the releases from the recording data
         mb_releases = mb_recording.get('releases') or []
         if not mb_releases:
             self.logger.info("  No releases found for this recording")
             return
-        
+
         # Use the first release for album title (for the recording)
         first_release = mb_releases[0]
         album_title = first_release.get('title', 'Unknown Album')
-        
-        # Extract recording date/year from first release
-        release_date = first_release.get('date', '')
-        release_year = None
-        formatted_date = None
-        
-        if release_date:
-            try:
-                if len(release_date) >= 4:
-                    release_year = int(release_date[:4])
-                if len(release_date) >= 10:
-                    formatted_date = release_date[:10]
-            except (ValueError, TypeError):
-                pass
-        
+
+        # Extract recording date from MusicBrainz data (performer relations or first-release-date)
+        date_info = extract_recording_date_from_mb(mb_recording, logger=self.logger)
+
         # STEP 1: Get or create the recording (use cache first - NO QUERY if exists)
         recording_id = existing_recordings.get(mb_recording_id)
         if recording_id:
@@ -410,7 +556,7 @@ class MBReleaseImporter:
         else:
             # Recording doesn't exist - need to create it
             recording_id = self._create_recording(
-                conn, song_id, mb_recording_id, album_title, release_year, formatted_date
+                conn, song_id, mb_recording_id, album_title, date_info
             )
             if recording_id:
                 # Add to cache for future reference
@@ -462,38 +608,61 @@ class MBReleaseImporter:
             )
     
     def _create_recording(self, conn, song_id: str, mb_recording_id: str,
-                           album_title: str, release_year: Optional[int],
-                           formatted_date: Optional[str]) -> Optional[str]:
+                           album_title: str, date_info: Dict[str, Any]) -> Optional[str]:
         """
         Create a new recording in the database.
-        
-        Separated from get_or_create to allow cache-first lookup.
+
+        Args:
+            conn: Database connection
+            song_id: Our database song ID
+            mb_recording_id: MusicBrainz recording ID
+            album_title: Album title for this recording
+            date_info: Dict from extract_recording_date_from_mb() containing:
+                - recording_date: Formatted date (YYYY-MM-DD)
+                - recording_year: Integer year
+                - recording_date_precision: 'day', 'month', or 'year'
+                - recording_date_source: 'mb_performer_relation' or 'mb_first_release'
+                - mb_first_release_date: Raw MB first-release-date
+
+        Returns:
+            Recording ID if created, None otherwise
         """
         if self.dry_run:
-            self.logger.info(f"  [DRY RUN] Would create recording: {album_title}")
+            source = date_info.get('recording_date_source', 'unknown')
+            year = date_info.get('recording_year')
+            self.logger.info(f"  [DRY RUN] Would create recording: {album_title} "
+                           f"(year={year}, source={source})")
             return None
-        
+
         with conn.cursor() as cur:
             cur.execute("""
                 INSERT INTO recordings (
                     song_id, album_title, recording_year, recording_date,
+                    recording_date_source, recording_date_precision, mb_first_release_date,
                     is_canonical, musicbrainz_id
                 )
-                VALUES (%s, %s, %s, %s, %s, %s)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING id
             """, (
                 song_id,
                 album_title,
-                release_year,
-                formatted_date,
+                date_info.get('recording_year'),
+                date_info.get('recording_date'),
+                date_info.get('recording_date_source'),
+                date_info.get('recording_date_precision'),
+                date_info.get('mb_first_release_date'),
                 False,
                 mb_recording_id
             ))
-            
+
             recording_id = cur.fetchone()['id']
-            self.logger.info(f"  ✓ Created recording: {album_title[:50]}")
+
+            # Log with source info
+            source = date_info.get('recording_date_source', 'none')
+            year = date_info.get('recording_year', '?')
+            self.logger.info(f"  ✓ Created recording: {album_title[:50]} (year={year}, source={source})")
             self.stats['recordings_created'] += 1
-            
+
             return recording_id
     
     def _get_existing_release_ids(self, conn, mb_release_ids: List[str]) -> Dict[str, str]:
@@ -644,24 +813,25 @@ class MBReleaseImporter:
             return result['id'] if result else None
     
     def _get_or_create_recording(self, conn, song_id: str, mb_recording_id: str,
-                                  album_title: str, release_year: Optional[int],
-                                  formatted_date: Optional[str]) -> Optional[str]:
+                                  album_title: str, date_info: Dict[str, Any]) -> Optional[str]:
         """
-        Get existing recording or create new one
-        
+        Get existing recording or create new one.
+
+        NOTE: This method is retained for backwards compatibility but the main import
+        path now uses _create_recording() with pre-cached existence checks.
+
         IMPORTANT: For MusicBrainz imports, we ONLY match by MusicBrainz recording ID.
         Album title matching is NOT reliable because different artists can have
-        albums with the same title (e.g., Grant Green's "Born to Be Blue" vs 
+        albums with the same title (e.g., Grant Green's "Born to Be Blue" vs
         Freddie Hubbard's "Born to Be Blue").
-        
+
         Args:
             conn: Database connection
             song_id: Song ID
             mb_recording_id: MusicBrainz recording ID (unique identifier)
             album_title: Album title (for display/storage only, NOT for matching)
-            release_year: Year of release
-            formatted_date: Formatted date string
-            
+            date_info: Dict from extract_recording_date_from_mb()
+
         Returns:
             Recording ID or None
         """
@@ -673,37 +843,43 @@ class MBReleaseImporter:
                 WHERE musicbrainz_id = %s
             """, (mb_recording_id,))
             result = cur.fetchone()
-            
+
             if result:
                 self.logger.debug(f"  Recording exists (by MB ID)")
                 self.stats['recordings_existing'] += 1
                 return result['id']
-            
+
             # Create new recording
             if self.dry_run:
                 self.logger.info(f"  [DRY RUN] Would create recording: {album_title}")
                 return None
-            
+
             cur.execute("""
                 INSERT INTO recordings (
                     song_id, album_title, recording_year, recording_date,
+                    recording_date_source, recording_date_precision, mb_first_release_date,
                     is_canonical, musicbrainz_id
                 )
-                VALUES (%s, %s, %s, %s, %s, %s)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING id
             """, (
                 song_id,
                 album_title,
-                release_year,
-                formatted_date,
+                date_info.get('recording_year'),
+                date_info.get('recording_date'),
+                date_info.get('recording_date_source'),
+                date_info.get('recording_date_precision'),
+                date_info.get('mb_first_release_date'),
                 False,
                 mb_recording_id
             ))
-            
+
             recording_id = cur.fetchone()['id']
-            self.logger.info(f"  ✓ Created recording: {album_title[:50]}")
+            source = date_info.get('recording_date_source', 'none')
+            year = date_info.get('recording_year', '?')
+            self.logger.info(f"  ✓ Created recording: {album_title[:50]} (year={year}, source={source})")
             self.stats['recordings_created'] += 1
-            
+
             return recording_id
     
     def _create_release(self, conn, release_data: Dict[str, Any]) -> Optional[str]:
