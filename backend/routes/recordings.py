@@ -7,6 +7,10 @@ UPDATED: Recording-Centric Architecture
 - Spotify URL and album art come from default_release or best release
 - release_performers is now for release-specific credits (producers, engineers)
 
+UPDATED: Release Imagery Support
+- Album art now checks release_imagery table first (CAA images)
+- Falls back to releases table (Spotify images) if no release_imagery exists
+
 Provides endpoints for listing and searching recordings, including releases.
 """
 from flask import Blueprint, jsonify, request
@@ -15,6 +19,96 @@ import db_utils as db_tools
 
 logger = logging.getLogger(__name__)
 recordings_bp = Blueprint('recordings', __name__)
+
+
+# ============================================================================
+# SQL FRAGMENTS FOR ALBUM ART
+# ============================================================================
+# These fragments implement the priority: 
+#   1. release_imagery (CAA) for default_release
+#   2. releases table (Spotify) for default_release  
+#   3. release_imagery (CAA) for any linked release
+#   4. releases table (Spotify) for any linked release
+
+ALBUM_ART_SMALL_SQL = """
+    COALESCE(
+        -- 1. release_imagery (Front) for default release
+        (SELECT ri.image_url_small FROM release_imagery ri 
+         WHERE ri.release_id = r.default_release_id AND ri.type = 'Front'),
+        -- 2. releases table for default release
+        (SELECT rel.cover_art_small FROM releases rel 
+         WHERE rel.id = r.default_release_id AND rel.cover_art_small IS NOT NULL),
+        -- 3. release_imagery (Front) for any linked release
+        (SELECT ri.image_url_small 
+         FROM recording_releases rr 
+         JOIN release_imagery ri ON rr.release_id = ri.release_id
+         WHERE rr.recording_id = r.id AND ri.type = 'Front'
+         LIMIT 1),
+        -- 4. releases table for any linked release
+        (SELECT rel.cover_art_small 
+         FROM recording_releases rr 
+         JOIN releases rel ON rr.release_id = rel.id
+         WHERE rr.recording_id = r.id AND rel.cover_art_small IS NOT NULL
+         ORDER BY rel.release_year DESC NULLS LAST LIMIT 1)
+    ) as album_art_small"""
+
+ALBUM_ART_MEDIUM_SQL = """
+    COALESCE(
+        (SELECT ri.image_url_medium FROM release_imagery ri 
+         WHERE ri.release_id = r.default_release_id AND ri.type = 'Front'),
+        (SELECT rel.cover_art_medium FROM releases rel 
+         WHERE rel.id = r.default_release_id AND rel.cover_art_medium IS NOT NULL),
+        (SELECT ri.image_url_medium 
+         FROM recording_releases rr 
+         JOIN release_imagery ri ON rr.release_id = ri.release_id
+         WHERE rr.recording_id = r.id AND ri.type = 'Front'
+         LIMIT 1),
+        (SELECT rel.cover_art_medium 
+         FROM recording_releases rr 
+         JOIN releases rel ON rr.release_id = rel.id
+         WHERE rr.recording_id = r.id AND rel.cover_art_medium IS NOT NULL
+         ORDER BY rel.release_year DESC NULLS LAST LIMIT 1)
+    ) as album_art_medium"""
+
+ALBUM_ART_LARGE_SQL = """
+    COALESCE(
+        (SELECT ri.image_url_large FROM release_imagery ri 
+         WHERE ri.release_id = r.default_release_id AND ri.type = 'Front'),
+        (SELECT rel.cover_art_large FROM releases rel 
+         WHERE rel.id = r.default_release_id AND rel.cover_art_large IS NOT NULL),
+        (SELECT ri.image_url_large 
+         FROM recording_releases rr 
+         JOIN release_imagery ri ON rr.release_id = ri.release_id
+         WHERE rr.recording_id = r.id AND ri.type = 'Front'
+         LIMIT 1),
+        (SELECT rel.cover_art_large 
+         FROM recording_releases rr 
+         JOIN releases rel ON rr.release_id = rel.id
+         WHERE rr.recording_id = r.id AND rel.cover_art_large IS NOT NULL
+         ORDER BY rel.release_year DESC NULLS LAST LIMIT 1)
+    ) as album_art_large"""
+
+# For release-level queries (get_recording_releases), we check imagery for specific release
+RELEASE_ART_SMALL_SQL = """
+    COALESCE(
+        (SELECT ri.image_url_small FROM release_imagery ri 
+         WHERE ri.release_id = rel.id AND ri.type = 'Front'),
+        rel.cover_art_small
+    ) as cover_art_small"""
+
+RELEASE_ART_MEDIUM_SQL = """
+    COALESCE(
+        (SELECT ri.image_url_medium FROM release_imagery ri 
+         WHERE ri.release_id = rel.id AND ri.type = 'Front'),
+        rel.cover_art_medium
+    ) as cover_art_medium"""
+
+RELEASE_ART_LARGE_SQL = """
+    COALESCE(
+        (SELECT ri.image_url_large FROM release_imagery ri 
+         WHERE ri.release_id = rel.id AND ri.type = 'Front'),
+        rel.cover_art_large
+    ) as cover_art_large"""
 
 
 @recordings_bp.route('/api/recordings', methods=['GET'])
@@ -35,7 +129,7 @@ def get_recordings():
     try:
         if search_query:
             # Search across album title, performer names, and song title
-            query = """
+            query = f"""
                 SELECT DISTINCT ON (r.id)
                     r.id,
                     r.song_id,
@@ -62,25 +156,10 @@ def get_recordings():
                            rel.release_year DESC NULLS LAST
                          LIMIT 1)
                     ) as spotify_url,
-                    -- Get album art from default release or best available
-                    COALESCE(
-                        (SELECT rel.cover_art_small FROM releases rel WHERE rel.id = r.default_release_id AND rel.cover_art_small IS NOT NULL),
-                        (SELECT rel.cover_art_small FROM recording_releases rr JOIN releases rel ON rr.release_id = rel.id
-                         WHERE rr.recording_id = r.id AND rel.cover_art_small IS NOT NULL
-                         ORDER BY rel.release_year DESC NULLS LAST LIMIT 1)
-                    ) as album_art_small,
-                    COALESCE(
-                        (SELECT rel.cover_art_medium FROM releases rel WHERE rel.id = r.default_release_id AND rel.cover_art_medium IS NOT NULL),
-                        (SELECT rel.cover_art_medium FROM recording_releases rr JOIN releases rel ON rr.release_id = rel.id
-                         WHERE rr.recording_id = r.id AND rel.cover_art_medium IS NOT NULL
-                         ORDER BY rel.release_year DESC NULLS LAST LIMIT 1)
-                    ) as album_art_medium,
-                    COALESCE(
-                        (SELECT rel.cover_art_large FROM releases rel WHERE rel.id = r.default_release_id AND rel.cover_art_large IS NOT NULL),
-                        (SELECT rel.cover_art_large FROM recording_releases rr JOIN releases rel ON rr.release_id = rel.id
-                         WHERE rr.recording_id = r.id AND rel.cover_art_large IS NOT NULL
-                         ORDER BY rel.release_year DESC NULLS LAST LIMIT 1)
-                    ) as album_art_large,
+                    -- Album art with release_imagery priority
+                    {ALBUM_ART_SMALL_SQL},
+                    {ALBUM_ART_MEDIUM_SQL},
+                    {ALBUM_ART_LARGE_SQL},
                     r.youtube_url,
                     r.apple_music_url,
                     r.musicbrainz_id,
@@ -106,7 +185,7 @@ def get_recordings():
                 (search_pattern, search_pattern, search_pattern, limit)
             )
         else:
-            query = """
+            query = f"""
                 SELECT 
                     r.id,
                     r.song_id,
@@ -133,25 +212,10 @@ def get_recordings():
                            rel.release_year DESC NULLS LAST
                          LIMIT 1)
                     ) as spotify_url,
-                    -- Get album art from default release or best available
-                    COALESCE(
-                        (SELECT rel.cover_art_small FROM releases rel WHERE rel.id = r.default_release_id AND rel.cover_art_small IS NOT NULL),
-                        (SELECT rel.cover_art_small FROM recording_releases rr JOIN releases rel ON rr.release_id = rel.id
-                         WHERE rr.recording_id = r.id AND rel.cover_art_small IS NOT NULL
-                         ORDER BY rel.release_year DESC NULLS LAST LIMIT 1)
-                    ) as album_art_small,
-                    COALESCE(
-                        (SELECT rel.cover_art_medium FROM releases rel WHERE rel.id = r.default_release_id AND rel.cover_art_medium IS NOT NULL),
-                        (SELECT rel.cover_art_medium FROM recording_releases rr JOIN releases rel ON rr.release_id = rel.id
-                         WHERE rr.recording_id = r.id AND rel.cover_art_medium IS NOT NULL
-                         ORDER BY rel.release_year DESC NULLS LAST LIMIT 1)
-                    ) as album_art_medium,
-                    COALESCE(
-                        (SELECT rel.cover_art_large FROM releases rel WHERE rel.id = r.default_release_id AND rel.cover_art_large IS NOT NULL),
-                        (SELECT rel.cover_art_large FROM recording_releases rr JOIN releases rel ON rr.release_id = rel.id
-                         WHERE rr.recording_id = r.id AND rel.cover_art_large IS NOT NULL
-                         ORDER BY rel.release_year DESC NULLS LAST LIMIT 1)
-                    ) as album_art_large,
+                    -- Album art with release_imagery priority
+                    {ALBUM_ART_SMALL_SQL},
+                    {ALBUM_ART_MEDIUM_SQL},
+                    {ALBUM_ART_LARGE_SQL},
                     r.youtube_url,
                     r.apple_music_url,
                     r.musicbrainz_id,
@@ -182,6 +246,9 @@ def get_recording_detail(recording_id):
     - Performers come from recording_performers (not release_performers)
     - Spotify URL and album art come from default_release or best release
     
+    UPDATED: Release Imagery Support
+    - Album art checks release_imagery table first, falls back to releases table
+    
     The response includes:
     - Recording metadata
     - Performers from recording_performers table
@@ -193,7 +260,7 @@ def get_recording_detail(recording_id):
     """
     try:
         # Single optimized query using CTEs for recording, releases, and authority data
-        combined_query = """
+        combined_query = f"""
             WITH recording_data AS (
                 SELECT 
                     r.id,
@@ -221,25 +288,10 @@ def get_recording_detail(recording_id):
                            rel_sub.release_year DESC NULLS LAST
                          LIMIT 1)
                     ) as spotify_url,
-                    -- Get album art from default release or best available
-                    COALESCE(
-                        (SELECT rel_sub.cover_art_small FROM releases rel_sub WHERE rel_sub.id = r.default_release_id AND rel_sub.cover_art_small IS NOT NULL),
-                        (SELECT rel_sub.cover_art_small FROM recording_releases rr_sub JOIN releases rel_sub ON rr_sub.release_id = rel_sub.id
-                         WHERE rr_sub.recording_id = r.id AND rel_sub.cover_art_small IS NOT NULL
-                         ORDER BY rel_sub.release_year DESC NULLS LAST LIMIT 1)
-                    ) as album_art_small,
-                    COALESCE(
-                        (SELECT rel_sub.cover_art_medium FROM releases rel_sub WHERE rel_sub.id = r.default_release_id AND rel_sub.cover_art_medium IS NOT NULL),
-                        (SELECT rel_sub.cover_art_medium FROM recording_releases rr_sub JOIN releases rel_sub ON rr_sub.release_id = rel_sub.id
-                         WHERE rr_sub.recording_id = r.id AND rel_sub.cover_art_medium IS NOT NULL
-                         ORDER BY rel_sub.release_year DESC NULLS LAST LIMIT 1)
-                    ) as album_art_medium,
-                    COALESCE(
-                        (SELECT rel_sub.cover_art_large FROM releases rel_sub WHERE rel_sub.id = r.default_release_id AND rel_sub.cover_art_large IS NOT NULL),
-                        (SELECT rel_sub.cover_art_large FROM recording_releases rr_sub JOIN releases rel_sub ON rr_sub.release_id = rel_sub.id
-                         WHERE rr_sub.recording_id = r.id AND rel_sub.cover_art_large IS NOT NULL
-                         ORDER BY rel_sub.release_year DESC NULLS LAST LIMIT 1)
-                    ) as album_art_large,
+                    -- Album art with release_imagery priority
+                    {ALBUM_ART_SMALL_SQL},
+                    {ALBUM_ART_MEDIUM_SQL},
+                    {ALBUM_ART_LARGE_SQL},
                     r.youtube_url,
                     r.apple_music_url,
                     r.musicbrainz_id,
@@ -264,9 +316,10 @@ def get_recording_detail(recording_id):
                     rel.catalog_number,
                     rel.spotify_album_id,
                     rel.spotify_album_url,
-                    rel.cover_art_small,
-                    rel.cover_art_medium,
-                    rel.cover_art_large,
+                    -- Release-level cover art with imagery priority
+                    {RELEASE_ART_SMALL_SQL},
+                    {RELEASE_ART_MEDIUM_SQL},
+                    {RELEASE_ART_LARGE_SQL},
                     rel.total_tracks,
                     rel.musicbrainz_release_id,
                     rr.disc_number,
@@ -356,11 +409,14 @@ def get_recording_releases(recording_id):
     - Performers come from recording_performers (the recording's performers)
     - release_performers now contains only release-specific credits (producers, engineers)
     
+    UPDATED: Release Imagery Support
+    - Cover art checks release_imagery table first, falls back to releases table
+    
     Returns:
         List of releases with recording's performers and Spotify info
     """
     try:
-        query = """
+        query = f"""
             SELECT 
                 rel.id,
                 rel.title,
@@ -372,9 +428,10 @@ def get_recording_releases(recording_id):
                 rel.catalog_number,
                 rel.spotify_album_id,
                 rel.spotify_album_url,
-                rel.cover_art_small,
-                rel.cover_art_medium,
-                rel.cover_art_large,
+                -- Cover art with release_imagery priority
+                {RELEASE_ART_SMALL_SQL},
+                {RELEASE_ART_MEDIUM_SQL},
+                {RELEASE_ART_LARGE_SQL},
                 rel.total_tracks,
                 rel.musicbrainz_release_id,
                 rr.disc_number,

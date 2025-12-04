@@ -1494,3 +1494,192 @@ CREATE INDEX IF NOT EXISTS idx_songs_alt_titles ON songs USING GIN (alt_titles);
 ALTER TABLE recording_releases 
 ADD CONSTRAINT recording_releases_recording_release_unique 
 UNIQUE (recording_id, release_id);
+
+
+-- ============================================================================
+-- Migration: Add Release Imagery Support
+-- Description: Creates release_imagery table to store cover art from multiple
+--              sources (CAA, Spotify, Wikipedia, Apple, Amazon) and adds
+--              cover_art_checked_at timestamp to releases table.
+-- ============================================================================
+
+-- ============================================================================
+-- STEP 1: Create imagery_source enum type
+-- ============================================================================
+
+-- Create enum type for image sources
+DO $$ 
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'imagery_source') THEN
+        CREATE TYPE imagery_source AS ENUM (
+            'MusicBrainz',   -- Cover Art Archive (via MusicBrainz)
+            'Spotify',
+            'Wikipedia',
+            'Apple',
+            'Amazon'
+        );
+    END IF;
+END $$;
+
+-- Create enum type for image types
+DO $$ 
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'imagery_type') THEN
+        CREATE TYPE imagery_type AS ENUM (
+            'Front',
+            'Back'
+        );
+    END IF;
+END $$;
+
+
+-- ============================================================================
+-- STEP 2: Create release_imagery table
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS release_imagery (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    
+    -- Foreign key to releases table
+    release_id UUID NOT NULL REFERENCES releases(id) ON DELETE CASCADE,
+    
+    -- Source identification
+    source imagery_source NOT NULL,
+    source_id VARCHAR(255),           -- e.g., CAA image ID, Spotify album ID
+    source_url VARCHAR(1000),         -- Canonical URL at the source
+    
+    -- Image type
+    type imagery_type NOT NULL,
+    
+    -- Image URLs at different sizes
+    image_url_small VARCHAR(1000),    -- ~250px
+    image_url_medium VARCHAR(1000),   -- ~500px  
+    image_url_large VARCHAR(1000),    -- ~1200px or original
+    
+    -- Deduplication/verification
+    checksum VARCHAR(64),             -- SHA-256 or MD5 from source (CAA provides this)
+    
+    -- Metadata
+    comment TEXT,                     -- Free text comment from source
+    approved BOOLEAN DEFAULT true,    -- Whether approved by source (CAA has this)
+    
+    -- Audit fields
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    
+    -- Uniqueness: one image per (release, source, type)
+    CONSTRAINT release_imagery_unique UNIQUE (release_id, source, type)
+);
+
+
+-- ============================================================================
+-- STEP 3: Create indexes
+-- ============================================================================
+
+-- Index for looking up imagery by release
+CREATE INDEX IF NOT EXISTS idx_release_imagery_release_id 
+    ON release_imagery(release_id);
+
+-- Index for looking up imagery by source
+CREATE INDEX IF NOT EXISTS idx_release_imagery_source 
+    ON release_imagery(source);
+
+-- Index for looking up imagery by type
+CREATE INDEX IF NOT EXISTS idx_release_imagery_type 
+    ON release_imagery(type);
+
+-- Composite index for common query patterns
+CREATE INDEX IF NOT EXISTS idx_release_imagery_release_source 
+    ON release_imagery(release_id, source);
+
+
+-- ============================================================================
+-- STEP 4: Add cover_art_checked_at to releases table
+-- ============================================================================
+
+-- Add column to track when we last checked for cover art
+ALTER TABLE releases
+ADD COLUMN IF NOT EXISTS cover_art_checked_at TIMESTAMP WITH TIME ZONE;
+
+-- Index for finding releases that haven't been checked
+CREATE INDEX IF NOT EXISTS idx_releases_cover_art_checked_at 
+    ON releases(cover_art_checked_at) 
+    WHERE cover_art_checked_at IS NULL;
+
+
+-- ============================================================================
+-- STEP 5: Create trigger for updated_at
+-- ============================================================================
+
+CREATE OR REPLACE FUNCTION update_release_imagery_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = CURRENT_TIMESTAMP;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trigger_release_imagery_updated_at ON release_imagery;
+CREATE TRIGGER trigger_release_imagery_updated_at
+    BEFORE UPDATE ON release_imagery
+    FOR EACH ROW
+    EXECUTE FUNCTION update_release_imagery_updated_at();
+
+
+-- ============================================================================
+-- COMMENTS
+-- ============================================================================
+
+COMMENT ON TABLE release_imagery IS 
+    'Cover art images for releases from multiple sources (CAA, Spotify, etc.)';
+
+COMMENT ON COLUMN release_imagery.release_id IS 
+    'The release this image belongs to';
+
+COMMENT ON COLUMN release_imagery.source IS 
+    'Source of the image (MusicBrainz/CAA, Spotify, Wikipedia, Apple, Amazon)';
+
+COMMENT ON COLUMN release_imagery.source_id IS 
+    'Identifier at the source (e.g., CAA image ID, Spotify album ID)';
+
+COMMENT ON COLUMN release_imagery.source_url IS 
+    'Canonical URL to the image page at the source';
+
+COMMENT ON COLUMN release_imagery.type IS 
+    'Type of cover art (Front or Back)';
+
+COMMENT ON COLUMN release_imagery.image_url_small IS 
+    'URL to small thumbnail (~250px)';
+
+COMMENT ON COLUMN release_imagery.image_url_medium IS 
+    'URL to medium image (~500px)';
+
+COMMENT ON COLUMN release_imagery.image_url_large IS 
+    'URL to large/original image (~1200px)';
+
+COMMENT ON COLUMN release_imagery.checksum IS 
+    'Checksum from source for deduplication (e.g., SHA-256 from CAA)';
+
+COMMENT ON COLUMN release_imagery.approved IS 
+    'Whether the image was approved by the source system';
+
+COMMENT ON COLUMN releases.cover_art_checked_at IS 
+    'When we last checked for cover art for this release (NULL = never checked)';
+
+
+-- ============================================================================
+-- VERIFICATION (uncomment to run)
+-- ============================================================================
+
+-- Check table was created
+-- SELECT column_name, data_type, is_nullable
+-- FROM information_schema.columns
+-- WHERE table_name = 'release_imagery'
+-- ORDER BY ordinal_position;
+
+-- Check releases column was added
+-- SELECT column_name FROM information_schema.columns 
+-- WHERE table_name = 'releases' AND column_name = 'cover_art_checked_at';
+
+-- Check indexes
+-- SELECT indexname FROM pg_indexes WHERE tablename = 'release_imagery';
