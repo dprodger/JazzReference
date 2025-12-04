@@ -72,21 +72,70 @@ ALBUM_ART_MEDIUM_SQL = """
 
 ALBUM_ART_LARGE_SQL = """
     COALESCE(
-        (SELECT ri.image_url_large FROM release_imagery ri 
+        (SELECT ri.image_url_large FROM release_imagery ri
          WHERE ri.release_id = r.default_release_id AND ri.type = 'Front'),
-        (SELECT rel.cover_art_large FROM releases rel 
+        (SELECT rel.cover_art_large FROM releases rel
          WHERE rel.id = r.default_release_id AND rel.cover_art_large IS NOT NULL),
-        (SELECT ri.image_url_large 
-         FROM recording_releases rr 
+        (SELECT ri.image_url_large
+         FROM recording_releases rr
          JOIN release_imagery ri ON rr.release_id = ri.release_id
          WHERE rr.recording_id = r.id AND ri.type = 'Front'
          LIMIT 1),
-        (SELECT rel.cover_art_large 
-         FROM recording_releases rr 
+        (SELECT rel.cover_art_large
+         FROM recording_releases rr
          JOIN releases rel ON rr.release_id = rel.id
          WHERE rr.recording_id = r.id AND rel.cover_art_large IS NOT NULL
          ORDER BY rel.release_year DESC NULLS LAST LIMIT 1)
     ) as album_art_large"""
+
+# ============================================================================
+# SQL FRAGMENTS FOR BACK COVER ART
+# ============================================================================
+# Back covers only come from release_imagery (CAA) - no Spotify fallback
+# Priority: default_release first, then any linked release
+
+BACK_COVER_SMALL_SQL = """
+    COALESCE(
+        (SELECT ri.image_url_small FROM release_imagery ri
+         WHERE ri.release_id = r.default_release_id AND ri.type = 'Back'),
+        (SELECT ri.image_url_small
+         FROM recording_releases rr
+         JOIN release_imagery ri ON rr.release_id = ri.release_id
+         WHERE rr.recording_id = r.id AND ri.type = 'Back'
+         LIMIT 1)
+    ) as back_cover_art_small"""
+
+BACK_COVER_MEDIUM_SQL = """
+    COALESCE(
+        (SELECT ri.image_url_medium FROM release_imagery ri
+         WHERE ri.release_id = r.default_release_id AND ri.type = 'Back'),
+        (SELECT ri.image_url_medium
+         FROM recording_releases rr
+         JOIN release_imagery ri ON rr.release_id = ri.release_id
+         WHERE rr.recording_id = r.id AND ri.type = 'Back'
+         LIMIT 1)
+    ) as back_cover_art_medium"""
+
+BACK_COVER_LARGE_SQL = """
+    COALESCE(
+        (SELECT ri.image_url_large FROM release_imagery ri
+         WHERE ri.release_id = r.default_release_id AND ri.type = 'Back'),
+        (SELECT ri.image_url_large
+         FROM recording_releases rr
+         JOIN release_imagery ri ON rr.release_id = ri.release_id
+         WHERE rr.recording_id = r.id AND ri.type = 'Back'
+         LIMIT 1)
+    ) as back_cover_art_large"""
+
+HAS_BACK_COVER_SQL = """
+    EXISTS(
+        SELECT 1 FROM release_imagery ri
+        WHERE ri.release_id = r.default_release_id AND ri.type = 'Back'
+    ) OR EXISTS(
+        SELECT 1 FROM recording_releases rr
+        JOIN release_imagery ri ON rr.release_id = ri.release_id
+        WHERE rr.recording_id = r.id AND ri.type = 'Back'
+    ) as has_back_cover"""
 
 # For release-level queries (get_recording_releases), we check imagery for specific release
 RELEASE_ART_SMALL_SQL = """
@@ -160,6 +209,11 @@ def get_recordings():
                     {ALBUM_ART_SMALL_SQL},
                     {ALBUM_ART_MEDIUM_SQL},
                     {ALBUM_ART_LARGE_SQL},
+                    -- Back cover art (CAA only)
+                    {BACK_COVER_SMALL_SQL},
+                    {BACK_COVER_MEDIUM_SQL},
+                    {BACK_COVER_LARGE_SQL},
+                    {HAS_BACK_COVER_SQL},
                     r.youtube_url,
                     r.apple_music_url,
                     r.musicbrainz_id,
@@ -216,6 +270,11 @@ def get_recordings():
                     {ALBUM_ART_SMALL_SQL},
                     {ALBUM_ART_MEDIUM_SQL},
                     {ALBUM_ART_LARGE_SQL},
+                    -- Back cover art (CAA only)
+                    {BACK_COVER_SMALL_SQL},
+                    {BACK_COVER_MEDIUM_SQL},
+                    {BACK_COVER_LARGE_SQL},
+                    {HAS_BACK_COVER_SQL},
                     r.youtube_url,
                     r.apple_music_url,
                     r.musicbrainz_id,
@@ -292,6 +351,11 @@ def get_recording_detail(recording_id):
                     {ALBUM_ART_SMALL_SQL},
                     {ALBUM_ART_MEDIUM_SQL},
                     {ALBUM_ART_LARGE_SQL},
+                    -- Back cover art (CAA only)
+                    {BACK_COVER_SMALL_SQL},
+                    {BACK_COVER_MEDIUM_SQL},
+                    {BACK_COVER_LARGE_SQL},
+                    {HAS_BACK_COVER_SQL},
                     r.youtube_url,
                     r.apple_music_url,
                     r.musicbrainz_id,

@@ -61,6 +61,13 @@ Examples:
         help='Re-process recordings even if they already have a recording_date_source'
     )
 
+    script.parser.add_argument(
+        '--batch-size',
+        type=int,
+        default=100,
+        help='Commit after this many updates (default: 100)'
+    )
+
     args = script.parse_args()
 
     # --name implies --force for that song
@@ -94,7 +101,11 @@ Examples:
         'no_date_available': 0,
         'skipped_already_has_source': 0,
         'errors': 0,
+        'commits': 0,
     }
+
+    # Batch commit tracking
+    updates_in_batch = 0
 
     # Find recordings that need backfill
     script.logger.info("Finding recordings to backfill...")
@@ -198,6 +209,7 @@ Examples:
                             mb_first_release,
                             recording_id
                         ))
+                        updates_in_batch += 1
                 else:
                     stats['no_date_available'] += 1
                     # Still update mb_first_release_date if available
@@ -209,14 +221,24 @@ Examples:
                                 updated_at = CURRENT_TIMESTAMP
                             WHERE id = %s
                         """, (mb_first_release, recording_id))
+                        updates_in_batch += 1
 
                     script.logger.debug(
                         f"  [{i}] No date found: {album_title[:40]}"
                     )
 
-            if not args.dry_run:
+                # Batch commit
+                if not args.dry_run and updates_in_batch >= args.batch_size:
+                    conn.commit()
+                    stats['commits'] += 1
+                    script.logger.info(f"  -- Committed batch ({updates_in_batch} updates, total commits: {stats['commits']})")
+                    updates_in_batch = 0
+
+            # Final commit for remaining updates
+            if not args.dry_run and updates_in_batch > 0:
                 conn.commit()
-                script.logger.info("Changes committed to database")
+                stats['commits'] += 1
+                script.logger.info(f"Final commit ({updates_in_batch} updates)")
 
     # Print summary
     script.logger.info("")
@@ -228,6 +250,7 @@ Examples:
         "Updated (first release)": stats['updated_from_first_release'],
         "No date available": stats['no_date_available'],
         "Skipped (already has source)": stats['skipped_already_has_source'],
+        "Commits": stats['commits'],
         "Errors": stats['errors'],
     }, title="BACKFILL SUMMARY")
 
