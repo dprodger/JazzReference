@@ -35,6 +35,10 @@ def parse_mb_date(date_str: str) -> Tuple[Optional[str], Optional[int], Optional
     """
     Parse a MusicBrainz date string (YYYY, YYYY-MM, or YYYY-MM-DD).
 
+    MusicBrainz uses '??' for unknown parts, e.g.:
+    - 2013-??-26 (year and day known, month unknown)
+    - 2013-05-?? (year and month known, day unknown)
+
     Returns:
         Tuple of (formatted_date, year, precision)
         - formatted_date: Full date string for DB (YYYY-MM-DD, using 01 for unknown parts)
@@ -45,16 +49,33 @@ def parse_mb_date(date_str: str) -> Tuple[Optional[str], Optional[int], Optional
         return (None, None, None)
 
     try:
-        if len(date_str) >= 10:
-            # Full date: YYYY-MM-DD
-            return (date_str[:10], int(date_str[:4]), 'day')
-        elif len(date_str) == 7:
-            # Month precision: YYYY-MM
-            return (f"{date_str}-01", int(date_str[:4]), 'month')
-        elif len(date_str) >= 4:
-            # Year only: YYYY
-            return (f"{date_str[:4]}-01-01", int(date_str[:4]), 'year')
-    except (ValueError, TypeError):
+        # Handle MusicBrainz '??' placeholders
+        has_unknown_parts = '?' in date_str
+
+        # Extract parts
+        parts = date_str.split('-')
+        year_str = parts[0] if len(parts) > 0 else None
+        month_str = parts[1] if len(parts) > 1 else None
+        day_str = parts[2] if len(parts) > 2 else None
+
+        # Check if year is valid (not ????)
+        if not year_str or '?' in year_str:
+            return (None, None, None)
+
+        year = int(year_str)
+
+        # Determine precision and build formatted date
+        if day_str and '?' not in day_str and month_str and '?' not in month_str:
+            # Full date known: YYYY-MM-DD
+            return (f"{year:04d}-{month_str}-{day_str}", year, 'day')
+        elif month_str and '?' not in month_str:
+            # Month known: YYYY-MM
+            return (f"{year:04d}-{month_str}-01", year, 'month')
+        else:
+            # Year only
+            return (f"{year:04d}-01-01", year, 'year')
+
+    except (ValueError, TypeError, IndexError):
         pass
 
     return (None, None, None)
