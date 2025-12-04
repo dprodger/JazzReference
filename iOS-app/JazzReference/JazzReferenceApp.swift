@@ -1,6 +1,7 @@
 // Jazz Reference iOS App
 // SwiftUI application for browsing jazz standards
 // UPDATED FOR PHASE 5: Connected AuthenticationManager to RepertoireManager
+// UPDATED: Added onboarding flow for first-time users
 
 import SwiftUI
 import Combine
@@ -164,6 +165,10 @@ struct JazzReferenceApp: App {
     
     // Password reset state
     @State private var resetPasswordToken: String?
+    
+    // Onboarding state - persisted across launches
+    @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
+    @State private var showingOnboarding = false
 
     // ADD THIS INITIALIZER
     init() {
@@ -257,6 +262,11 @@ struct JazzReferenceApp: App {
                     // PHASE 5: Connect RepertoireManager to AuthenticationManager
                     repertoireManager.setAuthManager(authManager)
                     print("📚 Connected RepertoireManager to AuthenticationManager")
+                    
+                    // Show onboarding on first launch
+                    if !hasCompletedOnboarding {
+                        showingOnboarding = true
+                    }
                 }
                 .onChange(of: scenePhase) { oldPhase, newPhase in
                     if newPhase == .active {
@@ -296,6 +306,13 @@ struct JazzReferenceApp: App {
                     ResetPasswordView(token: data.token)
                         .environmentObject(authManager)
                 }
+                .fullScreenCover(isPresented: $showingOnboarding) {
+                    OnboardingView(isPresented: $showingOnboarding)
+                        .onDisappear {
+                            // Mark onboarding as completed when dismissed
+                            hasCompletedOnboarding = true
+                        }
+                }
                 .ignoresSafeArea()
                 .environmentObject(authManager)
                 .onOpenURL { url in
@@ -307,7 +324,7 @@ struct JazzReferenceApp: App {
     
     private func checkForImportedArtist() {
         if let data = SharedArtistDataManager.retrieveSharedData() {
-            NSLog("🔥 Imported artist data detected: %@", data.name)
+            NSLog("📥 Imported artist data detected: %@", data.name)
             importedArtistData = data
             showingArtistCreation = true
         } else {
@@ -317,7 +334,7 @@ struct JazzReferenceApp: App {
     
     private func checkForImportedSong() {
         if let data = SharedSongDataManager.retrieveSharedData() {
-            NSLog("🔥 Imported song data detected: %@", data.title)
+            NSLog("📥 Imported song data detected: %@", data.title)
             importedSongData = data
             showingSongCreation = true
         } else {

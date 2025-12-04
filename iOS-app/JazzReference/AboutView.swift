@@ -15,6 +15,7 @@ struct AboutView: View {
     @State private var isLoadingQueue: Bool = true
     @State private var isRefreshing: Bool = false
     @State private var rotationAngle: Double = 0
+    @State private var showingOnboarding: Bool = false
     
     let networkManager = NetworkManager()
     
@@ -71,6 +72,27 @@ struct AboutView: View {
                 }
                 .padding(.horizontal, 40)
                 .shadow(color: .black.opacity(0.7), radius: 5, x: 0, y: 2)
+                
+                Spacer()
+                
+                // View Tutorial Button
+                Button(action: {
+                    showingOnboarding = true
+                }) {
+                    HStack {
+                        Image(systemName: "book.fill")
+                        Text("View Tutorial")
+                    }
+                    .font(.headline)
+                    .foregroundColor(JazzTheme.burgundy)
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 12)
+                    .background(
+                        RoundedRectangle(cornerRadius: 10)
+                            .fill(Color.white.opacity(0.95))
+                    )
+                    .shadow(color: .black.opacity(0.3), radius: 4, x: 0, y: 2)
+                }
                 
                 Spacer()
                 
@@ -193,6 +215,9 @@ struct AboutView: View {
         .toolbarColorScheme(.dark, for: .navigationBar)
         .task {
             await loadQueueStatus()
+        }
+        .fullScreenCover(isPresented: $showingOnboarding) {
+            OnboardingView(isPresented: $showingOnboarding)
         }
     }
     

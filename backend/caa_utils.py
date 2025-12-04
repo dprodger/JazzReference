@@ -338,12 +338,28 @@ class CoverArtArchiveClient:
         
         return None
     
+    def _ensure_https(self, url: Optional[str]) -> Optional[str]:
+        """
+        Convert HTTP URLs to HTTPS for iOS App Transport Security compatibility.
+        
+        Args:
+            url: URL that may be HTTP or HTTPS
+            
+        Returns:
+            URL with https:// scheme, or None if input is None
+        """
+        if url and url.startswith('http://'):
+            return url.replace('http://', 'https://', 1)
+        return url
+    
     def extract_imagery_data(self, release_mbid: str) -> List[Dict[str, Any]]:
         """
         Extract imagery data suitable for database insertion.
         
         Processes the raw CAA response and returns a list of dicts
         ready for insertion into the release_imagery table.
+        
+        Note: All URLs are converted to HTTPS for iOS ATS compatibility.
         
         Args:
             release_mbid: MusicBrainz release ID
@@ -352,11 +368,11 @@ class CoverArtArchiveClient:
             List of dicts with keys matching release_imagery columns:
             - source: 'MusicBrainz'
             - source_id: CAA image ID
-            - source_url: Full image URL
+            - source_url: Full image URL (HTTPS)
             - type: 'Front' or 'Back'
-            - image_url_small: 250px thumbnail
-            - image_url_medium: 500px thumbnail
-            - image_url_large: 1200px thumbnail
+            - image_url_small: 250px thumbnail (HTTPS)
+            - image_url_medium: 500px thumbnail (HTTPS)
+            - image_url_large: 1200px thumbnail (HTTPS)
             - checksum: None (CAA doesn't provide checksums in API)
             - comment: Image comment
             - approved: Whether approved
@@ -375,14 +391,20 @@ class CoverArtArchiveClient:
             # We only care about Front and Back
             for img_type in image_types:
                 if img_type in ('Front', 'Back'):
+                    # Get URLs and ensure they're HTTPS
+                    small_url = self._ensure_https(thumbnails.get('250') or thumbnails.get('small'))
+                    medium_url = self._ensure_https(thumbnails.get('500') or thumbnails.get('large'))
+                    large_url = self._ensure_https(thumbnails.get('1200') or image.get('image'))
+                    source_url = self._ensure_https(image.get('image'))
+                    
                     results.append({
                         'source': 'MusicBrainz',
                         'source_id': str(image.get('id', '')),
-                        'source_url': image.get('image'),
+                        'source_url': source_url,
                         'type': img_type,
-                        'image_url_small': thumbnails.get('250') or thumbnails.get('small'),
-                        'image_url_medium': thumbnails.get('500') or thumbnails.get('large'),
-                        'image_url_large': thumbnails.get('1200') or image.get('image'),
+                        'image_url_small': small_url,
+                        'image_url_medium': medium_url,
+                        'image_url_large': large_url,
                         'checksum': None,  # CAA doesn't provide in API response
                         'comment': image.get('comment') or None,
                         'approved': image.get('approved', True)
