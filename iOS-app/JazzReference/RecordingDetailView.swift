@@ -3,6 +3,7 @@
 //  JazzReference
 //
 //  Updated with JazzTheme color palette and consistent styling
+//  UPDATED: Added back cover flip support with 3D animation
 //
 
 import SwiftUI
@@ -23,6 +24,7 @@ struct RecordingDetailView: View {
     @State private var selectedReleaseId: String?
     @State private var showingStreamingPicker = false
     @State private var isLearnMoreExpanded = false
+    @State private var showingBackCover = false
     private let maxReleasesToShow = 5
     @Environment(\.openURL) var openURL
     
@@ -35,13 +37,23 @@ struct RecordingDetailView: View {
         return releases.first { $0.id == releaseId }
     }
     
-    /// Album art URL - uses selected release if user picked one, otherwise uses bestAlbumArt*
+    /// Front cover art URL - uses selected release if user picked one, otherwise uses bestAlbumArt*
     private var displayAlbumArtLarge: String? {
         if let release = selectedRelease {
             return release.coverArtLarge ?? release.coverArtMedium
         }
         // Use bestAlbumArt* which is consistent across API endpoints
         return recording?.bestAlbumArtLarge ?? recording?.bestAlbumArtMedium
+    }
+
+    /// Back cover art URL - uses recording's back cover fields
+    private var displayBackCoverArtLarge: String? {
+        return recording?.backCoverArtLarge ?? recording?.backCoverArtMedium
+    }
+
+    /// Whether the recording has a back cover available for flipping
+    private var canFlipToBackCover: Bool {
+        recording?.canFlipToBackCover ?? false
     }
     
     /// Spotify URL - uses selected release if user picked one, otherwise uses bestSpotifyUrl
@@ -126,40 +138,98 @@ struct RecordingDetailView: View {
                     VStack(alignment: .leading, spacing: 20) {
                         // Album Information
                         VStack(alignment: .leading, spacing: 12) {
-                            // Album artwork with play button overlay
-                            ZStack {
-                                if let albumArtUrl = displayAlbumArtLarge {
-                                    AsyncImage(url: URL(string: albumArtUrl)) { phase in
-                                        switch phase {
-                                        case .empty:
-                                            Rectangle()
-                                                .fill(Color(.systemGray5))
-                                                .frame(maxWidth: .infinity)
-                                                .aspectRatio(1, contentMode: .fit)
-                                                .cornerRadius(12)
-                                                .overlay(
-                                                    ProgressView()
-                                                        .tint(JazzTheme.brass)
-                                                )
-                                        case .success(let image):
-                                            image
-                                                .resizable()
-                                                .aspectRatio(contentMode: .fit)
-                                                .frame(maxWidth: .infinity)
-                                                .cornerRadius(12)
-                                        case .failure:
-                                            albumArtPlaceholder
-                                        @unknown default:
-                                            EmptyView()
+                            // Album artwork with play button overlay and flip support
+                            ZStack(alignment: .topTrailing) {
+                                // Card-flip container
+                                ZStack {
+                                    // Front cover
+                                    if let frontUrl = displayAlbumArtLarge {
+                                        AsyncImage(url: URL(string: frontUrl)) { phase in
+                                            switch phase {
+                                            case .empty:
+                                                Rectangle()
+                                                    .fill(Color(.systemGray5))
+                                                    .frame(maxWidth: .infinity)
+                                                    .aspectRatio(1, contentMode: .fit)
+                                                    .cornerRadius(12)
+                                                    .overlay(
+                                                        ProgressView()
+                                                            .tint(JazzTheme.brass)
+                                                    )
+                                            case .success(let image):
+                                                image
+                                                    .resizable()
+                                                    .aspectRatio(contentMode: .fit)
+                                                    .frame(maxWidth: .infinity)
+                                                    .cornerRadius(12)
+                                            case .failure:
+                                                albumArtPlaceholder
+                                            @unknown default:
+                                                EmptyView()
+                                            }
                                         }
+                                        .opacity(showingBackCover ? 0 : 1)
+                                    } else {
+                                        albumArtPlaceholder
+                                            .opacity(showingBackCover ? 0 : 1)
                                     }
-                                } else {
-                                    albumArtPlaceholder
+
+                                    // Back cover (pre-rotated so it appears correct after flip)
+                                    if let backUrl = displayBackCoverArtLarge {
+                                        AsyncImage(url: URL(string: backUrl)) { phase in
+                                            switch phase {
+                                            case .empty:
+                                                Rectangle()
+                                                    .fill(Color(.systemGray5))
+                                                    .frame(maxWidth: .infinity)
+                                                    .aspectRatio(1, contentMode: .fit)
+                                                    .cornerRadius(12)
+                                                    .overlay(
+                                                        ProgressView()
+                                                            .tint(JazzTheme.brass)
+                                                    )
+                                            case .success(let image):
+                                                image
+                                                    .resizable()
+                                                    .aspectRatio(contentMode: .fit)
+                                                    .frame(maxWidth: .infinity)
+                                                    .cornerRadius(12)
+                                            case .failure:
+                                                albumArtPlaceholder
+                                            @unknown default:
+                                                EmptyView()
+                                            }
+                                        }
+                                        .rotation3DEffect(.degrees(180), axis: (x: 0, y: 1, z: 0))
+                                        .opacity(showingBackCover ? 1 : 0)
+                                    }
                                 }
-                                
-                                // Play button overlay
-                                if hasStreamingSource {
+                                .rotation3DEffect(
+                                    .degrees(showingBackCover ? 180 : 0),
+                                    axis: (x: 0, y: 1, z: 0)
+                                )
+
+                                // Play button overlay (only on front)
+                                if hasStreamingSource && !showingBackCover {
                                     playButtonOverlay
+                                }
+
+                                // Flip button badge (shown when back cover available)
+                                if canFlipToBackCover {
+                                    Button(action: {
+                                        withAnimation(.easeInOut(duration: 0.4)) {
+                                            showingBackCover.toggle()
+                                        }
+                                    }) {
+                                        Image(systemName: showingBackCover ? "arrow.uturn.backward" : "arrow.trianglehead.2.clockwise.rotate.90")
+                                            .foregroundColor(.white)
+                                            .font(.system(size: 14, weight: .semibold))
+                                            .padding(10)
+                                            .background(Color.black.opacity(0.6))
+                                            .clipShape(Circle())
+                                    }
+                                    .buttonStyle(PlainButtonStyle())
+                                    .padding(12)
                                 }
                             }
                             .shadow(radius: 8)

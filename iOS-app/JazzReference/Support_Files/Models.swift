@@ -83,6 +83,13 @@ struct Recording: Codable, Identifiable {
     let bestCoverArtSmall: String?
     let bestCoverArtMedium: String?
     let bestCoverArtLarge: String?
+
+    // Back cover art (from Cover Art Archive via release_imagery)
+    let backCoverArtSmall: String?
+    let backCoverArtMedium: String?
+    let backCoverArtLarge: String?
+    let hasBackCover: Bool?
+
     // Best Spotify URL from releases (provided by API via subqueries)
     let bestSpotifyUrlFromRelease: String?
     
@@ -112,6 +119,10 @@ struct Recording: Codable, Identifiable {
         case bestCoverArtSmall = "best_cover_art_small"
         case bestCoverArtMedium = "best_cover_art_medium"
         case bestCoverArtLarge = "best_cover_art_large"
+        case backCoverArtSmall = "back_cover_art_small"
+        case backCoverArtMedium = "back_cover_art_medium"
+        case backCoverArtLarge = "back_cover_art_large"
+        case hasBackCover = "has_back_cover"
         case bestSpotifyUrlFromRelease = "best_spotify_url"
         case youtubeUrl = "youtube_url"
         case appleMusicUrl = "apple_music_url"
@@ -226,7 +237,12 @@ struct Recording: Codable, Identifiable {
         // No album art available
         return nil
     }
-    
+
+    /// Whether this recording has a back cover available for flipping
+    var canFlipToBackCover: Bool {
+        hasBackCover == true && backCoverArtMedium != nil
+    }
+
     /// Count of releases with Spotify links
     var spotifyReleaseCount: Int {
         releases?.filter { $0.hasSpotify }.count ?? 0
