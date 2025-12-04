@@ -7,6 +7,10 @@ UPDATED: Recording-Centric Architecture
 - Spotify URL and album art come from default_release or best release via subqueries
 - Dropped columns (spotify_url, spotify_track_id, album_art_*) removed from recordings table
 
+UPDATED: Release Imagery Support
+- Album art now checks release_imagery table first (CAA images)
+- Falls back to releases table (Spotify images) if no release_imagery exists
+
 Provides endpoints for listing, searching, and creating songs.
 """
 from flask import Blueprint, jsonify, request
@@ -17,6 +21,95 @@ from utils.helpers import safe_strip
 
 logger = logging.getLogger(__name__)
 songs_bp = Blueprint('songs', __name__)
+
+
+# ============================================================================
+# SQL FRAGMENTS FOR ALBUM ART (same as recordings.py)
+# ============================================================================
+# These fragments implement the priority: 
+#   1. release_imagery (CAA) for default_release
+#   2. releases table (Spotify) for default_release  
+#   3. release_imagery (CAA) for any linked release
+#   4. releases table (Spotify) for any linked release
+
+ALBUM_ART_SMALL_SQL = """
+    COALESCE(
+        -- 1. release_imagery (Front) for default release
+        (SELECT ri.image_url_small FROM release_imagery ri 
+         WHERE ri.release_id = r.default_release_id AND ri.type = 'Front'),
+        -- 2. releases table for default release
+        (SELECT rel_sub.cover_art_small FROM releases rel_sub 
+         WHERE rel_sub.id = r.default_release_id AND rel_sub.cover_art_small IS NOT NULL),
+        -- 3. release_imagery (Front) for any linked release
+        (SELECT ri.image_url_small 
+         FROM recording_releases rr_sub 
+         JOIN release_imagery ri ON rr_sub.release_id = ri.release_id
+         WHERE rr_sub.recording_id = r.id AND ri.type = 'Front'
+         LIMIT 1),
+        -- 4. releases table for any linked release
+        (SELECT rel_sub.cover_art_small 
+         FROM recording_releases rr_sub 
+         JOIN releases rel_sub ON rr_sub.release_id = rel_sub.id
+         WHERE rr_sub.recording_id = r.id AND rel_sub.cover_art_small IS NOT NULL
+         ORDER BY rel_sub.release_year DESC NULLS LAST LIMIT 1)
+    ) as best_cover_art_small"""
+
+ALBUM_ART_MEDIUM_SQL = """
+    COALESCE(
+        (SELECT ri.image_url_medium FROM release_imagery ri 
+         WHERE ri.release_id = r.default_release_id AND ri.type = 'Front'),
+        (SELECT rel_sub.cover_art_medium FROM releases rel_sub 
+         WHERE rel_sub.id = r.default_release_id AND rel_sub.cover_art_medium IS NOT NULL),
+        (SELECT ri.image_url_medium 
+         FROM recording_releases rr_sub 
+         JOIN release_imagery ri ON rr_sub.release_id = ri.release_id
+         WHERE rr_sub.recording_id = r.id AND ri.type = 'Front'
+         LIMIT 1),
+        (SELECT rel_sub.cover_art_medium 
+         FROM recording_releases rr_sub 
+         JOIN releases rel_sub ON rr_sub.release_id = rel_sub.id
+         WHERE rr_sub.recording_id = r.id AND rel_sub.cover_art_medium IS NOT NULL
+         ORDER BY rel_sub.release_year DESC NULLS LAST LIMIT 1)
+    ) as best_cover_art_medium"""
+
+ALBUM_ART_LARGE_SQL = """
+    COALESCE(
+        (SELECT ri.image_url_large FROM release_imagery ri 
+         WHERE ri.release_id = r.default_release_id AND ri.type = 'Front'),
+        (SELECT rel_sub.cover_art_large FROM releases rel_sub 
+         WHERE rel_sub.id = r.default_release_id AND rel_sub.cover_art_large IS NOT NULL),
+        (SELECT ri.image_url_large 
+         FROM recording_releases rr_sub 
+         JOIN release_imagery ri ON rr_sub.release_id = ri.release_id
+         WHERE rr_sub.recording_id = r.id AND ri.type = 'Front'
+         LIMIT 1),
+        (SELECT rel_sub.cover_art_large 
+         FROM recording_releases rr_sub 
+         JOIN releases rel_sub ON rr_sub.release_id = rel_sub.id
+         WHERE rr_sub.recording_id = r.id AND rel_sub.cover_art_large IS NOT NULL
+         ORDER BY rel_sub.release_year DESC NULLS LAST LIMIT 1)
+    ) as best_cover_art_large"""
+
+# For authority recommendations - uses 'r' alias for recordings
+AUTHORITY_ALBUM_ART_SQL = """
+    COALESCE(
+        (SELECT ri.image_url_large FROM release_imagery ri 
+         WHERE ri.release_id = r.default_release_id AND ri.type = 'Front'),
+        (SELECT rel.cover_art_large FROM releases rel 
+         WHERE rel.id = r.default_release_id AND rel.cover_art_large IS NOT NULL),
+        (SELECT ri.image_url_large 
+         FROM recording_releases rr
+         JOIN release_imagery ri ON rr.release_id = ri.release_id
+         WHERE rr.recording_id = r.id AND ri.type = 'Front'
+         LIMIT 1),
+        (SELECT rel.cover_art_large 
+         FROM recording_releases rr
+         JOIN releases rel ON rr.release_id = rel.id
+         WHERE rr.recording_id = r.id AND rel.cover_art_large IS NOT NULL
+         ORDER BY rel.release_year DESC NULLS LAST
+         LIMIT 1)
+    ) as matched_album_art"""
+
 
 # All song-related endpoints:
 # - GET /api/songs
@@ -72,6 +165,10 @@ def get_song_detail(song_id):
     - Spotify/artwork data now comes entirely from releases via subqueries
     - Performers come from recording_performers table
     
+    UPDATED: Release Imagery Support
+    - Album art checks release_imagery table first (CAA images)
+    - Falls back to releases table (Spotify images) if no release_imagery exists
+    
     NEW: Includes authority recommendation counts and sort parameter support.
     """
     try:
@@ -102,7 +199,7 @@ def get_song_detail(song_id):
             recordings_order = "r.recording_year ASC NULLS LAST"
         
         # ONE QUERY to get everything - song, recordings+performers+authority, transcriptions
-        # UPDATED: Removed dropped columns, all Spotify/artwork from releases
+        # UPDATED: Album art now uses release_imagery priority
         combined_query = f"""
             WITH song_data AS (
                 SELECT 
@@ -142,40 +239,10 @@ def get_song_detail(song_id):
                            rel_sub.release_year DESC NULLS LAST
                          LIMIT 1)
                     ) as best_spotify_url,
-                    -- Best cover art from default release or Spotify-linked releases
-                    COALESCE(
-                        (SELECT rel_sub.cover_art_small FROM releases rel_sub WHERE rel_sub.id = r.default_release_id AND rel_sub.cover_art_small IS NOT NULL),
-                        (SELECT rel.cover_art_small 
-                         FROM recording_releases rr_sub
-                         JOIN releases rel ON rr_sub.release_id = rel.id
-                         WHERE rr_sub.recording_id = r.id 
-                           AND rel.spotify_album_id IS NOT NULL 
-                           AND rel.cover_art_small IS NOT NULL
-                         ORDER BY rel.release_year DESC NULLS LAST
-                         LIMIT 1)
-                    ) as best_cover_art_small,
-                    COALESCE(
-                        (SELECT rel_sub.cover_art_medium FROM releases rel_sub WHERE rel_sub.id = r.default_release_id AND rel_sub.cover_art_medium IS NOT NULL),
-                        (SELECT rel.cover_art_medium 
-                         FROM recording_releases rr_sub
-                         JOIN releases rel ON rr_sub.release_id = rel.id
-                         WHERE rr_sub.recording_id = r.id 
-                           AND rel.spotify_album_id IS NOT NULL 
-                           AND rel.cover_art_medium IS NOT NULL
-                         ORDER BY rel.release_year DESC NULLS LAST
-                         LIMIT 1)
-                    ) as best_cover_art_medium,
-                    COALESCE(
-                        (SELECT rel_sub.cover_art_large FROM releases rel_sub WHERE rel_sub.id = r.default_release_id AND rel_sub.cover_art_large IS NOT NULL),
-                        (SELECT rel.cover_art_large 
-                         FROM recording_releases rr_sub
-                         JOIN releases rel ON rr_sub.release_id = rel.id
-                         WHERE rr_sub.recording_id = r.id 
-                           AND rel.spotify_album_id IS NOT NULL 
-                           AND rel.cover_art_large IS NOT NULL
-                         ORDER BY rel.release_year DESC NULLS LAST
-                         LIMIT 1)
-                    ) as best_cover_art_large,
+                    -- Album art with release_imagery priority
+                    {ALBUM_ART_SMALL_SQL},
+                    {ALBUM_ART_MEDIUM_SQL},
+                    {ALBUM_ART_LARGE_SQL},
                     r.youtube_url,
                     r.apple_music_url,
                     r.musicbrainz_id,
@@ -273,202 +340,157 @@ def get_song_detail(song_id):
 #    - REMOVED: r.spotify_url, r.spotify_track_id, r.album_art_small/medium/large (dropped columns)
 #    - ADDED: r.default_release_id to GROUP BY
 #    - Spotify URL comes from best_spotify_url subquery (default release or best available)
-#    - Cover art comes from best_cover_art_* subqueries (default release or best available)
+#    - Cover art comes from best_cover_art_* subqueries with release_imagery priority
 #    - Performers still from recording_performers (unchanged)
 #
 # 3. ORDER BY - Made dynamic based on sort parameter
 #    - Default 'year' sorts by recording year
 #    - 'name' sorts by leader's last name
 #
-# 4. PERFORMANCE CHARACTERISTICS:
-#    - Still ONE database query (single network round trip)
-#    - Uses existing indexes on recordings(song_id) and song_authority_recommendations(recording_id)
-#    - Subqueries for Spotify/artwork are correlated but efficient with indexes
-#
-# 5. RESPONSE FORMAT:
-#    Song object now includes:
-#    - authority_recommendation_count: int
-#    
-#    Each recording now includes:
-#    - best_spotify_url: string (from releases)
-#    - best_cover_art_small/medium/large: string (from releases)
-#    - authority_count: int
-#    - authority_sources: string[]
-#    - performers: array (from recording_performers)
-
-   
-@songs_bp.route('/api/songs/search', methods=['GET'])
-def search_songs():
-    """
-    Search for songs by title
-    
-    Query Parameters:
-        title: Song title to search for (case-insensitive partial match)
-        
-    Returns:
-        List of matching songs with their details
-    """
-    title = request.args.get('title', '').strip()
-    
-    if not title:
-        return jsonify({'error': 'Title parameter is required'}), 400
-    
-    try:
-        with db_tools.get_db_connection() as conn:
-            with conn.cursor() as cur:
-            
-                # Search for songs with titles containing the search term (case-insensitive)
-                # Use ILIKE for case-insensitive matching
-                cur.execute("""
-                    SELECT 
-                        id,
-                        title,
-                        composer,
-                        structure,
-                        musicbrainz_id,
-                        wikipedia_url,
-                        external_references
-                    FROM songs
-                    WHERE LOWER(title) LIKE LOWER(%s)
-                    ORDER BY 
-                        -- Exact matches first
-                        CASE WHEN LOWER(title) = LOWER(%s) THEN 0 ELSE 1 END,
-                        -- Then by title length (shorter = more likely to be what we want)
-                        LENGTH(title),
-                        title
-                    LIMIT 10
-                """, (f'%{title}%', title))
-                
-                songs = cur.fetchall()
-                
-                return jsonify(songs)
-                
-    except Exception as e:
-        logger.error(f"Error searching songs: {e}")
-        return jsonify({'error': 'Failed to search songs', 'detail': str(e)}), 500
+# 4. RELEASE IMAGERY - Added priority for CAA images
+#    - Checks release_imagery table first (type='Front')
+#    - Falls back to releases table (Spotify images)
 
 
 @songs_bp.route('/api/songs', methods=['POST'])
 def create_song():
-    """Create a new song from iOS app (typically from MusicBrainz import)"""
+    """Create a new song"""
     try:
         data = request.get_json()
         
-        # Validate required fields
-        title = data.get('title')
-        if not title or not title.strip():
-            return jsonify({'error': 'Song title is required'}), 400
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
         
-        title = title.strip()
-        
-        # Optional fields - safely handle None values
+        title = safe_strip(data.get('title'))
         composer = safe_strip(data.get('composer'))
+        structure = safe_strip(data.get('structure'))
+        song_reference = safe_strip(data.get('song_reference'))
         musicbrainz_id = safe_strip(data.get('musicbrainz_id'))
         wikipedia_url = safe_strip(data.get('wikipedia_url'))
-        structure = safe_strip(data.get('structure'))
+        external_references = data.get('external_references')
         
-        # Handle external references (JSON field)
-        external_refs = data.get('external_references', {})
-        if not isinstance(external_refs, dict):
-            external_refs = {}
+        if not title:
+            return jsonify({'error': 'Title is required'}), 400
         
-        # Note: wikipedia_url is now stored in its own column, not in external_references
+        # Build dynamic INSERT
+        fields = ['title']
+        values = [title]
+        placeholders = ['%s']
         
-        # Start transaction
-        with db_tools.get_db_connection() as conn:
-            with conn.cursor() as cur:
-                # Check if song already exists by title (case-insensitive)
-                cur.execute("""
-                    SELECT id, title, musicbrainz_id FROM songs 
-                    WHERE LOWER(title) = LOWER(%s)
-                """, (title,))
-                
-                existing = cur.fetchone()
-                if existing:
-                    return jsonify({
-                        'error': 'Song already exists',
-                        'existing_song': existing
-                    }), 409
-                
-                # Check if song exists by MusicBrainz ID
-                if musicbrainz_id:
-                    cur.execute("""
-                        SELECT id, title FROM songs 
-                        WHERE musicbrainz_id = %s
-                    """, (musicbrainz_id,))
-                    
-                    existing_by_mbid = cur.fetchone()
-                    if existing_by_mbid:
-                        return jsonify({
-                            'error': 'Song with this MusicBrainz ID already exists',
-                            'existing_song': existing_by_mbid
-                        }), 409
-                
-                # Insert new song
-                cur.execute("""
-                    INSERT INTO songs (
-                        title, 
-                        composer, 
-                        musicbrainz_id,
-                        wikipedia_url,
-                        structure,
-                        external_references,
-                        created_at,
-                        updated_at
-                    ) VALUES (%s, %s, %s, %s, %s, %s::jsonb, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                    RETURNING id, title, composer, musicbrainz_id, wikipedia_url
-                """, (
-                    title,
-                    composer,
-                    musicbrainz_id,
-                    wikipedia_url,
-                    structure,
-                    json.dumps(external_refs) if external_refs else None
-                ))
-                
-                new_song = cur.fetchone()
-                
-        logger.info(f"Created new song: {new_song['title']} (ID: {new_song['id']})")
+        if composer:
+            fields.append('composer')
+            values.append(composer)
+            placeholders.append('%s')
+        
+        if structure:
+            fields.append('structure')
+            values.append(structure)
+            placeholders.append('%s')
+        
+        if song_reference:
+            fields.append('song_reference')
+            values.append(song_reference)
+            placeholders.append('%s')
+        
+        if musicbrainz_id:
+            fields.append('musicbrainz_id')
+            values.append(musicbrainz_id)
+            placeholders.append('%s')
+        
+        if wikipedia_url:
+            fields.append('wikipedia_url')
+            values.append(wikipedia_url)
+            placeholders.append('%s')
+        
+        if external_references:
+            fields.append('external_references')
+            if isinstance(external_references, dict):
+                values.append(json.dumps(external_references))
+            else:
+                values.append(external_references)
+            placeholders.append('%s')
+        
+        query = f"""
+            INSERT INTO songs ({', '.join(fields)})
+            VALUES ({', '.join(placeholders)})
+            RETURNING id, title, composer, structure, musicbrainz_id, wikipedia_url, 
+                      song_reference, external_references, created_at, updated_at
+        """
+        
+        result = db_tools.execute_query(query, values, fetch_one=True)
+        
+        logger.info(f"Created new song: {title} (ID: {result['id']})")
         
         return jsonify({
             'success': True,
             'message': 'Song created successfully',
-            'song': new_song
+            'song': result
         }), 201
-        
-    except KeyError as e:
-        logger.error(f"Missing data field: {e}")
-        return jsonify({
-            'success': False,
-            'error': f'Invalid request data: {str(e)}'
-        }), 400
         
     except Exception as e:
         logger.error(f"Error creating song: {e}")
-        return jsonify({
-            'success': False,
-            'error': 'An error occurred while creating the song. Please try again later.'
-        }), 500
+        return jsonify({'error': 'Failed to create song', 'detail': str(e)}), 500
 
+
+@songs_bp.route('/api/songs/search', methods=['GET'])
+def search_songs():
+    """Search songs by title and optionally composer - returns first 20 matches"""
+    search_query = request.args.get('q', '').strip()
+    
+    if not search_query:
+        return jsonify([])
+    
+    try:
+        query = """
+            SELECT id, title, composer, musicbrainz_id
+            FROM songs
+            WHERE title ILIKE %s OR composer ILIKE %s
+            ORDER BY 
+                CASE WHEN title ILIKE %s THEN 0 ELSE 1 END,
+                title
+            LIMIT 20
+        """
+        params = (
+            f'%{search_query}%', 
+            f'%{search_query}%',
+            f'{search_query}%'  # Exact prefix match ranked higher
+        )
+        
+        songs = db_tools.execute_query(query, params)
+        return jsonify(songs if songs else [])
+        
+    except Exception as e:
+        logger.error(f"Error searching songs: {e}")
+        return jsonify({'error': 'Search failed', 'detail': str(e)}), 500
+
+
+# ============================================================================
+# 2. UPDATE ENDPOINT: PATCH /api/songs/<song_id>
+# ============================================================================
 
 @songs_bp.route('/api/songs/<song_id>', methods=['PATCH'])
-def update_song_musicbrainz_id(song_id):
+def update_song(song_id):
     """
-    Update a song's metadata (MusicBrainz ID, Wikipedia URL, etc.)
-    Used when associating an existing song with external references
+    Update a song's MusicBrainz ID and/or Wikipedia URL
+    
+    This is a targeted update endpoint primarily for iOS app to set
+    identifiers after manual research.
     """
     try:
         data = request.get_json()
+        
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+        
         musicbrainz_id = safe_strip(data.get('musicbrainz_id'))
         wikipedia_url = safe_strip(data.get('wikipedia_url'))
         
-        # At least one field must be provided
         if not musicbrainz_id and not wikipedia_url:
-            return jsonify({'error': 'At least one field (musicbrainz_id or wikipedia_url) is required'}), 400
+            return jsonify({'error': 'At least one field (musicbrainz_id or wikipedia_url) must be provided'}), 400
         
         with db_tools.get_db_connection() as conn:
             with conn.cursor() as cur:
-                # Check if song exists
+                # Check song exists
                 cur.execute("SELECT id, title FROM songs WHERE id = %s", (song_id,))
                 song = cur.fetchone()
                 
@@ -542,6 +564,10 @@ def get_song_authority_recommendations(song_id):
     UPDATED: Recording-Centric Architecture
     - Spotify URL and album art now come from releases via subqueries
     - Dropped columns no longer exist on recordings table
+    
+    UPDATED: Release Imagery Support
+    - Album art checks release_imagery table first (CAA images)
+    - Falls back to releases table (Spotify images)
     """
     try:
         with db_tools.get_db_connection() as conn:
@@ -552,8 +578,8 @@ def get_song_authority_recommendations(song_id):
                     return jsonify({'error': 'Song not found'}), 404
                 
                 # Get all recommendations with optional recording details
-                # UPDATED: Spotify URL and album art from releases, not recordings
-                cur.execute("""
+                # UPDATED: Spotify URL and album art from releases with release_imagery priority
+                cur.execute(f"""
                     SELECT sar.id, sar.source, sar.recommendation_text, sar.source_url,
                            sar.artist_name, sar.album_title, sar.recording_year,
                            sar.itunes_album_id, sar.itunes_track_id,
@@ -578,17 +604,8 @@ def get_song_authority_recommendations(song_id):
                                   rel.release_year DESC NULLS LAST
                                 LIMIT 1)
                            ) as matched_spotify_url,
-                           -- Get album art from default release or best available
-                           COALESCE(
-                               (SELECT rel.cover_art_large FROM releases rel 
-                                WHERE rel.id = r.default_release_id AND rel.cover_art_large IS NOT NULL),
-                               (SELECT rel.cover_art_large 
-                                FROM recording_releases rr
-                                JOIN releases rel ON rr.release_id = rel.id
-                                WHERE rr.recording_id = r.id AND rel.cover_art_large IS NOT NULL
-                                ORDER BY rel.release_year DESC NULLS LAST
-                                LIMIT 1)
-                           ) as matched_album_art
+                           -- Album art with release_imagery priority
+                           {AUTHORITY_ALBUM_ART_SQL}
                     FROM song_authority_recommendations sar
                     LEFT JOIN recordings r ON sar.recording_id = r.id
                     WHERE sar.song_id = %s

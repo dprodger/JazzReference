@@ -2,120 +2,36 @@
 """
 MusicBrainz Release Importer - Command Line Interface
 
-Fetches recordings and releases for songs with MusicBrainz IDs and imports them 
+Fetches recordings and releases for songs with MusicBrainz IDs and imports them
 into the database. Creates recordings, releases, and links performers to recordings.
-
-This script provides a command-line interface to the MBReleaseImporter module.
-It handles argument parsing, logging configuration, and result presentation.
 """
 
-import sys
-import argparse
-import logging
-from pathlib import Path
-
-# Add parent directory to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
-# Import the core business logic
+from script_base import ScriptBase, run_script
 from mb_release_importer import MBReleaseImporter
-from db_utils import find_song_by_name_or_id
-
-# Configure logging
-LOG_DIR = Path(__file__).parent / 'log'
-LOG_DIR.mkdir(exist_ok=True)
-
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler(sys.stdout),
-        logging.FileHandler(LOG_DIR / 'import_mb_releases.log')
-    ]
-)
-logger = logging.getLogger(__name__)
 
 
-def print_header(dry_run: bool, force_refresh: bool = False):
-    """Print CLI header"""
-    logger.info("="*80)
-    logger.info("MusicBrainz Recording & Release Import")
-    logger.info("="*80)
-    if dry_run:
-        logger.info("*** DRY RUN MODE - No database changes will be made ***")
-    if force_refresh:
-        logger.info("*** FORCE REFRESH MODE - Bypassing MusicBrainz cache ***")
-    logger.info("")
-
-
-def print_summary(result: dict):
-    """
-    Print a CLI-friendly summary of the import operation
-    
-    Args:
-        result: Result dict from MBReleaseImporter.import_releases()
-    """
-    logger.info("")
-    logger.info("="*80)
-    logger.info("IMPORT SUMMARY")
-    logger.info("="*80)
-    
-    if result['success']:
-        song = result['song']
-        stats = result['stats']
-        
-        logger.info(f"Song: {song['title']}")
-        logger.info(f"Composer: {song['composer']}")
-        logger.info("")
-        logger.info("Recordings:")
-        logger.info(f"  Found:     {stats['recordings_found']}")
-        logger.info(f"  Created:   {stats['recordings_created']}")
-        logger.info(f"  Existing:  {stats['recordings_existing']}")
-        logger.info("")
-        logger.info("Releases:")
-        logger.info(f"  Found (new):    {stats['releases_found']}")
-        logger.info(f"  Created:        {stats['releases_created']}")
-        logger.info(f"  Already exist:  {stats['releases_existing']}")
-        if stats.get('releases_skipped_api', 0) > 0:
-            logger.info(f"  API calls skipped: {stats['releases_skipped_api']}")
-        logger.info("")
-        logger.info(f"Links created:      {stats['links_created']}")
-        logger.info("")
-        logger.info("Performers:")
-        logger.info(f"  Added to recordings:  {stats['performers_added_to_recordings']}")
-        logger.info(f"  Release credits:      {stats['release_credits_linked']}")
-        logger.info("")
-        logger.info(f"Errors:             {stats['errors']}")
-    else:
-        logger.error(f"Import failed: {result.get('error', 'Unknown error')}")
-        if 'song' in result:
-            logger.info(f"Song: {result['song']['title']}")
-    
-    logger.info("="*80)
-
-
-def main():
-    """Main CLI entry point"""
-    parser = argparse.ArgumentParser(
-        description='Import MusicBrainz recordings and releases for a jazz song',
-        formatter_class=argparse.RawDescriptionHelpFormatter,
+def main() -> bool:
+    # Set up script with arguments
+    script = ScriptBase(
+        name="import_mb_releases",
+        description="Import MusicBrainz recordings and releases for a jazz song",
         epilog="""
 Examples:
   # Import by song name
   python import_mb_releases.py --name "Take Five"
-  
+
   # Import by song ID
   python import_mb_releases.py --id a1b2c3d4-e5f6-7890-abcd-ef1234567890
-  
+
   # Dry run to see what would be imported
   python import_mb_releases.py --name "Blue in Green" --dry-run
-  
+
   # Enable debug logging
   python import_mb_releases.py --name "Autumn Leaves" --debug
-  
+
   # Force refresh from MusicBrainz API (bypass cache)
   python import_mb_releases.py --name "Autumn Leaves" --force-refresh
-  
+
   # Limit recordings to process
   python import_mb_releases.py --name "Body and Soul" --limit 10
 
@@ -129,103 +45,72 @@ What this script does:
      - Creates releases if they don't exist
      - Links recordings to releases
      - Adds release-specific credits (producers, engineers) to releases
-
-Performance optimizations:
-  - Checks if releases exist BEFORE making API calls
-  - Uses single database connection per recording (not per release)
-  - Skips API calls for releases already in database
         """
     )
-    
-    # Song selection arguments
-    group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument(
-        '--name',
-        help='Song name'
-    )
-    group.add_argument(
-        '--id',
-        help='Song database ID'
-    )
-    
-    parser.add_argument(
-        '--dry-run',
-        action='store_true',
-        help='Show what would be imported without making changes'
-    )
-    
-    parser.add_argument(
-        '--debug',
-        action='store_true',
-        help='Enable debug logging'
-    )
-    
-    parser.add_argument(
-        '--limit',
-        type=int,
-        default=100,
-        help='Maximum number of recordings to fetch (default: 100)'
-    )
-    
-    parser.add_argument(
-        '--force-refresh',
-        action='store_true',
-        help='Force refresh from MusicBrainz API (bypass cache)'
-    )
-    
-    args = parser.parse_args()
-    
-    # Set logging level
-    if args.debug:
-        logging.getLogger().setLevel(logging.DEBUG)
-    
+
+    # Add arguments
+    script.add_song_args()
+    script.add_common_args()
+    script.add_limit_arg(default=100)
+
+    # Parse arguments
+    args = script.parse_args()
+
     # Print header
-    print_header(args.dry_run, args.force_refresh)
-    
-    # Create importer with CLI logger
+    script.print_header({
+        "DRY RUN": args.dry_run,
+        "FORCE REFRESH": args.force_refresh,
+    })
+
+    # Find the song
+    song = script.find_song(args)
+
+    # Create importer and run
     importer = MBReleaseImporter(
         dry_run=args.dry_run,
         force_refresh=args.force_refresh,
-        logger=logger
+        logger=script.logger
     )
-    
-    # Retrieve song from database
-    try:
-        song = find_song_by_name_or_id(name=args.name, song_id=args.id)
-        if song is None:
-            identifier = args.name if args.name else args.id
-            logger.error(f"Song not found: {identifier}")
-            sys.exit(1)
-        
-        song_identifier = song['id']
-        logger.info(f"Found song: {song['title']} (ID: {song_identifier})")
-        
-    except ValueError as e:
-        logger.error(f"Error: {e}")
-        sys.exit(1)
-    
-    try:
-        # Run the import
-        result = importer.import_releases(song_identifier, limit=args.limit)
-        
-        # Print summary
-        print_summary(result)
-        
-        # Exit with appropriate code
-        if result['success']:
-            logger.info("✓ Import completed successfully")
-            sys.exit(0)
-        else:
-            logger.error("✗ Import failed")
-            sys.exit(1)
-        
-    except KeyboardInterrupt:
-        logger.info("\nImport cancelled by user")
-        sys.exit(1)
-    except Exception as e:
-        logger.error(f"Unexpected error: {e}", exc_info=True)
-        sys.exit(1)
+
+    result = importer.import_releases(song['id'], limit=args.limit)
+
+    # Print summary
+    if result['success']:
+        script.print_section("Song", {
+            "Title": result['song']['title'],
+            "Composer": result['song']['composer'],
+        })
+
+        stats = result['stats']
+        script.print_section("Recordings", {
+            "Found": stats['recordings_found'],
+            "Created": stats['recordings_created'],
+            "Existing": stats['recordings_existing'],
+        })
+
+        release_stats = {
+            "Found (new)": stats['releases_found'],
+            "Created": stats['releases_created'],
+            "Already exist": stats['releases_existing'],
+        }
+        if stats.get('releases_skipped_api', 0) > 0:
+            release_stats["API calls skipped"] = stats['releases_skipped_api']
+        script.print_section("Releases", release_stats)
+
+        script.print_section("Performers", {
+            "Added to recordings": stats['performers_added_to_recordings'],
+            "Release credits": stats['release_credits_linked'],
+        })
+
+        script.logger.info(f"Links created: {stats['links_created']}")
+        script.logger.info(f"Errors: {stats['errors']}")
+        script.logger.info("=" * 80)
+        script.logger.info("Import completed successfully")
+    else:
+        script.logger.error(f"Import failed: {result.get('error', 'Unknown error')}")
+
+    return result['success']
 
 
 if __name__ == "__main__":
-    main()
+    run_script(main)
