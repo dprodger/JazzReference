@@ -64,6 +64,9 @@ CREATE TABLE recordings (
     album_title VARCHAR(255),
     recording_date DATE,
     recording_year INTEGER,
+    recording_date_source VARCHAR(50),      -- 'mb_performer_relation', 'mb_first_release', 'earliest_release', 'manual'
+    recording_date_precision VARCHAR(10),   -- 'day', 'month', 'year'
+    mb_first_release_date VARCHAR(10),      -- MusicBrainz first-release-date (YYYY, YYYY-MM, or YYYY-MM-DD)
     label VARCHAR(255),
     spotify_url VARCHAR(500),
     youtube_url VARCHAR(500),
@@ -171,6 +174,11 @@ COMMENT ON COLUMN recordings.spotify_track_id IS 'Spotify track ID extracted fro
 COMMENT ON COLUMN recordings.album_art_small IS 'Small album artwork (64x64) from Spotify';
 COMMENT ON COLUMN recordings.album_art_medium IS 'Medium album artwork (300x300) from Spotify';
 COMMENT ON COLUMN recordings.album_art_large IS 'Large album artwork (640x640) from Spotify';
+COMMENT ON COLUMN recordings.recording_date IS 'Best known recording session date. Source tracked in recording_date_source.';
+COMMENT ON COLUMN recordings.recording_year IS 'Recording year - may be more reliable than full date when precision is limited.';
+COMMENT ON COLUMN recordings.recording_date_source IS 'Source of recording_date: mb_performer_relation, mb_first_release, earliest_release, manual';
+COMMENT ON COLUMN recordings.recording_date_precision IS 'Precision of recording_date: day (YYYY-MM-DD), month (YYYY-MM), year (YYYY only)';
+COMMENT ON COLUMN recordings.mb_first_release_date IS 'MusicBrainz first-release-date cached. Upper bound for recording date.';
 -- Triggers -------------------------------------------------------
 
 
@@ -918,6 +926,8 @@ CREATE INDEX idx_recordings_year ON recordings(recording_year);
 CREATE INDEX idx_recordings_is_canonical ON recordings(is_canonical);
 CREATE INDEX idx_recordings_album_title ON recordings(album_title);
 CREATE INDEX idx_recordings_spotify_track_id ON recordings(spotify_track_id);
+CREATE INDEX idx_recordings_recording_date_source ON recordings(recording_date_source) WHERE recording_date_source IS NOT NULL;
+CREATE INDEX idx_recordings_mb_first_release_date ON recordings(mb_first_release_date) WHERE mb_first_release_date IS NOT NULL;
 
 -- Recording performer indexes
 CREATE INDEX idx_recording_performers_recording_id ON recording_performers(recording_id);
