@@ -2,7 +2,8 @@
 //  RecordingsSection.swift
 //  JazzReference
 //
-//  Collapsible section displaying filtered recordings with instrument and Spotify filtering
+//  Collapsible section displaying filtered recordings with filter chips + sheet pattern
+//  UPDATED: Replaced nested disclosure groups with filter chips and bottom sheet
 //  UPDATED: Sort options changed from Authority/Year/Canonical to Name/Year
 //  UPDATED: Grouping changes based on sort order (by year or by artist name)
 //
@@ -29,11 +30,11 @@ enum InstrumentFamily: String, CaseIterable, Hashable {
     case flute = "Flute"
     case vibraphone = "Vibraphone"
     case vocals = "Vocals"
-    
+
     // Map specific instruments to their family
     static func family(for instrument: String) -> InstrumentFamily? {
         let normalized = instrument.lowercased()
-        
+
         if normalized.contains("guitar") { return .guitar }
         if normalized.contains("sax") { return .saxophone }
         if normalized.contains("trumpet") || normalized.contains("flugelhorn") { return .trumpet }
@@ -46,7 +47,7 @@ enum InstrumentFamily: String, CaseIterable, Hashable {
         if normalized.contains("flute") { return .flute }
         if normalized.contains("vibraphone") || normalized.contains("vibes") { return .vibraphone }
         if normalized.contains("vocal") || normalized.contains("voice") || normalized.contains("singer") { return .vocals }
-        
+
         return nil
     }
 }
@@ -54,171 +55,32 @@ enum InstrumentFamily: String, CaseIterable, Hashable {
 // MARK: - Recordings Section
 struct RecordingsSection: View {
     let recordings: [Recording]
-    
+
     // Bindings for sort functionality (passed from parent)
     @Binding var recordingSortOrder: RecordingSortOrder
     @Binding var showingSortOptions: Bool
-    
+
     @State private var selectedFilter: SongRecordingFilter = .withSpotify
     @State private var selectedInstrument: InstrumentFamily? = nil
-    @State private var isFiltersExpanded: Bool = false
+    @State private var showFilterSheet: Bool = false
     @State private var isSectionExpanded: Bool = true
-    
+
     var body: some View {
         // HStack with explicit spacers ensures DisclosureGroup chevron is properly inset
         HStack(spacing: 0) {
             Spacer().frame(width: 16)
-            
+
             VStack(alignment: .leading, spacing: 0) {
                 DisclosureGroup(
                     isExpanded: $isSectionExpanded,
                     content: {
                         VStack(alignment: .leading, spacing: 0) {
-                            
-                            // MARK: - FILTERS SECTION
-                            VStack(alignment: .leading, spacing: 0) {
-                                DisclosureGroup(
-                                    isExpanded: $isFiltersExpanded,
-                                    content: {
-                                        VStack(alignment: .leading, spacing: 16) {
-                                            // Spotify Filter
-                                            VStack(alignment: .leading, spacing: 8) {
-                                                Text("Recording Type")
-                                                    .font(.subheadline)
-                                                    .fontWeight(.medium)
-                                                    .foregroundColor(JazzTheme.smokeGray)
-                                                
-                                                Picker("Recording Type", selection: $selectedFilter) {
-                                                    ForEach(SongRecordingFilter.allCases, id: \.self) { filter in
-                                                        Text(filter.rawValue).tag(filter)
-                                                    }
-                                                }
-                                                .pickerStyle(SegmentedPickerStyle())
-                                            }
-                                            
-                                            // Instrument Filter
-                                            if !availableInstruments.isEmpty {
-                                                VStack(alignment: .leading, spacing: 8) {
-                                                    HStack {
-                                                        Text("Instrument")
-                                                            .font(.subheadline)
-                                                            .fontWeight(.medium)
-                                                            .foregroundColor(JazzTheme.smokeGray)
-                                                        
-                                                        Spacer()
-                                                        
-                                                        if selectedInstrument != nil {
-                                                            Button(action: {
-                                                                selectedInstrument = nil
-                                                            }) {
-                                                                Text("Clear")
-                                                                    .font(.caption)
-                                                                    .foregroundColor(JazzTheme.burgundy)
-                                                            }
-                                                        }
-                                                    }
-                                                    
-                                                    ScrollView(.horizontal, showsIndicators: false) {
-                                                        HStack(spacing: 8) {
-                                                            ForEach(availableInstruments, id: \.self) { family in
-                                                                Button(action: {
-                                                                    if selectedInstrument == family {
-                                                                        selectedInstrument = nil
-                                                                    } else {
-                                                                        selectedInstrument = family
-                                                                    }
-                                                                }) {
-                                                                    Text(family.rawValue)
-                                                                        .font(.subheadline)
-                                                                        .foregroundColor(
-                                                                            selectedInstrument == family
-                                                                            ? .white
-                                                                            : JazzTheme.charcoal
-                                                                        )
-                                                                        .padding(.horizontal, 12)
-                                                                        .padding(.vertical, 6)
-                                                                        .background(
-                                                                            selectedInstrument == family
-                                                                            ? JazzTheme.brass
-                                                                            : JazzTheme.cardBackground
-                                                                        )
-                                                                        .cornerRadius(16)
-                                                                        .overlay(
-                                                                            RoundedRectangle(cornerRadius: 16)
-                                                                                .stroke(
-                                                                                    selectedInstrument == family
-                                                                                    ? Color.clear
-                                                                                    : JazzTheme.smokeGray.opacity(0.3),
-                                                                                    lineWidth: 1
-                                                                                )
-                                                                        )
-                                                                }
-                                                            }
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
-                                        .padding(.vertical, 12)
-                                        .padding(.horizontal)
-                                    },
-                                    label: {
-                                        HStack {
-                                            Image(systemName: isFiltersExpanded ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
-                                                .foregroundColor(JazzTheme.brass)
-                                            Text("Filters")
-                                                .font(.subheadline)
-                                                .fontWeight(.medium)
-                                                .foregroundColor(JazzTheme.charcoal)
-                                            
-                                            Spacer(minLength: 12)
-                                            
-                                            // Active filter indicators
-                                            if selectedFilter != .withSpotify || selectedInstrument != nil {
-                                                HStack(spacing: 4) {
-                                                    if selectedFilter != .withSpotify {
-                                                        Text(selectedFilter.rawValue)
-                                                            .font(.caption2)
-                                                            .foregroundColor(.white)
-                                                            .padding(.horizontal, 6)
-                                                            .padding(.vertical, 2)
-                                                            .background(JazzTheme.brass)
-                                                            .cornerRadius(4)
-                                                            .fixedSize(horizontal: true, vertical: false)
-                                                    }
-                                                    
-                                                    if let instrument = selectedInstrument {
-                                                        Text(instrument.rawValue)
-                                                            .font(.caption2)
-                                                            .foregroundColor(.white)
-                                                            .padding(.horizontal, 6)
-                                                            .padding(.vertical, 2)
-                                                            .background(JazzTheme.brass)
-                                                            .cornerRadius(4)
-                                                            .fixedSize(horizontal: true, vertical: false)
-                                                    }
-                                                }
-                                            }
-                                            
-                                            Spacer(minLength: 8)
-                                            
-                                            // Recording count on same line
-                                            Text("\(filteredRecordings.count) Recording\(filteredRecordings.count == 1 ? "" : "s")")
-                                                .font(.subheadline)
-                                                .foregroundColor(JazzTheme.smokeGray)
-                                                .fixedSize(horizontal: true, vertical: false)
-                                        }
-                                        .padding(.vertical, 8)
-                                    }
-                                )
-                                .tint(JazzTheme.brass)
-                                .padding(.vertical, 8)
-                            }
-                            .background(JazzTheme.cardBackground)
-                            .cornerRadius(10)
-                            .padding(.horizontal)
-                            .padding(.top, 8)
-                            
+
+                            // MARK: - FILTER CHIPS BAR
+                            filterChipsBar
+                                .padding(.top, 12)
+                                .padding(.horizontal)
+
                             // Recordings List
                             VStack(alignment: .leading, spacing: 12) {
                                 if !filteredRecordings.isEmpty {
@@ -303,8 +165,70 @@ struct RecordingsSection: View {
             Spacer().frame(width: 16)
         }
         .background(JazzTheme.backgroundLight)
+        .sheet(isPresented: $showFilterSheet) {
+            RecordingFilterSheet(
+                selectedFilter: $selectedFilter,
+                selectedInstrument: $selectedInstrument,
+                availableInstruments: availableInstruments
+            )
+        }
     }
-    
+
+    // MARK: - Filter Chips Bar
+
+    @ViewBuilder
+    private var filterChipsBar: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                // Spotify filter chip (only shown when active)
+                if selectedFilter == .withSpotify {
+                    FilterChip(
+                        label: "Spotify",
+                        icon: "music.note",
+                        onRemove: { selectedFilter = .all }
+                    )
+                }
+
+                // Instrument filter chip (only shown when active)
+                if let instrument = selectedInstrument {
+                    FilterChip(
+                        label: instrument.rawValue,
+                        icon: nil,
+                        onRemove: { selectedInstrument = nil }
+                    )
+                }
+
+                // Add/Edit Filter button
+                Button(action: { showFilterSheet = true }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: hasActiveFilters ? "line.3.horizontal.decrease" : "plus")
+                            .font(.caption.weight(.semibold))
+                        Text(hasActiveFilters ? "Edit" : "Filter")
+                            .font(.subheadline)
+                    }
+                    .foregroundColor(JazzTheme.burgundy)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(JazzTheme.burgundy.opacity(0.1))
+                    .cornerRadius(16)
+                }
+                .buttonStyle(.plain)
+
+                Spacer()
+
+                // Recording count
+                Text("\(filteredRecordings.count)")
+                    .font(.subheadline.weight(.medium))
+                    .foregroundColor(JazzTheme.smokeGray)
+                    .padding(.trailing, 4)
+            }
+        }
+    }
+
+    private var hasActiveFilters: Bool {
+        selectedFilter == .withSpotify || selectedInstrument != nil
+    }
+
     // MARK: - Computed Properties
     
     // Extract unique instrument families from recordings
@@ -387,5 +311,36 @@ struct RecordingsSection: View {
             guard let recordings = groups[key] else { return nil }
             return (groupKey: key, recordings: recordings)
         }
+    }
+}
+
+// MARK: - Filter Chip Component
+
+struct FilterChip: View {
+    let label: String
+    let icon: String?
+    let onRemove: () -> Void
+
+    var body: some View {
+        HStack(spacing: 4) {
+            if let icon = icon {
+                Image(systemName: icon)
+                    .font(.caption)
+            }
+
+            Text(label)
+                .font(.subheadline)
+
+            Button(action: onRemove) {
+                Image(systemName: "xmark")
+                    .font(.caption2.weight(.semibold))
+            }
+            .buttonStyle(.plain)
+        }
+        .foregroundColor(.white)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(JazzTheme.brass)
+        .cornerRadius(16)
     }
 }
