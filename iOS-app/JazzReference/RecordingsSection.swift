@@ -77,9 +77,14 @@ struct RecordingsSection: View {
                         VStack(alignment: .leading, spacing: 0) {
 
                             // MARK: - FILTER CHIPS BAR
-                            filterChipsBar
-                                .padding(.top, 12)
-                                .padding(.horizontal)
+                            if hasActiveFilters || !availableInstruments.isEmpty {
+                                filterChipsBar
+                                    .padding(.vertical, 8)
+                                    .padding(.horizontal, 4)
+                                    .background(JazzTheme.cardBackground)
+                                    .cornerRadius(8)
+                                    .padding(.horizontal)
+                            }
 
                             // Recordings List
                             VStack(alignment: .leading, spacing: 12) {
@@ -122,22 +127,26 @@ struct RecordingsSection: View {
                                     .padding(.vertical, 40)
                                 }
                             }
-                            .padding(.top)
+                            .padding(.top, 8)
                         }
-                        .padding(.top, 8)
                     },
                     label: {
-                        // MODIFIED: Added sort button to the label
-                        HStack {
+                        HStack(alignment: .center) {
                             Image(systemName: "music.note.list")
                                 .foregroundColor(JazzTheme.burgundy)
+
                             Text("Recordings")
                                 .font(.title2)
                                 .bold()
                                 .foregroundColor(JazzTheme.charcoal)
-                            
+
+                            // Recording count in header
+                            Text("(\(filteredRecordings.count))")
+                                .font(.subheadline)
+                                .foregroundColor(JazzTheme.smokeGray)
+
                             Spacer()
-                            
+
                             // Sort button
                             Button(action: {
                                 showingSortOptions = true
@@ -149,12 +158,12 @@ struct RecordingsSection: View {
                                         .font(.caption)
                                 }
                                 .foregroundColor(JazzTheme.burgundy)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 6)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 5)
                                 .background(JazzTheme.burgundy.opacity(0.1))
-                                .cornerRadius(8)
+                                .cornerRadius(6)
                             }
-                            .buttonStyle(.plain) // Prevent disclosure group from toggling
+                            .buttonStyle(.plain)
                         }
                         .padding(.vertical, 12)
                     }
@@ -178,50 +187,41 @@ struct RecordingsSection: View {
 
     @ViewBuilder
     private var filterChipsBar: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                // Spotify filter chip (only shown when active)
-                if selectedFilter == .withSpotify {
-                    FilterChip(
-                        label: "Spotify",
-                        icon: "music.note",
-                        onRemove: { selectedFilter = .all }
-                    )
-                }
-
-                // Instrument filter chip (only shown when active)
-                if let instrument = selectedInstrument {
-                    FilterChip(
-                        label: instrument.rawValue,
-                        icon: nil,
-                        onRemove: { selectedInstrument = nil }
-                    )
-                }
-
-                // Add/Edit Filter button
-                Button(action: { showFilterSheet = true }) {
-                    HStack(spacing: 4) {
-                        Image(systemName: hasActiveFilters ? "line.3.horizontal.decrease" : "plus")
-                            .font(.caption.weight(.semibold))
-                        Text(hasActiveFilters ? "Edit" : "Filter")
-                            .font(.subheadline)
-                    }
-                    .foregroundColor(JazzTheme.burgundy)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(JazzTheme.burgundy.opacity(0.1))
-                    .cornerRadius(16)
-                }
-                .buttonStyle(.plain)
-
-                Spacer()
-
-                // Recording count
-                Text("\(filteredRecordings.count)")
-                    .font(.subheadline.weight(.medium))
-                    .foregroundColor(JazzTheme.smokeGray)
-                    .padding(.trailing, 4)
+        HStack(spacing: 8) {
+            // Active filter chips
+            if selectedFilter == .withSpotify {
+                FilterChip(
+                    label: "Spotify",
+                    icon: "music.note",
+                    onRemove: { selectedFilter = .all }
+                )
             }
+
+            if let instrument = selectedInstrument {
+                FilterChip(
+                    label: instrument.rawValue,
+                    icon: nil,
+                    onRemove: { selectedInstrument = nil }
+                )
+            }
+
+            // Add/Edit Filter button
+            Button(action: { showFilterSheet = true }) {
+                HStack(spacing: 4) {
+                    Image(systemName: hasActiveFilters ? "slider.horizontal.3" : "plus")
+                        .font(.caption.weight(.medium))
+                    Text(hasActiveFilters ? "Edit" : "Filter")
+                        .font(.subheadline)
+                }
+                .foregroundColor(JazzTheme.burgundy)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(JazzTheme.burgundy.opacity(0.15))
+                .cornerRadius(14)
+            }
+            .buttonStyle(.plain)
+
+            Spacer()
         }
     }
 
