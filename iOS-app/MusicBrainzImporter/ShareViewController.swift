@@ -532,110 +532,143 @@ class ShareViewController: UIViewController {
 
     private func importArtist() {
         NSLog("🎯 importArtist() called")
-        
+
         guard let artistData = artistData else {
             showError("No artist data to import")
             return
         }
-        
+
         NSLog("💾 Saving artist data to shared container")
         SharedArtistData.saveSharedData(artistData, appGroup: appGroupIdentifier)
         NSLog("✅ Data saved successfully")
-        
-        // Show success message with clear next step
-        DispatchQueue.main.async { [weak self] in
-            let alert = UIAlertController(
-                title: "✅ Artist Data Imported",
-                message: "Open the Jazz Reference app to complete adding \(artistData.name) to your collection.",
-                preferredStyle: .alert
-            )
-            
-            alert.addAction(UIAlertAction(title: "Got It", style: .default) { [weak self] _ in
-                NSLog("👋 User acknowledged, closing extension")
-                // Extension will close, user manually opens main app
-                self?.extensionContext?.completeRequest(returningItems: nil, completionHandler: nil)
-            })
-            
-            self?.present(alert, animated: true)
-        }
+
+        // Try to open the main app directly
+        openMainApp(path: "import-artist")
     }
     
-    private func openMainAppForImport() {
-        NSLog("🔗 Opening main app for import...")
-        
-        guard let url = URL(string: "jazzreference://import-artist") else {
+    private func openMainApp(path: String) {
+        print("🔗 [ShareExt] Opening main app with path: \(path)")
+        NSLog("🔗 Opening main app with path: %@", path)
+
+        guard let url = URL(string: "jazzreference://\(path)") else {
+            print("❌ [ShareExt] Invalid URL scheme")
             NSLog("❌ Invalid URL scheme")
-            showError("Could not open main app")
+            fallbackToManualOpen(path: path)
             return
         }
-        
-        var responder = self as UIResponder?
-        let selector = #selector(openURL(_:))
-        
-        while responder != nil {
-            if responder!.responds(to: selector) && responder != self {
-                responder!.perform(selector, with: url)
-                
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
-                    NSLog("✅ Main app opened, closing extension")
-                    self?.extensionContext?.completeRequest(returningItems: nil, completionHandler: nil)
+
+        print("🔗 [ShareExt] Attempting to open URL: \(url)")
+        NSLog("🔗 Attempting to open URL: %@", url.absoluteString)
+
+        // Method 1: Try NSExtensionContext.open (works on iOS 16+ for some extension types)
+        if #available(iOS 16.0, *) {
+            print("🔗 [ShareExt] Trying extensionContext.open()")
+            extensionContext?.open(url) { [weak self] success in
+                print("🔗 [ShareExt] extensionContext.open completed, success: \(success)")
+                NSLog("🔗 extensionContext.open completed, success: %d", success)
+
+                if success {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        self?.extensionContext?.completeRequest(returningItems: nil, completionHandler: nil)
+                    }
+                } else {
+                    // Fall back to responder chain
+                    DispatchQueue.main.async {
+                        self?.tryResponderChain(url: url, path: path)
+                    }
+                }
+            }
+            return
+        }
+
+        // For older iOS, go straight to responder chain
+        tryResponderChain(url: url, path: path)
+    }
+
+    private func tryResponderChain(url: URL, path: String) {
+        print("🔗 [ShareExt] Trying responder chain approach")
+        NSLog("🔗 Trying responder chain approach")
+
+        var responder: UIResponder? = self
+
+        while let r = responder {
+            print("🔗 [ShareExt] Checking responder: \(type(of: r))")
+
+            // Check if this responder is UIApplication (or can open URLs)
+            // We need to use the modern open(_:options:completionHandler:) API
+            if let application = r as? UIApplication {
+                print("✅ [ShareExt] Found UIApplication, using modern open API")
+                NSLog("✅ Found UIApplication, using modern open API")
+
+                application.open(url, options: [:]) { [weak self] success in
+                    print("🔗 [ShareExt] UIApplication.open completed, success: \(success)")
+                    NSLog("🔗 UIApplication.open completed, success: %d", success)
+
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        self?.extensionContext?.completeRequest(returningItems: nil, completionHandler: nil)
+                    }
                 }
                 return
             }
-            responder = responder?.next
+            responder = r.next
         }
-        
-        NSLog("❌ Could not open URL")
-        showError("Could not open main app")
+
+        print("⚠️ [ShareExt] Responder chain failed - no UIApplication found")
+        NSLog("⚠️ Responder chain approach failed")
+        fallbackToManualOpen(path: path)
+    }
+
+    private func fallbackToManualOpen(path: String) {
+        print("⚠️ [ShareExt] Using fallback manual open")
+        NSLog("⚠️ Using fallback manual open")
+
+        DispatchQueue.main.async { [weak self] in
+            let alert = UIAlertController(
+                title: "Data Saved",
+                message: "Open Jazz Reference to complete the import.",
+                preferredStyle: .alert
+            )
+
+            alert.addAction(UIAlertAction(title: "OK", style: .default) { [weak self] _ in
+                self?.extensionContext?.completeRequest(returningItems: nil, completionHandler: nil)
+            })
+
+            self?.present(alert, animated: true)
+        }
     }
 
     @objc private func openURL(_ url: URL) {
-        // Called via perform selector
+        // Placeholder for selector - actual implementation is in UIApplication
     }
     
     private func openArtistInApp(artistId: String) {
         NSLog("🔗 Opening artist in app: \(artistId)")
-        
-        // TODO: Implement deep link to open the main app at the artist detail page
-        // For now, just show a placeholder
-        showNotImplementedAlert("Open in App")
+        openMainApp(path: "artist/\(artistId)")
     }
     
     private func importSong() {
-        NSLog("💾 Importing song...")
-        
+        print("💾 [ShareExt] importSong() called")
+        NSLog("💾 importSong() called")
+
         guard let songData = songData else {
+            print("❌ [ShareExt] No song data")
             showError("No song data to import")
             return
         }
-        
-        NSLog("💾 Saving song data to shared container")
+
+        print("💾 [ShareExt] Saving song: \(songData.title)")
+        NSLog("💾 Saving song data to shared container: %@", songData.title)
         SharedSongData.saveSharedData(songData, appGroup: appGroupIdentifier)
-        NSLog("✅ Data saved successfully")
-        
-        // Show success message with clear next step
-        DispatchQueue.main.async { [weak self] in
-            let alert = UIAlertController(
-                title: "✅ Song Data Imported",
-                message: "Open the Jazz Reference app to complete adding \(songData.title) to your collection.",
-                preferredStyle: .alert
-            )
-            
-            alert.addAction(UIAlertAction(title: "Got It", style: .default) { [weak self] _ in
-                NSLog("👋 User acknowledged, closing extension")
-                self?.extensionContext?.completeRequest(returningItems: nil, completionHandler: nil)
-            })
-            
-            self?.present(alert, animated: true)
-        }
+        print("✅ [ShareExt] Data saved, now opening main app")
+        NSLog("✅ Data saved successfully, opening main app")
+
+        // Try to open the main app directly
+        openMainApp(path: "import-song")
     }
     
     private func openSongInApp(songId: String) {
         NSLog("🔗 Opening song in app: \(songId)")
-        
-        // TODO: Implement deep link to open the main app at the song detail page
-        // For now, just show a placeholder
-        showNotImplementedAlert("Open in App")
+        openMainApp(path: "song/\(songId)")
     }
     
     private func showNotImplementedAlert(_ feature: String) {
