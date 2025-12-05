@@ -133,26 +133,25 @@ struct RecordingsSection: View {
                                 }
                             }
                             .padding(.top, 8)
-                            .overlay {
+                            .overlay(alignment: .top) {
                                 if isReloading {
-                                    ZStack {
-                                        Color(.systemBackground)
-                                            .opacity(0.8)
-
-                                        HStack(spacing: 8) {
-                                            ProgressView()
-                                                .tint(JazzTheme.burgundy)
-                                            Text("Reloading...")
-                                                .font(.subheadline)
-                                                .foregroundColor(JazzTheme.smokeGray)
-                                        }
-                                        .padding(.horizontal, 16)
-                                        .padding(.vertical, 10)
-                                        .background(.ultraThinMaterial)
-                                        .cornerRadius(8)
+                                    HStack(spacing: 8) {
+                                        ProgressView()
+                                            .tint(JazzTheme.burgundy)
+                                        Text("Reloading...")
+                                            .font(.subheadline)
+                                            .foregroundColor(JazzTheme.smokeGray)
                                     }
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 10)
+                                    .background(.ultraThinMaterial)
+                                    .cornerRadius(8)
+                                    .shadow(color: .black.opacity(0.1), radius: 4, y: 2)
+                                    .padding(.top, 40)
                                 }
                             }
+                            .opacity(isReloading ? 0.5 : 1.0)
+                            .animation(.easeInOut(duration: 0.2), value: isReloading)
                         }
                     },
                     label: {
@@ -190,16 +189,14 @@ struct RecordingsSection: View {
                                     }
                                 }
                             } label: {
-                                HStack(spacing: 4) {
-                                    Image(systemName: recordingSortOrder.icon)
-                                        .font(.caption)
+                                HStack(spacing: 3) {
                                     Text(recordingSortOrder.displayName)
                                         .font(.caption)
                                     Image(systemName: "chevron.down")
                                         .font(.caption2)
                                 }
                                 .foregroundColor(JazzTheme.burgundy)
-                                .padding(.horizontal, 10)
+                                .padding(.horizontal, 8)
                                 .padding(.vertical, 5)
                                 .background(JazzTheme.burgundy.opacity(0.1))
                                 .cornerRadius(6)
