@@ -51,8 +51,12 @@ struct RecordingRowView: View {
                         AsyncImage(url: URL(string: frontUrl)) { phase in
                             switch phase {
                             case .empty:
-                                ProgressView()
-                                    .frame(width: 150, height: 150)
+                                ZStack {
+                                    Color(.systemGray5)
+                                    ProgressView()
+                                        .tint(.secondary)
+                                }
+                                .frame(width: 150, height: 150)
                             case .success(let image):
                                 image
                                     .resizable()
@@ -84,8 +88,12 @@ struct RecordingRowView: View {
                         AsyncImage(url: URL(string: backUrl)) { phase in
                             switch phase {
                             case .empty:
-                                ProgressView()
-                                    .frame(width: 150, height: 150)
+                                ZStack {
+                                    Color(.systemGray5)
+                                    ProgressView()
+                                        .tint(.secondary)
+                                }
+                                .frame(width: 150, height: 150)
                             case .success(let image):
                                 image
                                     .resizable()
