@@ -41,7 +41,6 @@ struct SongDetailView: View {
     @State private var toast: ToastItem?
     
     @State private var recordingSortOrder: RecordingSortOrder = .year
-    @State private var showingSortOptions = false
     
     // NEW: Summary Information section expansion state (starts collapsed)
     @State private var isSummaryInfoExpanded = false
@@ -214,7 +213,15 @@ struct SongDetailView: View {
                 RecordingsSection(
                     recordings: song.recordings ?? [],
                     recordingSortOrder: $recordingSortOrder,
-                    showingSortOptions: $showingSortOptions
+                    onSortOrderChanged: { [self] newOrder in
+                        Task {
+                            isLoading = true
+                            if let updatedSong = await NetworkManager().fetchSongDetail(id: currentSongId, sortBy: newOrder) {
+                                self.song = updatedSong
+                            }
+                            isLoading = false
+                        }
+                    }
                 )
             // MARK: - TRANSCRIPTIONS SECTION
             TranscriptionsSection(transcriptions: transcriptions)
@@ -390,25 +397,6 @@ struct SongDetailView: View {
             .overlay(alignment: .bottom) {
                 pageIndicatorView
             }
-            .confirmationDialog("Sort Recordings", isPresented: $showingSortOptions, titleVisibility: .visible) {
-                ForEach(RecordingSortOrder.allCases) { sortOrder in
-                    Button(sortOrder.displayName) {
-                        recordingSortOrder = sortOrder
-                        // Reload song with new sort order
-                        Task {
-                            isLoading = true
-                            if let updatedSong = await NetworkManager().fetchSongDetail(id: currentSongId, sortBy: sortOrder) {
-                                song = updatedSong
-                            }
-                            isLoading = false
-                        }
-                    }
-                }
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                Text("Choose how to sort recordings")
-            }
-
     }
     
     private var mainScrollView: some View {

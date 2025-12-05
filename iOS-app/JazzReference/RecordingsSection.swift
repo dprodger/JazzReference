@@ -56,9 +56,11 @@ enum InstrumentFamily: String, CaseIterable, Hashable {
 struct RecordingsSection: View {
     let recordings: [Recording]
 
-    // Bindings for sort functionality (passed from parent)
+    // Binding for sort order (passed from parent)
     @Binding var recordingSortOrder: RecordingSortOrder
-    @Binding var showingSortOptions: Bool
+
+    // Callback when sort order changes (for parent to reload data)
+    var onSortOrderChanged: ((RecordingSortOrder) -> Void)?
 
     @State private var selectedFilter: SongRecordingFilter = .withSpotify
     @State private var selectedInstrument: InstrumentFamily? = nil
@@ -147,15 +149,31 @@ struct RecordingsSection: View {
 
                             Spacer()
 
-                            // Sort button
-                            Button(action: {
-                                showingSortOptions = true
-                            }) {
+                            // Sort menu
+                            Menu {
+                                ForEach(RecordingSortOrder.allCases) { sortOrder in
+                                    Button(action: {
+                                        if recordingSortOrder != sortOrder {
+                                            recordingSortOrder = sortOrder
+                                            onSortOrderChanged?(sortOrder)
+                                        }
+                                    }) {
+                                        HStack {
+                                            Text(sortOrder.displayName)
+                                            if recordingSortOrder == sortOrder {
+                                                Image(systemName: "checkmark")
+                                            }
+                                        }
+                                    }
+                                }
+                            } label: {
                                 HStack(spacing: 4) {
                                     Image(systemName: recordingSortOrder.icon)
                                         .font(.caption)
                                     Text(recordingSortOrder.displayName)
                                         .font(.caption)
+                                    Image(systemName: "chevron.down")
+                                        .font(.caption2)
                                 }
                                 .foregroundColor(JazzTheme.burgundy)
                                 .padding(.horizontal, 10)
@@ -163,7 +181,6 @@ struct RecordingsSection: View {
                                 .background(JazzTheme.burgundy.opacity(0.1))
                                 .cornerRadius(6)
                             }
-                            .buttonStyle(.plain)
                         }
                         .padding(.vertical, 12)
                     }
