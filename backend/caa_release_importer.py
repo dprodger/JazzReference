@@ -12,6 +12,10 @@ This module:
 
 Similar architecture to mb_release_importer.py - designed to be used by
 CLI scripts or other modules.
+
+SHARED FUNCTIONS:
+- save_release_imagery(): Used by both CAAImageImporter (batch) and
+  MBReleaseImporter (inline during release creation)
 """
 
 import logging
@@ -20,6 +24,112 @@ from typing import Optional, Dict, List, Any, Set
 
 from db_utils import get_db_connection
 from caa_utils import CoverArtArchiveClient
+
+# Module-level logger for shared functions
+_logger = logging.getLogger(__name__)
+
+
+def save_release_imagery(conn, release_id: str, images: List[Dict[str, Any]],
+                         logger: Optional[logging.Logger] = None,
+                         update_checked_timestamp: bool = True) -> Dict[str, int]:
+    """
+    Save imagery records and mark release as checked.
+
+    This is the shared function used by:
+    - MBReleaseImporter: For newly created releases during import
+    - CAAImageImporter: For batch processing existing releases
+
+    Args:
+        conn: Database connection (caller manages transaction/commit)
+        release_id: Database release UUID
+        images: List of imagery dicts from CoverArtArchiveClient.extract_imagery_data()
+        logger: Optional logger (uses module logger if not provided)
+        update_checked_timestamp: If True, update cover_art_checked_at on the release
+
+    Returns:
+        Dict with counts: {'created': int, 'updated': int, 'existing': int}
+    """
+    log = logger or _logger
+    result = {'created': 0, 'updated': 0, 'existing': 0}
+
+    with conn.cursor() as cur:
+        # Upsert each image
+        for img in images:
+            # Check if exists
+            cur.execute("""
+                SELECT id FROM release_imagery
+                WHERE release_id = %s AND source = %s::imagery_source AND type = %s::imagery_type
+            """, (release_id, img['source'], img['type']))
+
+            existing = cur.fetchone()
+
+            if existing:
+                # Update existing record
+                cur.execute("""
+                    UPDATE release_imagery
+                    SET source_id = %s,
+                        source_url = %s,
+                        image_url_small = %s,
+                        image_url_medium = %s,
+                        image_url_large = %s,
+                        checksum = %s,
+                        comment = %s,
+                        approved = %s,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE release_id = %s
+                      AND source = %s::imagery_source
+                      AND type = %s::imagery_type
+                """, (
+                    img['source_id'],
+                    img['source_url'],
+                    img['image_url_small'],
+                    img['image_url_medium'],
+                    img['image_url_large'],
+                    img['checksum'],
+                    img['comment'],
+                    img['approved'],
+                    release_id,
+                    img['source'],
+                    img['type']
+                ))
+                result['updated'] += 1
+                log.debug(f"    Updated {img['type']} image")
+            else:
+                # Insert new record
+                cur.execute("""
+                    INSERT INTO release_imagery (
+                        release_id, source, source_id, source_url, type,
+                        image_url_small, image_url_medium, image_url_large,
+                        checksum, comment, approved
+                    ) VALUES (
+                        %s, %s::imagery_source, %s, %s, %s::imagery_type,
+                        %s, %s, %s, %s, %s, %s
+                    )
+                """, (
+                    release_id,
+                    img['source'],
+                    img['source_id'],
+                    img['source_url'],
+                    img['type'],
+                    img['image_url_small'],
+                    img['image_url_medium'],
+                    img['image_url_large'],
+                    img['checksum'],
+                    img['comment'],
+                    img['approved']
+                ))
+                result['created'] += 1
+                log.debug(f"    Created {img['type']} image")
+
+        # Mark release as checked
+        if update_checked_timestamp:
+            cur.execute("""
+                UPDATE releases
+                SET cover_art_checked_at = CURRENT_TIMESTAMP
+                WHERE id = %s
+            """, (release_id,))
+
+    return result
 
 
 class CAAImageImporter:
@@ -216,7 +326,9 @@ class CAAImageImporter:
     def _save_release_imagery(self, release_id: str, images: List[Dict[str, Any]]):
         """
         Save imagery records and mark release as checked in a single transaction.
-        
+
+        Uses the shared save_release_imagery() function for the actual database work.
+
         Args:
             release_id: Database release UUID
             images: List of imagery dicts to upsert (may be empty)
@@ -227,87 +339,21 @@ class CAAImageImporter:
                 self.stats['images_created'] += 1
             self.logger.debug(f"    [DRY RUN] Would update cover_art_checked_at")
             return
-        
+
         try:
             with get_db_connection() as conn:
-                with conn.cursor() as cur:
-                    # Upsert each image
-                    for img in images:
-                        # Check if exists
-                        cur.execute("""
-                            SELECT id FROM release_imagery
-                            WHERE release_id = %s AND source = %s::imagery_source AND type = %s::imagery_type
-                        """, (release_id, img['source'], img['type']))
-                        
-                        existing = cur.fetchone()
-                        
-                        if existing:
-                            # Update existing record
-                            cur.execute("""
-                                UPDATE release_imagery
-                                SET source_id = %s,
-                                    source_url = %s,
-                                    image_url_small = %s,
-                                    image_url_medium = %s,
-                                    image_url_large = %s,
-                                    checksum = %s,
-                                    comment = %s,
-                                    approved = %s,
-                                    updated_at = CURRENT_TIMESTAMP
-                                WHERE release_id = %s 
-                                  AND source = %s::imagery_source 
-                                  AND type = %s::imagery_type
-                            """, (
-                                img['source_id'],
-                                img['source_url'],
-                                img['image_url_small'],
-                                img['image_url_medium'],
-                                img['image_url_large'],
-                                img['checksum'],
-                                img['comment'],
-                                img['approved'],
-                                release_id,
-                                img['source'],
-                                img['type']
-                            ))
-                            self.stats['images_updated'] += 1
-                            self.logger.debug(f"    Updated {img['type']} image")
-                        else:
-                            # Insert new record
-                            cur.execute("""
-                                INSERT INTO release_imagery (
-                                    release_id, source, source_id, source_url, type,
-                                    image_url_small, image_url_medium, image_url_large,
-                                    checksum, comment, approved
-                                ) VALUES (
-                                    %s, %s::imagery_source, %s, %s, %s::imagery_type,
-                                    %s, %s, %s, %s, %s, %s
-                                )
-                            """, (
-                                release_id,
-                                img['source'],
-                                img['source_id'],
-                                img['source_url'],
-                                img['type'],
-                                img['image_url_small'],
-                                img['image_url_medium'],
-                                img['image_url_large'],
-                                img['checksum'],
-                                img['comment'],
-                                img['approved']
-                            ))
-                            self.stats['images_created'] += 1
-                            self.logger.debug(f"    Created {img['type']} image")
-                    
-                    # Mark release as checked
-                    cur.execute("""
-                        UPDATE releases
-                        SET cover_art_checked_at = CURRENT_TIMESTAMP
-                        WHERE id = %s
-                    """, (release_id,))
-                    
-                    conn.commit()
-                    
+                # Use shared function for database operations
+                result = save_release_imagery(
+                    conn, release_id, images,
+                    logger=self.logger,
+                    update_checked_timestamp=True
+                )
+                conn.commit()
+
+                # Update stats from result
+                self.stats['images_created'] += result['created']
+                self.stats['images_updated'] += result['updated']
+
         except Exception as e:
             self.logger.error(f"    Error saving imagery: {e}")
             self.stats['errors'] += 1

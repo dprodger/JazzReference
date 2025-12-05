@@ -102,6 +102,14 @@ What this script does:
             "Release credits": stats['release_credits_linked'],
         })
 
+        # Cover Art Archive stats (only show if any releases were checked)
+        if stats.get('caa_releases_checked', 0) > 0:
+            script.print_section("Cover Art (CAA)", {
+                "Releases checked": stats['caa_releases_checked'],
+                "With art": stats['caa_releases_with_art'],
+                "Images created": stats['caa_images_created'],
+            })
+
         script.logger.info(f"Links created: {stats['links_created']}")
         script.logger.info(f"Errors: {stats['errors']}")
         script.logger.info("=" * 80)

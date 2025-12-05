@@ -6,17 +6,23 @@ PERFORMANCE OPTIMIZATIONS:
 2. Pre-check if releases exist BEFORE fetching from MusicBrainz API
 3. Only fetch release details for releases that don't exist in DB
 4. Batch all release operations for a recording in one transaction
-5. NEW (2025-12): Song-level pre-fetch of recordings with performers
+5. Song-level pre-fetch of recordings with performers
    - Single query to get all recordings that already have performers
    - Skips add_performers_to_recording() entirely for these recordings
    - Reduces "everything cached" case from 4 queries/recording to 1 query total
 
-KEY ARCHITECTURE (UPDATED):
+KEY ARCHITECTURE:
 - Recording = a specific sound recording (same audio across all releases)
 - Release = a product (album, CD, digital release, etc.)
 - A recording can appear on multiple releases
 - Performers are associated with RECORDINGS (the audio), not releases
 - Releases store Spotify/album art data and release-specific credits (producers, engineers)
+
+COVER ART ARCHIVE INTEGRATION (2025-12):
+- When import_cover_art=True (default), CAA is queried for each new release
+- Uses shared save_release_imagery() function from caa_release_importer module
+- CAA responses are cached to avoid repeated API calls
+- Cover art import failures are non-fatal (logged as warnings)
 """
 
 import logging
@@ -26,6 +32,8 @@ from typing import Optional, Dict, List, Any, Set, Tuple
 from db_utils import get_db_connection
 from mb_performer_importer import PerformerImporter
 from mb_utils import MusicBrainzSearcher
+from caa_utils import CoverArtArchiveClient
+from caa_release_importer import save_release_imagery
 
 # Module-level logger for helper functions
 _logger = logging.getLogger(__name__)
@@ -221,17 +229,19 @@ class MBReleaseImporter:
     - Releases only get release-specific credits (producers, engineers)
     """
     
-    def __init__(self, dry_run: bool = False, force_refresh: bool = False, 
+    def __init__(self, dry_run: bool = False, force_refresh: bool = False,
                  logger: Optional[logging.Logger] = None,
-                 progress_callback: Optional[callable] = None):
+                 progress_callback: Optional[callable] = None,
+                 import_cover_art: bool = True):
         """
         Initialize the importer
-        
+
         Args:
             dry_run: If True, don't make database changes
             force_refresh: If True, bypass MusicBrainz cache
             logger: Optional logger instance (creates one if not provided)
             progress_callback: Optional callback(phase, current, total) for progress tracking
+            import_cover_art: If True, fetch cover art from CAA for new releases
         """
         self.dry_run = dry_run
         self.force_refresh = force_refresh
@@ -239,6 +249,14 @@ class MBReleaseImporter:
         self.progress_callback = progress_callback
         self.mb_searcher = MusicBrainzSearcher(force_refresh=force_refresh)
         self.performer_importer = PerformerImporter(dry_run=dry_run)
+
+        # Cover Art Archive integration
+        self.import_cover_art = import_cover_art
+        if import_cover_art:
+            self.caa_client = CoverArtArchiveClient(force_refresh=force_refresh)
+        else:
+            self.caa_client = None
+
         self.stats = {
             'recordings_found': 0,
             'recordings_created': 0,
@@ -253,14 +271,18 @@ class MBReleaseImporter:
             'release_credits_linked': 0,  # NEW: Release-specific credits (producers, etc.)
             'performers_skipped_existing': 0,  # NEW: Recordings skipped because they already have performers
             'errors': 0,  # Error count
+            # Cover Art Archive stats
+            'caa_releases_checked': 0,
+            'caa_releases_with_art': 0,
+            'caa_images_created': 0,
         }
-        
+
         # Cache for lookup table IDs (populated once per import)
         self._format_cache = {}
         self._status_cache = {}
         self._packaging_cache = {}
-        
-        self.logger.info(f"MBReleaseImporter initialized (optimized version, force_refresh={force_refresh})")
+
+        self.logger.info(f"MBReleaseImporter initialized (optimized version, force_refresh={force_refresh}, import_cover_art={import_cover_art})")
     
     def find_song(self, song_identifier: str) -> Optional[Dict[str, Any]]:
         """
@@ -807,15 +829,15 @@ class MBReleaseImporter:
         
         # Create the release
         release_id = self._create_release(conn, release_data)
-        
+
         if release_id:
             self.stats['releases_created'] += 1
             self.logger.info(f"    ✓ Created release: {release_title[:40]}")
-            
+
             # Link recording to release
             if recording_id:
                 self._link_recording_to_release(conn, recording_id, release_id, mb_release)
-            
+
             # Link release-specific credits (producers, engineers, etc.)
             # These go to the RELEASE, not the recording
             credits_linked = self.performer_importer.link_release_credits(
@@ -823,6 +845,9 @@ class MBReleaseImporter:
             )
             if credits_linked > 0:
                 self.stats['release_credits_linked'] += credits_linked
+
+            # Import cover art from Cover Art Archive
+            self._import_cover_art_for_release(conn, release_id, mb_release_id)
     
     def _get_release_id_by_mb_id(self, conn, mb_release_id: str) -> Optional[str]:
         """Get our database release ID by MusicBrainz release ID"""
@@ -962,7 +987,61 @@ class MBReleaseImporter:
             
             result = cur.fetchone()
             return result['id'] if result else None
-    
+
+    def _import_cover_art_for_release(self, conn, release_id: str,
+                                       mb_release_id: str) -> None:
+        """
+        Import cover art for a newly created release from Cover Art Archive.
+
+        Called automatically after release creation if import_cover_art=True.
+        Uses the shared save_release_imagery() function for database operations.
+
+        Args:
+            conn: Database connection (caller manages transaction)
+            release_id: Our database release UUID
+            mb_release_id: MusicBrainz release ID
+        """
+        if not self.import_cover_art or not self.caa_client:
+            return
+
+        if self.dry_run:
+            self.logger.debug(f"      [DRY RUN] Would check CAA for cover art")
+            return
+
+        try:
+            # Get imagery data from CAA (uses cache)
+            imagery_data = self.caa_client.extract_imagery_data(mb_release_id)
+
+            # Dedupe to one Front, one Back (CAA may return multiple of each type)
+            images_to_store = []
+            stored_types = set()
+            for img in (imagery_data or []):
+                if img['type'] not in stored_types:
+                    images_to_store.append(img)
+                    stored_types.add(img['type'])
+
+            # Save using shared function (doesn't commit - caller does)
+            result = save_release_imagery(
+                conn, release_id, images_to_store,
+                logger=self.logger,
+                update_checked_timestamp=True
+            )
+
+            # Update stats
+            self.stats['caa_releases_checked'] += 1
+            if images_to_store:
+                self.stats['caa_releases_with_art'] += 1
+                self.stats['caa_images_created'] += result.get('created', 0)
+                front_count = sum(1 for img in images_to_store if img['type'] == 'Front')
+                back_count = sum(1 for img in images_to_store if img['type'] == 'Back')
+                self.logger.debug(f"      CAA: {front_count} front, {back_count} back image(s)")
+            else:
+                self.logger.debug(f"      CAA: no cover art available")
+
+        except Exception as e:
+            self.logger.warning(f"      CAA error (non-fatal): {e}")
+            # Don't increment error count - CAA failures shouldn't fail the release import
+
     def _link_recording_to_release(self, conn, recording_id: str, release_id: str,
                                     mb_release: Dict[str, Any]) -> None:
         """

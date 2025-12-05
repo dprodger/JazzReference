@@ -85,6 +85,11 @@ def research_song(song_id: str, song_name: str) -> Dict[str, Any]:
         logger.info(f"  Releases created: {mb_stats['releases_created']}")
         logger.info(f"  Releases existing: {mb_stats['releases_existing']}")
         logger.info(f"  Performers linked: {mb_stats['performers_linked']}")
+        # Cover Art Archive stats (integrated into MBReleaseImporter)
+        if mb_stats.get('caa_releases_checked', 0) > 0:
+            logger.info(f"  CAA releases checked: {mb_stats['caa_releases_checked']}")
+            logger.info(f"  CAA releases with art: {mb_stats['caa_releases_with_art']}")
+            logger.info(f"  CAA images created: {mb_stats['caa_images_created']}")
         if mb_stats['errors'] > 0:
             logger.info(f"  Errors: {mb_stats['errors']}")
         
