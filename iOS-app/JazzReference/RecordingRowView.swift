@@ -48,31 +48,24 @@ struct RecordingRowView: View {
                 ZStack {
                     // Front cover
                     if let frontUrl = frontCoverUrl {
-                        AsyncImage(url: URL(string: frontUrl)) { phase in
-                            switch phase {
-                            case .empty:
+                        CachedAsyncImage(
+                            url: URL(string: frontUrl),
+                            content: { image in
+                                image
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                                    .frame(width: 150, height: 150)
+                                    .clipped()
+                            },
+                            placeholder: {
                                 ZStack {
                                     Color(.systemGray5)
                                     ProgressView()
                                         .tint(.secondary)
                                 }
                                 .frame(width: 150, height: 150)
-                            case .success(let image):
-                                image
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fill)
-                                    .frame(width: 150, height: 150)
-                                    .clipped()
-                            case .failure:
-                                Image(systemName: "music.note")
-                                    .font(.largeTitle)
-                                    .foregroundColor(.secondary)
-                                    .frame(width: 150, height: 150)
-                                    .background(Color(.systemGray5))
-                            @unknown default:
-                                EmptyView()
                             }
-                        }
+                        )
                         .opacity(showingBackCover ? 0 : 1)
                     } else {
                         Image(systemName: "opticaldisc")
@@ -85,31 +78,24 @@ struct RecordingRowView: View {
 
                     // Back cover (pre-rotated so it appears correct after flip)
                     if let backUrl = backCoverUrl {
-                        AsyncImage(url: URL(string: backUrl)) { phase in
-                            switch phase {
-                            case .empty:
+                        CachedAsyncImage(
+                            url: URL(string: backUrl),
+                            content: { image in
+                                image
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                                    .frame(width: 150, height: 150)
+                                    .clipped()
+                            },
+                            placeholder: {
                                 ZStack {
                                     Color(.systemGray5)
                                     ProgressView()
                                         .tint(.secondary)
                                 }
                                 .frame(width: 150, height: 150)
-                            case .success(let image):
-                                image
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fill)
-                                    .frame(width: 150, height: 150)
-                                    .clipped()
-                            case .failure:
-                                Image(systemName: "music.note")
-                                    .font(.largeTitle)
-                                    .foregroundColor(.secondary)
-                                    .frame(width: 150, height: 150)
-                                    .background(Color(.systemGray5))
-                            @unknown default:
-                                EmptyView()
                             }
-                        }
+                        )
                         .rotation3DEffect(.degrees(180), axis: (x: 0, y: 1, z: 0))
                         .opacity(showingBackCover ? 1 : 0)
                     }

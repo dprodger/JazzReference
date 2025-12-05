@@ -91,8 +91,8 @@ struct RecordingsSection: View {
                                     .padding(.horizontal)
                             }
 
-                            // Recordings List
-                            VStack(alignment: .leading, spacing: 12) {
+                            // Recordings List (lazy-loaded for performance)
+                            LazyVStack(alignment: .leading, spacing: 12) {
                                 if !filteredRecordings.isEmpty {
                                     ForEach(groupedRecordings, id: \.groupKey) { group in
                                         VStack(alignment: .leading, spacing: 8) {
@@ -103,7 +103,7 @@ struct RecordingsSection: View {
                                                 .padding(.top, 8)
 
                                             ScrollView(.horizontal, showsIndicators: false) {
-                                                HStack(alignment: .top, spacing: 16) {
+                                                LazyHStack(alignment: .top, spacing: 16) {
                                                     ForEach(group.recordings) { recording in
                                                         NavigationLink(destination: RecordingDetailView(recordingId: recording.id)) {
                                                             RecordingRowView(

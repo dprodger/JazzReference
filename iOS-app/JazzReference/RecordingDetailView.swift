@@ -144,30 +144,26 @@ struct RecordingDetailView: View {
                                 ZStack {
                                     // Front cover
                                     if let frontUrl = displayAlbumArtLarge {
-                                        AsyncImage(url: URL(string: frontUrl)) { phase in
-                                            switch phase {
-                                            case .empty:
+                                        CachedAsyncImage(
+                                            url: URL(string: frontUrl),
+                                            content: { image in
+                                                image
+                                                    .resizable()
+                                                    .aspectRatio(contentMode: .fit)
+                                                    .frame(maxWidth: .infinity)
+                                                    .cornerRadius(12)
+                                            },
+                                            placeholder: {
                                                 Rectangle()
                                                     .fill(Color(.systemGray5))
-                                                    .frame(maxWidth: .infinity)
                                                     .aspectRatio(1, contentMode: .fit)
                                                     .cornerRadius(12)
                                                     .overlay(
                                                         ProgressView()
                                                             .tint(JazzTheme.brass)
                                                     )
-                                            case .success(let image):
-                                                image
-                                                    .resizable()
-                                                    .aspectRatio(contentMode: .fit)
-                                                    .frame(maxWidth: .infinity)
-                                                    .cornerRadius(12)
-                                            case .failure:
-                                                albumArtPlaceholder
-                                            @unknown default:
-                                                EmptyView()
                                             }
-                                        }
+                                        )
                                         .opacity(showingBackCover ? 0 : 1)
                                     } else {
                                         albumArtPlaceholder
@@ -176,30 +172,26 @@ struct RecordingDetailView: View {
 
                                     // Back cover (pre-rotated so it appears correct after flip)
                                     if let backUrl = displayBackCoverArtLarge {
-                                        AsyncImage(url: URL(string: backUrl)) { phase in
-                                            switch phase {
-                                            case .empty:
+                                        CachedAsyncImage(
+                                            url: URL(string: backUrl),
+                                            content: { image in
+                                                image
+                                                    .resizable()
+                                                    .aspectRatio(contentMode: .fit)
+                                                    .frame(maxWidth: .infinity)
+                                                    .cornerRadius(12)
+                                            },
+                                            placeholder: {
                                                 Rectangle()
                                                     .fill(Color(.systemGray5))
-                                                    .frame(maxWidth: .infinity)
                                                     .aspectRatio(1, contentMode: .fit)
                                                     .cornerRadius(12)
                                                     .overlay(
                                                         ProgressView()
                                                             .tint(JazzTheme.brass)
                                                     )
-                                            case .success(let image):
-                                                image
-                                                    .resizable()
-                                                    .aspectRatio(contentMode: .fit)
-                                                    .frame(maxWidth: .infinity)
-                                                    .cornerRadius(12)
-                                            case .failure:
-                                                albumArtPlaceholder
-                                            @unknown default:
-                                                EmptyView()
                                             }
-                                        }
+                                        )
                                         .rotation3DEffect(.degrees(180), axis: (x: 0, y: 1, z: 0))
                                         .opacity(showingBackCover ? 1 : 0)
                                     }
@@ -545,16 +537,23 @@ struct RecordingDetailView: View {
             
             // Cover art or placeholder
             if let artUrl = release.coverArtSmall, let url = URL(string: artUrl) {
-                AsyncImage(url: url) { image in
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                } placeholder: {
-                    Rectangle()
-                        .fill(JazzTheme.smokeGray.opacity(0.3))
-                }
-                .frame(width: 50, height: 50)
-                .cornerRadius(4)
+                CachedAsyncImage(
+                    url: url,
+                    content: { image in
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .frame(width: 50, height: 50)
+                            .clipped()
+                            .cornerRadius(4)
+                    },
+                    placeholder: {
+                        Rectangle()
+                            .fill(JazzTheme.smokeGray.opacity(0.3))
+                            .frame(width: 50, height: 50)
+                            .cornerRadius(4)
+                    }
+                )
                 .overlay(
                     RoundedRectangle(cornerRadius: 4)
                         .stroke(isSelected ? JazzTheme.burgundy : Color.clear, lineWidth: 2)
