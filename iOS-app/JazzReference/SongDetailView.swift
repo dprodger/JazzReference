@@ -41,7 +41,8 @@ struct SongDetailView: View {
     @State private var toast: ToastItem?
     
     @State private var recordingSortOrder: RecordingSortOrder = .year
-    
+    @State private var isRecordingsReloading: Bool = false
+
     // NEW: Summary Information section expansion state (starts collapsed)
     @State private var isSummaryInfoExpanded = false
 
@@ -213,13 +214,14 @@ struct SongDetailView: View {
                 RecordingsSection(
                     recordings: song.recordings ?? [],
                     recordingSortOrder: $recordingSortOrder,
+                    isReloading: isRecordingsReloading,
                     onSortOrderChanged: { [self] newOrder in
                         Task {
-                            isLoading = true
+                            isRecordingsReloading = true
                             if let updatedSong = await NetworkManager().fetchSongDetail(id: currentSongId, sortBy: newOrder) {
                                 self.song = updatedSong
                             }
-                            isLoading = false
+                            isRecordingsReloading = false
                         }
                     }
                 )

@@ -59,6 +59,9 @@ struct RecordingsSection: View {
     // Binding for sort order (passed from parent)
     @Binding var recordingSortOrder: RecordingSortOrder
 
+    // Loading state for sort order changes
+    var isReloading: Bool = false
+
     // Callback when sort order changes (for parent to reload data)
     var onSortOrderChanged: ((RecordingSortOrder) -> Void)?
 
@@ -98,7 +101,7 @@ struct RecordingsSection: View {
                                                 .foregroundColor(JazzTheme.burgundy)
                                                 .padding(.horizontal)
                                                 .padding(.top, 8)
-                                            
+
                                             ScrollView(.horizontal, showsIndicators: false) {
                                                 HStack(alignment: .top, spacing: 16) {
                                                     ForEach(group.recordings) { recording in
@@ -130,6 +133,26 @@ struct RecordingsSection: View {
                                 }
                             }
                             .padding(.top, 8)
+                            .overlay {
+                                if isReloading {
+                                    ZStack {
+                                        Color(.systemBackground)
+                                            .opacity(0.8)
+
+                                        HStack(spacing: 8) {
+                                            ProgressView()
+                                                .tint(JazzTheme.burgundy)
+                                            Text("Reloading...")
+                                                .font(.subheadline)
+                                                .foregroundColor(JazzTheme.smokeGray)
+                                        }
+                                        .padding(.horizontal, 16)
+                                        .padding(.vertical, 10)
+                                        .background(.ultraThinMaterial)
+                                        .cornerRadius(8)
+                                    }
+                                }
+                            }
                         }
                     },
                     label: {
