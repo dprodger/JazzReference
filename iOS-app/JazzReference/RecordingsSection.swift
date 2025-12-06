@@ -108,7 +108,7 @@ struct RecordingsSection: View {
                                                         NavigationLink(destination: RecordingDetailView(recordingId: recording.id)) {
                                                             RecordingRowView(
                                                                 recording: recording,
-                                                                showArtistName: recordingSortOrder == .year
+                                                                showArtistName: recordingSortOrder == .year || group.groupKey == "More Recordings"
                                                             )
                                                         }
                                                         .buttonStyle(.plain)
@@ -312,42 +312,96 @@ struct RecordingsSection: View {
         return result
     }
     
-    // Group recordings based on sort order, preserving backend sort order
-    // - Year sort: Group by recording year
-    // - Name sort: Group by leader/artist name
+    // Group recordings based on sort order with smart consolidation
+    // - Year sort: Group by decade (1960s, 1970s, etc.)
+    // - Name sort: Featured artists (2+ recordings) + "More Recordings" (singles, alphabetical)
     private var groupedRecordings: [(groupKey: String, recordings: [Recording])] {
-        var keyOrder: [String] = []
-        var groups: [String: [Recording]] = [:]
-        
-        for recording in filteredRecordings {
-            let groupKey: String
-            
-            switch recordingSortOrder {
-            case .year:
-                // Group by year
-                if let year = recording.recordingYear {
-                    groupKey = String(year)
-                } else {
-                    groupKey = "Unknown Year"
-                }
-            case .name:
-                // Group by leader name
-                groupKey = recording.performers?.first { $0.role == "leader" }?.name ?? "Unknown"
-            }
-            
-            // Track first appearance order
-            if groups[groupKey] == nil {
-                keyOrder.append(groupKey)
-            }
-            
-            groups[groupKey, default: []].append(recording)
+        switch recordingSortOrder {
+        case .year:
+            return groupByDecade()
+        case .name:
+            return groupByArtistWithConsolidation()
         }
-        
-        // Return groups in the order they first appeared (preserves backend sort)
-        return keyOrder.compactMap { key in
-            guard let recordings = groups[key] else { return nil }
+    }
+
+    // MARK: - Decade Grouping (for Year sort)
+    private func groupByDecade() -> [(groupKey: String, recordings: [Recording])] {
+        var decadeOrder: [String] = []
+        var decades: [String: [Recording]] = [:]
+
+        for recording in filteredRecordings {
+            let decadeKey: String
+            if let year = recording.recordingYear {
+                let decade = (year / 10) * 10
+                decadeKey = "\(decade)s"
+            } else {
+                decadeKey = "Unknown Year"
+            }
+
+            if decades[decadeKey] == nil {
+                decadeOrder.append(decadeKey)
+            }
+            decades[decadeKey, default: []].append(recording)
+        }
+
+        return decadeOrder.compactMap { key in
+            guard let recordings = decades[key] else { return nil }
             return (groupKey: key, recordings: recordings)
         }
+    }
+
+    // MARK: - Artist Grouping with Consolidation (for Name sort)
+    // Artists with 2+ recordings get their own section
+    // Artists with 1 recording are combined into "More Recordings", sorted alphabetically
+    private func groupByArtistWithConsolidation() -> [(groupKey: String, recordings: [Recording])] {
+        // First pass: count recordings per artist
+        var artistCounts: [String: Int] = [:]
+        for recording in filteredRecordings {
+            let artist = recording.performers?.first { $0.role == "leader" }?.name ?? "Unknown"
+            artistCounts[artist, default: 0] += 1
+        }
+
+        // Second pass: separate featured artists from singles
+        var featuredOrder: [String] = []
+        var featuredGroups: [String: [Recording]] = [:]
+        var moreRecordings: [Recording] = []
+
+        for recording in filteredRecordings {
+            let artist = recording.performers?.first { $0.role == "leader" }?.name ?? "Unknown"
+
+            if artistCounts[artist, default: 0] >= 2 {
+                // Featured artist - gets own section
+                if featuredGroups[artist] == nil {
+                    featuredOrder.append(artist)
+                }
+                featuredGroups[artist, default: []].append(recording)
+            } else {
+                // Single recording - goes to "More Recordings"
+                moreRecordings.append(recording)
+            }
+        }
+
+        // Build result: featured artists first (in original order)
+        var result: [(groupKey: String, recordings: [Recording])] = []
+
+        for artist in featuredOrder {
+            if let recordings = featuredGroups[artist] {
+                result.append((groupKey: artist, recordings: recordings))
+            }
+        }
+
+        // Add "More Recordings" section if there are any singles
+        if !moreRecordings.isEmpty {
+            // Sort alphabetically by artist name
+            let sortedMore = moreRecordings.sorted { rec1, rec2 in
+                let artist1 = rec1.performers?.first { $0.role == "leader" }?.name ?? "Unknown"
+                let artist2 = rec2.performers?.first { $0.role == "leader" }?.name ?? "Unknown"
+                return artist1.localizedCaseInsensitiveCompare(artist2) == .orderedAscending
+            }
+            result.append((groupKey: "More Recordings", recordings: sortedMore))
+        }
+
+        return result
     }
 }
 
