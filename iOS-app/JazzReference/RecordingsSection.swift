@@ -103,15 +103,25 @@ struct RecordingsSection: View {
                                                 .padding(.top, 8)
 
                                             ScrollView(.horizontal, showsIndicators: false) {
-                                                LazyHStack(alignment: .top, spacing: 16) {
-                                                    ForEach(group.recordings) { recording in
-                                                        NavigationLink(destination: RecordingDetailView(recordingId: recording.id)) {
-                                                            RecordingRowView(
-                                                                recording: recording,
-                                                                showArtistName: recordingSortOrder == .year || group.groupKey == "More Recordings"
-                                                            )
+                                                LazyHStack(alignment: .top, spacing: 0) {
+                                                    ForEach(Array(group.recordings.enumerated()), id: \.element.id) { index, recording in
+                                                        HStack(alignment: .top, spacing: 0) {
+                                                            // Divider before item (except first)
+                                                            if index > 0 {
+                                                                Rectangle()
+                                                                    .fill(JazzTheme.burgundy.opacity(0.4))
+                                                                    .frame(width: 2, height: 150)
+                                                                    .padding(.horizontal, 8)
+                                                            }
+
+                                                            NavigationLink(destination: RecordingDetailView(recordingId: recording.id)) {
+                                                                RecordingRowView(
+                                                                    recording: recording,
+                                                                    showArtistName: recordingSortOrder == .year || group.groupKey == "More Recordings"
+                                                                )
+                                                            }
+                                                            .buttonStyle(.plain)
                                                         }
-                                                        .buttonStyle(.plain)
                                                     }
                                                 }
                                                 .padding(.horizontal)
