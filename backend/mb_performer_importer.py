@@ -36,12 +36,18 @@ def normalize_group_name(group_name):
     name = group_name.lower().strip()
     
     # Patterns to remove (order matters - try longest first)
+    # Note: (?:and|&) handles both "and" and "&" which MusicBrainz uses interchangeably
     patterns = [
-        r'\s+and\s+his\s+orchestra\b.*$',
-        r'\s+and\s+his\s+band\b.*$',
-        r'\s+and\s+his\s+quintet\b.*$',
-        r'\s+and\s+his\s+quartet\b.*$',
-        r'\s+and\s+his\s+trio\b.*$',
+        r'\s+(?:and|&)\s+his\s+orchestra\b.*$',
+        r'\s+(?:and|&)\s+his\s+band\b.*$',
+        r'\s+(?:and|&)\s+his\s+quintet\b.*$',
+        r'\s+(?:and|&)\s+his\s+quartet\b.*$',
+        r'\s+(?:and|&)\s+his\s+trio\b.*$',
+        r'\s+(?:and|&)\s+her\s+orchestra\b.*$',
+        r'\s+(?:and|&)\s+her\s+band\b.*$',
+        r'\s+(?:and|&)\s+her\s+quintet\b.*$',
+        r'\s+(?:and|&)\s+her\s+quartet\b.*$',
+        r'\s+(?:and|&)\s+her\s+trio\b.*$',
         r'\s+orchestra\b.*$',
         r'\s+big\s+band\b.*$',
         r'\s+band\b.*$',
