@@ -162,10 +162,14 @@ struct JazzReferenceApp: App {
     @State private var importedSongData: ImportedSongData?
     @StateObject private var repertoireManager = RepertoireManager()
     @StateObject private var authManager = AuthenticationManager()
-    
+
     // Password reset state
     @State private var resetPasswordToken: String?
-    
+
+    // Deep link navigation state
+    @State private var deepLinkSongId: String?
+    @State private var deepLinkArtistId: String?
+
     // Onboarding state - persisted across launches
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     @State private var showingOnboarding = false
@@ -251,6 +255,28 @@ struct JazzReferenceApp: App {
                         NSLog("🎵 Song import deep link detected")
                         checkForImportedSong()
                     }
+                    // Handle song view: jazzreference://song/{songId}
+                    else if url.scheme == "jazzreference" && url.host == "song" {
+                        let songId = url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+                        NSLog("🎵 Song deep link detected: %@", songId)
+                        if !songId.isEmpty {
+                            // Clear any pending import data to avoid sheet conflicts
+                            importedSongData = nil
+                            importedArtistData = nil
+                            deepLinkSongId = songId
+                        }
+                    }
+                    // Handle artist view: jazzreference://artist/{artistId}
+                    else if url.scheme == "jazzreference" && url.host == "artist" {
+                        let artistId = url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+                        NSLog("🎵 Artist deep link detected: %@", artistId)
+                        if !artistId.isEmpty {
+                            // Clear any pending import data to avoid sheet conflicts
+                            importedSongData = nil
+                            importedArtistData = nil
+                            deepLinkArtistId = artistId
+                        }
+                    }
                     else {
                         NSLog("❓ Unrecognized deep link format: \(url)")
                     }
@@ -270,8 +296,12 @@ struct JazzReferenceApp: App {
                 }
                 .onChange(of: scenePhase) { oldPhase, newPhase in
                     if newPhase == .active {
-                        checkForImportedArtist()
-                        checkForImportedSong()
+                        // Only check for imports if we're not handling a direct deep link
+                        // This prevents sheet conflicts
+                        if deepLinkSongId == nil && deepLinkArtistId == nil {
+                            checkForImportedArtist()
+                            checkForImportedSong()
+                        }
                     }
                 }
                 .onChange(of: authManager.isAuthenticated) { wasAuthenticated, isAuthenticated in
@@ -305,6 +335,23 @@ struct JazzReferenceApp: App {
                 )) { data in
                     ResetPasswordView(token: data.token)
                         .environmentObject(authManager)
+                }
+                .sheet(item: Binding(
+                    get: { deepLinkSongId.map { DeepLinkSongData(songId: $0) } },
+                    set: { deepLinkSongId = $0?.songId }
+                )) { data in
+                    NavigationStack {
+                        SongDetailView(songId: data.songId)
+                            .environmentObject(repertoireManager)
+                    }
+                }
+                .sheet(item: Binding(
+                    get: { deepLinkArtistId.map { DeepLinkArtistData(artistId: $0) } },
+                    set: { deepLinkArtistId = $0?.artistId }
+                )) { data in
+                    NavigationStack {
+                        PerformerDetailView(performerId: data.artistId)
+                    }
                 }
                 .fullScreenCover(isPresented: $showingOnboarding) {
                     OnboardingView(isPresented: $showingOnboarding)
@@ -357,6 +404,18 @@ struct JazzReferenceApp: App {
 struct ResetPasswordData: Identifiable {
     let id = UUID()
     let token: String
+}
+
+// Helper struct for deep link song navigation
+struct DeepLinkSongData: Identifiable {
+    let id = UUID()
+    let songId: String
+}
+
+// Helper struct for deep link artist navigation
+struct DeepLinkArtistData: Identifiable {
+    let id = UUID()
+    let artistId: String
 }
 
 // MARK: - Preview
