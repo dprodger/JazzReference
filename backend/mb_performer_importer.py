@@ -134,10 +134,91 @@ class PerformerImporter:
         }
     
     # ========================================================================
+    # DATA QUALITY CHECKS: Determine if MusicBrainz has better data
+    # ========================================================================
+
+    def has_better_performer_data(self, conn, recording_id, mb_recording_data):
+        """
+        Check if MusicBrainz has better performer data than what's in our database.
+
+        "Better" means:
+        - MusicBrainz has instrument-type relations (specific instruments)
+        - Our database has performers but WITHOUT instrument info
+
+        Args:
+            conn: Database connection
+            recording_id: Our database recording ID
+            mb_recording_data: MusicBrainz recording data with relations
+
+        Returns:
+            bool: True if MusicBrainz has better data and we should re-import
+        """
+        if not recording_id or not mb_recording_data:
+            return False
+
+        # Check if MusicBrainz has instrument-type relations
+        relations = mb_recording_data.get('relations') or []
+        mb_has_instruments = any(
+            r.get('type') == 'instrument' and r.get('attributes')
+            for r in relations
+            if r.get('target-type') == 'artist'
+        )
+
+        if not mb_has_instruments:
+            return False
+
+        # Check if our database lacks instrument info
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT
+                    COUNT(*) as total_performers,
+                    COUNT(instrument_id) as performers_with_instruments
+                FROM recording_performers
+                WHERE recording_id = %s
+            """, (recording_id,))
+            row = cur.fetchone()
+
+            total = row['total_performers']
+            with_instruments = row['performers_with_instruments']
+
+            # If we have performers but none have instruments, MB data is better
+            if total > 0 and with_instruments == 0:
+                logger.info(f"  MusicBrainz has better performer data (instruments available)")
+                return True
+
+        return False
+
+    def clear_recording_performers(self, conn, recording_id):
+        """
+        Remove all performer links for a recording to allow fresh import.
+
+        Args:
+            conn: Database connection
+            recording_id: Recording ID to clear
+
+        Returns:
+            int: Number of performer links removed
+        """
+        if self.dry_run:
+            logger.info(f"  [DRY RUN] Would clear performers for recording")
+            return 0
+
+        with conn.cursor() as cur:
+            cur.execute("""
+                DELETE FROM recording_performers
+                WHERE recording_id = %s
+                RETURNING performer_id
+            """, (recording_id,))
+            deleted = cur.rowcount
+            if deleted > 0:
+                logger.info(f"  Cleared {deleted} old performer links (will re-import with better data)")
+            return deleted
+
+    # ========================================================================
     # PRIMARY METHOD: Add performers to recordings (OPTIMIZED)
     # ========================================================================
-    
-    def add_performers_to_recording(self, conn, recording_id, recording_data, 
+
+    def add_performers_to_recording(self, conn, recording_id, recording_data,
                                      source_release_title=None):
         """
         Add performers to a recording, aggregating from release data.

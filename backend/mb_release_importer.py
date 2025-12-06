@@ -609,13 +609,24 @@ class MBReleaseImporter:
             self.logger.error("  Failed to get/create recording")
             return
         
-        # STEP 2: Add performers (SKIP if already has performers - NO QUERY)
+        # STEP 2: Add performers
+        # Check if we should skip, or if MusicBrainz has better data than what we have
+        should_import_performers = True
         if mb_recording_id in recordings_with_performers:
-            self.logger.debug(f"  Skipping performer check - recording already has performers")
-            self.stats['performers_skipped_existing'] += 1
-        else:
+            # Recording already has performers - check if MusicBrainz has better data
+            if self.performer_importer.has_better_performer_data(conn, recording_id, mb_recording):
+                # MusicBrainz has better data (instruments) - clear old and re-import
+                self.performer_importer.clear_recording_performers(conn, recording_id)
+                # Also update recording date if MB has better date info
+                self._update_recording_date_if_better(conn, recording_id, date_info)
+            else:
+                self.logger.debug(f"  Skipping performer check - recording already has performers")
+                self.stats['performers_skipped_existing'] += 1
+                should_import_performers = False
+
+        if should_import_performers:
             performers_added = self.performer_importer.add_performers_to_recording(
-                conn, recording_id, mb_recording, 
+                conn, recording_id, mb_recording,
                 source_release_title=album_title
             )
             if performers_added > 0:
@@ -707,7 +718,72 @@ class MBReleaseImporter:
             self.stats['recordings_created'] += 1
 
             return recording_id
-    
+
+    def _update_recording_date_if_better(self, conn, recording_id: str,
+                                          date_info: Dict[str, Any]) -> bool:
+        """
+        Update recording date if MusicBrainz has better date info.
+
+        "Better" means:
+        - MusicBrainz has performer relation dates (actual session dates)
+        - Our database only has mb_first_release dates
+
+        Args:
+            conn: Database connection
+            recording_id: Our database recording ID
+            date_info: Dict from extract_recording_date_from_mb()
+
+        Returns:
+            bool: True if date was updated
+        """
+        if not recording_id or not date_info:
+            return False
+
+        # Only update if MusicBrainz has performer relation dates
+        new_source = date_info.get('recording_date_source')
+        if new_source != 'mb_performer_relation':
+            return False
+
+        if self.dry_run:
+            self.logger.info(f"  [DRY RUN] Would update recording date to {date_info.get('recording_date')}")
+            return True
+
+        with conn.cursor() as cur:
+            # Check current date source
+            cur.execute("""
+                SELECT recording_date_source FROM recordings WHERE id = %s
+            """, (recording_id,))
+            row = cur.fetchone()
+
+            if not row:
+                return False
+
+            current_source = row['recording_date_source']
+
+            # Only update if we have a worse source (release date) or no date
+            if current_source not in (None, 'mb_first_release'):
+                return False
+
+            # Update with better date info
+            cur.execute("""
+                UPDATE recordings
+                SET recording_date = %s,
+                    recording_year = %s,
+                    recording_date_source = %s,
+                    recording_date_precision = %s
+                WHERE id = %s
+            """, (
+                date_info.get('recording_date'),
+                date_info.get('recording_year'),
+                date_info.get('recording_date_source'),
+                date_info.get('recording_date_precision'),
+                recording_id
+            ))
+
+            self.logger.info(f"  Updated recording date: {date_info.get('recording_date')} "
+                           f"(source: {new_source})")
+            return True
+
     def _get_existing_release_ids(self, conn, mb_release_ids: List[str]) -> Dict[str, str]:
         """
         Check which MusicBrainz release IDs already exist in the database
