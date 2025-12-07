@@ -306,10 +306,10 @@ class MBReleaseImporter:
     def import_releases(self, song_identifier: str, limit: int = 200) -> Dict[str, Any]:
         """
         Main method to import recordings and releases for a song
-        
+
         This method:
         1. Finds the song by name or ID
-        2. Fetches recordings from MusicBrainz (via the work)
+        2. Fetches recordings from MusicBrainz (via the work, and second_mb_id if present)
         3. Pre-fetches which recordings already have performers (OPTIMIZATION)
         4. For each recording:
            - Creates the recording if it doesn't exist
@@ -318,31 +318,49 @@ class MBReleaseImporter:
            - Only fetches details for NEW releases
            - Creates release-specific credits (producers, engineers)
         5. Links recordings to releases
-        
+
         Args:
             song_identifier: Song name or UUID to find recordings for
             limit: Maximum number of recordings to process
-            
+
         Returns:
             Dict with import statistics
         """
         # Find the song
         song = self.find_song(song_identifier)
-        
+
         if not song:
             return {'success': False, 'error': 'Song not found', 'stats': self.stats}
-        
+
         self.logger.info(f"Found song: {song['title']} (ID: {song['id']})")
-        
-        # Get MusicBrainz work ID
+
+        # Get MusicBrainz work IDs (primary and optional secondary)
         mb_work_id = song.get('musicbrainz_id')
-        
+        second_mb_id = song.get('second_mb_id')
+
         if not mb_work_id:
             return {'success': False, 'error': 'Song has no MusicBrainz ID', 'stats': self.stats}
-        
-        # Fetch recordings from MusicBrainz
+
+        # Fetch recordings from primary MusicBrainz work
         recordings = self._fetch_musicbrainz_recordings(mb_work_id, limit)
-        
+
+        # Tag recordings with their source work ID
+        for rec in recordings:
+            rec['_source_mb_work_id'] = mb_work_id
+
+        # Fetch recordings from secondary MusicBrainz work if present
+        if second_mb_id:
+            self.logger.info(f"Song has secondary MusicBrainz work ID: {second_mb_id}")
+            secondary_recordings = self._fetch_musicbrainz_recordings(second_mb_id, limit)
+
+            # Tag secondary recordings with their source work ID
+            for rec in secondary_recordings:
+                rec['_source_mb_work_id'] = second_mb_id
+
+            if secondary_recordings:
+                self.logger.info(f"Found {len(secondary_recordings)} additional recordings from secondary MB work")
+                recordings.extend(secondary_recordings)
+
         if not recordings:
             return {'success': False, 'error': 'No recordings found on MusicBrainz', 'stats': self.stats}
         
@@ -395,19 +413,23 @@ class MBReleaseImporter:
             
             for i, mb_recording in enumerate(recordings, 1):
                 recording_title = mb_recording.get('title', 'Unknown')
-                self.logger.info(f"\n[{i}/{len(recordings)}] Processing: {recording_title}")
-                
+                source_work_id = mb_recording.get('_source_mb_work_id')
+                is_secondary = source_work_id == second_mb_id if second_mb_id else False
+                source_label = " [from secondary MB work]" if is_secondary else ""
+                self.logger.info(f"\n[{i}/{len(recordings)}] Processing: {recording_title}{source_label}")
+
                 # Report progress via callback
                 if self.progress_callback:
                     self.progress_callback('musicbrainz_recording_import', i, len(recordings))
-                
+
                 try:
                     self._process_recording_fast(
-                        conn, song['id'], mb_recording, 
+                        conn, song['id'], mb_recording,
                         recordings_with_performers,
                         existing_recordings,
                         existing_releases_all,
-                        all_existing_links
+                        all_existing_links,
+                        source_mb_work_id=source_work_id
                     )
                     self.stats['recordings_found'] += 1
                 except Exception as e:
@@ -560,13 +582,14 @@ class MBReleaseImporter:
                                  recordings_with_performers: Set[str],
                                  existing_recordings: Dict[str, str],
                                  existing_releases_all: Dict[str, str],
-                                 all_existing_links: Dict[str, Set[str]]) -> None:
+                                 all_existing_links: Dict[str, Set[str]],
+                                 source_mb_work_id: Optional[str] = None) -> None:
         """
         Process a single MusicBrainz recording (OPTIMIZED VERSION)
-        
+
         FULLY OPTIMIZED: Uses pre-fetched data for ALL lookups.
         For "everything exists" case: ZERO database queries per recording.
-        
+
         Args:
             conn: Database connection (reused from caller)
             song_id: Our database song ID
@@ -575,6 +598,7 @@ class MBReleaseImporter:
             existing_recordings: Dict of MB recording ID -> our recording ID
             existing_releases_all: Dict of MB release ID -> our release ID
             all_existing_links: Dict of our recording ID -> set of linked release IDs
+            source_mb_work_id: MusicBrainz work ID this recording was imported from (for tracking)
         """
         mb_recording_id = mb_recording.get('id')
 
@@ -599,7 +623,8 @@ class MBReleaseImporter:
         else:
             # Recording doesn't exist - need to create it
             recording_id = self._create_recording(
-                conn, song_id, mb_recording_id, album_title, date_info
+                conn, song_id, mb_recording_id, album_title, date_info,
+                source_mb_work_id=source_mb_work_id
             )
             if recording_id:
                 # Add to cache for future reference
@@ -662,7 +687,8 @@ class MBReleaseImporter:
             )
     
     def _create_recording(self, conn, song_id: str, mb_recording_id: str,
-                           album_title: str, date_info: Dict[str, Any]) -> Optional[str]:
+                           album_title: str, date_info: Dict[str, Any],
+                           source_mb_work_id: Optional[str] = None) -> Optional[str]:
         """
         Create a new recording in the database.
 
@@ -677,6 +703,7 @@ class MBReleaseImporter:
                 - recording_date_precision: 'day', 'month', or 'year'
                 - recording_date_source: 'mb_performer_relation' or 'mb_first_release'
                 - mb_first_release_date: Raw MB first-release-date
+            source_mb_work_id: MusicBrainz work ID this recording was imported from
 
         Returns:
             Recording ID if created, None otherwise
@@ -693,9 +720,9 @@ class MBReleaseImporter:
                 INSERT INTO recordings (
                     song_id, album_title, recording_year, recording_date,
                     recording_date_source, recording_date_precision, mb_first_release_date,
-                    is_canonical, musicbrainz_id
+                    is_canonical, musicbrainz_id, source_mb_work_id
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING id
             """, (
                 song_id,
@@ -706,7 +733,8 @@ class MBReleaseImporter:
                 date_info.get('recording_date_precision'),
                 date_info.get('mb_first_release_date'),
                 False,
-                mb_recording_id
+                mb_recording_id,
+                source_mb_work_id
             ))
 
             recording_id = cur.fetchone()['id']
@@ -935,7 +963,8 @@ class MBReleaseImporter:
             return result['id'] if result else None
     
     def _get_or_create_recording(self, conn, song_id: str, mb_recording_id: str,
-                                  album_title: str, date_info: Dict[str, Any]) -> Optional[str]:
+                                  album_title: str, date_info: Dict[str, Any],
+                                  source_mb_work_id: Optional[str] = None) -> Optional[str]:
         """
         Get existing recording or create new one.
 
@@ -953,6 +982,7 @@ class MBReleaseImporter:
             mb_recording_id: MusicBrainz recording ID (unique identifier)
             album_title: Album title (for display/storage only, NOT for matching)
             date_info: Dict from extract_recording_date_from_mb()
+            source_mb_work_id: MusicBrainz work ID this recording was imported from
 
         Returns:
             Recording ID or None
@@ -980,9 +1010,9 @@ class MBReleaseImporter:
                 INSERT INTO recordings (
                     song_id, album_title, recording_year, recording_date,
                     recording_date_source, recording_date_precision, mb_first_release_date,
-                    is_canonical, musicbrainz_id
+                    is_canonical, musicbrainz_id, source_mb_work_id
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING id
             """, (
                 song_id,
@@ -993,7 +1023,8 @@ class MBReleaseImporter:
                 date_info.get('recording_date_precision'),
                 date_info.get('mb_first_release_date'),
                 False,
-                mb_recording_id
+                mb_recording_id,
+                source_mb_work_id
             ))
 
             recording_id = cur.fetchone()['id']
@@ -1003,7 +1034,7 @@ class MBReleaseImporter:
             self.stats['recordings_created'] += 1
 
             return recording_id
-    
+
     def _create_release(self, conn, release_data: Dict[str, Any]) -> Optional[str]:
         """
         Create a new release in the database, or return existing ID if duplicate
@@ -1347,11 +1378,11 @@ class MBReleaseImporter:
     def _find_song_by_name(self, song_name: str) -> Optional[Dict[str, Any]]:
         """Find a song in the database by name"""
         self.logger.info(f"Searching for song: {song_name}")
-        
+
         with get_db_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute("""
-                    SELECT id, title, composer, musicbrainz_id
+                    SELECT id, title, composer, musicbrainz_id, second_mb_id
                     FROM songs
                     WHERE title ILIKE %s
                     ORDER BY title
@@ -1374,15 +1405,15 @@ class MBReleaseImporter:
     def _find_song_by_id(self, song_id: str) -> Optional[Dict[str, Any]]:
         """Find a song in the database by ID"""
         self.logger.info(f"Looking up song by ID: {song_id}")
-        
+
         with get_db_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute("""
-                    SELECT id, title, composer, musicbrainz_id
+                    SELECT id, title, composer, musicbrainz_id, second_mb_id
                     FROM songs
                     WHERE id = %s
                 """, (song_id,))
-                
+
                 result = cur.fetchone()
                 return dict(result) if result else None
     

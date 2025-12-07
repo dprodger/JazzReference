@@ -16,6 +16,7 @@ CREATE TABLE songs (
     structure TEXT, -- Chord progressions, form description
     external_references JSONB, -- Store Wikipedia links, book references, etc.
 	musicbrainz_id VARCHAR(36) UNIQUE,
+	second_mb_id VARCHAR(36), -- Secondary MusicBrainz work ID for songs with multiple MB works
 	wikipedia_url VARCHAR(500),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -78,6 +79,7 @@ CREATE TABLE recordings (
     created_by VARCHAR(100),
     updated_by VARCHAR(100),
     musicbrainz_id VARCHAR(255) UNIQUE,
+    source_mb_work_id VARCHAR(36), -- MusicBrainz work ID this recording was imported from
     spotify_track_id VARCHAR(100),
     album_art_small VARCHAR(500),
     album_art_medium VARCHAR(500),
