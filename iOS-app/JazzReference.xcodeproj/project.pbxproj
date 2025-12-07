@@ -7,6 +7,16 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		B41D0FAE2EE633EE00DB427C /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B41D0FA22EE633EE00DB427C /* Assets.xcassets */; };
+		B41D0FAF2EE633EE00DB427C /* Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = B41D0FA42EE633EE00DB427C /* Info.plist */; };
+		B41D0FB02EE633EE00DB427C /* JazzReferenceMacApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B41D0FA62EE633EE00DB427C /* JazzReferenceMacApp.swift */; };
+		B41D0FB12EE633EE00DB427C /* PerformerDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B41D0FA82EE633EE00DB427C /* PerformerDetailView.swift */; };
+		B41D0FB22EE633EE00DB427C /* SongDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B41D0FAB2EE633EE00DB427C /* SongDetailView.swift */; };
+		B41D0FB32EE633EE00DB427C /* RecordingDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B41D0FA92EE633EE00DB427C /* RecordingDetailView.swift */; };
+		B41D0FB42EE633EE00DB427C /* SongsListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B41D0FAC2EE633EE00DB427C /* SongsListView.swift */; };
+		B41D0FB52EE633EE00DB427C /* ArtistsListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B41D0FA72EE633EE00DB427C /* ArtistsListView.swift */; };
+		B41D0FB62EE633EE00DB427C /* RecordingsListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B41D0FAA2EE633EE00DB427C /* RecordingsListView.swift */; };
+		B41D0FB72EE633EE00DB427C /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B41D0FA32EE633EE00DB427C /* ContentView.swift */; };
 		B4C535842ECE5FFF0030A127 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = B4C535832ECE5FFF0030A127 /* GoogleSignIn */; };
 		B4C535862ECE5FFF0030A127 /* GoogleSignInSwift in Frameworks */ = {isa = PBXBuildFile; productRef = B4C535852ECE5FFF0030A127 /* GoogleSignInSwift */; };
 		B4EE328C2EB3ED5E00C643D1 /* MusicBrainzImporter.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = B4911D2A2EB316F600326CA7 /* MusicBrainzImporter.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
@@ -52,6 +62,18 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		B41D0F972EE6337400DB427C /* Jazz Liner Notes.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Jazz Liner Notes.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		B41D0FA22EE633EE00DB427C /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Assets.xcassets; path = JazzReferenceMac/Assets.xcassets; sourceTree = "<group>"; };
+		B41D0FA32EE633EE00DB427C /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ContentView.swift; path = JazzReferenceMac/ContentView.swift; sourceTree = "<group>"; };
+		B41D0FA42EE633EE00DB427C /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = Info.plist; path = JazzReferenceMac/Info.plist; sourceTree = "<group>"; };
+		B41D0FA52EE633EE00DB427C /* JazzReferenceMac.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; name = JazzReferenceMac.entitlements; path = JazzReferenceMac/JazzReferenceMac.entitlements; sourceTree = "<group>"; };
+		B41D0FA62EE633EE00DB427C /* JazzReferenceMacApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = JazzReferenceMacApp.swift; path = JazzReferenceMac/JazzReferenceMacApp.swift; sourceTree = "<group>"; };
+		B41D0FA72EE633EE00DB427C /* ArtistsListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArtistsListView.swift; sourceTree = "<group>"; };
+		B41D0FA82EE633EE00DB427C /* PerformerDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerformerDetailView.swift; sourceTree = "<group>"; };
+		B41D0FA92EE633EE00DB427C /* RecordingDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingDetailView.swift; sourceTree = "<group>"; };
+		B41D0FAA2EE633EE00DB427C /* RecordingsListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingsListView.swift; sourceTree = "<group>"; };
+		B41D0FAB2EE633EE00DB427C /* SongDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SongDetailView.swift; sourceTree = "<group>"; };
+		B41D0FAC2EE633EE00DB427C /* SongsListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SongsListView.swift; sourceTree = "<group>"; };
 		B4911D2A2EB316F600326CA7 /* MusicBrainzImporter.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = MusicBrainzImporter.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		B4C160402E91B03600EB8D2C /* JazzReference.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = JazzReference.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B4C1604D2E91B03700EB8D2C /* JazzReferenceTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = JazzReferenceTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -65,6 +87,21 @@
 				Info.plist,
 			);
 			target = B4C1603F2E91B03600EB8D2C /* JazzReference */;
+		};
+		B41D0FB92EE6343900DB427C /* Exceptions for "JazzReference" folder in "Jazz Liner Notes" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Auth/AuthenticationManager.swift,
+				Auth/KeychainHelper.swift,
+				Auth/Models/User.swift,
+				RepertoireManager.swift,
+				Support_Files/HelperViews.swift,
+				Support_Files/JazzTheme.swift,
+				Support_Files/Models.swift,
+				Support_Files/NetworkManager.swift,
+				Support_Files/PreviewHelpers.swift,
+			);
+			target = B41D0F962EE6337400DB427C /* Jazz Liner Notes */;
 		};
 		B4911D382EB316F700326CA7 /* Exceptions for "MusicBrainzImporter" folder in "MusicBrainzImporter" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
@@ -99,6 +136,7 @@
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
 				B4147E552EB4FB2C004A16E7 /* Exceptions for "JazzReference" folder in "JazzReference" target */,
+				B41D0FB92EE6343900DB427C /* Exceptions for "JazzReference" folder in "Jazz Liner Notes" target */,
 			);
 			path = JazzReference;
 			sourceTree = "<group>";
@@ -116,6 +154,13 @@
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		B41D0F942EE6337400DB427C /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		B4911D272EB316F600326CA7 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -150,9 +195,29 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		B41D0FAD2EE633EE00DB427C /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				B41D0FA72EE633EE00DB427C /* ArtistsListView.swift */,
+				B41D0FA82EE633EE00DB427C /* PerformerDetailView.swift */,
+				B41D0FA92EE633EE00DB427C /* RecordingDetailView.swift */,
+				B41D0FAA2EE633EE00DB427C /* RecordingsListView.swift */,
+				B41D0FAB2EE633EE00DB427C /* SongDetailView.swift */,
+				B41D0FAC2EE633EE00DB427C /* SongsListView.swift */,
+			);
+			name = Views;
+			path = JazzReferenceMac/Views;
+			sourceTree = "<group>";
+		};
 		B4C160372E91B03600EB8D2C = {
 			isa = PBXGroup;
 			children = (
+				B41D0FA22EE633EE00DB427C /* Assets.xcassets */,
+				B41D0FA32EE633EE00DB427C /* ContentView.swift */,
+				B41D0FA42EE633EE00DB427C /* Info.plist */,
+				B41D0FA52EE633EE00DB427C /* JazzReferenceMac.entitlements */,
+				B41D0FA62EE633EE00DB427C /* JazzReferenceMacApp.swift */,
+				B41D0FAD2EE633EE00DB427C /* Views */,
 				B4C160422E91B03600EB8D2C /* JazzReference */,
 				B4C160502E91B03700EB8D2C /* JazzReferenceTests */,
 				B4C1605A2E91B03700EB8D2C /* JazzReferenceUITests */,
@@ -168,6 +233,7 @@
 				B4C1604D2E91B03700EB8D2C /* JazzReferenceTests.xctest */,
 				B4C160572E91B03700EB8D2C /* JazzReferenceUITests.xctest */,
 				B4911D2A2EB316F600326CA7 /* MusicBrainzImporter.appex */,
+				B41D0F972EE6337400DB427C /* Jazz Liner Notes.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -175,6 +241,25 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		B41D0F962EE6337400DB427C /* Jazz Liner Notes */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B41D0FA12EE6337500DB427C /* Build configuration list for PBXNativeTarget "Jazz Liner Notes" */;
+			buildPhases = (
+				B41D0F932EE6337400DB427C /* Sources */,
+				B41D0F942EE6337400DB427C /* Frameworks */,
+				B41D0F952EE6337400DB427C /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = "Jazz Liner Notes";
+			packageProductDependencies = (
+			);
+			productName = "Jazz Liner Notes";
+			productReference = B41D0F972EE6337400DB427C /* Jazz Liner Notes.app */;
+			productType = "com.apple.product-type.application";
+		};
 		B4911D292EB316F600326CA7 /* MusicBrainzImporter */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = B4911D392EB316F700326CA7 /* Build configuration list for PBXNativeTarget "MusicBrainzImporter" */;
@@ -277,9 +362,12 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
-				LastSwiftUpdateCheck = 2600;
+				LastSwiftUpdateCheck = 2610;
 				LastUpgradeCheck = 2600;
 				TargetAttributes = {
+					B41D0F962EE6337400DB427C = {
+						CreatedOnToolsVersion = 26.1.1;
+					};
 					B4911D292EB316F600326CA7 = {
 						CreatedOnToolsVersion = 26.0.1;
 					};
@@ -318,11 +406,21 @@
 				B4C1604C2E91B03700EB8D2C /* JazzReferenceTests */,
 				B4C160562E91B03700EB8D2C /* JazzReferenceUITests */,
 				B4911D292EB316F600326CA7 /* MusicBrainzImporter */,
+				B41D0F962EE6337400DB427C /* Jazz Liner Notes */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		B41D0F952EE6337400DB427C /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B41D0FAE2EE633EE00DB427C /* Assets.xcassets in Resources */,
+				B41D0FAF2EE633EE00DB427C /* Info.plist in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		B4911D282EB316F600326CA7 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -354,6 +452,21 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		B41D0F932EE6337400DB427C /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B41D0FB02EE633EE00DB427C /* JazzReferenceMacApp.swift in Sources */,
+				B41D0FB12EE633EE00DB427C /* PerformerDetailView.swift in Sources */,
+				B41D0FB22EE633EE00DB427C /* SongDetailView.swift in Sources */,
+				B41D0FB32EE633EE00DB427C /* RecordingDetailView.swift in Sources */,
+				B41D0FB42EE633EE00DB427C /* SongsListView.swift in Sources */,
+				B41D0FB52EE633EE00DB427C /* ArtistsListView.swift in Sources */,
+				B41D0FB62EE633EE00DB427C /* RecordingsListView.swift in Sources */,
+				B41D0FB72EE633EE00DB427C /* ContentView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		B4911D262EB316F600326CA7 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -403,6 +516,108 @@
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
+		B41D0F9F2EE6337500DB427C /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				AUTOMATION_APPLE_EVENTS = NO;
+				CODE_SIGN_ENTITLEMENTS = JazzReferenceMac/JazzReferenceMac.entitlements;
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = FX893D85BJ;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_PREVIEWS = YES;
+				ENABLE_RESOURCE_ACCESS_AUDIO_INPUT = NO;
+				ENABLE_RESOURCE_ACCESS_CALENDARS = NO;
+				ENABLE_RESOURCE_ACCESS_CAMERA = NO;
+				ENABLE_RESOURCE_ACCESS_CONTACTS = NO;
+				ENABLE_RESOURCE_ACCESS_LOCATION = NO;
+				ENABLE_RESOURCE_ACCESS_PHOTO_LIBRARY = NO;
+				ENABLE_USER_SELECTED_FILES = readonly;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = JazzReferenceMac/Info.plist;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.music";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.6;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "me.rodger.david.Jazz-Liner-Notes";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				RUNTIME_EXCEPTION_ALLOW_DYLD_ENVIRONMENT_VARIABLES = NO;
+				RUNTIME_EXCEPTION_ALLOW_JIT = NO;
+				RUNTIME_EXCEPTION_ALLOW_UNSIGNED_EXECUTABLE_MEMORY = NO;
+				RUNTIME_EXCEPTION_DEBUGGING_TOOL = NO;
+				RUNTIME_EXCEPTION_DISABLE_EXECUTABLE_PAGE_PROTECTION = NO;
+				RUNTIME_EXCEPTION_DISABLE_LIBRARY_VALIDATION = NO;
+				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		B41D0FA02EE6337500DB427C /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				AUTOMATION_APPLE_EVENTS = NO;
+				CODE_SIGN_ENTITLEMENTS = JazzReferenceMac/JazzReferenceMac.entitlements;
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = FX893D85BJ;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_PREVIEWS = YES;
+				ENABLE_RESOURCE_ACCESS_AUDIO_INPUT = NO;
+				ENABLE_RESOURCE_ACCESS_CALENDARS = NO;
+				ENABLE_RESOURCE_ACCESS_CAMERA = NO;
+				ENABLE_RESOURCE_ACCESS_CONTACTS = NO;
+				ENABLE_RESOURCE_ACCESS_LOCATION = NO;
+				ENABLE_RESOURCE_ACCESS_PHOTO_LIBRARY = NO;
+				ENABLE_USER_SELECTED_FILES = readonly;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = JazzReferenceMac/Info.plist;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.music";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.6;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "me.rodger.david.Jazz-Liner-Notes";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				RUNTIME_EXCEPTION_ALLOW_DYLD_ENVIRONMENT_VARIABLES = NO;
+				RUNTIME_EXCEPTION_ALLOW_JIT = NO;
+				RUNTIME_EXCEPTION_ALLOW_UNSIGNED_EXECUTABLE_MEMORY = NO;
+				RUNTIME_EXCEPTION_DEBUGGING_TOOL = NO;
+				RUNTIME_EXCEPTION_DISABLE_EXECUTABLE_PAGE_PROTECTION = NO;
+				RUNTIME_EXCEPTION_DISABLE_LIBRARY_VALIDATION = NO;
+				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
 		B4911D362EB316F700326CA7 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -735,6 +950,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		B41D0FA12EE6337500DB427C /* Build configuration list for PBXNativeTarget "Jazz Liner Notes" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B41D0F9F2EE6337500DB427C /* Debug */,
+				B41D0FA02EE6337500DB427C /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		B4911D392EB316F700326CA7 /* Build configuration list for PBXNativeTarget "MusicBrainzImporter" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

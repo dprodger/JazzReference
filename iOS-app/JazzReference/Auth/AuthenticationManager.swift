@@ -8,7 +8,9 @@
 
 import SwiftUI
 import Combine
+#if os(iOS)
 import GoogleSignIn
+#endif
 
 @MainActor
 class AuthenticationManager: ObservableObject {
@@ -471,6 +473,7 @@ class AuthenticationManager: ObservableObject {
         }
     }
     
+    #if os(iOS)
     @MainActor
     func signInWithGoogle() async -> Bool {
         isLoading = true
@@ -519,7 +522,15 @@ class AuthenticationManager: ObservableObject {
             return false
         }
     }
-
+#else
+    @MainActor
+    func signInWithGoogle() async -> Bool {
+        // macOS placeholder - implement later if needed
+        errorMessage = "Google Sign-In not yet available on macOS"
+        return false
+    }
+#endif
+    
     private func authenticateWithGoogle(idToken: String) async -> Bool {
         let url = URL(string: "\(NetworkManager.baseURL)/auth/google")!
         var request = URLRequest(url: url)
@@ -566,4 +577,5 @@ class AuthenticationManager: ObservableObject {
             return false
         }
     }
+
 }
