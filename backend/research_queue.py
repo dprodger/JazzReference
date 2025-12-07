@@ -24,7 +24,8 @@ _current_song_lock = threading.Lock()
 # Progress tracking for current research operation
 # Phase names for research stages
 PHASE_IDLE = 'idle'
-PHASE_MB_RECORDING_IMPORT = 'musicbrainz_recording_import'
+PHASE_MB_FETCH = 'musicbrainz_fetch'  # Fetching recording details from MusicBrainz
+PHASE_MB_RECORDING_IMPORT = 'musicbrainz_recording_import'  # Processing/importing recordings
 PHASE_SPOTIFY_TRACK_MATCH = 'spotify_track_match'
 
 _current_progress: Optional[dict] = None

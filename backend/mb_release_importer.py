@@ -1412,7 +1412,11 @@ class MBReleaseImporter:
             relations = data.get('relations') or []
             
             self.logger.info(f"Found {len(relations)} related items in work")
-            
+
+            # Count performance relations for accurate progress tracking
+            performance_relations = [r for r in relations if isinstance(r, dict) and r.get('type') == 'performance' and 'recording' in r]
+            total_performances = min(len(performance_relations), limit)
+
             for relation in relations:
                 if not isinstance(relation, dict):
                     continue
@@ -1424,10 +1428,18 @@ class MBReleaseImporter:
                     
                     # Fetch detailed recording information (CACHED by mb_utils)
                     recording_details = self.mb_searcher.get_recording_details(recording_id)
-                    
+
                     if recording_details:
                         recordings.append(recording_details)
-                        
+
+                        # Report progress during fetch phase
+                        if self.progress_callback:
+                            self.progress_callback('musicbrainz_fetch', len(recordings), total_performances)
+
+                        # Log progress every 25 recordings to show activity
+                        if len(recordings) % 25 == 0:
+                            self.logger.info(f"  Fetched {len(recordings)}/{total_performances} recording details...")
+
                         if len(recordings) >= limit:
                             self.logger.info(f"Reached limit of {limit} recordings")
                             break
