@@ -39,7 +39,7 @@ struct RecordingsListView: View {
         NavigationStack {
             contentView
                 .background(JazzTheme.backgroundLight)
-                .navigationTitle("Recordings")
+                .navigationTitle("Recordings (\(networkManager.recordingsCount))")
                 .toolbarBackground(JazzTheme.brass, for: .navigationBar)
                 .toolbarBackground(.visible, for: .navigationBar)
                 .toolbarColorScheme(.dark, for: .navigationBar)
@@ -54,6 +54,7 @@ struct RecordingsListView: View {
                     }
                 }
                 .task {
+                    await networkManager.fetchRecordingsCount()
                     await networkManager.fetchRecordings(searchQuery: searchText)
                 }
         }
@@ -133,17 +134,19 @@ struct RecordingsListView: View {
     
     private var emptyStateView: some View {
         VStack(spacing: 16) {
-            Image(systemName: "opticaldisc")
+            Image(systemName: searchText.isEmpty ? "magnifyingglass" : "opticaldisc")
                 .font(.system(size: 60))
                 .foregroundColor(JazzTheme.smokeGray.opacity(0.5))
-            
+
             if searchText.isEmpty {
-                Text("No Recordings")
+                Text("Search to Browse")
                     .font(.headline)
                     .foregroundColor(JazzTheme.charcoal)
-                Text("Recordings will appear here")
+                Text("Enter an artist, album, or song title to find recordings")
                     .font(.subheadline)
                     .foregroundColor(JazzTheme.smokeGray)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 32)
             } else {
                 Text("No Results")
                     .font(.headline)

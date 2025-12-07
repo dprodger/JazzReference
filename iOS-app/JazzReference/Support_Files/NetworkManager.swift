@@ -628,22 +628,51 @@ class NetworkManager: ObservableObject {
     }
     
     // MARK: - Recordings
-    
-    /// Fetch recordings with optional search query
+
+    /// Total count of recordings in the database (fetched separately for performance)
+    @Published var recordingsCount: Int = 0
+
+    /// Fetch total recordings count (lightweight endpoint)
+    func fetchRecordingsCount() async {
+        guard let url = URL(string: "\(NetworkManager.baseURL)/recordings/count") else {
+            return
+        }
+
+        do {
+            let (data, _) = try await URLSession.shared.data(from: url)
+            if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let count = json["count"] as? Int {
+                await MainActor.run {
+                    self.recordingsCount = count
+                }
+            }
+        } catch {
+            // Silently fail - count is just for display
+        }
+    }
+
+    /// Fetch recordings with search query (search required due to large dataset)
     /// Search matches against artist name, album title, or song title
-    /// - Parameter searchQuery: Optional search string
+    /// - Parameter searchQuery: Search string (required - empty string clears results)
     func fetchRecordings(searchQuery: String = "") async {
         let startTime = Date()
+
+        // If no search query, clear results (dataset too large to load all)
+        if searchQuery.isEmpty {
+            await MainActor.run {
+                self.recordings = []
+                self.isLoading = false
+            }
+            return
+        }
+
         await MainActor.run {
             isLoading = true
             errorMessage = nil
         }
-        
-        var urlString = "\(NetworkManager.baseURL)/recordings"
-        if !searchQuery.isEmpty {
-            urlString += "?search=\(searchQuery.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")"
-        }
-        
+
+        let urlString = "\(NetworkManager.baseURL)/recordings?search=\(searchQuery.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")"
+
         guard let url = URL(string: urlString) else {
             await MainActor.run {
                 errorMessage = "Invalid URL"
@@ -651,17 +680,17 @@ class NetworkManager: ObservableObject {
             }
             return
         }
-        
+
         do {
             let (data, _) = try await URLSession.shared.data(from: url)
             let decodedRecordings = try JSONDecoder().decode([Recording].self, from: data)
-            
+
             await MainActor.run {
                 self.recordings = decodedRecordings
                 self.isLoading = false
             }
-            NetworkManager.logRequest("GET /recordings\(searchQuery.isEmpty ? "" : "?search=...")", startTime: startTime)
-            
+            NetworkManager.logRequest("GET /recordings?search=...", startTime: startTime)
+
             if NetworkManager.diagnosticsEnabled {
                 print("   ↳ Returned \(decodedRecordings.count) recordings")
             }

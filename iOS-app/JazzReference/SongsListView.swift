@@ -42,7 +42,7 @@ struct SongsListView: View {
         NavigationStack {
             contentView
                 .background(JazzTheme.backgroundLight)
-                .navigationTitle("Songs")
+                .navigationTitle("Songs (\(networkManager.songs.count))")
                 .toolbarBackground(JazzTheme.burgundy, for: .navigationBar)
                 .toolbarBackground(.visible, for: .navigationBar)
                 .toolbarColorScheme(.dark, for: .navigationBar)

@@ -63,7 +63,7 @@ struct ArtistsListView: View {
         NavigationStack {
             contentView
                 .background(JazzTheme.backgroundLight)
-                .navigationTitle("Artists")
+                .navigationTitle("Artists (\(networkManager.performers.count))")
                 .toolbarBackground(JazzTheme.amber, for: .navigationBar)
                 .toolbarBackground(.visible, for: .navigationBar)
                 .toolbarColorScheme(.dark, for: .navigationBar)

@@ -160,15 +160,30 @@ RELEASE_ART_LARGE_SQL = """
     ) as cover_art_large"""
 
 
+@recordings_bp.route('/api/recordings/count', methods=['GET'])
+def get_recordings_count():
+    """
+    Get total count of recordings (lightweight endpoint for UI display)
+
+    Returns:
+        JSON with count field
+    """
+    try:
+        result = db_tools.execute_query("SELECT COUNT(*) as count FROM recordings")
+        return jsonify({"count": result[0]['count'] if result else 0})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @recordings_bp.route('/api/recordings', methods=['GET'])
 def get_recordings():
     """
     Get all recordings with optional search
-    
+
     Query Parameters:
         search: Search query to filter recordings by album title, artist name, or song title
         limit: Maximum number of results (default: 100, max: 500)
-        
+
     Returns:
         List of recordings with basic info including performers
     """
