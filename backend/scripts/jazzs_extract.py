@@ -431,7 +431,7 @@ class JazzStandardsRecommendationExtractor:
         
         # Fetch from iTunes API
         try:
-            url = f"https://itunes.apple.com/lookup?id={itunes_id}"
+            url = f"https://itunes.apple.com/lookup?id={itunes_id}&country=US"
             logger.debug(f"    Fetching iTunes metadata: {url}")
             
             self.stats['itunes_api_calls'] += 1
@@ -463,7 +463,49 @@ class JazzStandardsRecommendationExtractor:
         except Exception as e:
             logger.warning(f"Error fetching iTunes metadata: {e}")
             return None
-    
+
+    def search_itunes(self, artist_name: str, song_title: str) -> Optional[Dict]:
+        """
+        Search iTunes by artist name and song title.
+        Used as fallback when ID lookups fail (stale IDs).
+
+        Returns:
+            Dict with track metadata including collectionName, releaseDate, etc.
+        """
+        try:
+            # Build search query - combine artist and song title
+            query = f"{artist_name} {song_title}".replace(' ', '+')
+            url = f"https://itunes.apple.com/search?term={query}&entity=song&limit=10&country=US"
+            logger.debug(f"        Searching iTunes: {artist_name} + {song_title}")
+
+            self.stats['itunes_api_calls'] += 1
+
+            response = self.session.get(url, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+
+            if data.get('resultCount', 0) > 0:
+                # Find best match - prefer exact artist match
+                artist_lower = artist_name.lower()
+                for result in data['results']:
+                    result_artist = result.get('artistName', '').lower()
+                    # Check if artist names match reasonably well
+                    if artist_lower in result_artist or result_artist in artist_lower:
+                        logger.debug(f"        ✓ Search found: {result.get('artistName')} - {result.get('collectionName')}")
+                        return result
+
+                # If no exact artist match, return first result
+                result = data['results'][0]
+                logger.debug(f"        ✓ Search found (first result): {result.get('artistName')} - {result.get('collectionName')}")
+                return result
+            else:
+                logger.debug(f"        iTunes search returned no results")
+                return None
+
+        except Exception as e:
+            logger.warning(f"Error searching iTunes: {e}")
+            return None
+
     def parse_itunes_panel(self, table_elem) -> List[Dict]:
         """
         Parse iTunes panel format recommendations.
@@ -531,17 +573,27 @@ class JazzStandardsRecommendationExtractor:
                 # Fetch album metadata from iTunes API
                 album_title = None
                 recording_year = None
-                
+
                 itunes_data = self.fetch_itunes_metadata(album_id, lookup_type='album')
+
+                # If album lookup failed but we have a track ID, try looking up the track
+                if not itunes_data and track_id:
+                    logger.debug(f"        Album lookup failed, trying track ID: {track_id}")
+                    itunes_data = self.fetch_itunes_metadata(track_id, lookup_type='track')
+
+                # If both lookups failed, try searching by artist + song title (stale ID fallback)
+                if not itunes_data and hasattr(self, 'current_song_title'):
+                    itunes_data = self.search_itunes(artist_name, self.current_song_title)
+
                 if itunes_data:
                     album_title = itunes_data.get('collectionName')
-                    
+
                     # Extract year from releaseDate
                     if itunes_data.get('releaseDate'):
                         year_match = re.search(r'(\d{4})', itunes_data['releaseDate'])
                         if year_match:
                             recording_year = int(year_match.group(1))
-                    
+
                     self.stats['itunes_enriched'] += 1
                     logger.debug(f"        ✓ Album: {album_title}")
                     logger.debug(f"        ✓ Year: {recording_year}")
@@ -869,7 +921,10 @@ class JazzStandardsRecommendationExtractor:
         song_id = song['id']
         song_title = song['title']
         js_url = song['jazzstandards_url']
-        
+
+        # Store song_title for use in iTunes search fallback
+        self.current_song_title = song_title
+
         logger.info(f"\nProcessing: {song_title}")
         logger.debug(f"  URL: {js_url}")
         
