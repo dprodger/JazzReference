@@ -21,6 +21,7 @@ Confidence Levels:
 import sys
 import argparse
 import logging
+import unicodedata
 from typing import Dict, List, Optional, Tuple
 from pathlib import Path
 
@@ -43,6 +44,15 @@ logging.basicConfig(
     ]
 )
 logger = logging.getLogger(__name__)
+
+
+def strip_accents(text: str) -> str:
+    """Remove accents from text for fuzzy matching (e.g., 'Antônio' -> 'Antonio')"""
+    if not text:
+        return text
+    # Normalize to NFD (decomposed form), then remove combining characters
+    normalized = unicodedata.normalize('NFD', text)
+    return ''.join(c for c in normalized if unicodedata.category(c) != 'Mn')
 
 
 class AuthorityRecommendationMatcher:
@@ -78,6 +88,8 @@ class AuthorityRecommendationMatcher:
         """Normalize string for comparison"""
         if not s:
             return ""
+        # Strip accents (e.g., "Antônio" -> "Antonio")
+        s = strip_accents(s)
         # Remove common variations
         s = s.lower().strip()
         # Remove "the" prefix
@@ -210,9 +222,18 @@ class AuthorityRecommendationMatcher:
                     # Use PostgreSQL's similarity function or just get all and filter in Python
                     # For now, get performers with similar names (case-insensitive, contains)
                     normalized_artist = artist_name.lower()
-                    
+
+                    # Also create accent-stripped version for matching (e.g., "Antônio" -> "Antonio")
+                    stripped_artist = strip_accents(artist_name).lower()
+
+                    # Extract last word (usually surname) for broader matching
+                    # This helps with names like "Antonio Carlos Jobim" matching "Antônio Carlos Jobim"
+                    name_parts = artist_name.split()
+                    last_name = name_parts[-1].lower() if name_parts else normalized_artist
+
                     # Get recordings with their primary performer (usually the leader)
                     # Filter to only those where at least one performer name is somewhat similar
+                    # Search by: full name, accent-stripped name, or last name
                     cur.execute("""
                         WITH matching_performers AS (
                             SELECT DISTINCT p.id, p.name
@@ -220,15 +241,17 @@ class AuthorityRecommendationMatcher:
                             WHERE LOWER(p.name) LIKE %s
                                OR LOWER(%s) LIKE '%%' || LOWER(p.name) || '%%'
                                OR LOWER(p.name) LIKE '%%' || LOWER(%s) || '%%'
+                               OR LOWER(p.name) LIKE %s
+                               OR LOWER(p.name) LIKE %s
                         )
-                        SELECT 
+                        SELECT
                             r.id,
                             r.album_title,
                             r.recording_year,
                             r.label,
                             STRING_AGG(DISTINCT p.name, ' / ' ORDER BY p.name) as artist_names,
                             -- Get primary performer as main artist
-                            (SELECT p2.name 
+                            (SELECT p2.name
                              FROM recording_performers rp2
                              JOIN performers p2 ON rp2.performer_id = p2.id
                              WHERE rp2.recording_id = r.id
@@ -241,7 +264,8 @@ class AuthorityRecommendationMatcher:
                         WHERE r.song_id = %s
                         GROUP BY r.id
                         LIMIT 50
-                    """, (f'%{normalized_artist}%', artist_name, artist_name, song_id))
+                    """, (f'%{normalized_artist}%', artist_name, artist_name,
+                          f'%{stripped_artist}%', f'%{last_name}%', song_id))
                     
                     recordings = cur.fetchall()
                     
