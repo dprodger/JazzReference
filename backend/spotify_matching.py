@@ -126,8 +126,12 @@ def normalize_for_comparison(text: str) -> str:
     # Normalize "and" vs "&"
     text = text.replace(' & ', ' and ')
 
-    # Normalize spacing around punctuation (e.g., "St. / Denis" → "St./Denis")
-    text = re.sub(r'\s*/\s*', '/', text)
+    # Normalize slashes to spaces (e.g., "Strasbourg/St. Denis" → "Strasbourg St. Denis")
+    # This handles title variations where "/" is used as a separator
+    text = re.sub(r'\s*/\s*', ' ', text)
+    text = text.replace('/', ' ')
+
+    # Normalize spacing around dashes (e.g., "St. - Denis" → "St.-Denis")
     text = re.sub(r'\s*-\s*', '-', text)
     
     # Remove extra whitespace
@@ -400,6 +404,29 @@ def validate_album_match(spotify_album: dict, expected_album: str,
         album_similarity >= min_album_similarity or
         (album_is_substring and album_similarity >= 50)  # Substring match with at least 50% similarity
     )
+
+    # Special case: Spotify sometimes prepends artist name to album title, e.g.:
+    # "Ryan Porter (Live at New Morning, Paris)" where our album is "Live at New Morning, Paris"
+    # If the expected album is contained in Spotify album and the extra text is the artist name, accept it
+    # NOTE: We use raw lowercased names here, not normalized ones, because normalize_for_comparison
+    # strips out "(Live at ...)" annotations which we need to preserve for this check
+    if not album_valid and expected_artist:
+        raw_expected = expected_album.lower().strip()
+        raw_spotify = spotify_album_name.lower().strip()
+
+        # Check if expected album is contained in Spotify album name
+        if raw_expected in raw_spotify:
+            # Check if Spotify album is "Artist (Album)" or "Artist - Album" pattern
+            extra_text = raw_spotify.replace(raw_expected, '').strip()
+            # Remove common separators
+            extra_text = extra_text.strip('()-–—:').strip()
+
+            if extra_text:
+                raw_expected_artist = expected_artist.lower().strip()
+                extra_similarity = calculate_similarity(extra_text, raw_expected_artist)
+                if extra_similarity >= 75:
+                    album_valid = True
+                    logger.debug(f"      Album accepted: Spotify prepended artist name to album title ({extra_similarity}% match)")
     
     if not album_valid:
         return False, f"Album similarity too low ({album_similarity}% < {min_album_similarity}%)", scores
