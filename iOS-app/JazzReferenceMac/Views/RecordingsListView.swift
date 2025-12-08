@@ -30,6 +30,8 @@ struct RecordingsListView: View {
                     .background(JazzTheme.amber.opacity(0.15))
                 }
 
+                
+                
                 List(selection: $selectedRecordingId) {
                     ForEach(networkManager.recordings) { recording in
                         RecordingRowView(recording: recording)
