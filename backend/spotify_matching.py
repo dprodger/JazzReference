@@ -22,6 +22,37 @@ ENSEMBLE_SUFFIXES = [
     'Orchestra', 'Big Band', 'Band', 'Ensemble', 'Group'
 ]
 
+# Artist names that indicate a compilation rather than a specific artist
+# For these, we allow lenient track verification since artist matching is meaningless
+COMPILATION_ARTIST_PATTERNS = [
+    'various artists',
+    'various',
+    'va',
+    'multiple artists',
+    'compilation',
+    'assorted artists',
+    'diverse artists',
+    'varios artistas',
+    'artistes divers',
+]
+
+
+def is_compilation_artist(artist_name: str) -> bool:
+    """
+    Check if an artist name indicates a compilation/various artists release.
+
+    Args:
+        artist_name: The artist name to check
+
+    Returns:
+        True if the artist name suggests a compilation
+    """
+    if not artist_name:
+        return False
+
+    normalized = artist_name.lower().strip()
+    return normalized in COMPILATION_ARTIST_PATTERNS
+
 
 def strip_ensemble_suffix(artist_name: str) -> str:
     """
@@ -385,15 +416,28 @@ def validate_album_match(spotify_album: dict, expected_album: str,
             logger.debug(f"      Artist accepted via substring containment ({artist_similarity}%)")
         else:
             # Artist validation failed - try track verification fallback
-            # This handles "Various Artists", ensemble name variations, etc.
+            # This handles "Various Artists" compilations where artist matching is meaningless
             # Only attempt if album similarity is high (>=80%) and we have a song title
             if song_title and album_similarity >= 80 and verify_track_callback:
-                album_id = spotify_album.get('id')
-                if album_id and verify_track_callback(album_id, song_title):
-                    scores['verified_by_track'] = True
-                    logger.debug(f"      Album accepted via track verification (artist {artist_similarity}% < {min_artist_similarity}%)")
-                    return True, "Valid match (verified by track presence)", scores
-            
+                # For compilation artists (Various Artists, etc.), allow lenient track verification
+                # For real artists, require at least 40% artist similarity to use track verification
+                # This prevents matching "Illinois Jacquet" to "Charles Bradley" just because
+                # both have albums/tracks called "Black Velvet"
+                is_compilation = is_compilation_artist(expected_artist)
+                min_artist_for_track_verify = 0 if is_compilation else 40
+
+                if artist_similarity >= min_artist_for_track_verify:
+                    album_id = spotify_album.get('id')
+                    if album_id and verify_track_callback(album_id, song_title):
+                        scores['verified_by_track'] = True
+                        if is_compilation:
+                            logger.debug(f"      Album accepted via track verification (compilation artist)")
+                        else:
+                            logger.debug(f"      Album accepted via track verification (artist {artist_similarity}% >= {min_artist_for_track_verify}%)")
+                        return True, "Valid match (verified by track presence)", scores
+                else:
+                    logger.debug(f"      Track verification skipped (artist {artist_similarity}% < {min_artist_for_track_verify}% minimum for non-compilation)")
+
             return False, f"Artist similarity too low ({artist_similarity}% < {min_artist_similarity}%)", scores
     
     return True, "Valid match", scores
