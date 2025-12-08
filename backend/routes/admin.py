@@ -153,6 +153,43 @@ def update_orphan_status(orphan_id):
         return jsonify({'error': str(e)}), 500
 
 
+@admin_bp.route('/orphans/<song_id>/bulk-reject', methods=['POST'])
+def bulk_reject_by_artist(song_id):
+    """Bulk reject all pending orphans by a specific artist"""
+    data = request.get_json()
+    artist_credit = data.get('artist_credit')
+    notes = data.get('notes', 'Bulk rejected')
+
+    if not artist_credit:
+        return jsonify({'error': 'artist_credit is required'}), 400
+
+    try:
+        with get_db_connection() as db:
+            with db.cursor() as cur:
+                cur.execute("""
+                    UPDATE orphan_recordings
+                    SET status = 'rejected',
+                        review_notes = %s,
+                        reviewed_at = CURRENT_TIMESTAMP,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE song_id = %s
+                      AND mb_artist_credit = %s
+                      AND status = 'pending'
+                    RETURNING id
+                """, (notes, song_id, artist_credit))
+                results = cur.fetchall()
+                db.commit()
+
+        return jsonify({
+            'success': True,
+            'rejected_count': len(results)
+        })
+
+    except Exception as e:
+        logger.error(f"Error bulk rejecting orphans: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
 @admin_bp.route('/api/orphans/<song_id>')
 def api_orphans_for_song(song_id):
     """API endpoint to get orphan recordings for a song"""

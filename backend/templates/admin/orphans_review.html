@@ -61,7 +61,48 @@
         .orphan-card.status-pending { border-color: #f39c12; }
         .orphan-card.status-approved { border-color: #27ae60; }
         .orphan-card.status-rejected { border-color: #e74c3c; opacity: 0.6; }
-        .orphan-card.status-imported { border-color: #9b59b6; }
+        .orphan-card.status-imported { border-color: #9b59b6; opacity: 0.7; }
+
+        /* Collapsible cards (imported and rejected) */
+        .orphan-card.status-imported .card-details,
+        .orphan-card.status-rejected .card-details {
+            margin: 0;
+        }
+        .orphan-card.status-imported .card-details summary,
+        .orphan-card.status-rejected .card-details summary {
+            list-style: none;
+            cursor: pointer;
+        }
+        .orphan-card.status-imported .card-details summary::-webkit-details-marker,
+        .orphan-card.status-rejected .card-details summary::-webkit-details-marker {
+            display: none;
+        }
+        .orphan-card.status-imported .card-header,
+        .orphan-card.status-rejected .card-header {
+            cursor: pointer;
+        }
+        .orphan-card.status-imported .card-header:hover,
+        .orphan-card.status-rejected .card-header:hover {
+            background: #f0f0f0;
+        }
+        .orphan-card.status-imported .collapse-indicator {
+            color: #9b59b6;
+            font-size: 14px;
+            transition: transform 0.2s;
+        }
+        .orphan-card.status-rejected .collapse-indicator {
+            color: #e74c3c;
+            font-size: 14px;
+            transition: transform 0.2s;
+        }
+        .orphan-card.status-imported .card-details[open] .collapse-indicator,
+        .orphan-card.status-rejected .card-details[open] .collapse-indicator {
+            transform: rotate(90deg);
+        }
+        .orphan-card.status-imported .card-details:not([open]) .card-header,
+        .orphan-card.status-rejected .card-details:not([open]) .card-header {
+            border-bottom: none;
+        }
 
         .card-header {
             padding: 15px 20px;
@@ -115,7 +156,7 @@
             border-bottom: none;
         }
         .field-col {
-            width: 70px;
+            width: 80px;
         }
         .mb-col {
             width: 42%;
@@ -500,9 +541,173 @@
             color: #666;
             text-transform: uppercase;
         }
+
+        /* Bulk Actions */
+        .bulk-actions {
+            background: #fff;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+            border: 1px solid #e0e0e0;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .bulk-actions-header {
+            margin-bottom: 12px;
+        }
+        .bulk-actions-title {
+            font-weight: 600;
+            color: #1d1d1f;
+            margin-right: 10px;
+        }
+        .bulk-actions-subtitle {
+            font-size: 13px;
+            color: #666;
+        }
+        .artist-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .artist-chip {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: #f5f5f7;
+            border: 1px solid #e0e0e0;
+            border-radius: 20px;
+            padding: 6px 12px;
+        }
+        .artist-chip-name {
+            font-size: 13px;
+            color: #333;
+            max-width: 200px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .artist-chip-count {
+            background: #f39c12;
+            color: #000;
+            font-size: 11px;
+            font-weight: 600;
+            padding: 2px 6px;
+            border-radius: 10px;
+        }
+        .artist-chip-reject {
+            background: #e74c3c;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            padding: 4px 8px;
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+        .artist-chip-reject:hover {
+            opacity: 0.8;
+        }
+
+        /* Sticky Header */
+        .sticky-header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: #fff;
+            border-bottom: 1px solid #e0e0e0;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            padding: 10px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            z-index: 1000;
+            transform: translateY(-100%);
+            transition: transform 0.3s ease;
+        }
+        .sticky-header.visible {
+            transform: translateY(0);
+        }
+        .sticky-header-left {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        .sticky-header-title {
+            font-weight: 600;
+            color: #1d1d1f;
+            font-size: 16px;
+        }
+        .sticky-header-stats {
+            display: flex;
+            gap: 12px;
+            font-size: 13px;
+        }
+        .sticky-stat {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .sticky-stat-value {
+            font-weight: 600;
+        }
+        .sticky-stat-value.pending { color: #f39c12; }
+        .sticky-stat-value.approved { color: #27ae60; }
+        .sticky-header-actions {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .btn-scroll-top {
+            background: #0066cc;
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            padding: 6px 12px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .btn-scroll-top:hover {
+            background: #0055aa;
+        }
     </style>
 </head>
 <body>
+    {% set pending = orphans|selectattr('status', 'equalto', 'pending')|list|length %}
+    {% set approved = orphans|selectattr('status', 'equalto', 'approved')|list|length %}
+    {% set rejected = orphans|selectattr('status', 'equalto', 'rejected')|list|length %}
+    {% set imported = orphans|selectattr('status', 'equalto', 'imported')|list|length %}
+
+    <!-- Sticky Header (appears on scroll) -->
+    <div class="sticky-header" id="stickyHeader">
+        <div class="sticky-header-left">
+            <a href="/admin/orphans" class="back-link">&larr; Back</a>
+            <span class="sticky-header-title">{{ song.title }}</span>
+            <div class="sticky-header-stats">
+                <span class="sticky-stat">
+                    <span class="sticky-stat-value pending">{{ pending }}</span> pending
+                </span>
+                <span class="sticky-stat">
+                    <span class="sticky-stat-value approved">{{ approved }}</span> approved
+                </span>
+            </div>
+        </div>
+        <div class="sticky-header-actions">
+            {% if approved > 0 %}
+            <button class="btn btn-import" onclick="importApproved()" style="padding: 6px 12px; font-size: 13px;">
+                Import {{ approved }}
+            </button>
+            {% endif %}
+            <button class="btn-scroll-top" onclick="scrollToTop()">
+                ↑ Top
+            </button>
+        </div>
+    </div>
+
     <div class="container">
         <div class="header">
             <a href="/admin/orphans" class="back-link">&larr; Back to Songs</a>
@@ -512,10 +717,6 @@
                 <a href="https://musicbrainz.org/work/{{ song.musicbrainz_id }}" target="_blank">View on MusicBrainz</a>
             </p>
         </div>
-
-        {% set pending = orphans|selectattr('status', 'equalto', 'pending')|list|length %}
-        {% set approved = orphans|selectattr('status', 'equalto', 'approved')|list|length %}
-        {% set rejected = orphans|selectattr('status', 'equalto', 'rejected')|list|length %}
 
         <div class="stats">
             <div class="stat">
@@ -534,7 +735,6 @@
                 <div class="stat-value" style="color: #e74c3c;">{{ rejected }}</div>
                 <div class="stat-label">Rejected</div>
             </div>
-            {% set imported = orphans|selectattr('status', 'equalto', 'imported')|list|length %}
             <div class="stat">
                 <div class="stat-value" style="color: #9b59b6;">{{ imported }}</div>
                 <div class="stat-label">Imported</div>
@@ -548,10 +748,62 @@
             {% endif %}
         </div>
 
+        {% set pending_by_artist = {} %}
+        {% for orphan in orphans %}
+            {% if orphan.status == 'pending' %}
+                {% if orphan.mb_artist_credit in pending_by_artist %}
+                    {% set _ = pending_by_artist.update({orphan.mb_artist_credit: pending_by_artist[orphan.mb_artist_credit] + 1}) %}
+                {% else %}
+                    {% set _ = pending_by_artist.update({orphan.mb_artist_credit: 1}) %}
+                {% endif %}
+            {% endif %}
+        {% endfor %}
+
+        {% set artists_with_multiple = pending_by_artist | dictsort | selectattr('1', 'gt', 1) | list %}
+        {% if artists_with_multiple %}
+        <div class="bulk-actions">
+            <div class="bulk-actions-header">
+                <span class="bulk-actions-title">Bulk Actions</span>
+                <span class="bulk-actions-subtitle">Artists with multiple pending orphans</span>
+            </div>
+            <div class="artist-chips">
+                {% for artist, count in artists_with_multiple %}
+                <div class="artist-chip">
+                    <span class="artist-chip-name">{{ artist }}</span>
+                    <span class="artist-chip-count">{{ count }}</span>
+                    <button class="artist-chip-reject" onclick="bulkRejectArtist('{{ artist | e }}', {{ count }})" title="Reject all {{ count }} pending">
+                        Reject All
+                    </button>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
         {% if orphans %}
         <div class="orphan-grid">
             {% for orphan in orphans %}
             <div class="orphan-card status-{{ orphan.status }}" data-id="{{ orphan.id }}">
+                {% if orphan.status == 'imported' or orphan.status == 'rejected' %}
+                <details class="card-details">
+                    <summary>
+                        <div class="card-header">
+                            <div>
+                                <div class="artist-name">{{ orphan.mb_artist_credit }}</div>
+                                <div class="release-date">
+                                    {% if orphan.mb_first_release_date %}
+                                        {{ orphan.mb_first_release_date }}
+                                    {% else %}
+                                        Unknown date
+                                    {% endif %}
+                                    &bull;
+                                    <span class="status-indicator {{ orphan.status }}">{{ orphan.status|title }}</span>
+                                </div>
+                            </div>
+                            <span class="collapse-indicator">▶</span>
+                        </div>
+                    </summary>
+                {% else %}
                 <div class="card-header">
                     <div>
                         <div class="artist-name">{{ orphan.mb_artist_credit }}</div>
@@ -568,6 +820,7 @@
                         </div>
                     </div>
                 </div>
+                {% endif %}
 
                 <div class="card-body">
                     <!-- Comparison Table -->
@@ -727,6 +980,9 @@
                         {% endif %}
                     </div>
                 </div>
+                {% if orphan.status == 'imported' or orphan.status == 'rejected' %}
+                </details>
+                {% endif %}
             </div>
             {% endfor %}
         </div>
@@ -740,6 +996,57 @@
     </div>
 
     <script>
+        // Sticky header scroll handling
+        const stickyHeader = document.getElementById('stickyHeader');
+        let lastScrollY = 0;
+        const scrollThreshold = 200;
+
+        window.addEventListener('scroll', () => {
+            const currentScrollY = window.scrollY;
+
+            if (currentScrollY > scrollThreshold) {
+                stickyHeader.classList.add('visible');
+            } else {
+                stickyHeader.classList.remove('visible');
+            }
+
+            lastScrollY = currentScrollY;
+        });
+
+        function scrollToTop() {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        async function bulkRejectArtist(artistCredit, count) {
+            if (!confirm(`Reject all ${count} pending orphans by "${artistCredit}"?`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/admin/orphans/{{ song.id }}/bulk-reject`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        artist_credit: artistCredit,
+                        notes: 'Bulk rejected - wrong artist'
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    alert(`Rejected ${data.rejected_count} orphan(s) by "${artistCredit}"`);
+                    location.reload();
+                } else {
+                    alert('Error: ' + (data.error || 'Unknown error'));
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+
         async function updateStatus(orphanId, status) {
             try {
                 const response = await fetch(`/admin/orphans/${orphanId}/status`, {

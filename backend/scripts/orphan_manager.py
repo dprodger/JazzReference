@@ -48,10 +48,12 @@ logger = logging.getLogger(__name__)
 class OrphanManager:
     """Manages discovery and enrichment of orphan recordings"""
 
-    def __init__(self, cache_days=30, force_refresh=False):
+    def __init__(self, cache_days=30, force_refresh=False, recording_limit=100, reset_status=False):
         self.mb = MusicBrainzSearcher(cache_days=cache_days, force_refresh=force_refresh)
         self.spotify = None  # Lazy-loaded
         self.force_refresh = force_refresh
+        self.recording_limit = recording_limit
+        self.reset_status = reset_status
         self.stats = {
             'songs_processed': 0,
             'orphans_discovered': 0,
@@ -105,7 +107,7 @@ class OrphanManager:
             params = {
                 'query': f'recording:"{escaped_title}"',
                 'fmt': 'json',
-                'limit': 100
+                'limit': self.recording_limit
             }
 
             response = self.mb.session.get(url, params=params, timeout=15)
@@ -262,7 +264,8 @@ class OrphanManager:
         if not orphans:
             return 0
 
-        saved = 0
+        inserted = 0
+        updated = 0
         with get_db_connection() as db:
             with db.cursor() as cur:
                 for orphan in orphans:
@@ -270,27 +273,71 @@ class OrphanManager:
                         # Serialize releases to JSON for JSONB column
                         releases_json = json.dumps(orphan.get('mb_releases', []))
 
-                        cur.execute("""
-                            INSERT INTO orphan_recordings (
-                                song_id, mb_recording_id, mb_recording_title,
-                                mb_artist_credit, mb_artist_ids, mb_first_release_date,
-                                mb_length_ms, mb_disambiguation, issue_type, linked_work_ids,
-                                mb_releases, discovered_at
-                            ) VALUES (
-                                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP
-                            )
-                            ON CONFLICT (song_id, mb_recording_id) DO UPDATE SET
-                                mb_recording_title = EXCLUDED.mb_recording_title,
-                                mb_artist_credit = EXCLUDED.mb_artist_credit,
-                                mb_artist_ids = EXCLUDED.mb_artist_ids,
-                                mb_first_release_date = EXCLUDED.mb_first_release_date,
-                                mb_length_ms = EXCLUDED.mb_length_ms,
-                                mb_disambiguation = EXCLUDED.mb_disambiguation,
-                                issue_type = EXCLUDED.issue_type,
-                                linked_work_ids = EXCLUDED.linked_work_ids,
-                                mb_releases = EXCLUDED.mb_releases,
-                                updated_at = CURRENT_TIMESTAMP
-                        """, (
+                        # Use RETURNING with xmax to detect insert vs update
+                        # xmax = 0 means insert, xmax > 0 means update
+                        # Optionally reset status to 'pending' for rejected items (not imported)
+                        if self.reset_status:
+                            cur.execute("""
+                                INSERT INTO orphan_recordings (
+                                    song_id, mb_recording_id, mb_recording_title,
+                                    mb_artist_credit, mb_artist_ids, mb_first_release_date,
+                                    mb_length_ms, mb_disambiguation, issue_type, linked_work_ids,
+                                    mb_releases, discovered_at
+                                ) VALUES (
+                                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP
+                                )
+                                ON CONFLICT (song_id, mb_recording_id) DO UPDATE SET
+                                    mb_recording_title = EXCLUDED.mb_recording_title,
+                                    mb_artist_credit = EXCLUDED.mb_artist_credit,
+                                    mb_artist_ids = EXCLUDED.mb_artist_ids,
+                                    mb_first_release_date = EXCLUDED.mb_first_release_date,
+                                    mb_length_ms = EXCLUDED.mb_length_ms,
+                                    mb_disambiguation = EXCLUDED.mb_disambiguation,
+                                    issue_type = EXCLUDED.issue_type,
+                                    linked_work_ids = EXCLUDED.linked_work_ids,
+                                    mb_releases = EXCLUDED.mb_releases,
+                                    status = CASE
+                                        WHEN orphan_recordings.status = 'imported' THEN 'imported'
+                                        ELSE 'pending'
+                                    END,
+                                    updated_at = CURRENT_TIMESTAMP
+                                RETURNING (xmax = 0) AS is_insert
+                            """, (
+                                orphan['song_id'],
+                                orphan['mb_recording_id'],
+                                orphan['mb_recording_title'],
+                                orphan['mb_artist_credit'],
+                                orphan['mb_artist_ids'],
+                                orphan['mb_first_release_date'],
+                                orphan['mb_length_ms'],
+                                orphan['mb_disambiguation'],
+                                orphan['issue_type'],
+                                orphan['linked_work_ids'],
+                                releases_json
+                            ))
+                        else:
+                            cur.execute("""
+                                INSERT INTO orphan_recordings (
+                                    song_id, mb_recording_id, mb_recording_title,
+                                    mb_artist_credit, mb_artist_ids, mb_first_release_date,
+                                    mb_length_ms, mb_disambiguation, issue_type, linked_work_ids,
+                                    mb_releases, discovered_at
+                                ) VALUES (
+                                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP
+                                )
+                                ON CONFLICT (song_id, mb_recording_id) DO UPDATE SET
+                                    mb_recording_title = EXCLUDED.mb_recording_title,
+                                    mb_artist_credit = EXCLUDED.mb_artist_credit,
+                                    mb_artist_ids = EXCLUDED.mb_artist_ids,
+                                    mb_first_release_date = EXCLUDED.mb_first_release_date,
+                                    mb_length_ms = EXCLUDED.mb_length_ms,
+                                    mb_disambiguation = EXCLUDED.mb_disambiguation,
+                                    issue_type = EXCLUDED.issue_type,
+                                    linked_work_ids = EXCLUDED.linked_work_ids,
+                                    mb_releases = EXCLUDED.mb_releases,
+                                    updated_at = CURRENT_TIMESTAMP
+                                RETURNING (xmax = 0) AS is_insert
+                            """, (
                             orphan['song_id'],
                             orphan['mb_recording_id'],
                             orphan['mb_recording_title'],
@@ -303,15 +350,21 @@ class OrphanManager:
                             orphan['linked_work_ids'],
                             releases_json
                         ))
-                        saved += 1
+                        result = cur.fetchone()
+                        if result and result['is_insert']:
+                            inserted += 1
+                        else:
+                            updated += 1
                     except Exception as e:
                         logger.error(f"Error saving orphan: {e}")
                         self.stats['errors'] += 1
 
                 db.commit()
 
-        self.stats['orphans_inserted'] += saved
-        return saved
+        self.stats['orphans_inserted'] += inserted
+        self.stats['orphans_updated'] += updated
+        logger.info(f"  Inserted {inserted} new, updated {updated} existing")
+        return inserted + updated
 
     def enrich_with_spotify(self, song: Dict) -> int:
         """Enrich orphan recordings with Spotify matches (release-aware)"""
@@ -647,6 +700,10 @@ def main():
                         help='Action to perform')
     parser.add_argument('--name', help='Filter by song name')
     parser.add_argument('--limit', type=int, help='Limit number of songs')
+    parser.add_argument('--recording-limit', type=int, default=100,
+                        help='Max recordings to fetch per song from MusicBrainz (default: 100)')
+    parser.add_argument('--reset-status', action='store_true',
+                        help='Reset rejected orphans back to pending (does not affect imported)')
     parser.add_argument('--debug', action='store_true', help='Debug logging')
     parser.add_argument('--force-refresh', action='store_true', help='Bypass cache')
 
@@ -655,7 +712,11 @@ def main():
     if args.debug:
         logging.getLogger().setLevel(logging.DEBUG)
 
-    manager = OrphanManager(force_refresh=args.force_refresh)
+    manager = OrphanManager(
+        force_refresh=args.force_refresh,
+        recording_limit=args.recording_limit,
+        reset_status=args.reset_status
+    )
 
     if args.action == 'discover':
         manager.run_discover(name_filter=args.name, limit=args.limit)
