@@ -15,6 +15,7 @@ Example:
 """
 
 import argparse
+import re
 import sys
 import os
 
@@ -22,6 +23,33 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from db_utils import get_db_connection
+
+
+def normalize_title(title: str) -> str:
+    """
+    Normalize a title for comparison by removing punctuation and extra whitespace.
+
+    Examples:
+        "Don't Blame Me" -> "dont blame me"
+        "(What Did I Do To Be So) Black and Blue" -> "what did i do to be so black and blue"
+        "It's Only a Paper Moon" -> "its only a paper moon"
+    """
+    if not title:
+        return ""
+    # Remove punctuation (apostrophes, parentheses, commas, etc.)
+    normalized = re.sub(r"[^\w\s]", "", title)
+    # Collapse whitespace and lowercase
+    normalized = " ".join(normalized.lower().split())
+    return normalized
+
+
+def titles_are_different(title1: str, title2: str) -> bool:
+    """
+    Check if two titles are meaningfully different (ignoring punctuation).
+
+    Returns True if the titles should be considered different variants.
+    """
+    return normalize_title(title1) != normalize_title(title2)
 
 
 def get_song_info(conn, song_id: str) -> dict | None:
@@ -83,7 +111,8 @@ def display_song_info(song: dict, repertoire_count: int, label: str):
     print(f"  In repertoires:  {repertoire_count}")
 
 
-def merge_songs(master_id: str, extra_id: str, extra_mb_id: str, dry_run: bool = False):
+def merge_songs(master_id: str, extra_id: str, extra_mb_id: str,
+                master_title: str, extra_title: str, dry_run: bool = False):
     """
     Merge extra song into master song.
 
@@ -91,9 +120,14 @@ def merge_songs(master_id: str, extra_id: str, extra_mb_id: str, dry_run: bool =
         master_id: UUID of the song to keep
         extra_id: UUID of the song to merge and delete
         extra_mb_id: MusicBrainz work ID of the extra song (to set as second_mb_id)
+        master_title: Title of the master song (for comparison)
+        extra_title: Title of the extra song (may be added to alt_titles)
         dry_run: If True, don't make any changes
     """
     prefix = "[DRY RUN] " if dry_run else ""
+
+    # Check if titles are meaningfully different
+    add_alt_title = titles_are_different(master_title, extra_title)
 
     with get_db_connection() as conn:
         # Find duplicate recordings (same MB recording ID in both songs)
@@ -106,15 +140,38 @@ def merge_songs(master_id: str, extra_id: str, extra_mb_id: str, dry_run: bool =
             print(f"{prefix}These will be skipped (master's copy kept, extra's copy deleted)")
 
         with conn.cursor() as cur:
-            # Step 1: Set second_mb_id on master song
-            print(f"\n{prefix}Setting second_mb_id on master song to: {extra_mb_id}")
-            if not dry_run:
-                cur.execute("""
-                    UPDATE songs
-                    SET second_mb_id = %s,
-                        updated_at = CURRENT_TIMESTAMP
-                    WHERE id = %s
-                """, (extra_mb_id, master_id))
+            # Step 1: Set second_mb_id on master song (and optionally add alt_title)
+            if add_alt_title:
+                print(f"\n{prefix}Setting second_mb_id on master song to: {extra_mb_id}")
+                print(f"{prefix}Adding '{extra_title}' to alt_titles (titles are different)")
+                if not dry_run:
+                    cur.execute("""
+                        UPDATE songs
+                        SET second_mb_id = %s,
+                            alt_titles = array_append(COALESCE(alt_titles, '{}'), %s),
+                            updated_at = CURRENT_TIMESTAMP
+                        WHERE id = %s
+                          AND NOT (%s = ANY(COALESCE(alt_titles, '{}')))
+                    """, (extra_mb_id, extra_title, master_id, extra_title))
+                    # If alt_title already existed, we still need to set second_mb_id
+                    if cur.rowcount == 0:
+                        cur.execute("""
+                            UPDATE songs
+                            SET second_mb_id = %s,
+                                updated_at = CURRENT_TIMESTAMP
+                            WHERE id = %s
+                        """, (extra_mb_id, master_id))
+                        print(f"  (alt_title already existed)")
+            else:
+                print(f"\n{prefix}Setting second_mb_id on master song to: {extra_mb_id}")
+                print(f"{prefix}Not adding alt_title (titles are equivalent after normalization)")
+                if not dry_run:
+                    cur.execute("""
+                        UPDATE songs
+                        SET second_mb_id = %s,
+                            updated_at = CURRENT_TIMESTAMP
+                        WHERE id = %s
+                    """, (extra_mb_id, master_id))
 
             # Step 2: Delete duplicate recordings from extra song
             if duplicates:
@@ -294,6 +351,9 @@ def main():
         else:
             print("Invalid choice. Please enter 1, 2, or q.")
 
+    # Check if titles are different (will add to alt_titles)
+    will_add_alt_title = titles_are_different(master['title'], extra['title'])
+
     # Confirm the merge
     print(f"\n" + "=" * 60)
     print("MERGE PLAN:")
@@ -302,6 +362,10 @@ def main():
     print(f"  ")
     print(f"  Master's musicbrainz_id:  {master['musicbrainz_id']}")
     print(f"  Master's second_mb_id:    {extra['musicbrainz_id']} (will be set)")
+    if will_add_alt_title:
+        print(f"  Master's alt_titles:      + '{extra['title']}' (will be added)")
+    else:
+        print(f"  Master's alt_titles:      (no change - titles equivalent)")
     print("=" * 60)
 
     if args.dry_run:
@@ -318,6 +382,8 @@ def main():
         master_id=str(master['id']),
         extra_id=str(extra['id']),
         extra_mb_id=extra['musicbrainz_id'],
+        master_title=master['title'],
+        extra_title=extra['title'],
         dry_run=args.dry_run
     )
 
