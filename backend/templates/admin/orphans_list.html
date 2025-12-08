@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Orphan Recordings - Admin</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1a1a2e;
+            color: #eee;
+            line-height: 1.6;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: #f4d03f;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            color: #888;
+            margin-bottom: 30px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: #16213e;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #0f3460;
+        }
+        th {
+            background: #0f3460;
+            color: #f4d03f;
+            font-weight: 600;
+        }
+        tr:hover {
+            background: #1a1a3e;
+        }
+        .song-link {
+            color: #4da8da;
+            text-decoration: none;
+        }
+        .song-link:hover {
+            text-decoration: underline;
+        }
+        .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .badge-pending { background: #f39c12; color: #000; }
+        .badge-approved { background: #27ae60; color: #fff; }
+        .badge-rejected { background: #e74c3c; color: #fff; }
+        .badge-spotify { background: #1db954; color: #fff; }
+        .count {
+            color: #888;
+            font-size: 14px;
+        }
+        .composer {
+            color: #888;
+            font-size: 13px;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #666;
+        }
+        .empty-state h2 {
+            color: #888;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Orphan Recordings</h1>
+        <p class="subtitle">MusicBrainz recordings that match song titles but lack proper work relationships</p>
+
+        {% if songs %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Song</th>
+                    <th>Total Orphans</th>
+                    <th>Pending</th>
+                    <th>Approved</th>
+                    <th>Rejected</th>
+                    <th>With Spotify</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for song in songs %}
+                <tr>
+                    <td>
+                        <a href="/admin/orphans/{{ song.id }}" class="song-link">{{ song.title }}</a>
+                        {% if song.composer %}
+                        <div class="composer">{{ song.composer }}</div>
+                        {% endif %}
+                    </td>
+                    <td>{{ song.orphan_count }}</td>
+                    <td>
+                        {% if song.pending_count > 0 %}
+                        <span class="badge badge-pending">{{ song.pending_count }}</span>
+                        {% else %}
+                        <span class="count">0</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if song.approved_count > 0 %}
+                        <span class="badge badge-approved">{{ song.approved_count }}</span>
+                        {% else %}
+                        <span class="count">0</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if song.rejected_count > 0 %}
+                        <span class="badge badge-rejected">{{ song.rejected_count }}</span>
+                        {% else %}
+                        <span class="count">0</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if song.with_spotify > 0 %}
+                        <span class="badge badge-spotify">{{ song.with_spotify }}</span>
+                        {% else %}
+                        <span class="count">0</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="empty-state">
+            <h2>No orphan recordings found</h2>
+            <p>Run the orphan discovery script to populate this list:</p>
+            <code>python scripts/orphan_manager.py both --name "Song Name"</code>
+        </div>
+        {% endif %}
+    </div>
+</body>
+</html>
