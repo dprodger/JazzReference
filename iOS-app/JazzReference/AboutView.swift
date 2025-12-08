@@ -42,18 +42,21 @@ struct AboutView: View {
             // Content
             VStack(spacing: 20) {
                 Spacer()
-                
+
                 Text("Jazz Liner Notes")
                     .font(.system(size: 48, weight: .bold))
                     .foregroundColor(.white)
                     .shadow(color: .black.opacity(0.7), radius: 10, x: 0, y: 5)
-                
+                    .minimumScaleFactor(0.7)
+                    .lineLimit(1)
+
                 Text("Your comprehensive guide to jazz recordings")
                     .font(.title3)
                     .foregroundColor(.white)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 40)
                     .shadow(color: .black.opacity(0.7), radius: 5, x: 0, y: 2)
+                    .minimumScaleFactor(0.8)
                 
                 Spacer()
                 
@@ -107,31 +110,33 @@ struct AboutView: View {
                                 .foregroundColor(.white.opacity(0.9))
                                 .font(.body)
                                 .rotationEffect(.degrees(isRefreshing ? rotationAngle : 0))
-                            
+
                             Text("Research Queue: \(queueSize)")
                                 .font(.body)
                                 .foregroundColor(.white.opacity(0.9))
-                            
+
                             if isRefreshing {
                                 ProgressView()
                                     .tint(.white)
                                     .scaleEffect(0.7)
                             }
                         }
-                        
+
                         if workerActive && queueSize > 0 {
                             if let songName = currentSongName {
                                 Text("Processing: \(songName)")
                                     .font(.caption)
                                     .foregroundColor(.white.opacity(0.9))
                                     .fontWeight(.medium)
+                                    .lineLimit(1)
+                                    .truncationMode(.tail)
                             } else {
                                 Text("Processing...")
                                     .font(.caption)
                                     .foregroundColor(.white.opacity(0.7))
                                     .italic()
                             }
-                            
+
                             // Progress indicator
                             if let progress = progress {
                                 VStack(spacing: 4) {
@@ -140,33 +145,32 @@ struct AboutView: View {
                                         Text(progress.phaseLabel)
                                             .font(.caption2)
                                             .foregroundColor(.white.opacity(0.7))
-                                        
+                                            .lineLimit(1)
+
                                         Text("\(progress.current)/\(progress.total)")
                                             .font(.caption2)
                                             .foregroundColor(.white.opacity(0.9))
                                             .fontWeight(.medium)
                                     }
-                                    
+
                                     // Progress bar
-                                    GeometryReader { geometry in
-                                        ZStack(alignment: .leading) {
-                                            // Background track
-                                            RoundedRectangle(cornerRadius: 2)
-                                                .fill(Color.white.opacity(0.2))
-                                                .frame(height: 4)
-                                            
-                                            // Progress fill
-                                            RoundedRectangle(cornerRadius: 2)
-                                                .fill(Color.white.opacity(0.8))
-                                                .frame(width: geometry.size.width * progress.progressFraction, height: 4)
-                                        }
+                                    ZStack(alignment: .leading) {
+                                        // Background track
+                                        RoundedRectangle(cornerRadius: 2)
+                                            .fill(Color.white.opacity(0.2))
+                                            .frame(height: 4)
+
+                                        // Progress fill
+                                        RoundedRectangle(cornerRadius: 2)
+                                            .fill(Color.white.opacity(0.8))
+                                            .frame(width: 200 * progress.progressFraction, height: 4)
                                     }
-                                    .frame(height: 4)
+                                    .frame(width: 200, height: 4)
                                 }
                                 .padding(.top, 4)
                             }
                         }
-                        
+
                         // Tap to refresh hint
                         Text("Tap to refresh")
                             .font(.caption2)
@@ -176,6 +180,7 @@ struct AboutView: View {
                 }
                 .padding(.vertical, 16)
                 .padding(.horizontal, 24)
+                .frame(maxWidth: 300)
                 .background(
                     RoundedRectangle(cornerRadius: 12)
                         .fill(Color.black.opacity(0.3))
@@ -208,6 +213,7 @@ struct AboutView: View {
                     .tint(.white.opacity(0.8))
                     .padding(.bottom, 40)
             }
+            .dynamicTypeSize(...DynamicTypeSize.large)
         }
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(JazzTheme.burgundy, for: .navigationBar)
