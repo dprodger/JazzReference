@@ -19,7 +19,7 @@ struct DetailRow: View {
         HStack {
             Label {
                 Text(label)
-                    .font(.subheadline)
+                    .font(JazzTheme.subheadline())
                     .foregroundColor(JazzTheme.smokeGray)
             } icon: {
                 Image(systemName: icon)
@@ -27,7 +27,7 @@ struct DetailRow: View {
             }
             Spacer()
             Text(value)
-                .font(.subheadline)
+                .font(JazzTheme.subheadline())
                 .bold()
                 .foregroundColor(JazzTheme.charcoal)
         }
@@ -42,14 +42,14 @@ struct StreamingButton: View {
     var body: some View {
         VStack(spacing: 8) {
             Image(systemName: icon)
-                .font(.title2)
+                .font(JazzTheme.title2())
                 .foregroundColor(JazzTheme.cream)
                 .frame(width: 60, height: 60)
                 .background(color)
                 .clipShape(Circle())
             
             Text(label)
-                .font(.caption)
+                .font(JazzTheme.caption())
                 .foregroundColor(JazzTheme.smokeGray)
         }
     }
@@ -62,12 +62,12 @@ struct PerformerRowView: View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
                 Text(performer.name)
-                    .font(.headline)
+                    .font(JazzTheme.headline())
                     .foregroundColor(JazzTheme.charcoal)
                 
                 if let instrument = performer.instrument {
                     Text(instrument)
-                        .font(.subheadline)
+                        .font(JazzTheme.subheadline())
                         .foregroundColor(JazzTheme.smokeGray)
                 }
             }
@@ -76,7 +76,7 @@ struct PerformerRowView: View {
             
             if let role = performer.role {
                 Text(role.capitalized)
-                    .font(.caption)
+                    .font(JazzTheme.caption())
                     .foregroundColor(JazzTheme.cream)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
@@ -102,20 +102,20 @@ struct ExternalReferenceRow: View {
             HStack(spacing: 12) {
                 // Icon
                 Image(systemName: reference.iconName)
-                    .font(.title3)
+                    .font(JazzTheme.title3())
                     .foregroundColor(JazzTheme.burgundy)
                     .frame(width: 32)
                 
                 // Source name
                 Text(reference.displayName)
-                    .font(.subheadline)
+                    .font(JazzTheme.subheadline())
                     .foregroundColor(JazzTheme.charcoal)
                 
                 Spacer()
                 
                 // External link indicator
                 Image(systemName: "arrow.up.right.square")
-                    .font(.caption)
+                    .font(JazzTheme.caption())
                     .foregroundColor(JazzTheme.smokeGray)
             }
             .padding(.horizontal)
@@ -140,11 +140,11 @@ struct AuthorityRecordingRow: View {
                         if recording.isCanonical == true {
                             Image(systemName: "star.fill")
                                 .foregroundColor(.yellow)
-                                .font(.caption)
+                                .font(JazzTheme.caption())
                         }
                         
                         Text(recording.albumTitle ?? "Unknown Album")
-                            .font(.headline)
+                            .font(JazzTheme.headline())
                             .foregroundColor(JazzTheme.charcoal)
                     }
                     
@@ -152,7 +152,7 @@ struct AuthorityRecordingRow: View {
                     HStack(spacing: 8) {
                         if let year = recording.recordingYear {
                             Text("\(year)")
-                                .font(.subheadline)
+                                .font(JazzTheme.subheadline())
                                 .foregroundColor(JazzTheme.smokeGray)
                         }
                         
@@ -160,7 +160,7 @@ struct AuthorityRecordingRow: View {
                             Text("•")
                                 .foregroundColor(JazzTheme.smokeGray)
                             Text(label)
-                                .font(.caption)
+                                .font(JazzTheme.caption())
                                 .foregroundColor(JazzTheme.smokeGray)
                         }
                     }
@@ -189,9 +189,9 @@ struct AuthorityBadge: View {
     var body: some View {
         HStack(spacing: 4) {
             Image(systemName: "checkmark.seal.fill")
-                .font(.caption2)
+                .font(JazzTheme.caption2())
             Text(text)
-                .font(.caption2)
+                .font(JazzTheme.caption2())
                 .fontWeight(.semibold)
         }
         .foregroundColor(.white)

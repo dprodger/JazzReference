@@ -97,7 +97,7 @@ struct RecordingsSection: View {
                                     ForEach(groupedRecordings, id: \.groupKey) { group in
                                         VStack(alignment: .leading, spacing: 8) {
                                             Text("\(group.groupKey) (\(group.recordings.count))")
-                                                .font(.headline)
+                                                .font(JazzTheme.headline())
                                                 .foregroundColor(JazzTheme.burgundy)
                                                 .padding(.horizontal)
                                                 .padding(.top, 8)
@@ -134,7 +134,7 @@ struct RecordingsSection: View {
                                             .font(.system(size: 48))
                                             .foregroundColor(JazzTheme.smokeGray.opacity(0.5))
                                         Text("No recordings match the current filters")
-                                            .font(.subheadline)
+                                            .font(JazzTheme.subheadline())
                                             .foregroundColor(JazzTheme.smokeGray)
                                             .multilineTextAlignment(.center)
                                     }
@@ -149,7 +149,7 @@ struct RecordingsSection: View {
                                         ProgressView()
                                             .tint(JazzTheme.burgundy)
                                         Text("Reloading...")
-                                            .font(.subheadline)
+                                            .font(JazzTheme.subheadline())
                                             .foregroundColor(JazzTheme.smokeGray)
                                     }
                                     .padding(.horizontal, 16)
@@ -170,13 +170,13 @@ struct RecordingsSection: View {
                                 .foregroundColor(JazzTheme.burgundy)
 
                             Text("Recordings")
-                                .font(.title2)
+                                .font(JazzTheme.title2())
                                 .bold()
                                 .foregroundColor(JazzTheme.charcoal)
 
                             // Recording count in header
                             Text("(\(filteredRecordings.count))")
-                                .font(.subheadline)
+                                .font(JazzTheme.subheadline())
                                 .foregroundColor(JazzTheme.smokeGray)
 
                             Spacer()
@@ -201,7 +201,7 @@ struct RecordingsSection: View {
                             } label: {
                                 HStack(spacing: 3) {
                                     Text(recordingSortOrder.displayName)
-                                        .font(.caption)
+                                        .font(JazzTheme.caption())
                                     Image(systemName: "chevron.down")
                                         .font(.caption2)
                                 }
@@ -258,7 +258,7 @@ struct RecordingsSection: View {
                     Image(systemName: hasActiveFilters ? "slider.horizontal.3" : "plus")
                         .font(.caption.weight(.medium))
                     Text(hasActiveFilters ? "Edit" : "Filter")
-                        .font(.subheadline)
+                        .font(JazzTheme.subheadline())
                 }
                 .foregroundColor(JazzTheme.burgundy)
                 .padding(.horizontal, 10)
@@ -426,11 +426,11 @@ struct FilterChip: View {
         HStack(spacing: 4) {
             if let icon = icon {
                 Image(systemName: icon)
-                    .font(.caption)
+                    .font(JazzTheme.caption())
             }
 
             Text(label)
-                .font(.subheadline)
+                .font(JazzTheme.subheadline())
 
             Button(action: onRemove) {
                 Image(systemName: "xmark")

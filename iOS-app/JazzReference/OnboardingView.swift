@@ -128,20 +128,21 @@ private struct WelcomePage: View {
                     .foregroundColor(JazzTheme.burgundy)
                 
                 Text("Welcome!")
-                    .font(.largeTitle)
-                    .fontWeight(.bold)
+                    .font(JazzTheme.largeTitle())
                     .foregroundColor(JazzTheme.charcoal)
                 
                 VStack(spacing: 16) {
                     Text("Thanks for checking out Approach Note.")
-                        .font(.title3)
+                        .font(JazzTheme.title3())
                         .multilineTextAlignment(.center)
                     
                     Text("I'm going to give you a brief description of what is available here so you can get yourself oriented.")
+                        .font(JazzTheme.body())
+                        .foregroundColor(JazzTheme.smokeGray)
                         .multilineTextAlignment(.center)
                     
                     Text("You can always re-run this tutorial by going to the About section and tapping \"View Tutorial\".")
-                        .font(.callout)
+                        .font(JazzTheme.body())
                         .foregroundColor(JazzTheme.smokeGray)
                         .multilineTextAlignment(.center)
                 }
@@ -154,11 +155,11 @@ private struct WelcomePage: View {
                 // Decorative element
                 VStack(spacing: 12) {
                     Image(systemName: "info.circle")
-                        .font(.title2)
+                        .font(JazzTheme.title2())
                         .foregroundColor(JazzTheme.amber)
                     
                     Text("When it comes to music, the data are complicated.\nI'll walk you through the definitions.")
-                        .font(.body)
+                        .font(JazzTheme.body())
                         .italic()
                         .multilineTextAlignment(.center)
                         .foregroundColor(JazzTheme.smokeGray)
@@ -187,8 +188,7 @@ private struct SongPage: View {
                         .foregroundColor(JazzTheme.burgundy)
                     
                     Text("Song")
-                        .font(.largeTitle)
-                        .fontWeight(.bold)
+                        .font(JazzTheme.largeTitle())
                         .foregroundColor(JazzTheme.charcoal)
                 }
                 
@@ -200,14 +200,14 @@ private struct SongPage: View {
                     + Text("Song")
                         .fontWeight(.semibold)
                     + Text(".")
-                    
+                    .foregroundColor(JazzTheme.charcoal)
+
                     Text("This can sometimes be called a Work, or a Composition.")
-                        .foregroundColor(JazzTheme.smokeGray)
                     
                     Text("But it's the basic chords, melody, and (if appropriate) lyrics of a particular written piece of music.")
                 }
-                .font(.body)
-                .foregroundColor(JazzTheme.charcoal)
+                .font(JazzTheme.body())
+                .foregroundColor(JazzTheme.smokeGray)
                 .multilineTextAlignment(.leading)
                 .padding(.horizontal, 32)
                 
@@ -219,17 +219,17 @@ private struct SongPage: View {
                     HStack(spacing: 12) {
                         Image(systemName: "pianokeys")
                         Image(systemName: "plus")
-                            .font(.caption)
+                            .font(JazzTheme.caption())
                         Image(systemName: "waveform")
                         Image(systemName: "plus")
-                            .font(.caption)
+                            .font(JazzTheme.caption())
                         Image(systemName: "text.alignleft")
                     }
-                    .font(.title2)
+                    .font(JazzTheme.title2())
                     .foregroundColor(JazzTheme.brass)
                     
                     Text("Chords + Melody + Lyrics")
-                        .font(.caption)
+                        .font(JazzTheme.caption())
                         .foregroundColor(JazzTheme.smokeGray)
                 }
                 .padding()
@@ -261,8 +261,7 @@ private struct RecordingPage: View {
                         .foregroundColor(JazzTheme.brass)
                     
                     Text("Recording")
-                        .font(.largeTitle)
-                        .fontWeight(.bold)
+                        .font(JazzTheme.largeTitle())
                         .foregroundColor(JazzTheme.charcoal)
                 }
                 
@@ -275,7 +274,7 @@ private struct RecordingPage: View {
                     Text("The lineup for this recording is what it was on that date & time.")
                         .foregroundColor(JazzTheme.smokeGray)
                 }
-                .font(.body)
+                .font(JazzTheme.body())
                 .foregroundColor(JazzTheme.charcoal)
                 .multilineTextAlignment(.leading)
                 .padding(.horizontal, 32)
@@ -297,10 +296,10 @@ private struct RecordingPage: View {
                         Image(systemName: "calendar")
                             .foregroundColor(JazzTheme.teal)
                     }
-                    .font(.title2)
+                    .font(JazzTheme.title2())
                     
                     Text("Artists + Song + Date")
-                        .font(.caption)
+                        .font(JazzTheme.caption())
                         .foregroundColor(JazzTheme.smokeGray)
                 }
                 .padding()
@@ -332,14 +331,12 @@ private struct ReleasesPage: View {
                         .foregroundColor(JazzTheme.teal)
                     
                     Text("Releases")
-                        .font(.largeTitle)
-                        .fontWeight(.bold)
+                        .font(JazzTheme.largeTitle())
                         .foregroundColor(JazzTheme.charcoal)
                 }
                 
                 VStack(alignment: .leading, spacing: 16) {
                     Text("The music industry being what it is, here's where it gets complicated.")
-                        .foregroundColor(JazzTheme.smokeGray)
                     
                     Text("That recording was issued to the public on a ")
                     + Text("Release")
@@ -347,10 +344,9 @@ private struct ReleasesPage: View {
                     + Text(". The release is a piece of commercial product (vinyl, CD, cassette, streaming) that was put into the world by a label.")
                     
                     Text("The same piece of audio often appears on multiple releases.")
-                        .fontWeight(.medium)
                 }
-                .font(.body)
-                .foregroundColor(JazzTheme.charcoal)
+                .font(JazzTheme.body())
+                .foregroundColor(JazzTheme.smokeGray)
                 .multilineTextAlignment(.leading)
                 .padding(.horizontal, 32)
                 
@@ -358,7 +354,7 @@ private struct ReleasesPage: View {
                 HStack(spacing: 16) {
                     ForEach(["opticaldisc", "record.circle", "play.rectangle.fill"], id: \.self) { icon in
                         Image(systemName: icon)
-                            .font(.title)
+                            .font(JazzTheme.title())
                             .foregroundColor(JazzTheme.teal)
                     }
                 }
@@ -366,16 +362,14 @@ private struct ReleasesPage: View {
                 
                 VStack(alignment: .leading, spacing: 12) {
                     Text("If you care about hearing the specific version (or Recording) of that song, it doesn't matter too much what Release it's on — they should sound the same.")
-                        .font(.callout)
-                    
+
                     Text("(Remastering, etc., may be counted as a separate release or may not.)")
-                        .font(.caption)
-                        .foregroundColor(JazzTheme.smokeGray)
-                    
+                        .font(JazzTheme.caption())
+
                     Text("Oftentimes, releases are restricted by geographic region; or they may no longer be available at all.")
-                        .font(.callout)
                 }
-                .foregroundColor(JazzTheme.charcoal)
+                .font(JazzTheme.body())
+                .foregroundColor(JazzTheme.smokeGray)
                 .padding(.horizontal, 32)
                 
                 // Key insight box
@@ -384,7 +378,7 @@ private struct ReleasesPage: View {
                         .foregroundColor(JazzTheme.gold)
                     
                     Text("For our purposes, if we can find any Release of the same Recording, we can treat them interchangeably from a playback and lineup perspective.")
-                        .font(.callout)
+                        .font(JazzTheme.callout())
                         .italic()
                         .multilineTextAlignment(.center)
                         .foregroundColor(JazzTheme.charcoal)
@@ -416,24 +410,22 @@ private struct CompletionPage: View {
                 .foregroundColor(JazzTheme.burgundy)
             
             Text("You're All Set!")
-                .font(.largeTitle)
-                .fontWeight(.bold)
+                .font(JazzTheme.largeTitle())
                 .foregroundColor(JazzTheme.charcoal)
             
             Text("So, there you have it in a nutshell.")
-                .font(.title3)
+                .font(JazzTheme.title3())
                 .foregroundColor(JazzTheme.charcoal)
-            
+
             Text("Enjoy!")
-                .font(.title2)
-                .fontWeight(.semibold)
+                .font(JazzTheme.title2())
                 .foregroundColor(JazzTheme.burgundy)
             
             Spacer()
             
             Button(action: onFinish) {
                 Text("Get Started")
-                    .font(.headline)
+                    .font(JazzTheme.headline())
                     .foregroundColor(.white)
                     .frame(maxWidth: .infinity)
                     .padding()

@@ -98,7 +98,7 @@ struct SettingsView: View {
                         // Name
                         if let displayName = authManager.currentUser?.displayName {
                             Text(displayName)
-                                .font(.title2)
+                                .font(JazzTheme.title2())
                                 .fontWeight(.semibold)
                                 .foregroundColor(JazzTheme.charcoal)
                         }
@@ -106,7 +106,7 @@ struct SettingsView: View {
                         // Email
                         if let email = authManager.currentUser?.email {
                             Text(email)
-                                .font(.body)
+                                .font(JazzTheme.body())
                                 .foregroundColor(JazzTheme.smokeGray)
                         }
                     }
@@ -139,10 +139,7 @@ struct SettingsView: View {
                 }
             }
             .background(JazzTheme.backgroundLight)
-            .navigationTitle("Settings")
-            .toolbarBackground(JazzTheme.burgundy, for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
-            .toolbarColorScheme(.dark, for: .navigationBar)
+            .jazzNavigationBar(title: "Settings")
         }
     }
 }
@@ -176,6 +173,9 @@ struct JazzReferenceApp: App {
 
     // ADD THIS INITIALIZER
     init() {
+        // Configure navigation bar fonts from JazzTheme
+        JazzTheme.configureNavigationBarAppearance()
+
         // Diagnostic: Check URL scheme registration
         NSLog("========================================")
         NSLog("🔧 MAIN APP URL SCHEME DIAGNOSTICS")

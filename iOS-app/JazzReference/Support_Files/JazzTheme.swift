@@ -6,8 +6,313 @@
 //
 
 import SwiftUI
+import UIKit
 
 struct JazzTheme {
+    // MARK: - Typography
+
+    /// Font family for headings (largeTitle, title, title2, title3, headline)
+    /// Options: "Futura", "Avenir", "Helvetica Neue", "Gill Sans", "Optima"
+    static let headingFontFamily = "Baskerville"
+
+    /// Font family for body text (body, callout, subheadline, footnote, caption)
+    /// Options: "Baskerville", "Georgia", "Palatino", "Didot", "Cochin", "Charter"
+    static let bodyFontFamily = "Futura"
+
+    // MARK: - Heading Fonts
+
+    /// Font for large titles (e.g., screen titles, hero text)
+    static func largeTitle(size: CGFloat = 34, weight: Font.Weight = .bold) -> Font {
+        .custom(headingFontName(for: weight), size: size)
+    }
+
+    /// Font for titles (e.g., section headers, card titles)
+    static func title(size: CGFloat = 28, weight: Font.Weight = .bold) -> Font {
+        .custom(headingFontName(for: weight), size: size)
+    }
+
+    /// Font for titles level 2
+    static func title2(size: CGFloat = 22, weight: Font.Weight = .semibold) -> Font {
+        .custom(headingFontName(for: weight), size: size)
+    }
+
+    /// Font for titles level 3
+    static func title3(size: CGFloat = 20, weight: Font.Weight = .semibold) -> Font {
+        .custom(headingFontName(for: weight), size: size)
+    }
+
+    /// Font for headlines
+    static func headline(size: CGFloat = 17, weight: Font.Weight = .semibold) -> Font {
+        .custom(headingFontName(for: weight), size: size)
+    }
+
+    // MARK: - Body Fonts
+
+    /// Font for body text
+    static func body(size: CGFloat = 17, weight: Font.Weight = .regular) -> Font {
+        .custom(bodyFontName(for: weight), size: size)
+    }
+
+    /// Font for callouts
+    static func callout(size: CGFloat = 16, weight: Font.Weight = .regular) -> Font {
+        .custom(bodyFontName(for: weight), size: size)
+    }
+
+    /// Font for subheadlines
+    static func subheadline(size: CGFloat = 15, weight: Font.Weight = .regular) -> Font {
+        .custom(bodyFontName(for: weight), size: size)
+    }
+
+    /// Font for footnotes
+    static func footnote(size: CGFloat = 13, weight: Font.Weight = .regular) -> Font {
+        .custom(bodyFontName(for: weight), size: size)
+    }
+
+    /// Font for captions
+    static func caption(size: CGFloat = 12, weight: Font.Weight = .regular) -> Font {
+        .custom(bodyFontName(for: weight), size: size)
+    }
+
+    /// Font for smaller captions
+    static func caption2(size: CGFloat = 11, weight: Font.Weight = .regular) -> Font {
+        .custom(bodyFontName(for: weight), size: size)
+    }
+
+    // MARK: - Font Name Helpers
+
+    /// Helper to get the correct heading font name variant for the weight
+    private static func headingFontName(for weight: Font.Weight) -> String {
+        switch headingFontFamily {
+        case "Futura":
+            switch weight {
+            case .bold, .heavy, .black: return "Futura-Bold"
+            case .semibold, .medium: return "Futura-Medium"
+            case .light, .ultraLight, .thin: return "Futura-Medium"
+            default: return "Futura-Medium"
+            }
+        case "Avenir":
+            switch weight {
+            case .bold, .heavy, .black: return "Avenir-Black"
+            case .semibold, .medium: return "Avenir-Medium"
+            case .light, .ultraLight, .thin: return "Avenir-Light"
+            default: return "Avenir-Book"
+            }
+        case "Helvetica Neue":
+            switch weight {
+            case .bold, .heavy, .black: return "HelveticaNeue-Bold"
+            case .semibold, .medium: return "HelveticaNeue-Medium"
+            case .light, .ultraLight, .thin: return "HelveticaNeue-Light"
+            default: return "HelveticaNeue"
+            }
+        case "Gill Sans":
+            switch weight {
+            case .bold, .heavy, .black: return "GillSans-Bold"
+            case .semibold, .medium: return "GillSans-SemiBold"
+            case .light, .ultraLight, .thin: return "GillSans-Light"
+            default: return "GillSans"
+            }
+        case "Optima":
+            switch weight {
+            case .bold, .heavy, .black: return "Optima-Bold"
+            case .semibold, .medium: return "Optima-Regular"
+            default: return "Optima-Regular"
+            }
+        case "Baskerville":
+            switch weight {
+            case .bold, .heavy, .black: return "Baskerville-Bold"
+            case .semibold, .medium: return "Baskerville-SemiBold"
+            case .light, .ultraLight, .thin: return "Baskerville"
+            default: return "Baskerville"
+            }
+        default:
+            return headingFontFamily
+        }
+    }
+
+    /// Helper to get the correct body font name variant for the weight
+    private static func bodyFontName(for weight: Font.Weight) -> String {
+        switch bodyFontFamily {
+        case "Futura":
+            switch weight {
+            case .bold, .heavy, .black: return "Futura-Bold"
+            case .semibold, .medium: return "Futura-Medium"
+            case .light, .ultraLight, .thin: return "Futura-Medium"
+            default: return "Futura-Medium"
+            }
+        case "Baskerville":
+            switch weight {
+            case .bold, .heavy, .black: return "Baskerville-Bold"
+            case .semibold, .medium: return "Baskerville-SemiBold"
+            case .light, .ultraLight, .thin: return "Baskerville"
+            default: return "Baskerville"
+            }
+        case "Georgia":
+            switch weight {
+            case .bold, .heavy, .black, .semibold: return "Georgia-Bold"
+            case .light, .ultraLight, .thin: return "Georgia"
+            default: return "Georgia"
+            }
+        case "Palatino":
+            switch weight {
+            case .bold, .heavy, .black, .semibold: return "Palatino-Bold"
+            case .light, .ultraLight, .thin: return "Palatino-Roman"
+            default: return "Palatino-Roman"
+            }
+        case "Didot":
+            switch weight {
+            case .bold, .heavy, .black, .semibold: return "Didot-Bold"
+            default: return "Didot"
+            }
+        case "Cochin":
+            switch weight {
+            case .bold, .heavy, .black, .semibold: return "Cochin-Bold"
+            default: return "Cochin"
+            }
+        default:
+            return bodyFontFamily
+        }
+    }
+
+    // MARK: - UIKit Font Helpers
+
+    /// Returns a UIFont for the heading style (for UIKit components like navigation bars)
+    static func uiHeadingFont(size: CGFloat, weight: UIFont.Weight = .bold) -> UIFont {
+        let fontWeight: Font.Weight = {
+            switch weight {
+            case .bold, .heavy, .black: return .bold
+            case .semibold, .medium: return .semibold
+            case .light, .ultraLight, .thin: return .light
+            default: return .regular
+            }
+        }()
+        let fontName = headingFontName(for: fontWeight)
+        print("🔤 JazzTheme: Looking for font '\(fontName)' at size \(size)")
+        if let font = UIFont(name: fontName, size: size) {
+            print("✅ JazzTheme: Found font: \(font.fontName)")
+            return font
+        } else {
+            print("❌ JazzTheme: Font '\(fontName)' NOT FOUND, falling back to system font")
+            return UIFont.systemFont(ofSize: size, weight: weight)
+        }
+    }
+
+    /// Returns a UIFont for the body style (for UIKit components)
+    static func uiBodyFont(size: CGFloat, weight: UIFont.Weight = .regular) -> UIFont {
+        let fontWeight: Font.Weight = {
+            switch weight {
+            case .bold, .heavy, .black: return .bold
+            case .semibold, .medium: return .semibold
+            case .light, .ultraLight, .thin: return .light
+            default: return .regular
+            }
+        }()
+        let fontName = bodyFontName(for: fontWeight)
+        return UIFont(name: fontName, size: size) ?? UIFont.systemFont(ofSize: size, weight: weight)
+    }
+
+    // MARK: - Navigation Bar Appearance
+
+    /// Creates a configured UINavigationBarAppearance with JazzTheme fonts
+    static func navigationBarAppearance() -> UINavigationBarAppearance {
+        let appearance = UINavigationBarAppearance()
+        appearance.configureWithOpaqueBackground()
+        appearance.backgroundColor = UIColor(burgundy)
+
+        // Large title font (used when scrolled to top)
+        appearance.largeTitleTextAttributes = [
+            .font: uiHeadingFont(size: 34, weight: .bold),
+            .foregroundColor: UIColor.white
+        ]
+
+        // Inline title font (used when scrolled or in compact mode)
+        appearance.titleTextAttributes = [
+            .font: uiHeadingFont(size: 17, weight: .semibold),
+            .foregroundColor: UIColor.white
+        ]
+
+        return appearance
+    }
+
+    /// Configures the navigation bar appearance to use JazzTheme fonts
+    /// Call this once at app startup (e.g., in App init or ContentView.onAppear)
+    static func configureNavigationBarAppearance() {
+        let appearance = navigationBarAppearance()
+        UINavigationBar.appearance().standardAppearance = appearance
+        UINavigationBar.appearance().scrollEdgeAppearance = appearance
+        UINavigationBar.appearance().compactAppearance = appearance
+    }
+}
+
+// MARK: - Navigation Bar Styling
+
+/// Helper view that finds and configures the parent UINavigationController
+struct NavigationBarConfigurator: UIViewControllerRepresentable {
+    func makeUIViewController(context: Context) -> UIViewController {
+        let controller = UIViewController()
+        return controller
+    }
+
+    func updateUIViewController(_ uiViewController: UIViewController, context: Context) {
+        DispatchQueue.main.async {
+            if let navController = uiViewController.navigationController {
+                print("🧭 NavigationBarConfigurator: Found navigation controller, applying appearance")
+                let appearance = JazzTheme.navigationBarAppearance()
+                navController.navigationBar.standardAppearance = appearance
+                navController.navigationBar.scrollEdgeAppearance = appearance
+                navController.navigationBar.compactAppearance = appearance
+                print("🧭 NavigationBarConfigurator: Appearance applied")
+            } else {
+                print("⚠️ NavigationBarConfigurator: No navigation controller found")
+            }
+        }
+    }
+}
+
+/// Custom navigation title view with JazzTheme fonts
+struct JazzNavigationTitle: View {
+    let title: String
+
+    var body: some View {
+        Text(title)
+            .font(JazzTheme.headline())
+            .foregroundColor(.white)
+    }
+}
+
+/// Large navigation title for scroll edge (top of screen)
+struct JazzLargeNavigationTitle: View {
+    let title: String
+
+    var body: some View {
+        Text(title)
+            .font(JazzTheme.largeTitle())
+            .foregroundColor(.white)
+    }
+}
+
+extension View {
+    /// Applies JazzTheme styling to the navigation bar with custom title font
+    /// Use this instead of .navigationTitle() for themed headers
+    /// - Parameters:
+    ///   - title: The navigation bar title
+    ///   - color: Background color (defaults to burgundy)
+    func jazzNavigationBar(title: String, color: Color = JazzTheme.burgundy) -> some View {
+        self
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(color, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbarColorScheme(.dark, for: .navigationBar)
+            .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Text(title)
+                        .font(JazzTheme.headline())
+                        .foregroundColor(.white)
+                }
+            }
+    }
+}
+
+extension JazzTheme {
     // MARK: - Primary Colors
     
     /// Deep burgundy - main accent color

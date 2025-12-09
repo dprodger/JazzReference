@@ -63,10 +63,7 @@ struct ArtistsListView: View {
         NavigationStack {
             contentView
                 .background(JazzTheme.backgroundLight)
-                .navigationTitle("Artists (\(networkManager.performers.count))")
-                .toolbarBackground(JazzTheme.amber, for: .navigationBar)
-                .toolbarBackground(.visible, for: .navigationBar)
-                .toolbarColorScheme(.dark, for: .navigationBar)
+                .jazzNavigationBar(title: "Artists (\(networkManager.performers.count))", color: JazzTheme.amber)
                 .searchable(text: $searchText, prompt: "Search artists")
                 .onChange(of: searchText) { oldValue, newValue in
                     searchTask?.cancel()
@@ -115,10 +112,10 @@ struct ArtistsListView: View {
                 .font(.system(size: 50))
                 .foregroundColor(JazzTheme.amber)
             Text("Error")
-                .font(.headline)
+                .font(JazzTheme.headline())
                 .foregroundColor(JazzTheme.charcoal)
             Text(error)
-                .font(.subheadline)
+                .font(JazzTheme.subheadline())
                 .foregroundColor(JazzTheme.smokeGray)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal)
@@ -171,12 +168,12 @@ struct ArtistsListView: View {
     private func artistRowView(performer: Performer) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(performer.name)
-                .font(.headline)
+                .font(JazzTheme.headline())
                 .foregroundColor(JazzTheme.charcoal)
             
             if let instrument = performer.instrument {
                 Text(instrument)
-                    .font(.subheadline)
+                    .font(JazzTheme.subheadline())
                     .foregroundColor(JazzTheme.smokeGray)
             }
         }
@@ -190,7 +187,7 @@ struct ArtistSectionHeaderView: View {
     
     var body: some View {
         Text(letter)
-            .font(.headline)
+            .font(JazzTheme.headline())
             .fontWeight(.bold)
             .foregroundColor(JazzTheme.amber)
             .frame(maxWidth: .infinity, alignment: .leading)

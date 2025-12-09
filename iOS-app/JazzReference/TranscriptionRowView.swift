@@ -17,11 +17,11 @@ struct TranscriptionRowView: View {
             // Album/Recording title
             if let albumTitle = transcription.albumTitle {
                 Text(albumTitle)
-                    .font(.headline)
+                    .font(JazzTheme.headline())
                     .foregroundColor(JazzTheme.charcoal)
             } else {
                 Text("Solo Transcription")
-                    .font(.headline)
+                    .font(JazzTheme.headline())
                     .foregroundColor(JazzTheme.charcoal)
             }
             
@@ -31,9 +31,9 @@ struct TranscriptionRowView: View {
                     HStack(spacing: 4) {
                         Image(systemName: "calendar")
                             .foregroundColor(JazzTheme.brass)
-                            .font(.caption)
+                            .font(JazzTheme.caption())
                         Text(String(format: "%d", year))
-                            .font(.subheadline)
+                            .font(JazzTheme.subheadline())
                             .foregroundColor(JazzTheme.smokeGray)
                     }
                 }
@@ -42,9 +42,9 @@ struct TranscriptionRowView: View {
                     HStack(spacing: 4) {
                         Image(systemName: "opticaldisc")
                             .foregroundColor(JazzTheme.brass)
-                            .font(.caption)
+                            .font(JazzTheme.caption())
                         Text(label)
-                            .font(.subheadline)
+                            .font(JazzTheme.subheadline())
                             .foregroundColor(JazzTheme.smokeGray)
                     }
                 }

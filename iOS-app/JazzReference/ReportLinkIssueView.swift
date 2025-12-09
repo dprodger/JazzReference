@@ -27,12 +27,12 @@ struct ReportLinkIssueView: View {
                     // Header section with description
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Report a Problem")
-                            .font(.title3)
+                            .font(JazzTheme.title3())
                             .fontWeight(.semibold)
                             .foregroundColor(JazzTheme.charcoal)
                         
                         Text("Help us improve the quality of our external references by reporting broken or incorrect links.")
-                            .font(.subheadline)
+                            .font(JazzTheme.subheadline())
                             .foregroundColor(JazzTheme.smokeGray)
                     }
                     .padding()
@@ -43,7 +43,7 @@ struct ReportLinkIssueView: View {
                     // Entity Information Card
                     VStack(alignment: .leading, spacing: 12) {
                         Text("About This \(entityType)")
-                            .font(.headline)
+                            .font(JazzTheme.headline())
                             .foregroundColor(JazzTheme.charcoal)
                         
                         VStack(alignment: .leading, spacing: 8) {
@@ -60,7 +60,7 @@ struct ReportLinkIssueView: View {
                     // External Reference Card
                     VStack(alignment: .leading, spacing: 12) {
                         Text("External Link")
-                            .font(.headline)
+                            .font(JazzTheme.headline())
                             .foregroundColor(JazzTheme.charcoal)
                         
                         VStack(alignment: .leading, spacing: 8) {
@@ -68,7 +68,7 @@ struct ReportLinkIssueView: View {
                             
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("URL")
-                                    .font(.caption)
+                                    .font(JazzTheme.caption())
                                     .fontWeight(.medium)
                                     .foregroundColor(JazzTheme.smokeGray)
                                 
@@ -87,7 +87,7 @@ struct ReportLinkIssueView: View {
                     // Explanation Input
                     VStack(alignment: .leading, spacing: 12) {
                         Text("What's Wrong?")
-                            .font(.headline)
+                            .font(JazzTheme.headline())
                             .foregroundColor(JazzTheme.charcoal)
                         
                         TextEditor(text: $explanation)
@@ -101,7 +101,7 @@ struct ReportLinkIssueView: View {
                             )
                         
                         Text("Examples: broken link, incorrect information, wrong page, outdated content")
-                            .font(.caption)
+                            .font(JazzTheme.caption())
                             .foregroundColor(JazzTheme.smokeGray)
                             .italic()
                     }
@@ -143,7 +143,7 @@ struct IssueInfoRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(label)
-                .font(.caption)
+                .font(JazzTheme.caption())
                 .fontWeight(.medium)
                 .foregroundColor(JazzTheme.smokeGray)
             

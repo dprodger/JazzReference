@@ -99,7 +99,7 @@ private struct ImageThumbnail: View {
                         .frame(width: cardWidth, height: 280)
                         .overlay(
                             Image(systemName: "photo")
-                                .font(.largeTitle)
+                                .font(JazzTheme.largeTitle())
                                 .foregroundColor(.gray)
                         )
                 }
@@ -191,10 +191,10 @@ private struct ImageDetailSheet: View {
                         if let attribution = image.attribution {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("Attribution")
-                                    .font(.caption)
+                                    .font(JazzTheme.caption())
                                     .foregroundColor(JazzTheme.smokeGray)
                                 Text(cleanHTML(attribution))
-                                    .font(.subheadline)
+                                    .font(JazzTheme.subheadline())
                                     .foregroundColor(JazzTheme.charcoal)
                             }
                         }
@@ -208,9 +208,9 @@ private struct ImageDetailSheet: View {
                             Link(destination: url) {
                                 HStack {
                                     Text("View on \(sourceName)")
-                                        .font(.subheadline)
+                                        .font(JazzTheme.subheadline())
                                     Image(systemName: "arrow.up.forward.square")
-                                        .font(.caption)
+                                        .font(JazzTheme.caption())
                                 }
                                 .foregroundColor(JazzTheme.brass)
                             }
@@ -275,10 +275,10 @@ private struct InfoRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title)
-                .font(.caption)
+                .font(JazzTheme.caption())
                 .foregroundColor(JazzTheme.smokeGray)
             Text(value)
-                .font(.subheadline)
+                .font(JazzTheme.subheadline())
                 .foregroundColor(JazzTheme.charcoal)
         }
     }

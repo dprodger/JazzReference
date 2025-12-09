@@ -43,7 +43,7 @@ struct ArtistCreationView: View {
                 
                 Section {
                     Text("Additional details (bio, dates, instruments) will be automatically fetched by the backend.")
-                        .font(.caption)
+                        .font(JazzTheme.caption())
                         .foregroundColor(.gray)
                 }
                 

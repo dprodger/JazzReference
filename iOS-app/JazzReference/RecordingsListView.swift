@@ -39,10 +39,7 @@ struct RecordingsListView: View {
         NavigationStack {
             contentView
                 .background(JazzTheme.backgroundLight)
-                .navigationTitle("Recordings (\(networkManager.recordingsCount))")
-                .toolbarBackground(JazzTheme.brass, for: .navigationBar)
-                .toolbarBackground(.visible, for: .navigationBar)
-                .toolbarColorScheme(.dark, for: .navigationBar)
+                .jazzNavigationBar(title: "Recordings (\(networkManager.recordingsCount))", color: JazzTheme.brass)
                 .searchable(text: $searchText, prompt: "Artist, album, or song")
                 .onChange(of: searchText) { oldValue, newValue in
                     searchTask?.cancel()
@@ -85,9 +82,9 @@ struct RecordingsListView: View {
         HStack(spacing: 8) {
             Image(systemName: "magnifyingglass")
                 .foregroundColor(JazzTheme.brass)
-                .font(.caption)
+                .font(JazzTheme.caption())
             Text("Search by artist, album name, or song title")
-                .font(.caption)
+                .font(JazzTheme.caption())
                 .foregroundColor(JazzTheme.smokeGray)
             Spacer()
         }
@@ -113,10 +110,10 @@ struct RecordingsListView: View {
                 .font(.system(size: 50))
                 .foregroundColor(JazzTheme.amber)
             Text("Error")
-                .font(.headline)
+                .font(JazzTheme.headline())
                 .foregroundColor(JazzTheme.charcoal)
             Text(error)
-                .font(.subheadline)
+                .font(JazzTheme.subheadline())
                 .foregroundColor(JazzTheme.smokeGray)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal)
@@ -140,19 +137,19 @@ struct RecordingsListView: View {
 
             if searchText.isEmpty {
                 Text("Search to Browse")
-                    .font(.headline)
+                    .font(JazzTheme.headline())
                     .foregroundColor(JazzTheme.charcoal)
                 Text("Enter an artist, album, or song title to find recordings")
-                    .font(.subheadline)
+                    .font(JazzTheme.subheadline())
                     .foregroundColor(JazzTheme.smokeGray)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 32)
             } else {
                 Text("No Results")
-                    .font(.headline)
+                    .font(JazzTheme.headline())
                     .foregroundColor(JazzTheme.charcoal)
                 Text("No recordings match \"\(searchText)\"")
-                    .font(.subheadline)
+                    .font(JazzTheme.subheadline())
                     .foregroundColor(JazzTheme.smokeGray)
                     .multilineTextAlignment(.center)
             }
@@ -225,13 +222,13 @@ struct RecordingsListView: View {
             // Recording info
             VStack(alignment: .leading, spacing: 4) {
                 Text(recording.albumTitle ?? "Unknown Album")
-                    .font(.headline)
+                    .font(JazzTheme.headline())
                     .foregroundColor(JazzTheme.charcoal)
                     .lineLimit(1)
                 
                 if let songTitle = recording.songTitle {
                     Text(songTitle)
-                        .font(.subheadline)
+                        .font(JazzTheme.subheadline())
                         .foregroundColor(JazzTheme.smokeGray)
                         .lineLimit(1)
                 }
@@ -240,7 +237,7 @@ struct RecordingsListView: View {
                 if let performers = recording.performers,
                    let leader = performers.first(where: { $0.role?.lowercased() == "leader" }) ?? performers.first {
                     Text(leader.name)
-                        .font(.caption)
+                        .font(JazzTheme.caption())
                         .foregroundColor(JazzTheme.brass)
                         .lineLimit(1)
                 }
@@ -252,13 +249,13 @@ struct RecordingsListView: View {
             VStack(alignment: .trailing, spacing: 4) {
                 if let year = recording.recordingYear {
                     Text(String(year))
-                        .font(.caption)
+                        .font(JazzTheme.caption())
                         .foregroundColor(JazzTheme.smokeGray)
                 }
                 
                 if recording.isCanonical == true {
                     Image(systemName: "star.fill")
-                        .font(.caption)
+                        .font(JazzTheme.caption())
                         .foregroundColor(JazzTheme.gold)
                 }
             }
@@ -268,7 +265,7 @@ struct RecordingsListView: View {
     
     private var albumPlaceholder: some View {
         Image(systemName: "opticaldisc")
-            .font(.title2)
+            .font(JazzTheme.title2())
             .foregroundColor(JazzTheme.smokeGray.opacity(0.5))
             .frame(width: 50, height: 50)
             .background(JazzTheme.cardBackground)
@@ -283,7 +280,7 @@ struct RecordingSectionHeaderView: View {
     
     var body: some View {
         Text(letter)
-            .font(.headline)
+            .font(JazzTheme.headline())
             .fontWeight(.bold)
             .foregroundColor(JazzTheme.brass)
             .frame(maxWidth: .infinity, alignment: .leading)

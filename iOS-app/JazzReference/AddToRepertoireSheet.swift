@@ -59,7 +59,7 @@ struct AddToRepertoireSheet: View {
                                 .scaleEffect(1.5)
                             Text("Adding to repertoire...")
                                 .foregroundColor(.white)
-                                .font(.headline)
+                                .font(JazzTheme.headline())
                         }
                         .padding(30)
                         .background(JazzTheme.charcoal)
@@ -96,12 +96,12 @@ struct AddToRepertoireSheet: View {
                 .foregroundColor(JazzTheme.burgundy.opacity(0.6))
             
             Text("Sign In Required")
-                .font(.title2)
+                .font(JazzTheme.title2())
                 .fontWeight(.semibold)
                 .foregroundColor(JazzTheme.charcoal)
             
             Text("You need to be signed in to add songs to repertoires")
-                .font(.body)
+                .font(JazzTheme.body())
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 32)
@@ -145,12 +145,12 @@ struct AddToRepertoireSheet: View {
                 .foregroundColor(JazzTheme.smokeGray.opacity(0.5))
             
             Text("No Repertoires Yet")
-                .font(.title2)
+                .font(JazzTheme.title2())
                 .fontWeight(.semibold)
                 .foregroundColor(JazzTheme.charcoal)
             
             Text("Create a repertoire first to start organizing your songs.")
-                .font(.subheadline)
+                .font(JazzTheme.subheadline())
                 .foregroundColor(JazzTheme.smokeGray)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 40)
@@ -185,16 +185,16 @@ struct AddToRepertoireSheet: View {
                         HStack {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("Add to \(lastUsed.name)")
-                                    .font(.headline)
+                                    .font(JazzTheme.headline())
                                     .foregroundColor(JazzTheme.charcoal)
                                 Text("Last used")
-                                    .font(.caption)
+                                    .font(JazzTheme.caption())
                                     .foregroundColor(JazzTheme.smokeGray)
                             }
                             Spacer()
                             Image(systemName: "arrow.right.circle.fill")
                                 .foregroundColor(JazzTheme.amber)
-                                .font(.title2)
+                                .font(JazzTheme.title2())
                         }
                     }
                     .disabled(isAdding)
@@ -213,18 +213,18 @@ struct AddToRepertoireSheet: View {
                         HStack {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(repertoire.name)
-                                    .font(.headline)
+                                    .font(JazzTheme.headline())
                                     .foregroundColor(JazzTheme.charcoal)
                                 
                                 if let description = repertoire.description {
                                     Text(description)
-                                        .font(.subheadline)
+                                        .font(JazzTheme.subheadline())
                                         .foregroundColor(JazzTheme.smokeGray)
                                         .lineLimit(2)
                                 }
                                 
                                 Text("\(repertoire.songCount) songs")
-                                    .font(.caption)
+                                    .font(JazzTheme.caption())
                                     .foregroundColor(JazzTheme.burgundy)
                             }
                             Spacer()

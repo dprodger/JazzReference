@@ -134,7 +134,7 @@ struct ExternalReferencesPanel: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Learn More")
-                .font(.headline)
+                .font(JazzTheme.headline())
                 .foregroundColor(JazzTheme.charcoal)
             
             VStack(spacing: 10) {
@@ -294,10 +294,11 @@ struct ExternalLinkButton: View {
                 Image(systemName: icon)
                     .foregroundColor(color)
                 Text(label)
-                    .foregroundColor(JazzTheme.charcoal)
+                    .font(JazzTheme.caption())
+                    .foregroundColor(JazzTheme.smokeGray)
                 Spacer()
                 Image(systemName: "arrow.up.right")
-                    .font(.caption)
+                    .font(JazzTheme.caption())
                     .foregroundColor(JazzTheme.smokeGray)
             }
             .padding()

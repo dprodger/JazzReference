@@ -124,10 +124,10 @@ struct RecordingDetailView: View {
                     // Styled Header with Jazz Theme
                     HStack {
                         Image(systemName: "opticaldisc")
-                            .font(.title2)
+                            .font(JazzTheme.title2())
                             .foregroundColor(JazzTheme.cream)
                         Text("RECORDING")
-                            .font(.headline)
+                            .font(JazzTheme.headline())
                             .fontWeight(.semibold)
                             .foregroundColor(JazzTheme.cream)
                         Spacer()
@@ -231,10 +231,10 @@ struct RecordingDetailView: View {
                                 if recording.isCanonical == true {
                                     Image(systemName: "star.fill")
                                         .foregroundColor(JazzTheme.gold)
-                                        .font(.title2)
+                                        .font(JazzTheme.title2())
                                 }
                                 Text(displayAlbumTitle)
-                                    .font(.largeTitle)
+                                    .font(JazzTheme.largeTitle())
                                     .bold()
                                     .foregroundColor(JazzTheme.charcoal)
                                     .animation(.easeInOut(duration: 0.3), value: selectedReleaseId)
@@ -242,13 +242,13 @@ struct RecordingDetailView: View {
                             
                             if let songTitle = recording.songTitle {
                                 Text(songTitle)
-                                    .font(.title2)
+                                    .font(JazzTheme.title2())
                                     .foregroundColor(JazzTheme.smokeGray)
                             }
                             
                             if let composer = recording.composer {
                                 Text("Composed by \(composer)")
-                                    .font(.subheadline)
+                                    .font(JazzTheme.subheadline())
                                     .foregroundColor(JazzTheme.smokeGray)
                             }
                         }
@@ -269,14 +269,14 @@ struct RecordingDetailView: View {
                         VStack(alignment: .leading, spacing: 12) {
                             HStack {
                                 Text("Performers")
-                                    .font(.title2)
+                                    .font(JazzTheme.title2())
                                     .bold()
                                     .foregroundColor(JazzTheme.charcoal)
                                 
                                 // Indicator when showing release-specific performers
                                 if selectedRelease != nil, let releasePerformers = selectedRelease?.performers, !releasePerformers.isEmpty {
                                     Text("(from selected release)")
-                                        .font(.caption)
+                                        .font(JazzTheme.caption())
                                         .foregroundColor(JazzTheme.smokeGray)
                                 }
                             }
@@ -311,10 +311,7 @@ struct RecordingDetailView: View {
             }
         }
         .background(JazzTheme.backgroundLight)
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(JazzTheme.brass, for: .navigationBar)
-        .toolbarBackground(.visible, for: .navigationBar)
-        .toolbarColorScheme(.dark, for: .navigationBar)
+        .jazzNavigationBar(title: displayAlbumTitle, color: JazzTheme.brass)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button {
@@ -460,7 +457,7 @@ struct RecordingDetailView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text("Also Available On")
-                    .font(.headline)
+                    .font(JazzTheme.headline())
                     .foregroundColor(JazzTheme.charcoal)
                 
                 Spacer()
@@ -470,10 +467,10 @@ struct RecordingDetailView: View {
                 if spotifyCount > 0 {
                     HStack(spacing: 4) {
                         Image(systemName: "music.note")
-                            .font(.caption)
+                            .font(JazzTheme.caption())
                             .foregroundColor(JazzTheme.teal)
                         Text("\(spotifyCount)")
-                            .font(.caption)
+                            .font(JazzTheme.caption())
                             .foregroundColor(JazzTheme.smokeGray)
                     }
                 }
@@ -506,9 +503,9 @@ struct RecordingDetailView: View {
                 } label: {
                     HStack {
                         Text(showAllReleases ? "Show Less" : "Show All \(releases.count) Releases")
-                            .font(.subheadline)
+                            .font(JazzTheme.subheadline())
                         Image(systemName: showAllReleases ? "chevron.up" : "chevron.down")
-                            .font(.caption)
+                            .font(JazzTheme.caption())
                     }
                     .foregroundColor(JazzTheme.burgundy)
                 }
@@ -527,11 +524,11 @@ struct RecordingDetailView: View {
             // Selection indicator
             if isSelected {
                 Image(systemName: "checkmark.circle.fill")
-                    .font(.title3)
+                    .font(JazzTheme.title3())
                     .foregroundColor(JazzTheme.burgundy)
             } else {
                 Image(systemName: "circle")
-                    .font(.title3)
+                    .font(JazzTheme.title3())
                     .foregroundColor(JazzTheme.smokeGray.opacity(0.5))
             }
             
@@ -576,7 +573,7 @@ struct RecordingDetailView: View {
             VStack(alignment: .leading, spacing: 4) {
                 // Release title
                 Text(release.title)
-                    .font(.subheadline)
+                    .font(JazzTheme.subheadline())
                     .fontWeight(isSelected ? .bold : .medium)
                     .foregroundColor(isSelected ? JazzTheme.burgundy : JazzTheme.charcoal)
                     .lineLimit(2)
@@ -594,20 +591,20 @@ struct RecordingDetailView: View {
                         Text(String(year))
                     }
                 }
-                .font(.caption)
+                .font(JazzTheme.caption())
                 .foregroundColor(JazzTheme.smokeGray)
                 
                 // Track position
                 if let trackPos = release.trackPositionDisplay {
                     Text(trackPos)
-                        .font(.caption2)
+                        .font(JazzTheme.caption2())
                         .foregroundColor(JazzTheme.smokeGray)
                 }
                 
                 // Format badge
                 if let format = release.formatName {
                     Text(format)
-                        .font(.caption2)
+                        .font(JazzTheme.caption2())
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
                         .background(JazzTheme.smokeGray.opacity(0.2))
@@ -621,7 +618,7 @@ struct RecordingDetailView: View {
             // Spotify indicator (not a link - the whole row is tappable)
             if release.spotifyTrackUrl != nil || release.spotifyAlbumUrl != nil {
                 Image(systemName: "music.note")
-                    .font(.title3)
+                    .font(JazzTheme.title3())
                     .foregroundColor(JazzTheme.teal)
             }
         }
@@ -667,7 +664,7 @@ struct RecordingDetailView: View {
                             .frame(width: 60, height: 60)
                         
                         Image(systemName: "play.fill")
-                            .font(.title)
+                            .font(JazzTheme.title())
                             .foregroundColor(.white)
                             .offset(x: 2) // Slight offset for visual centering
                     }
@@ -769,13 +766,13 @@ struct RecordingDetailView: View {
                 } label: {
                     HStack {
                         Text("Learn More")
-                            .font(.headline)
+                            .font(JazzTheme.headline())
                             .foregroundColor(JazzTheme.charcoal)
                         
                         Spacer()
                         
                         Image(systemName: isLearnMoreExpanded ? "chevron.up" : "chevron.down")
-                            .font(.subheadline)
+                            .font(JazzTheme.subheadline())
                             .foregroundColor(JazzTheme.brass)
                     }
                     .padding()
@@ -817,11 +814,11 @@ struct RecordingDetailView: View {
                                         .foregroundColor(JazzTheme.brass)
                                         .frame(width: 24)
                                     Text("Notes")
-                                        .font(.subheadline)
+                                        .font(JazzTheme.subheadline())
                                         .foregroundColor(JazzTheme.smokeGray)
                                 }
                                 Text(notes)
-                                    .font(.body)
+                                    .font(JazzTheme.body())
                                     .foregroundColor(JazzTheme.charcoal)
                                     .padding(.leading, 32)
                             }

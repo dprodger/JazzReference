@@ -40,14 +40,14 @@ struct TranscriptionsSection: View {
                             Image(systemName: "music.quarternote.3")
                                 .foregroundColor(JazzTheme.teal)
                             Text("Solo Transcriptions")
-                                .font(.title2)
+                                .font(JazzTheme.title2())
                                 .bold()
                                 .foregroundColor(JazzTheme.charcoal)
                             
                             Spacer()
                             
                             Text("\(transcriptions.count)")
-                                .font(.subheadline)
+                                .font(JazzTheme.subheadline())
                                 .foregroundColor(JazzTheme.smokeGray)
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 4)

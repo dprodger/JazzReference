@@ -42,10 +42,7 @@ struct SongsListView: View {
         NavigationStack {
             contentView
                 .background(JazzTheme.backgroundLight)
-                .navigationTitle("Songs (\(networkManager.songs.count))")
-                .toolbarBackground(JazzTheme.burgundy, for: .navigationBar)
-                .toolbarBackground(.visible, for: .navigationBar)
-                .toolbarColorScheme(.dark, for: .navigationBar)
+                .jazzNavigationBar(title: "Songs (\(networkManager.songs.count))")
                 .searchable(text: $searchText, prompt: "Search songs")
                 .onChange(of: searchText) { oldValue, newValue in
                     searchTask?.cancel()
@@ -123,7 +120,7 @@ struct SongsListView: View {
             Image(systemName: "music.note.list")
                 .foregroundColor(JazzTheme.burgundy)
             Text(repertoireManager.currentRepertoireDisplayName)
-                .font(.subheadline)
+                .font(JazzTheme.subheadline())
                 .fontWeight(.medium)
                 .foregroundColor(JazzTheme.charcoal)
             Spacer()
@@ -135,7 +132,7 @@ struct SongsListView: View {
                 }
             }) {
                 Text("Change")
-                    .font(.subheadline)
+                    .font(JazzTheme.subheadline())
                     .foregroundColor(JazzTheme.burgundy)
             }
             .sheet(isPresented: $showRepertoirePicker) {
@@ -172,10 +169,10 @@ struct SongsListView: View {
                 .font(.system(size: 50))
                 .foregroundColor(JazzTheme.amber)
             Text("Error")
-                .font(.headline)
+                .font(JazzTheme.headline())
                 .foregroundColor(JazzTheme.charcoal)
             Text(error)
-                .font(.subheadline)
+                .font(JazzTheme.subheadline())
                 .foregroundColor(JazzTheme.smokeGray)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal)
@@ -233,11 +230,11 @@ struct SongsListView: View {
     private func songRowView(song: Song) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(song.title)
-                .font(.headline)
+                .font(JazzTheme.headline())
                 .foregroundColor(JazzTheme.charcoal)
             if let composer = song.composer {
                 Text(composer)
-                    .font(.subheadline)
+                    .font(JazzTheme.subheadline())
                     .foregroundColor(JazzTheme.smokeGray)
             }
         }
@@ -265,19 +262,19 @@ struct RepertoirePickerSheet: View {
                             HStack {
                                 VStack(alignment: .leading, spacing: 4) {
                                     Text(repertoire.name)
-                                        .font(.headline)
+                                        .font(JazzTheme.headline())
                                         .foregroundColor(JazzTheme.charcoal)
                                     
                                     if let description = repertoire.description {
                                         Text(description)
-                                            .font(.subheadline)
+                                            .font(JazzTheme.subheadline())
                                             .foregroundColor(JazzTheme.smokeGray)
                                             .lineLimit(2)
                                     }
                                     
                                     if repertoire.id != "all" {
                                         Text("\(repertoire.songCount) songs")
-                                            .font(.caption)
+                                            .font(JazzTheme.caption())
                                             .foregroundColor(JazzTheme.burgundy)
                                     }
                                 }
@@ -287,7 +284,7 @@ struct RepertoirePickerSheet: View {
                                 if repertoire.id == repertoireManager.selectedRepertoire.id {
                                     Image(systemName: "checkmark.circle.fill")
                                         .foregroundColor(JazzTheme.burgundy)
-                                        .font(.title3)
+                                        .font(JazzTheme.title3())
                                 }
                             }
                             .contentShape(Rectangle())
@@ -319,10 +316,10 @@ struct RepertoirePickerSheet: View {
                             HStack {
                                 Image(systemName: "plus.circle.fill")
                                     .foregroundColor(JazzTheme.burgundy)
-                                    .font(.title3)
+                                    .font(JazzTheme.title3())
                                 
                                 Text("Create New Repertoire")
-                                    .font(.headline)
+                                    .font(JazzTheme.headline())
                                     .foregroundColor(JazzTheme.burgundy)
                                 
                                 Spacer()
@@ -363,7 +360,7 @@ struct SectionHeaderView: View {
     
     var body: some View {
         Text(letter)
-            .font(.headline)
+            .font(JazzTheme.headline())
             .fontWeight(.bold)
             .foregroundColor(JazzTheme.burgundy)
             .frame(maxWidth: .infinity, alignment: .leading)

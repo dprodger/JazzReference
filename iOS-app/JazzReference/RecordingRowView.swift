@@ -69,7 +69,7 @@ struct RecordingRowView: View {
                         .opacity(showingBackCover ? 0 : 1)
                     } else {
                         Image(systemName: "opticaldisc")
-                            .font(.largeTitle)
+                            .font(JazzTheme.largeTitle())
                             .foregroundColor(.secondary)
                             .frame(width: 150, height: 150)
                             .background(Color(.systemGray5))
@@ -128,7 +128,7 @@ struct RecordingRowView: View {
                     if recording.isCanonical == true {
                         Image(systemName: "star.fill")
                             .foregroundColor(.yellow)
-                            .font(.caption)
+                            .font(JazzTheme.caption())
                             .padding(6)
                             .background(Color.black.opacity(0.6))
                             .clipShape(Circle())
@@ -147,7 +147,7 @@ struct RecordingRowView: View {
             // Artist name (shown when grouping by year)
             if showArtistName {
                 Text(leadArtist)
-                    .font(.subheadline)
+                    .font(JazzTheme.subheadline())
                     .fontWeight(.semibold)
                     .foregroundColor(JazzTheme.brass)
                     .lineLimit(1)
@@ -156,7 +156,7 @@ struct RecordingRowView: View {
 
             // Album title
             Text(recording.albumTitle ?? "Unknown Album")
-                .font(.subheadline)
+                .font(JazzTheme.subheadline())
                 .fontWeight(.medium)
                 .lineLimit(2)
                 .frame(width: 150, alignment: .leading)
@@ -164,7 +164,7 @@ struct RecordingRowView: View {
             // Year
             if let year = recording.recordingYear {
                 Text(String(format: "%d", year))
-                    .font(.caption)
+                    .font(JazzTheme.caption())
                     .foregroundColor(.secondary)
                     .frame(width: 150, alignment: .leading)
             }

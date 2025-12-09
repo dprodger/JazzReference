@@ -22,7 +22,7 @@ struct RecordingFilterSheet: View {
                     // MARK: - Availability Section
                     VStack(alignment: .leading, spacing: 12) {
                         Text("Availability")
-                            .font(.headline)
+                            .font(JazzTheme.headline())
                             .foregroundColor(JazzTheme.charcoal)
 
                         VStack(spacing: 0) {
@@ -53,11 +53,11 @@ struct RecordingFilterSheet: View {
                     if !availableInstruments.isEmpty {
                         VStack(alignment: .leading, spacing: 12) {
                             Text("By Instrument")
-                                .font(.headline)
+                                .font(JazzTheme.headline())
                                 .foregroundColor(JazzTheme.charcoal)
 
                             Text("Filter to recordings featuring a specific instrument")
-                                .font(.subheadline)
+                                .font(JazzTheme.subheadline())
                                 .foregroundColor(JazzTheme.smokeGray)
 
                             LazyVGrid(columns: [
@@ -114,15 +114,15 @@ struct RecordingFilterSheet: View {
         Button(action: action) {
             HStack(spacing: 12) {
                 Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                    .font(.title2)
+                    .font(JazzTheme.title2())
                     .foregroundColor(isSelected ? JazzTheme.burgundy : JazzTheme.smokeGray.opacity(0.5))
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
-                        .font(.body)
+                        .font(JazzTheme.body())
                         .foregroundColor(JazzTheme.charcoal)
                     Text(subtitle)
-                        .font(.caption)
+                        .font(JazzTheme.caption())
                         .foregroundColor(JazzTheme.smokeGray)
                 }
 
@@ -148,9 +148,9 @@ struct RecordingFilterSheet: View {
         }) {
             HStack(spacing: 6) {
                 Image(systemName: iconForInstrument(family))
-                    .font(.caption)
+                    .font(JazzTheme.caption())
                 Text(family.rawValue)
-                    .font(.subheadline)
+                    .font(JazzTheme.subheadline())
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 10)

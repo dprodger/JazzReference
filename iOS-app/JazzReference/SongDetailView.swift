@@ -164,7 +164,7 @@ struct SongDetailView: View {
             // Song Information Header
             VStack(alignment: .leading, spacing: 12) {
                 Text(song.title)
-                    .font(.largeTitle)
+                    .font(JazzTheme.largeTitle())
                     .bold()
                     .foregroundColor(JazzTheme.charcoal)
                     .onLongPressGesture {
@@ -176,7 +176,7 @@ struct SongDetailView: View {
                         Image(systemName: "music.note.list")
                             .foregroundColor(JazzTheme.brass)
                         Text(composer)
-                            .font(.title3)
+                            .font(JazzTheme.title3())
                             .foregroundColor(JazzTheme.smokeGray)
                     }
                 }
@@ -186,9 +186,9 @@ struct SongDetailView: View {
                     HStack(alignment: .top, spacing: 8) {
                         Image(systemName: "book.closed.fill")
                             .foregroundColor(JazzTheme.brass)
-                            .font(.subheadline)
+                            .font(JazzTheme.subheadline())
                         Text(songRef)
-                            .font(.subheadline)
+                            .font(JazzTheme.subheadline())
                             .foregroundColor(JazzTheme.smokeGray)
                             .fixedSize(horizontal: false, vertical: true)
                     }
@@ -245,7 +245,7 @@ struct SongDetailView: View {
             }) {
                 HStack {
                     Text("Summary Information")
-                        .font(.title3)
+                        .font(JazzTheme.title3())
                         .bold()
                         .foregroundColor(JazzTheme.charcoal)
                     Spacer()
@@ -264,10 +264,10 @@ struct SongDetailView: View {
                     if let structure = song.structure {
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Structure")
-                                .font(.headline)
+                                .font(JazzTheme.headline())
                                 .foregroundColor(JazzTheme.charcoal)
                             Text(structure)
-                                .font(.body)
+                                .font(JazzTheme.body())
                                 .foregroundColor(JazzTheme.smokeGray)
                         }
                         .padding()
@@ -290,7 +290,7 @@ struct SongDetailView: View {
                     if !externalRefs.isEmpty {
                         VStack(alignment: .leading, spacing: 12) {
                             Text("References")
-                                .font(.headline)
+                                .font(JazzTheme.headline())
                                 .foregroundColor(JazzTheme.charcoal)
                             
                             ForEach(externalRefs) { ref in
@@ -314,13 +314,13 @@ struct SongDetailView: View {
         VStack(alignment: .leading, spacing: 16) {
             // Header
             Text("Featured Recordings")
-                .font(.title2)
+                .font(JazzTheme.title2())
                 .bold()
                 .foregroundColor(JazzTheme.charcoal)
             
             // Introductory text
             Text("Take a look at these important recordings for this song.")
-                .font(.subheadline)
+                .font(JazzTheme.subheadline())
                 .foregroundColor(JazzTheme.smokeGray)
             
             // Horizontal scrolling carousel
@@ -367,11 +367,7 @@ struct SongDetailView: View {
             .overlay(alignment: .trailing) {
                 navigationArrow(direction: .right, isVisible: dragOffset < -50 && canNavigateNext)
             }
-            .navigationTitle(song?.title ?? "")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(JazzTheme.burgundy, for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
-            .toolbarColorScheme(.dark, for: .navigationBar)
+            .jazzNavigationBar(title: song?.title ?? "")
             .toolbar {
                 toolbarContent
             }
@@ -430,7 +426,7 @@ struct SongDetailView: View {
                 .font(.system(size: 60))
                 .foregroundColor(JazzTheme.smokeGray)
             Text("Song not found")
-                .font(.headline)
+                .font(JazzTheme.headline())
                 .foregroundColor(JazzTheme.charcoal)
         }
         .frame(maxWidth: .infinity, minHeight: 300)
@@ -654,21 +650,21 @@ struct AuthoritativeRecordingCard: View {
             VStack(alignment: .leading, spacing: 4) {
                 // Lead Artist
                 Text(leadArtist)
-                    .font(.subheadline)
+                    .font(JazzTheme.subheadline())
                     .fontWeight(.semibold)
                     .foregroundColor(JazzTheme.brass)
                     .lineLimit(1)
                 
                 // Album Title
                 Text(recording.albumTitle ?? "Unknown Album")
-                    .font(.body)
+                    .font(JazzTheme.body())
                     .fontWeight(.medium)
                     .foregroundColor(JazzTheme.charcoal)
                     .lineLimit(2)
                 
                 // Year (always reserve space)
                 Text(recording.recordingYear.map { String($0) } ?? " ")
-                    .font(.caption)
+                    .font(JazzTheme.caption())
                     .foregroundColor(JazzTheme.smokeGray)
             }
             .frame(width: 180, height: 75, alignment: .topLeading)

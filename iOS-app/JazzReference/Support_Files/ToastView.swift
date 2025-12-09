@@ -57,7 +57,7 @@ struct ToastView: View {
                 .foregroundColor(toast.type.color)
             
             Text(toast.message)
-                .font(.subheadline)
+                .font(JazzTheme.subheadline())
                 .foregroundColor(JazzTheme.charcoal)
                 .fixedSize(horizontal: false, vertical: true)
             

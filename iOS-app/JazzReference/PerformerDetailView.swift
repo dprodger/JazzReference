@@ -63,10 +63,10 @@ struct PerformerDetailView: View {
                     // Styled Header with Jazz Theme
                     HStack {
                         Image(systemName: "person.fill")
-                            .font(.title2)
+                            .font(JazzTheme.title2())
                             .foregroundColor(JazzTheme.cream)
                         Text("ARTIST")
-                            .font(.headline)
+                            .font(JazzTheme.headline())
                             .fontWeight(.semibold)
                             .foregroundColor(JazzTheme.cream)
                         Spacer()
@@ -77,7 +77,7 @@ struct PerformerDetailView: View {
                     VStack(alignment: .leading, spacing: 20) {
                         // Artist Name - MOVED TO TOP
                         Text(performer.name)
-                            .font(.largeTitle)
+                            .font(JazzTheme.largeTitle())
                             .bold()
                             .foregroundColor(JazzTheme.charcoal)
                             .padding(.horizontal)
@@ -98,7 +98,7 @@ struct PerformerDetailView: View {
                             }) {
                                 HStack {
                                     Text("Biographical Information")
-                                        .font(.title2)
+                                        .font(JazzTheme.title2())
                                         .bold()
                                         .foregroundColor(JazzTheme.charcoal)
                                     Spacer()
@@ -117,7 +117,7 @@ struct PerformerDetailView: View {
                                     VStack(alignment: .leading, spacing: 12) {
                                         ForEach(Array(paragraphs.enumerated()), id: \.offset) { _, paragraph in
                                             Text(paragraph)
-                                                .font(.body)
+                                                .font(JazzTheme.body())
                                                 .foregroundColor(JazzTheme.smokeGray)
                                         }
                                     }
@@ -134,7 +134,7 @@ struct PerformerDetailView: View {
                                                 Image(systemName: "calendar")
                                                     .foregroundColor(JazzTheme.brass)
                                                 Text("Born: \(birthDate)")
-                                                    .font(.subheadline)
+                                                    .font(JazzTheme.subheadline())
                                                     .foregroundColor(JazzTheme.smokeGray)
                                             }
                                         }
@@ -144,7 +144,7 @@ struct PerformerDetailView: View {
                                                 Image(systemName: "calendar")
                                                     .foregroundColor(JazzTheme.brass)
                                                 Text("Died: \(deathDate)")
-                                                    .font(.subheadline)
+                                                    .font(JazzTheme.subheadline())
                                                     .foregroundColor(JazzTheme.smokeGray)
                                             }
                                         }
@@ -152,7 +152,7 @@ struct PerformerDetailView: View {
                                         if let instruments = performer.instruments, !instruments.isEmpty {
                                             VStack(alignment: .leading, spacing: 8) {
                                                 Text("Instruments")
-                                                    .font(.headline)
+                                                    .font(JazzTheme.headline())
                                                     .foregroundColor(JazzTheme.charcoal)
                                                 
                                                 ForEach(instruments, id: \.name) { instrument in
@@ -160,11 +160,11 @@ struct PerformerDetailView: View {
                                                         Image(systemName: "music.note")
                                                             .foregroundColor(JazzTheme.brass)
                                                         Text(instrument.name)
-                                                            .font(.subheadline)
+                                                            .font(JazzTheme.subheadline())
                                                             .foregroundColor(JazzTheme.charcoal)
                                                         if instrument.isPrimary == true {
                                                             Text("(Primary)")
-                                                                .font(.caption)
+                                                                .font(JazzTheme.caption())
                                                                 .foregroundColor(JazzTheme.smokeGray)
                                                         }
                                                     }
@@ -198,7 +198,7 @@ struct PerformerDetailView: View {
                         // Recordings Section
                         VStack(alignment: .leading, spacing: 12) {
                             Text("Recordings (\(filteredRecordings.count))")
-                                .font(.title2)
+                                .font(JazzTheme.title2())
                                 .bold()
                                 .foregroundColor(JazzTheme.charcoal)
                                 .padding(.horizontal)
@@ -263,10 +263,7 @@ struct PerformerDetailView: View {
             }
         }
         .background(JazzTheme.backgroundLight)
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(JazzTheme.amber, for: .navigationBar)
-        .toolbarBackground(.visible, for: .navigationBar)
-        .toolbarColorScheme(.dark, for: .navigationBar)
+        .jazzNavigationBar(title: performer?.name ?? "", color: JazzTheme.amber)
         .task {
             #if DEBUG
             if ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1" {
@@ -293,7 +290,7 @@ struct PerformerRecordingRowView: View {
             if recording.isCanonical == true {
                 Image(systemName: "star.fill")
                     .foregroundColor(JazzTheme.gold)
-                    .font(.subheadline)
+                    .font(JazzTheme.subheadline())
                     .frame(width: 20)
             } else {
                 Spacer()
@@ -303,14 +300,14 @@ struct PerformerRecordingRowView: View {
             VStack(alignment: .leading, spacing: 4) {
                 // Song title
                 Text(recording.songTitle)
-                    .font(.headline)
+                    .font(JazzTheme.headline())
                     .foregroundColor(JazzTheme.charcoal)
                     .lineLimit(1)
                 
                 // Album name
                 if let albumTitle = recording.albumTitle {
                     Text(albumTitle)
-                        .font(.subheadline)
+                        .font(JazzTheme.subheadline())
                         .foregroundColor(JazzTheme.smokeGray)
                         .lineLimit(1)
                 }
@@ -318,7 +315,7 @@ struct PerformerRecordingRowView: View {
                 // Role
                 if let role = recording.role {
                     Text(role.capitalized)
-                        .font(.caption)
+                        .font(JazzTheme.caption())
                         .foregroundColor(JazzTheme.smokeGray)
                 }
             }
@@ -328,7 +325,7 @@ struct PerformerRecordingRowView: View {
             // Year
             if let year = recording.recordingYear {
                 Text(String(year))
-                    .font(.subheadline)
+                    .font(JazzTheme.subheadline())
                     .foregroundColor(JazzTheme.smokeGray)
                     .frame(minWidth: 40, alignment: .trailing)
             }
