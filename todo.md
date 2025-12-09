@@ -20,7 +20,7 @@ Data
 * running jazz_song_research, not sure I'm getting wikipedia on finding a new song
 * when running fetch_artist_images.py, it looks like it's slow either sleeping, or with db connection
 * consider pulling from https://thejazztome.info/about/
-    
+* recoridngDetailView seems to have backend URLs in it -- clean that up?    
     
      
 
@@ -36,7 +36,7 @@ Done:
 * at Ron Carter and wikipedia logic. We have the wrong URL for Wikipedia for him	
 * fix import_mb_releases to use --name or --id params, not just taking the name
 * add a single-song path for gather_mb_ids.py
-* check for propagation of DNS settings: Go here, for instance: http://linernotesjazz.com/docs
+* check for propagation of DNS settings: Go here, for instance: http://approachnote.com/docs
 * MusicBrainz release import doesn't seem to be getting all performers
 * Deal with this:
 	Processing: Thelonious Monk
@@ -111,6 +111,8 @@ Data problems:
 * SongDetailView recording List showing different release metadata than RecordingDetailView
 
 * match_spotify taking a recording_id to look for just that recording & releases
+
+* what to do with song that has two or more musicbrainz IDs? (A Child Is Born is a good example of this)
 
 
 Overall approach:
