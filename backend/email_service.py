@@ -19,9 +19,9 @@ logger = logging.getLogger(__name__)
 
 # Configuration from environment variables
 SENDGRID_API_KEY = os.getenv('SENDGRID_API_KEY')
-FROM_EMAIL = os.getenv('FROM_EMAIL', 'noreply@jazzreference.com')
+FROM_EMAIL = os.getenv('FROM_EMAIL', 'noreply@approachnote.com')
 FRONTEND_URL = os.getenv('FRONTEND_URL', 'jazzreference://auth')
-API_BASE_URL = os.getenv('API_BASE_URL', 'https://jazzreference.onrender.com/api')
+API_BASE_URL = os.getenv('API_BASE_URL', 'https://www.approachnote.com/api')
 
 # Check if SendGrid is configured
 SENDGRID_CONFIGURED = bool(SENDGRID_API_KEY)
@@ -125,7 +125,7 @@ def send_verification_email(email: str, token: str) -> bool:
         </head>
         <body>
             <div class="container">
-                <h2>Welcome to Jazz Reference!</h2>
+                <h2>Welcome to Approach Note!!</h2>
                 <p>Please verify your email address by clicking the button below:</p>
                 <a href="{verify_url}" class="button">Verify Email Address</a>
                 <p>Or copy and paste this link into your browser:</p>
@@ -140,7 +140,7 @@ def send_verification_email(email: str, token: str) -> bool:
     """
     
     logger.info(f"Sending verification email to: {email}")
-    return send_email(email, "Verify your Jazz Reference email", html_content)
+    return send_email(email, "Verify your Approach Note email", html_content)
 
 
 def send_password_reset_email(email: str, token: str) -> bool:
@@ -193,7 +193,7 @@ def send_password_reset_email(email: str, token: str) -> bool:
     """
     
     logger.info(f"Sending password reset email to: {email}")
-    return send_email(email, "Reset your Jazz Reference password", html_content)
+    return send_email(email, "Reset your Approach Note password", html_content)
 
 
 def send_welcome_email(email: str, display_name: Optional[str] = None) -> bool:
@@ -224,7 +224,7 @@ def send_welcome_email(email: str, display_name: Optional[str] = None) -> bool:
         <body>
             <div class="container">
                 <div class="header">
-                    <h1 style="margin: 0;">Jazz Reference</h1>
+                    <h1 style="margin: 0;">Approach Note</h1>
                 </div>
                 <div class="content">
                     <h2>{greeting}</h2>
@@ -239,7 +239,7 @@ def send_welcome_email(email: str, display_name: Optional[str] = None) -> bool:
                     <p>Start exploring the world's most comprehensive jazz standards reference!</p>
                 </div>
                 <div class="footer">
-                    <p>Questions? Contact us at support@jazzreference.com</p>
+                    <p>Questions? Contact us at support@approachnote.com</p>
                 </div>
             </div>
         </body>
@@ -247,4 +247,4 @@ def send_welcome_email(email: str, display_name: Optional[str] = None) -> bool:
     """
     
     logger.info(f"Sending welcome email to: {email}")
-    return send_email(email, "Welcome to Jazz Reference", html_content)
+    return send_email(email, "Welcome to Approach Note", html_content)
