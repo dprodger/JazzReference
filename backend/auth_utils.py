@@ -79,10 +79,10 @@ def generate_access_token(user_id: str) -> str:
 def generate_refresh_token(user_id: str) -> str:
     """
     Generate JWT refresh token (30 days expiry)
-    
+
     Args:
         user_id: UUID of the user
-        
+
     Returns:
         JWT token as string
     """
@@ -90,7 +90,8 @@ def generate_refresh_token(user_id: str) -> str:
         'user_id': str(user_id),
         'exp': datetime.now(timezone.utc) + REFRESH_TOKEN_EXPIRY,
         'iat': datetime.now(timezone.utc),
-        'type': 'refresh'
+        'type': 'refresh',
+        'jti': secrets.token_hex(16)  # Unique token ID to prevent duplicates
     }
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
