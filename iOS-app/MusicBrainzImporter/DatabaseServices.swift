@@ -11,10 +11,10 @@ import Foundation
 
 class ArtistDatabaseService {
     static let shared = ArtistDatabaseService()
-    
+
     // For development, you might use: http://localhost:5001
     // For production, use your deployed backend URL
-    private  let baseURL = "https://linernotesjazz.com/api"
+    private  let baseURL = "https://approachnote.com/api"
 
     private init() {}
     
@@ -77,8 +77,8 @@ class ArtistDatabaseService {
 
 class SongDatabaseService {
     static let shared = SongDatabaseService()
-    
-    private  let baseURL = "https://linernotesjazz.com/api"
+
+    private  let baseURL = "https://approachnote.com/api"
 
     private init() {}
     

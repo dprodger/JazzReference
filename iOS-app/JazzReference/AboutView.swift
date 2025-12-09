@@ -208,7 +208,7 @@ struct AboutView: View {
                     .foregroundColor(.white.opacity(0.8))
                     .padding(.bottom, 10)
                 
-                Link("www.linernotesjazz.com", destination: URL(string: "https://www.linernotesjazz.com")!)
+                Link("www.approachnote.com", destination: URL(string: "https://www.approachnote.com")!)
                     .font(.caption)
                     .tint(.white.opacity(0.8))
                     .padding(.bottom, 40)

@@ -55,7 +55,7 @@ class SendGridTester:
         
         # Get environment variables
         self.api_key = os.getenv('SENDGRID_API_KEY')
-        self.from_email = os.getenv('FROM_EMAIL', 'noreply@linernotesjazz.com')
+        self.from_email = os.getenv('FROM_EMAIL', 'noreply@approachnote.com')
         self.frontend_url = os.getenv('FRONTEND_URL', 'jazzreference://auth')
     
     def test_environment_variables(self):

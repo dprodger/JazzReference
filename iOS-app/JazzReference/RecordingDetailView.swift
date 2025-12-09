@@ -408,7 +408,7 @@ struct RecordingDetailView: View {
     private func sendReportToAPI(entityType: String, entityId: String, entityName: String, externalSource: String, externalUrl: String, explanation: String) async throws -> Bool {
         
         // Get API base URL from environment or use default
-        let baseURL = ProcessInfo.processInfo.environment["API_BASE_URL"] ?? "https://linernotesjazz.com"
+        let baseURL = ProcessInfo.processInfo.environment["API_BASE_URL"] ?? "https://approachnote.com"
         
         guard let url = URL(string: "\(baseURL)/api/content-reports") else {
             throw URLError(.badURL)
