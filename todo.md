@@ -22,7 +22,7 @@ Data
 * consider pulling from https://thejazztome.info/about/
 * recoridngDetailView seems to have backend URLs in it -- clean that up?    
 * API should use dedicated domain (api.approachnote.com) rather than www.approachnote.com/api -- fix that thruout
-    
+* Fix Sendgrid domain stuff and update remainder of emails    
      
 
 	
