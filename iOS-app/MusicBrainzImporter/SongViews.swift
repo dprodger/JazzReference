@@ -58,7 +58,7 @@ struct SongImportConfirmationView: View {
             
             VStack(spacing: 12) {
                 Button(action: onImport) {
-                    Text("Import to Jazz Reference")
+                    Text("Import to Approach Note")
                         .font(.headline)
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity)
@@ -133,7 +133,7 @@ struct SongExactMatchView: View {
             
             VStack(spacing: 12) {
                 Button(action: onOpenInApp) {
-                    Text("Open in Jazz Reference")
+                    Text("Open in Approach Note")
                         .font(.headline)
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity)

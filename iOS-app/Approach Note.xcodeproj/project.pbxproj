@@ -62,7 +62,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		B41D0F972EE6337400DB427C /* Jazz Liner Notes.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Jazz Liner Notes.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		B41D0F972EE6337400DB427C /* Approach Note Mac.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Approach Note Mac.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		B41D0FA22EE633EE00DB427C /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Assets.xcassets; path = JazzReferenceMac/Assets.xcassets; sourceTree = "<group>"; };
 		B41D0FA32EE633EE00DB427C /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ContentView.swift; path = JazzReferenceMac/ContentView.swift; sourceTree = "<group>"; };
 		B41D0FA42EE633EE00DB427C /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = Info.plist; path = JazzReferenceMac/Info.plist; sourceTree = "<group>"; };
@@ -75,20 +75,20 @@
 		B41D0FAB2EE633EE00DB427C /* SongDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SongDetailView.swift; sourceTree = "<group>"; };
 		B41D0FAC2EE633EE00DB427C /* SongsListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SongsListView.swift; sourceTree = "<group>"; };
 		B4911D2A2EB316F600326CA7 /* MusicBrainzImporter.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = MusicBrainzImporter.appex; sourceTree = BUILT_PRODUCTS_DIR; };
-		B4C160402E91B03600EB8D2C /* JazzReference.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = JazzReference.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		B4C160402E91B03600EB8D2C /* Approach Note.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Approach Note.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		B4C1604D2E91B03700EB8D2C /* JazzReferenceTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = JazzReferenceTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		B4C160572E91B03700EB8D2C /* JazzReferenceUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = JazzReferenceUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		B4147E552EB4FB2C004A16E7 /* Exceptions for "JazzReference" folder in "JazzReference" target */ = {
+		B4147E552EB4FB2C004A16E7 /* Exceptions for "JazzReference" folder in "Approach Note" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
 			);
-			target = B4C1603F2E91B03600EB8D2C /* JazzReference */;
+			target = B4C1603F2E91B03600EB8D2C /* Approach Note */;
 		};
-		B41D0FB92EE6343900DB427C /* Exceptions for "JazzReference" folder in "Jazz Liner Notes" target */ = {
+		B41D0FB92EE6343900DB427C /* Exceptions for "JazzReference" folder in "Approach Note Mac" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Auth/AuthenticationManager.swift,
@@ -101,7 +101,7 @@
 				Support_Files/NetworkManager.swift,
 				Support_Files/PreviewHelpers.swift,
 			);
-			target = B41D0F962EE6337400DB427C /* Jazz Liner Notes */;
+			target = B41D0F962EE6337400DB427C /* Approach Note Mac */;
 		};
 		B4911D382EB316F700326CA7 /* Exceptions for "MusicBrainzImporter" folder in "MusicBrainzImporter" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
@@ -135,8 +135,8 @@
 		B4C160422E91B03600EB8D2C /* JazzReference */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				B4147E552EB4FB2C004A16E7 /* Exceptions for "JazzReference" folder in "JazzReference" target */,
-				B41D0FB92EE6343900DB427C /* Exceptions for "JazzReference" folder in "Jazz Liner Notes" target */,
+				B4147E552EB4FB2C004A16E7 /* Exceptions for "JazzReference" folder in "Approach Note" target */,
+				B41D0FB92EE6343900DB427C /* Exceptions for "JazzReference" folder in "Approach Note Mac" target */,
 			);
 			path = JazzReference;
 			sourceTree = "<group>";
@@ -229,11 +229,11 @@
 		B4C160412E91B03600EB8D2C /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				B4C160402E91B03600EB8D2C /* JazzReference.app */,
+				B4C160402E91B03600EB8D2C /* Approach Note.app */,
 				B4C1604D2E91B03700EB8D2C /* JazzReferenceTests.xctest */,
 				B4C160572E91B03700EB8D2C /* JazzReferenceUITests.xctest */,
 				B4911D2A2EB316F600326CA7 /* MusicBrainzImporter.appex */,
-				B41D0F972EE6337400DB427C /* Jazz Liner Notes.app */,
+				B41D0F972EE6337400DB427C /* Approach Note Mac.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -241,9 +241,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		B41D0F962EE6337400DB427C /* Jazz Liner Notes */ = {
+		B41D0F962EE6337400DB427C /* Approach Note Mac */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = B41D0FA12EE6337500DB427C /* Build configuration list for PBXNativeTarget "Jazz Liner Notes" */;
+			buildConfigurationList = B41D0FA12EE6337500DB427C /* Build configuration list for PBXNativeTarget "Approach Note Mac" */;
 			buildPhases = (
 				B41D0F932EE6337400DB427C /* Sources */,
 				B41D0F942EE6337400DB427C /* Frameworks */,
@@ -253,11 +253,11 @@
 			);
 			dependencies = (
 			);
-			name = "Jazz Liner Notes";
+			name = "Approach Note Mac";
 			packageProductDependencies = (
 			);
-			productName = "Jazz Liner Notes";
-			productReference = B41D0F972EE6337400DB427C /* Jazz Liner Notes.app */;
+			productName = "Approach Note";
+			productReference = B41D0F972EE6337400DB427C /* Approach Note Mac.app */;
 			productType = "com.apple.product-type.application";
 		};
 		B4911D292EB316F600326CA7 /* MusicBrainzImporter */ = {
@@ -282,9 +282,9 @@
 			productReference = B4911D2A2EB316F600326CA7 /* MusicBrainzImporter.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
-		B4C1603F2E91B03600EB8D2C /* JazzReference */ = {
+		B4C1603F2E91B03600EB8D2C /* Approach Note */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = B4C160612E91B03700EB8D2C /* Build configuration list for PBXNativeTarget "JazzReference" */;
+			buildConfigurationList = B4C160612E91B03700EB8D2C /* Build configuration list for PBXNativeTarget "Approach Note" */;
 			buildPhases = (
 				B4C1603C2E91B03600EB8D2C /* Sources */,
 				B4C1603D2E91B03600EB8D2C /* Frameworks */,
@@ -299,14 +299,14 @@
 			fileSystemSynchronizedGroups = (
 				B4C160422E91B03600EB8D2C /* JazzReference */,
 			);
-			name = JazzReference;
+			name = "Approach Note";
 			packageProductDependencies = (
 				B4F38C232EC166A800231130 /* YouTubePlayerKit */,
 				B4C535832ECE5FFF0030A127 /* GoogleSignIn */,
 				B4C535852ECE5FFF0030A127 /* GoogleSignInSwift */,
 			);
 			productName = JazzReference;
-			productReference = B4C160402E91B03600EB8D2C /* JazzReference.app */;
+			productReference = B4C160402E91B03600EB8D2C /* Approach Note.app */;
 			productType = "com.apple.product-type.application";
 		};
 		B4C1604C2E91B03700EB8D2C /* JazzReferenceTests */ = {
@@ -384,7 +384,7 @@
 					};
 				};
 			};
-			buildConfigurationList = B4C1603B2E91B03600EB8D2C /* Build configuration list for PBXProject "JazzReference" */;
+			buildConfigurationList = B4C1603B2E91B03600EB8D2C /* Build configuration list for PBXProject "Approach Note" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -402,11 +402,11 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				B4C1603F2E91B03600EB8D2C /* JazzReference */,
+				B4C1603F2E91B03600EB8D2C /* Approach Note */,
 				B4C1604C2E91B03700EB8D2C /* JazzReferenceTests */,
 				B4C160562E91B03700EB8D2C /* JazzReferenceUITests */,
 				B4911D292EB316F600326CA7 /* MusicBrainzImporter */,
-				B41D0F962EE6337400DB427C /* Jazz Liner Notes */,
+				B41D0F962EE6337400DB427C /* Approach Note Mac */,
 			);
 		};
 /* End PBXProject section */
@@ -500,12 +500,12 @@
 /* Begin PBXTargetDependency section */
 		B4C1604F2E91B03700EB8D2C /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = B4C1603F2E91B03600EB8D2C /* JazzReference */;
+			target = B4C1603F2E91B03600EB8D2C /* Approach Note */;
 			targetProxy = B4C1604E2E91B03700EB8D2C /* PBXContainerItemProxy */;
 		};
 		B4C160592E91B03700EB8D2C /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = B4C1603F2E91B03600EB8D2C /* JazzReference */;
+			target = B4C1603F2E91B03600EB8D2C /* Approach Note */;
 			targetProxy = B4C160582E91B03700EB8D2C /* PBXContainerItemProxy */;
 		};
 		B4EE328E2EB3F95000C643D1 /* PBXTargetDependency */ = {
@@ -950,7 +950,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		B41D0FA12EE6337500DB427C /* Build configuration list for PBXNativeTarget "Jazz Liner Notes" */ = {
+		B41D0FA12EE6337500DB427C /* Build configuration list for PBXNativeTarget "Approach Note Mac" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				B41D0F9F2EE6337500DB427C /* Debug */,
@@ -968,7 +968,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		B4C1603B2E91B03600EB8D2C /* Build configuration list for PBXProject "JazzReference" */ = {
+		B4C1603B2E91B03600EB8D2C /* Build configuration list for PBXProject "Approach Note" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				B4C1605F2E91B03700EB8D2C /* Debug */,
@@ -977,7 +977,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		B4C160612E91B03700EB8D2C /* Build configuration list for PBXNativeTarget "JazzReference" */ = {
+		B4C160612E91B03700EB8D2C /* Build configuration list for PBXNativeTarget "Approach Note" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				B4C160622E91B03700EB8D2C /* Debug */,

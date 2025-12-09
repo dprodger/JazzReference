@@ -43,7 +43,7 @@ struct AboutView: View {
             VStack(spacing: 20) {
                 Spacer()
 
-                Text("Jazz Liner Notes")
+                Text("Approach Note")
                     .font(.system(size: 48, weight: .bold))
                     .foregroundColor(.white)
                     .shadow(color: .black.opacity(0.7), radius: 10, x: 0, y: 5)

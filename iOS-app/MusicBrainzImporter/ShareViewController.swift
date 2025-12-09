@@ -625,7 +625,7 @@ class ShareViewController: UIViewController {
         DispatchQueue.main.async { [weak self] in
             let alert = UIAlertController(
                 title: "Data Saved",
-                message: "Open Jazz Reference to complete the import.",
+                message: "Open Approach Note to complete the import.",
                 preferredStyle: .alert
             )
 

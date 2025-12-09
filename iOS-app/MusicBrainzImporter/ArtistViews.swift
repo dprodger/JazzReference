@@ -45,7 +45,7 @@ struct ArtistImportConfirmationView: View {
             // Action buttons
             VStack(spacing: 12) {
                 Button(action: onImport) {
-                    Text("Import to Jazz Reference")
+                    Text("Import to Approach Note")
                         .font(.headline)
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity)
@@ -131,7 +131,7 @@ struct ArtistExactMatchView: View {
                 Button(action: onOpenInApp) {
                     HStack {
                         Image(systemName: "arrow.up.forward.app")
-                        Text("View in Jazz Reference")
+                        Text("View in Approach Note")
                     }
                     .font(.headline)
                     .foregroundColor(.white)

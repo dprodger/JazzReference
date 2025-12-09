@@ -133,7 +133,7 @@ private struct WelcomePage: View {
                     .foregroundColor(JazzTheme.charcoal)
                 
                 VStack(spacing: 16) {
-                    Text("Thanks for checking out Jazz Liner Notes.")
+                    Text("Thanks for checking out Approach Note.")
                         .font(.title3)
                         .multilineTextAlignment(.center)
                     
