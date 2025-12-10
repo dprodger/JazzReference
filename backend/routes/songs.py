@@ -195,25 +195,280 @@ def get_songs():
 
 
 
+@songs_bp.route('/api/songs/<song_id>/summary', methods=['GET'])
+def get_song_summary(song_id):
+    """
+    Get song metadata, transcriptions, and featured (authoritative) recordings ONLY.
+
+    This is a fast endpoint for initial page load. It returns:
+    - Song metadata (title, composer, structure, external references, etc.)
+    - Transcriptions for the song
+    - Only featured recordings (those with authority recommendations)
+
+    The full recordings list should be loaded separately via /api/songs/<song_id>/recordings
+    """
+    try:
+        # Query for song + transcriptions + featured recordings only
+        combined_query = f"""
+            WITH song_data AS (
+                SELECT
+                    s.id, s.title, s.composer, s.structure, s.song_reference,
+                    s.musicbrainz_id, s.wikipedia_url, s.external_references,
+                    s.created_at, s.updated_at,
+                    (SELECT COUNT(*)
+                     FROM song_authority_recommendations
+                     WHERE song_id = s.id) as authority_recommendation_count,
+                    (SELECT COUNT(*) FROM recordings WHERE song_id = s.id) as recording_count
+                FROM songs s
+                WHERE s.id = %s
+            ),
+            featured_recordings AS (
+                SELECT
+                    r.id,
+                    r.album_title,
+                    r.recording_date,
+                    r.recording_year,
+                    r.label,
+                    r.default_release_id,
+                    COALESCE(
+                        (SELECT COALESCE(rr_sub.spotify_track_url, rel_sub.spotify_album_url)
+                         FROM releases rel_sub
+                         LEFT JOIN recording_releases rr_sub ON rr_sub.release_id = rel_sub.id AND rr_sub.recording_id = r.id
+                         WHERE rel_sub.id = r.default_release_id
+                           AND (rel_sub.spotify_album_url IS NOT NULL OR rr_sub.spotify_track_url IS NOT NULL)
+                        ),
+                        (SELECT COALESCE(rr_sub.spotify_track_url, rel_sub.spotify_album_url)
+                         FROM recording_releases rr_sub
+                         JOIN releases rel_sub ON rr_sub.release_id = rel_sub.id
+                         WHERE rr_sub.recording_id = r.id
+                           AND (rr_sub.spotify_track_url IS NOT NULL OR rel_sub.spotify_album_url IS NOT NULL)
+                         ORDER BY
+                           CASE WHEN rr_sub.spotify_track_url IS NOT NULL THEN 0 ELSE 1 END,
+                           rel_sub.release_year DESC NULLS LAST
+                         LIMIT 1)
+                    ) as best_spotify_url,
+                    {ALBUM_ART_SMALL_SQL},
+                    {ALBUM_ART_MEDIUM_SQL},
+                    {ALBUM_ART_LARGE_SQL},
+                    r.youtube_url,
+                    r.apple_music_url,
+                    r.musicbrainz_id,
+                    r.is_canonical,
+                    r.notes,
+                    COALESCE(
+                        json_agg(
+                            json_build_object(
+                                'id', p.id,
+                                'name', p.name,
+                                'instrument', i.name,
+                                'role', rp.role
+                            ) ORDER BY
+                                CASE rp.role
+                                    WHEN 'leader' THEN 1
+                                    WHEN 'sideman' THEN 2
+                                    ELSE 3
+                                END,
+                                p.name
+                        ) FILTER (WHERE p.id IS NOT NULL),
+                        '[]'::json
+                    ) as performers,
+                    COUNT(DISTINCT sar.id) as authority_count,
+                    COALESCE(
+                        array_agg(DISTINCT sar.source) FILTER (WHERE sar.source IS NOT NULL),
+                        ARRAY[]::text[]
+                    ) as authority_sources
+                FROM recordings r
+                INNER JOIN song_authority_recommendations sar ON r.id = sar.recording_id
+                LEFT JOIN recording_performers rp ON r.id = rp.recording_id
+                LEFT JOIN performers p ON rp.performer_id = p.id
+                LEFT JOIN instruments i ON rp.instrument_id = i.id
+                WHERE r.song_id = %s
+                GROUP BY r.id, r.album_title, r.recording_date, r.recording_year,
+                         r.label, r.default_release_id,
+                         r.youtube_url, r.apple_music_url, r.musicbrainz_id,
+                         r.is_canonical, r.notes
+                ORDER BY r.recording_year ASC NULLS LAST
+            ),
+            transcriptions_data AS (
+                SELECT
+                    st.id,
+                    st.song_id,
+                    st.recording_id,
+                    st.youtube_url,
+                    st.created_at,
+                    st.updated_at,
+                    r.album_title,
+                    r.recording_year
+                FROM solo_transcriptions st
+                LEFT JOIN recordings r ON st.recording_id = r.id
+                WHERE st.song_id = %s
+                ORDER BY r.recording_year DESC
+            )
+            SELECT
+                (SELECT row_to_json(song_data.*) FROM song_data) as song,
+                (SELECT json_agg(featured_recordings.*) FROM featured_recordings) as featured_recordings,
+                (SELECT json_agg(transcriptions_data.*) FROM transcriptions_data) as transcriptions
+        """
+
+        result = db_tools.execute_query(combined_query, (song_id, song_id, song_id), fetch_one=True)
+
+        if not result or not result['song']:
+            return jsonify({'error': 'Song not found'}), 404
+
+        song_dict = result['song']
+        featured_recordings = result['featured_recordings'] if result['featured_recordings'] else []
+        transcriptions = result['transcriptions'] if result['transcriptions'] else []
+
+        song_dict['featured_recordings'] = featured_recordings
+        song_dict['transcriptions'] = transcriptions
+        song_dict['transcription_count'] = len(transcriptions)
+
+        return jsonify(song_dict)
+
+    except Exception as e:
+        logger.error(f"Error fetching song summary: {e}")
+        return jsonify({'error': 'Failed to fetch song summary', 'detail': str(e)}), 500
+
+
+@songs_bp.route('/api/songs/<song_id>/recordings', methods=['GET'])
+def get_song_recordings(song_id):
+    """
+    Get all recordings for a song with performers and authority info.
+
+    This is the heavier endpoint that loads all recordings. Call this after
+    the summary endpoint has returned to populate the full recordings list.
+
+    Supports sort parameter: 'year' (default) or 'name' (by leader's last name)
+    """
+    try:
+        sort_by = request.args.get('sort', 'year')
+
+        if sort_by == 'name':
+            recordings_order = """
+                (
+                    SELECT COALESCE(
+                        SUBSTRING(p2.name FROM '([^ ]+)$'),
+                        p2.name,
+                        'ZZZ'
+                    )
+                    FROM recording_performers rp2
+                    JOIN performers p2 ON rp2.performer_id = p2.id
+                    WHERE rp2.recording_id = r.id AND rp2.role = 'leader'
+                    ORDER BY p2.name
+                    LIMIT 1
+                ) ASC NULLS LAST,
+                r.recording_year ASC NULLS LAST
+            """
+        else:
+            recordings_order = "r.recording_year ASC NULLS LAST"
+
+        recordings_query = f"""
+            SELECT
+                r.id,
+                r.album_title,
+                r.recording_date,
+                r.recording_year,
+                r.label,
+                r.default_release_id,
+                COALESCE(
+                    (SELECT COALESCE(rr_sub.spotify_track_url, rel_sub.spotify_album_url)
+                     FROM releases rel_sub
+                     LEFT JOIN recording_releases rr_sub ON rr_sub.release_id = rel_sub.id AND rr_sub.recording_id = r.id
+                     WHERE rel_sub.id = r.default_release_id
+                       AND (rel_sub.spotify_album_url IS NOT NULL OR rr_sub.spotify_track_url IS NOT NULL)
+                    ),
+                    (SELECT COALESCE(rr_sub.spotify_track_url, rel_sub.spotify_album_url)
+                     FROM recording_releases rr_sub
+                     JOIN releases rel_sub ON rr_sub.release_id = rel_sub.id
+                     WHERE rr_sub.recording_id = r.id
+                       AND (rr_sub.spotify_track_url IS NOT NULL OR rel_sub.spotify_album_url IS NOT NULL)
+                     ORDER BY
+                       CASE WHEN rr_sub.spotify_track_url IS NOT NULL THEN 0 ELSE 1 END,
+                       rel_sub.release_year DESC NULLS LAST
+                     LIMIT 1)
+                ) as best_spotify_url,
+                {ALBUM_ART_SMALL_SQL},
+                {ALBUM_ART_MEDIUM_SQL},
+                {ALBUM_ART_LARGE_SQL},
+                {BACK_COVER_SMALL_SQL},
+                {BACK_COVER_MEDIUM_SQL},
+                {BACK_COVER_LARGE_SQL},
+                {HAS_BACK_COVER_SQL},
+                r.youtube_url,
+                r.apple_music_url,
+                r.musicbrainz_id,
+                r.is_canonical,
+                r.notes,
+                COALESCE(
+                    json_agg(
+                        json_build_object(
+                            'id', p.id,
+                            'name', p.name,
+                            'instrument', i.name,
+                            'role', rp.role
+                        ) ORDER BY
+                            CASE rp.role
+                                WHEN 'leader' THEN 1
+                                WHEN 'sideman' THEN 2
+                                ELSE 3
+                            END,
+                            p.name
+                    ) FILTER (WHERE p.id IS NOT NULL),
+                    '[]'::json
+                ) as performers,
+                COUNT(DISTINCT sar.id) as authority_count,
+                COALESCE(
+                    array_agg(DISTINCT sar.source) FILTER (WHERE sar.source IS NOT NULL),
+                    ARRAY[]::text[]
+                ) as authority_sources
+            FROM recordings r
+            LEFT JOIN recording_performers rp ON r.id = rp.recording_id
+            LEFT JOIN performers p ON rp.performer_id = p.id
+            LEFT JOIN instruments i ON rp.instrument_id = i.id
+            LEFT JOIN song_authority_recommendations sar ON r.id = sar.recording_id
+            WHERE r.song_id = %s
+            GROUP BY r.id, r.album_title, r.recording_date, r.recording_year,
+                     r.label, r.default_release_id,
+                     r.youtube_url, r.apple_music_url, r.musicbrainz_id,
+                     r.is_canonical, r.notes
+            ORDER BY {recordings_order}
+        """
+
+        recordings = db_tools.execute_query(recordings_query, (song_id,))
+
+        return jsonify({
+            'song_id': song_id,
+            'recordings': recordings if recordings else [],
+            'recording_count': len(recordings) if recordings else 0
+        })
+
+    except Exception as e:
+        logger.error(f"Error fetching song recordings: {e}")
+        return jsonify({'error': 'Failed to fetch recordings', 'detail': str(e)}), 500
+
+
 @songs_bp.route('/api/songs/<song_id>', methods=['GET'])
 def get_song_detail(song_id):
     """
     Get detailed information about a specific song with all recordings, performers, transcriptions,
     AND authority recommendations.
-    
+
     ULTRA-OPTIMIZED VERSION: Uses a SINGLE query with CTEs instead of 4+ separate queries.
     This eliminates network round trips between Render and Supabase.
-    
+
     UPDATED: Recording-Centric Architecture
     - Removed dropped columns (spotify_url, spotify_track_id, album_art_*) from recordings
     - Spotify/artwork data now comes entirely from releases via subqueries
     - Performers come from recording_performers table
-    
+
     UPDATED: Release Imagery Support
     - Album art checks release_imagery table first (CAA images)
     - Falls back to releases table (Spotify images) if no release_imagery exists
-    
+
     NEW: Includes authority recommendation counts and sort parameter support.
+
+    NOTE: For better performance, consider using /api/songs/<song_id>/summary followed by
+    /api/songs/<song_id>/recordings for progressive loading.
     """
     try:
         # Get sort preference from query parameter (default: 'year')
