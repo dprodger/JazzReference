@@ -497,6 +497,28 @@
             background: #3498db;
             color: #fff;
         }
+        .spotify-checkbox {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 6px 10px;
+            background: #f0f0f0;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            color: #555;
+            user-select: none;
+        }
+        .spotify-checkbox:hover {
+            background: #e5e5e5;
+        }
+        .spotify-checkbox input[type="checkbox"] {
+            margin: 0;
+            cursor: pointer;
+        }
+        .spotify-checkbox .checkbox-label {
+            white-space: nowrap;
+        }
         .btn-reject {
             background: #e74c3c;
             color: #fff;
@@ -1108,7 +1130,15 @@
                                 Pending Review
                             {% endif %}
                         </span>
-                        <button class="btn btn-approve" onclick="updateStatus('{{ orphan.id }}', 'approved')"
+                        {% if orphan.spotify_track_id %}
+                        <label class="spotify-checkbox" title="Include Spotify link when approving">
+                            <input type="checkbox"
+                                   id="include-spotify-{{ orphan.id }}"
+                                   {% if orphan.spotify_match_confidence == 'HIGH' %}checked{% endif %}>
+                            <span class="checkbox-label">Include Spotify</span>
+                        </label>
+                        {% endif %}
+                        <button class="btn btn-approve" onclick="approveOrphan('{{ orphan.id }}')"
                                 {% if orphan.status == 'approved' %}disabled{% endif %}>
                             Approve
                         </button>
@@ -1194,14 +1224,19 @@
             }
         }
 
-        async function updateStatus(orphanId, status) {
+        async function updateStatus(orphanId, status, includeSpotify = null) {
             try {
+                const body = { status: status };
+                if (includeSpotify !== null) {
+                    body.include_spotify = includeSpotify;
+                }
+
                 const response = await fetch(`/admin/orphans/${orphanId}/status`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ status: status })
+                    body: JSON.stringify(body)
                 });
 
                 if (response.ok) {
@@ -1214,6 +1249,13 @@
             } catch (error) {
                 alert('Error: ' + error.message);
             }
+        }
+
+        function approveOrphan(orphanId) {
+            // Check if checkbox exists (only present when there's a Spotify match)
+            const checkbox = document.getElementById(`include-spotify-${orphanId}`);
+            const includeSpotify = checkbox ? checkbox.checked : false;
+            updateStatus(orphanId, 'approved', includeSpotify);
         }
 
         async function importApproved() {

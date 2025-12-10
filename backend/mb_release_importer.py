@@ -1149,6 +1149,21 @@ class MBReleaseImporter:
             self.logger.warning(f"      CAA error (non-fatal): {e}")
             # Don't increment error count - CAA failures shouldn't fail the release import
 
+    def _maybe_set_default_release(self, cur, recording_id: str, release_id: str) -> None:
+        """
+        Set default_release_id on recording if it doesn't have one.
+
+        This ensures recordings always have a default release for display purposes,
+        even when imported from MusicBrainz without Spotify matching.
+        """
+        cur.execute("""
+            UPDATE recordings
+            SET default_release_id = %s,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = %s
+              AND default_release_id IS NULL
+        """, (release_id, recording_id))
+
     def _link_recording_to_release(self, conn, recording_id: str, release_id: str,
                                     mb_release: Dict[str, Any]) -> None:
         """
@@ -1182,14 +1197,17 @@ class MBReleaseImporter:
                 VALUES (%s, %s, %s, %s)
                 ON CONFLICT (recording_id, release_id) DO NOTHING
             """, (recording_id, release_id, track_number, disc_number))
-            
+
             self.stats['links_created'] += 1
-    
+
+            # Set default_release_id if recording doesn't have one
+            self._maybe_set_default_release(cur, recording_id, release_id)
+
     def _link_recording_to_release_fast(self, conn, recording_id: str, release_id: str,
                                          mb_recording_id: str, mb_release: Dict[str, Any]) -> None:
         """
         Fast version of link creation - just creates the link without track info
-        
+
         Used when release already exists but link doesn't
         """
         with conn.cursor() as cur:
@@ -1198,8 +1216,11 @@ class MBReleaseImporter:
                 VALUES (%s, %s)
                 ON CONFLICT (recording_id, release_id) DO NOTHING
             """, (recording_id, release_id))
-            
+
             self.stats['links_created'] += 1
+
+            # Set default_release_id if recording doesn't have one
+            self._maybe_set_default_release(cur, recording_id, release_id)
     
     def _parse_release_data(self, mb_release: Dict[str, Any]) -> Dict[str, Any]:
         """

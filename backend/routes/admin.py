@@ -124,6 +124,7 @@ def update_orphan_status(orphan_id):
     data = request.get_json()
     new_status = data.get('status')
     notes = data.get('notes', '')
+    include_spotify = data.get('include_spotify')  # True/False/None
 
     if new_status not in ['pending', 'approved', 'rejected']:
         return jsonify({'error': 'Invalid status'}), 400
@@ -131,15 +132,31 @@ def update_orphan_status(orphan_id):
     try:
         with get_db_connection() as db:
             with db.cursor() as cur:
-                cur.execute("""
-                    UPDATE orphan_recordings
-                    SET status = %s,
-                        review_notes = %s,
-                        reviewed_at = CURRENT_TIMESTAMP,
-                        updated_at = CURRENT_TIMESTAMP
-                    WHERE id = %s
-                    RETURNING id, status
-                """, (new_status, notes, orphan_id))
+                # If approving and explicitly NOT including Spotify, clear the Spotify fields
+                # so the import logic won't use them
+                if new_status == 'approved' and include_spotify is False:
+                    cur.execute("""
+                        UPDATE orphan_recordings
+                        SET status = %s,
+                            review_notes = %s,
+                            reviewed_at = CURRENT_TIMESTAMP,
+                            updated_at = CURRENT_TIMESTAMP,
+                            spotify_track_id = NULL,
+                            spotify_external_url = NULL,
+                            spotify_matched_mb_release_id = NULL
+                        WHERE id = %s
+                        RETURNING id, status
+                    """, (new_status, notes or 'Approved without Spotify link', orphan_id))
+                else:
+                    cur.execute("""
+                        UPDATE orphan_recordings
+                        SET status = %s,
+                            review_notes = %s,
+                            reviewed_at = CURRENT_TIMESTAMP,
+                            updated_at = CURRENT_TIMESTAMP
+                        WHERE id = %s
+                        RETURNING id, status
+                    """, (new_status, notes, orphan_id))
                 result = cur.fetchone()
                 db.commit()
 
@@ -369,20 +386,29 @@ def _import_single_orphan(db, song, orphan):
                 ON CONFLICT DO NOTHING
             """, (recording_id, performer_id, role))
 
-    # Link to release and add Spotify data if we have a matched release
+    # Link to release - always create a release from MB data, with Spotify if available
     matched_release_id = orphan.get('spotify_matched_mb_release_id')
     spotify_track_id = orphan.get('spotify_track_id')
 
-    if matched_release_id and spotify_track_id:
+    # Determine which MB release to use:
+    # 1. If we have a Spotify-matched release, use that
+    # 2. Otherwise, use the first release from mb_releases
+    mb_release_id = matched_release_id
+    if not mb_release_id and orphan.get('mb_releases'):
+        mb_releases = orphan['mb_releases']
+        if mb_releases and len(mb_releases) > 0:
+            mb_release_id = mb_releases[0].get('id')
+
+    if mb_release_id:
         # Find or create the release using full MBReleaseImporter flow
         # This ensures:
         # - Full release metadata from MusicBrainz API
         # - Cover Art Archive images imported
         # - Same code path as regular song research
-        release_id, is_new = _find_or_create_release_with_caa(db, matched_release_id, orphan)
+        release_id, is_new = _find_or_create_release_with_caa(db, mb_release_id, orphan)
 
         if release_id:
-            # Create recording_releases entry with Spotify data
+            # Create recording_releases entry (with Spotify data if available)
             cur.execute("""
                 INSERT INTO recording_releases (
                     recording_id, release_id, track_title, track_artist_credit,
@@ -390,18 +416,31 @@ def _import_single_orphan(db, song, orphan):
                 )
                 VALUES (%s, %s, %s, %s, %s, %s)
                 ON CONFLICT (recording_id, release_id) DO UPDATE
-                SET spotify_track_id = EXCLUDED.spotify_track_id,
-                    spotify_track_url = EXCLUDED.spotify_track_url
+                SET spotify_track_id = COALESCE(EXCLUDED.spotify_track_id, recording_releases.spotify_track_id),
+                    spotify_track_url = COALESCE(EXCLUDED.spotify_track_url, recording_releases.spotify_track_url)
             """, (
                 recording_id,
                 release_id,
                 orphan.get('mb_recording_title'),
                 orphan.get('mb_artist_credit'),
-                spotify_track_id,
-                orphan.get('spotify_external_url')
+                spotify_track_id if spotify_track_id else None,
+                orphan.get('spotify_external_url') if spotify_track_id else None
             ))
-            logger.info(f"Linked recording to release with Spotify: {spotify_track_id}"
-                       f"{' (new release with CAA)' if is_new else ''}")
+            if spotify_track_id:
+                logger.info(f"Linked recording to release with Spotify: {spotify_track_id}"
+                           f"{' (new release with CAA)' if is_new else ''}")
+            else:
+                logger.info(f"Linked recording to release (no Spotify): {mb_release_id}"
+                           f"{' (new release with CAA)' if is_new else ''}")
+
+            # Set default_release_id if recording doesn't have one
+            cur.execute("""
+                UPDATE recordings
+                SET default_release_id = %s,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = %s
+                  AND default_release_id IS NULL
+            """, (release_id, recording_id))
 
     # Update orphan status to imported
     cur.execute("""
@@ -721,6 +760,24 @@ def link_orphan_to_existing_recording(orphan_id):
                     orphan.get('spotify_external_url')
                 ))
                 rr_result = cur.fetchone()
+
+                # Set default_release_id if recording doesn't have one, or if this release
+                # has Spotify data and the current default doesn't
+                has_spotify = bool(orphan.get('spotify_track_id'))
+                cur.execute("""
+                    UPDATE recordings
+                    SET default_release_id = %s,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE id = %s
+                      AND (
+                          default_release_id IS NULL
+                          OR (%s AND NOT EXISTS (
+                              SELECT 1 FROM releases rel
+                              WHERE rel.id = default_release_id
+                                AND rel.spotify_album_id IS NOT NULL
+                          ))
+                      )
+                """, (release_id, recording_id, has_spotify))
 
                 # Update orphan status to 'linked' (a new status) or 'imported'
                 cur.execute("""
