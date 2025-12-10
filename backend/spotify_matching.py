@@ -57,26 +57,61 @@ def is_compilation_artist(artist_name: str) -> bool:
 def strip_ensemble_suffix(artist_name: str) -> str:
     """
     Strip common ensemble suffixes from artist names.
-    
+
     Examples:
         "Lynne Arriale Trio" -> "Lynne Arriale"
         "Bill Evans Trio" -> "Bill Evans"
         "Duke Ellington Orchestra" -> "Duke Ellington"
         "Miles Davis" -> "Miles Davis" (unchanged)
-    
+
     Returns:
         Artist name with suffix stripped, or original if no suffix found
     """
     if not artist_name:
         return artist_name
-    
+
     for suffix in ENSEMBLE_SUFFIXES:
         # Check for suffix at end of string (case-insensitive)
         pattern = rf'\s+{re.escape(suffix)}$'
         if re.search(pattern, artist_name, re.IGNORECASE):
             return re.sub(pattern, '', artist_name, flags=re.IGNORECASE).strip()
-    
+
     return artist_name
+
+
+# Common album title suffixes that may differ between MusicBrainz and Spotify
+# These are stripped for search queries to improve matching
+ALBUM_LIVE_SUFFIXES = [
+    r'\s*:\s*live$',      # "Solo: Live" -> "Solo"
+    r'\s*-\s*live$',      # "Album - Live" -> "Album"
+    r'\s*\(live\)$',      # "Album (Live)" -> "Album"
+]
+
+
+def strip_live_suffix(album_title: str) -> str:
+    """
+    Strip common live recording suffixes from album titles for search queries.
+
+    MusicBrainz often includes ": Live" or "- Live" in album titles, but Spotify
+    may have the album without this suffix.
+
+    Examples:
+        "Solo: Live" -> "Solo"
+        "At The Philharmonic - Live" -> "At The Philharmonic"
+        "Concert (Live)" -> "Concert"
+        "Night Train" -> "Night Train" (unchanged)
+
+    Returns:
+        Album title with live suffix stripped, or original if no suffix found
+    """
+    if not album_title:
+        return album_title
+
+    for pattern in ALBUM_LIVE_SUFFIXES:
+        if re.search(pattern, album_title, re.IGNORECASE):
+            return re.sub(pattern, '', album_title, flags=re.IGNORECASE).strip()
+
+    return album_title
 
 
 def normalize_for_comparison(text: str) -> str:
@@ -94,6 +129,7 @@ def normalize_for_comparison(text: str) -> str:
     text = re.sub(r'\s*\(live\s+(at|in|from)\s+[^)]*\).*$', '', text, flags=re.IGNORECASE)
     text = re.sub(r'\s*-\s*live$', '', text, flags=re.IGNORECASE)  # Simple "- Live" suffix
     text = re.sub(r'\s*\(live\)$', '', text, flags=re.IGNORECASE)  # Simple "(Live)" suffix
+    text = re.sub(r'\s*:\s*live$', '', text, flags=re.IGNORECASE)  # Simple ": Live" suffix (e.g., "Solo: Live")
     
     # Remove recorded at annotations
     text = re.sub(r'\s*-\s*recorded\s+(at|in)\s+.*$', '', text, flags=re.IGNORECASE)

@@ -31,6 +31,7 @@ from db_utils import get_db_connection
 from spotify_client import SpotifyClient, SpotifyRateLimitError, _CACHE_MISS
 from spotify_matching import (
     strip_ensemble_suffix,
+    strip_live_suffix,
     normalize_for_comparison,
     calculate_similarity,
     is_substring_title_match,
@@ -787,7 +788,11 @@ class SpotifyMatcher:
         
         # Progressive search strategy
         search_strategies = []
-        
+
+        # Check if album title has a live suffix we can strip (e.g., "Solo: Live" -> "Solo")
+        stripped_album = strip_live_suffix(album_title)
+        has_stripped_album = stripped_album != album_title
+
         if artist_name:
             search_strategies.append({
                 'query': f'album:"{album_title}" artist:"{artist_name}"',
@@ -797,7 +802,7 @@ class SpotifyMatcher:
                 'query': f'"{album_title}" "{artist_name}"',
                 'description': 'quoted album and artist'
             })
-            
+
             # Try with ensemble suffix stripped (e.g., "Bill Evans Trio" -> "Bill Evans")
             stripped_artist = strip_ensemble_suffix(artist_name)
             if stripped_artist != artist_name:
@@ -809,11 +814,29 @@ class SpotifyMatcher:
                     'query': f'"{album_title}" "{stripped_artist}"',
                     'description': f'quoted album with stripped artist ({stripped_artist})'
                 })
-        
+
+            # Try with live suffix stripped from album (e.g., "Solo: Live" -> "Solo")
+            if has_stripped_album:
+                search_strategies.append({
+                    'query': f'album:"{stripped_album}" artist:"{artist_name}"',
+                    'description': f'stripped album ({stripped_album}) and artist'
+                })
+                search_strategies.append({
+                    'query': f'"{stripped_album}" "{artist_name}"',
+                    'description': f'quoted stripped album ({stripped_album}) and artist'
+                })
+
         search_strategies.append({
             'query': f'album:"{album_title}"',
             'description': 'exact album only'
         })
+
+        # Fallback: stripped album only
+        if has_stripped_album:
+            search_strategies.append({
+                'query': f'album:"{stripped_album}"',
+                'description': f'stripped album only ({stripped_album})'
+            })
         
         for strategy in search_strategies:
             try:
