@@ -605,8 +605,8 @@ def get_existing_recordings_for_song(song_id):
                             'spotify_track_url', rr.spotify_track_url,
                             'album_art_small', COALESCE(
                                 (SELECT ri.image_url_small FROM release_imagery ri
-                                 WHERE ri.release_id = rel.id AND ri.type = 'front' LIMIT 1),
-                                rel.album_art_small
+                                 WHERE ri.release_id = rel.id AND ri.type = 'Front' LIMIT 1),
+                                rel.cover_art_small
                             )
                         ) ORDER BY rel.release_year)
                         FROM recording_releases rr
