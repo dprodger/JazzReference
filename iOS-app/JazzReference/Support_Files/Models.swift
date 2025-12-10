@@ -24,8 +24,11 @@ struct Song: Identifiable, Codable {
     let updatedAt: String?
 
     // Recordings data (included in detail view)
-    let recordings: [Recording]?
+    var recordings: [Recording]?
     let recordingCount: Int?
+
+    // Featured recordings (only authoritative ones, from summary endpoint)
+    let featuredRecordings: [Recording]?
 
     // NEW: Transcriptions data (now included in song response)
     let transcriptions: [SoloTranscription]?
@@ -43,8 +46,9 @@ struct Song: Identifiable, Codable {
         case updatedAt = "updated_at"
         case recordings
         case recordingCount = "recording_count"
-        case transcriptions  // NEW
-        case transcriptionCount = "transcription_count"  // NEW
+        case featuredRecordings = "featured_recordings"
+        case transcriptions
+        case transcriptionCount = "transcription_count"
         case authorityRecommendationCount = "authority_recommendation_count"
     }
 
@@ -58,6 +62,19 @@ struct Song: Identifiable, Codable {
         guard let refs = externalReferences else { return [] }
         return refs.map { ExternalReference(source: $0.key, url: $0.value) }
             .sorted { $0.displayName < $1.displayName }
+    }
+}
+
+// MARK: - Song Recordings Response (from /api/songs/{id}/recordings)
+struct SongRecordingsResponse: Codable {
+    let songId: String
+    let recordings: [Recording]
+    let recordingCount: Int
+
+    enum CodingKeys: String, CodingKey {
+        case songId = "song_id"
+        case recordings
+        case recordingCount = "recording_count"
     }
 }
 

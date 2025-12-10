@@ -509,10 +509,10 @@ class NetworkManager: ObservableObject {
             print("Invalid URL for song detail with sort parameter")
             return nil
         }
-        
+
         do {
             let (data, response) = try await URLSession.shared.data(from: url)
-            
+
             // Check for HTTP errors
             if let httpResponse = response as? HTTPURLResponse {
                 guard (200...299).contains(httpResponse.statusCode) else {
@@ -520,7 +520,7 @@ class NetworkManager: ObservableObject {
                     return nil
                 }
             }
-            
+
             let decoder = JSONDecoder()
             let song = try decoder.decode(Song.self, from: data)
             return song
@@ -532,11 +532,84 @@ class NetworkManager: ObservableObject {
             return nil
         }
     }
-    
+
     /// Fetch song detail without sort parameter (uses backend default)
     func fetchSongDetail(id: String) async -> Song? {
         // Default to authority sort
         return await fetchSongDetail(id: id, sortBy: .year)
+    }
+
+    // MARK: - Two-Phase Song Loading (for performance)
+
+    /// Fetch song summary - fast endpoint for initial page load
+    /// Returns song metadata, transcriptions, and only featured (authoritative) recordings
+    func fetchSongSummary(id: String) async -> Song? {
+        let startTime = Date()
+        guard let url = URL(string: "\(Self.baseURL)/songs/\(id)/summary") else {
+            print("Invalid URL for song summary")
+            return nil
+        }
+
+        do {
+            let (data, response) = try await URLSession.shared.data(from: url)
+
+            if let httpResponse = response as? HTTPURLResponse {
+                guard (200...299).contains(httpResponse.statusCode) else {
+                    print("HTTP error fetching song summary: \(httpResponse.statusCode)")
+                    return nil
+                }
+            }
+
+            let decoder = JSONDecoder()
+            let song = try decoder.decode(Song.self, from: data)
+            NetworkManager.logRequest("GET /songs/\(id)/summary", startTime: startTime)
+
+            if NetworkManager.diagnosticsEnabled {
+                print("   ↳ Summary: \(song.featuredRecordings?.count ?? 0) featured recordings, \(song.recordingCount ?? 0) total")
+            }
+            return song
+        } catch {
+            print("Error fetching song summary: \(error)")
+            if let decodingError = error as? DecodingError {
+                print("Decoding error details: \(decodingError)")
+            }
+            return nil
+        }
+    }
+
+    /// Fetch all recordings for a song - heavier endpoint, call after summary loads
+    func fetchSongRecordings(id: String, sortBy: RecordingSortOrder = .year) async -> [Recording]? {
+        let startTime = Date()
+        guard let url = URL(string: "\(Self.baseURL)/songs/\(id)/recordings?sort=\(sortBy.rawValue)") else {
+            print("Invalid URL for song recordings")
+            return nil
+        }
+
+        do {
+            let (data, response) = try await URLSession.shared.data(from: url)
+
+            if let httpResponse = response as? HTTPURLResponse {
+                guard (200...299).contains(httpResponse.statusCode) else {
+                    print("HTTP error fetching song recordings: \(httpResponse.statusCode)")
+                    return nil
+                }
+            }
+
+            let decoder = JSONDecoder()
+            let recordingsResponse = try decoder.decode(SongRecordingsResponse.self, from: data)
+            NetworkManager.logRequest("GET /songs/\(id)/recordings", startTime: startTime)
+
+            if NetworkManager.diagnosticsEnabled {
+                print("   ↳ Loaded \(recordingsResponse.recordingCount) recordings")
+            }
+            return recordingsResponse.recordings
+        } catch {
+            print("Error fetching song recordings: \(error)")
+            if let decodingError = error as? DecodingError {
+                print("Decoding error details: \(decodingError)")
+            }
+            return nil
+        }
     }
 
     // USAGE IN SongDetailView:

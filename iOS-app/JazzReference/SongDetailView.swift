@@ -43,6 +43,9 @@ struct SongDetailView: View {
     @State private var recordingSortOrder: RecordingSortOrder = .year
     @State private var isRecordingsReloading: Bool = false
 
+    // Two-phase loading: summary loads first (fast), then recordings load in background
+    @State private var isRecordingsLoading: Bool = true
+
     // NEW: Summary Information section expansion state (starts collapsed)
     @State private var isSummaryInfoExpanded = false
 
@@ -87,14 +90,27 @@ struct SongDetailView: View {
     
     private func loadCurrentSong() {
         isLoading = true
+        isRecordingsLoading = true
         Task {
             let networkManager = NetworkManager()
-            // FIXED: Pass sort order to maintain user's preference when swiping between songs
-            let fetchedSong = await networkManager.fetchSongDetail(id: currentSongId, sortBy: recordingSortOrder)
+            // Phase 1: Load summary (fast) - includes song metadata, transcriptions, featured recordings
+            let fetchedSong = await networkManager.fetchSongSummary(id: currentSongId)
             await MainActor.run {
                 song = fetchedSong
                 transcriptions = fetchedSong?.transcriptions ?? []
                 isLoading = false
+            }
+
+            // Phase 2: Load all recordings in background
+            if let recordings = await networkManager.fetchSongRecordings(id: currentSongId, sortBy: recordingSortOrder) {
+                await MainActor.run {
+                    self.song?.recordings = recordings
+                    isRecordingsLoading = false
+                }
+            } else {
+                await MainActor.run {
+                    isRecordingsLoading = false
+                }
             }
         }
     }
@@ -140,19 +156,10 @@ struct SongDetailView: View {
     }
     
     // MARK: - Check if song has authoritative recordings
-    
+    // Now uses featuredRecordings from summary endpoint (already filtered server-side)
     private func hasAuthoritativeRecordings(for song: Song) -> Bool {
-        guard let recordings = song.recordings else { return false }
-        return recordings.contains { hasAuthoritativeReference($0) }
-    }
-    
-    // MARK: - Check if recording has authoritative reference
-    // A recording has an authoritative reference if it has any entries
-    // in the song_authority_recommendations table (returned as authority_count)
-    private func hasAuthoritativeReference(_ recording: Recording) -> Bool {
-        // Use the Recording model's built-in hasAuthority computed property
-        // which checks if authorityCount > 0
-        return recording.hasAuthority
+        guard let featured = song.featuredRecordings else { return false }
+        return !featured.isEmpty
     }
     
     // MARK: - Song Content View
@@ -214,12 +221,12 @@ struct SongDetailView: View {
                 RecordingsSection(
                     recordings: song.recordings ?? [],
                     recordingSortOrder: $recordingSortOrder,
-                    isReloading: isRecordingsReloading,
+                    isReloading: isRecordingsReloading || isRecordingsLoading,
                     onSortOrderChanged: { [self] newOrder in
                         Task {
                             isRecordingsReloading = true
-                            if let updatedSong = await NetworkManager().fetchSongDetail(id: currentSongId, sortBy: newOrder) {
-                                self.song = updatedSong
+                            if let recordings = await NetworkManager().fetchSongRecordings(id: currentSongId, sortBy: newOrder) {
+                                self.song?.recordings = recordings
                             }
                             isRecordingsReloading = false
                         }
@@ -308,7 +315,7 @@ struct SongDetailView: View {
     }
     
     // MARK: - Authoritative Recordings Carousel Section
-    
+    // Uses featuredRecordings from summary endpoint (already filtered server-side)
     @ViewBuilder
     private func authoritativeRecordingsSection(for song: Song) -> some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -317,16 +324,16 @@ struct SongDetailView: View {
                 .font(JazzTheme.title2())
                 .bold()
                 .foregroundColor(JazzTheme.charcoal)
-            
+
             // Introductory text
             Text("Take a look at these important recordings for this song.")
                 .font(JazzTheme.subheadline())
                 .foregroundColor(JazzTheme.smokeGray)
-            
-            // Horizontal scrolling carousel
+
+            // Horizontal scrolling carousel - use featuredRecordings from summary
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(alignment: .top, spacing: 20) {
-                    ForEach(song.recordings?.filter { hasAuthoritativeReference($0) } ?? []) { recording in
+                    ForEach(song.featuredRecordings ?? []) { recording in
                         NavigationLink(destination: RecordingDetailView(recordingId: recording.id)) {
                             AuthoritativeRecordingCard(recording: recording)
                         }
@@ -536,17 +543,31 @@ struct SongDetailView: View {
             song = networkManager.fetchSongDetailSync(id: currentSongId)
             transcriptions = song?.transcriptions ?? []
             isLoading = false
+            isRecordingsLoading = false
             return
         }
         #endif
-        
+
         let networkManager = NetworkManager()
-        // FIXED: Pass sort order to maintain user's preference when returning to view
-        let fetchedSong = await networkManager.fetchSongDetail(id: currentSongId, sortBy: recordingSortOrder)
+
+        // Phase 1: Load summary (fast) - includes song metadata, transcriptions, featured recordings
+        let fetchedSong = await networkManager.fetchSongSummary(id: currentSongId)
         await MainActor.run {
             song = fetchedSong
             transcriptions = fetchedSong?.transcriptions ?? []
             isLoading = false
+        }
+
+        // Phase 2: Load all recordings in background
+        if let recordings = await networkManager.fetchSongRecordings(id: currentSongId, sortBy: recordingSortOrder) {
+            await MainActor.run {
+                self.song?.recordings = recordings
+                isRecordingsLoading = false
+            }
+        } else {
+            await MainActor.run {
+                isRecordingsLoading = false
+            }
         }
     }
     

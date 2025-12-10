@@ -28,10 +28,11 @@ extension Song {
         updatedAt: "2024-01-15T10:30:00Z",
         recordings: [Recording.preview1, Recording.preview2],
         recordingCount: 2,
+        featuredRecordings: [Recording.preview1],
         transcriptions: [SoloTranscription.preview1, SoloTranscription.preview2],
         transcriptionCount: 2
     )
-    
+
     static let previewNoRecordings = Song(
         id: "preview-song-2",
         title: "Blue in Green",
@@ -45,6 +46,7 @@ extension Song {
         updatedAt: "2024-01-15T10:30:00Z",
         recordings: [],
         recordingCount: 0,
+        featuredRecordings: nil,
         transcriptions: [],
         transcriptionCount: 0
     )
