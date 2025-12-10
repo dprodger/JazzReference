@@ -62,27 +62,33 @@
         .orphan-card.status-approved { border-color: #27ae60; }
         .orphan-card.status-rejected { border-color: #e74c3c; opacity: 0.6; }
         .orphan-card.status-imported { border-color: #9b59b6; opacity: 0.7; }
+        .orphan-card.status-linked { border-color: #3498db; opacity: 0.7; }
 
-        /* Collapsible cards (imported and rejected) */
+        /* Collapsible cards (imported, rejected, and linked) */
         .orphan-card.status-imported .card-details,
-        .orphan-card.status-rejected .card-details {
+        .orphan-card.status-rejected .card-details,
+        .orphan-card.status-linked .card-details {
             margin: 0;
         }
         .orphan-card.status-imported .card-details summary,
-        .orphan-card.status-rejected .card-details summary {
+        .orphan-card.status-rejected .card-details summary,
+        .orphan-card.status-linked .card-details summary {
             list-style: none;
             cursor: pointer;
         }
         .orphan-card.status-imported .card-details summary::-webkit-details-marker,
-        .orphan-card.status-rejected .card-details summary::-webkit-details-marker {
+        .orphan-card.status-rejected .card-details summary::-webkit-details-marker,
+        .orphan-card.status-linked .card-details summary::-webkit-details-marker {
             display: none;
         }
         .orphan-card.status-imported .card-header,
-        .orphan-card.status-rejected .card-header {
+        .orphan-card.status-rejected .card-header,
+        .orphan-card.status-linked .card-header {
             cursor: pointer;
         }
         .orphan-card.status-imported .card-header:hover,
-        .orphan-card.status-rejected .card-header:hover {
+        .orphan-card.status-rejected .card-header:hover,
+        .orphan-card.status-linked .card-header:hover {
             background: #f0f0f0;
         }
         .orphan-card.status-imported .collapse-indicator {
@@ -95,12 +101,19 @@
             font-size: 14px;
             transition: transform 0.2s;
         }
+        .orphan-card.status-linked .collapse-indicator {
+            color: #3498db;
+            font-size: 14px;
+            transition: transform 0.2s;
+        }
         .orphan-card.status-imported .card-details[open] .collapse-indicator,
-        .orphan-card.status-rejected .card-details[open] .collapse-indicator {
+        .orphan-card.status-rejected .card-details[open] .collapse-indicator,
+        .orphan-card.status-linked .card-details[open] .collapse-indicator {
             transform: rotate(90deg);
         }
         .orphan-card.status-imported .card-details:not([open]) .card-header,
-        .orphan-card.status-rejected .card-details:not([open]) .card-header {
+        .orphan-card.status-rejected .card-details:not([open]) .card-header,
+        .orphan-card.status-linked .card-details:not([open]) .card-header {
             border-bottom: none;
         }
 
@@ -480,6 +493,10 @@
             background: #27ae60;
             color: #fff;
         }
+        .btn-link-existing {
+            background: #3498db;
+            color: #fff;
+        }
         .btn-reject {
             background: #e74c3c;
             color: #fff;
@@ -673,6 +690,130 @@
         }
         .btn-scroll-top:hover {
             background: #0055aa;
+        }
+
+        /* Link to Existing Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-overlay.active {
+            display: flex;
+        }
+        .modal-content {
+            background: #fff;
+            border-radius: 12px;
+            max-width: 700px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        }
+        .modal-header {
+            padding: 20px;
+            border-bottom: 1px solid #e0e0e0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .modal-header h2 {
+            margin: 0;
+            font-size: 18px;
+        }
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #666;
+        }
+        .modal-body {
+            padding: 20px;
+        }
+        .recording-option {
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: border-color 0.2s, background 0.2s;
+        }
+        .recording-option:hover {
+            border-color: #3498db;
+            background: #f8f9fa;
+        }
+        .recording-option.selected {
+            border-color: #3498db;
+            background: #e8f4fc;
+        }
+        .recording-option-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        .recording-option-leader {
+            font-weight: 600;
+            font-size: 15px;
+        }
+        .recording-option-year {
+            color: #666;
+            font-size: 13px;
+        }
+        .recording-option-releases {
+            font-size: 13px;
+            color: #555;
+        }
+        .recording-option-release {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 5px;
+            padding: 5px;
+            background: #f5f5f5;
+            border-radius: 4px;
+        }
+        .recording-option-release img {
+            width: 30px;
+            height: 30px;
+            border-radius: 3px;
+            object-fit: cover;
+        }
+        .spotify-badge {
+            background: #1db954;
+            color: #fff;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 10px;
+            font-weight: 600;
+        }
+        .modal-footer {
+            padding: 15px 20px;
+            border-top: 1px solid #e0e0e0;
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+        .modal-footer .btn {
+            padding: 10px 20px;
+        }
+        .modal-loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+        .no-recordings-message {
+            text-align: center;
+            padding: 30px;
+            color: #666;
         }
     </style>
 </head>
@@ -961,6 +1102,8 @@
                                 Rejected
                             {% elif orphan.status == 'imported' %}
                                 Imported
+                            {% elif orphan.status == 'linked' %}
+                                Linked
                             {% else %}
                                 Pending Review
                             {% endif %}
@@ -968,6 +1111,10 @@
                         <button class="btn btn-approve" onclick="updateStatus('{{ orphan.id }}', 'approved')"
                                 {% if orphan.status == 'approved' %}disabled{% endif %}>
                             Approve
+                        </button>
+                        <button class="btn btn-link-existing" onclick="showLinkModal('{{ orphan.id }}')"
+                                {% if orphan.status == 'linked' or orphan.status == 'imported' %}disabled{% endif %}>
+                            Link to Existing
                         </button>
                         <button class="btn btn-reject" onclick="updateStatus('{{ orphan.id }}', 'rejected')"
                                 {% if orphan.status == 'rejected' %}disabled{% endif %}>
@@ -980,7 +1127,7 @@
                         {% endif %}
                     </div>
                 </div>
-                {% if orphan.status == 'imported' or orphan.status == 'rejected' %}
+                {% if orphan.status == 'imported' or orphan.status == 'rejected' or orphan.status == 'linked' %}
                 </details>
                 {% endif %}
             </div>
@@ -1107,6 +1254,148 @@
                 btn.disabled = false;
             }
         }
+
+        // Link to Existing Recording Modal
+        let currentOrphanId = null;
+        let selectedRecordingId = null;
+        let existingRecordings = [];
+
+        async function showLinkModal(orphanId) {
+            currentOrphanId = orphanId;
+            selectedRecordingId = null;
+
+            const modal = document.getElementById('linkModal');
+            const modalBody = document.getElementById('linkModalBody');
+
+            modal.classList.add('active');
+            modalBody.innerHTML = '<div class="modal-loading">Loading existing recordings...</div>';
+
+            try {
+                const response = await fetch(`/admin/orphans/{{ song.id }}/existing-recordings`);
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to load recordings');
+                }
+
+                existingRecordings = data.recordings || [];
+
+                if (existingRecordings.length === 0) {
+                    modalBody.innerHTML = '<div class="no-recordings-message">No existing recordings found for this song. Use "Approve" to create a new recording.</div>';
+                    return;
+                }
+
+                renderRecordingOptions();
+            } catch (error) {
+                modalBody.innerHTML = `<div class="no-recordings-message">Error: ${error.message}</div>`;
+            }
+        }
+
+        function renderRecordingOptions() {
+            const modalBody = document.getElementById('linkModalBody');
+
+            let html = '<p style="margin-bottom: 15px; color: #666;">Select the existing recording that matches this orphan:</p>';
+
+            for (const rec of existingRecordings) {
+                const isSelected = selectedRecordingId === rec.id;
+                html += `
+                    <div class="recording-option ${isSelected ? 'selected' : ''}"
+                         onclick="selectRecording('${rec.id}')">
+                        <div class="recording-option-header">
+                            <span class="recording-option-leader">${rec.leader_name || 'Unknown Artist'}</span>
+                            <span class="recording-option-year">${rec.recording_year || rec.mb_first_release_date || '?'}</span>
+                        </div>
+                        <div class="recording-option-releases">
+                            ${rec.releases && rec.releases.length > 0 ? rec.releases.map(rel => `
+                                <div class="recording-option-release">
+                                    ${rel.album_art_small ? `<img src="${rel.album_art_small}" alt="">` : ''}
+                                    <span>${rel.title} (${rel.year || '?'})</span>
+                                    ${rel.spotify_album_url || rel.spotify_track_url ? '<span class="spotify-badge">Spotify</span>' : ''}
+                                </div>
+                            `).join('') : '<em>No releases linked</em>'}
+                        </div>
+                    </div>
+                `;
+            }
+
+            modalBody.innerHTML = html;
+            updateLinkButton();
+        }
+
+        function selectRecording(recordingId) {
+            selectedRecordingId = recordingId;
+            renderRecordingOptions();
+        }
+
+        function updateLinkButton() {
+            const btn = document.getElementById('linkConfirmBtn');
+            btn.disabled = !selectedRecordingId;
+        }
+
+        function closeLinkModal() {
+            const modal = document.getElementById('linkModal');
+            modal.classList.remove('active');
+            currentOrphanId = null;
+            selectedRecordingId = null;
+        }
+
+        async function confirmLink() {
+            if (!currentOrphanId || !selectedRecordingId) return;
+
+            const btn = document.getElementById('linkConfirmBtn');
+            const originalText = btn.textContent;
+            btn.textContent = 'Linking...';
+            btn.disabled = true;
+
+            try {
+                const response = await fetch(`/admin/orphans/${currentOrphanId}/link-to-recording`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ recording_id: selectedRecordingId })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to link recording');
+                }
+
+                alert('Successfully linked orphan to existing recording!');
+                closeLinkModal();
+                location.reload();
+            } catch (error) {
+                alert('Error: ' + error.message);
+                btn.textContent = originalText;
+                btn.disabled = false;
+            }
+        }
+
+        // Close modal when clicking outside
+        document.addEventListener('click', (e) => {
+            const modal = document.getElementById('linkModal');
+            if (e.target === modal) {
+                closeLinkModal();
+            }
+        });
     </script>
+
+    <!-- Link to Existing Recording Modal -->
+    <div id="linkModal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Link to Existing Recording</h2>
+                <button class="modal-close" onclick="closeLinkModal()">&times;</button>
+            </div>
+            <div class="modal-body" id="linkModalBody">
+                <!-- Content loaded dynamically -->
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-reset" onclick="closeLinkModal()">Cancel</button>
+                <button class="btn btn-link-existing" id="linkConfirmBtn" onclick="confirmLink()" disabled>
+                    Link to Selected
+                </button>
+            </div>
+        </div>
+    </div>
 </body>
 </html>

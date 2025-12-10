@@ -563,3 +563,188 @@ def _create_minimal_release(conn, mb_release_id: str, orphan: dict):
             return result['id']
 
     return None
+
+
+@admin_bp.route('/orphans/<song_id>/existing-recordings')
+def get_existing_recordings_for_song(song_id):
+    """
+    Get existing recordings for a song that an orphan could be linked to.
+
+    Returns recordings with their releases and Spotify info to help identify
+    if an orphan is the same performance as an existing recording.
+    """
+    with get_db_connection() as db:
+        with db.cursor() as cur:
+            # Get song info
+            cur.execute("""
+                SELECT id, title, musicbrainz_id FROM songs WHERE id = %s
+            """, (song_id,))
+            song = cur.fetchone()
+
+            if not song:
+                return jsonify({'error': 'Song not found'}), 404
+
+            # Get existing recordings with their releases and Spotify data
+            cur.execute("""
+                SELECT
+                    rec.id,
+                    rec.musicbrainz_id as mb_recording_id,
+                    rec.album_title,
+                    rec.recording_year,
+                    rec.mb_first_release_date,
+                    p.name as leader_name,
+                    p.id as leader_id,
+                    -- Get releases for this recording
+                    (
+                        SELECT json_agg(json_build_object(
+                            'release_id', rel.id,
+                            'title', rel.title,
+                            'year', rel.release_year,
+                            'mb_release_id', rel.musicbrainz_release_id,
+                            'spotify_album_url', rel.spotify_album_url,
+                            'spotify_track_url', rr.spotify_track_url,
+                            'album_art_small', COALESCE(
+                                (SELECT ri.thumbnail_url FROM release_imagery ri
+                                 WHERE ri.release_id = rel.id AND ri.is_front = true LIMIT 1),
+                                rel.album_art_small
+                            )
+                        ) ORDER BY rel.release_year)
+                        FROM recording_releases rr
+                        JOIN releases rel ON rr.release_id = rel.id
+                        WHERE rr.recording_id = rec.id
+                    ) as releases
+                FROM recordings rec
+                LEFT JOIN recording_performers rp ON rec.id = rp.recording_id AND rp.role = 'leader'
+                LEFT JOIN performers p ON rp.performer_id = p.id
+                WHERE rec.song_id = %s
+                ORDER BY rec.recording_year, p.name
+            """, (song_id,))
+
+            recordings = []
+            for row in cur.fetchall():
+                rec = dict(row)
+                # Parse releases JSON
+                rec['releases'] = rec['releases'] or []
+                # Add a flag for whether any release has Spotify
+                rec['has_spotify'] = any(
+                    r.get('spotify_album_url') or r.get('spotify_track_url')
+                    for r in rec['releases']
+                )
+                recordings.append(rec)
+
+            return jsonify({
+                'song': dict(song),
+                'recordings': recordings
+            })
+
+
+@admin_bp.route('/orphans/<orphan_id>/link-to-recording', methods=['POST'])
+def link_orphan_to_existing_recording(orphan_id):
+    """
+    Link an orphan recording to an existing recording instead of creating a new one.
+
+    This is used when the orphan is the same performance as an existing recording,
+    just appearing on a different release (compilation, reissue, etc.).
+
+    The orphan's MB release will be added as a new recording_releases entry
+    for the existing recording.
+    """
+    data = request.get_json() or {}
+    recording_id = data.get('recording_id')
+
+    if not recording_id:
+        return jsonify({'error': 'recording_id is required'}), 400
+
+    try:
+        with get_db_connection() as db:
+            with db.cursor() as cur:
+                # Get the orphan
+                cur.execute("""
+                    SELECT id, song_id, mb_recording_id, mb_recording_title, mb_artist_credit,
+                           mb_releases, spotify_track_id, spotify_external_url,
+                           spotify_matched_mb_release_id, status
+                    FROM orphan_recordings
+                    WHERE id = %s
+                """, (orphan_id,))
+                orphan = cur.fetchone()
+
+                if not orphan:
+                    return jsonify({'error': 'Orphan not found'}), 404
+
+                orphan = dict(orphan)
+
+                # Verify the recording exists and belongs to the same song
+                cur.execute("""
+                    SELECT id, song_id, musicbrainz_id FROM recordings WHERE id = %s
+                """, (recording_id,))
+                recording = cur.fetchone()
+
+                if not recording:
+                    return jsonify({'error': 'Recording not found'}), 404
+
+                if str(recording['song_id']) != str(orphan['song_id']):
+                    return jsonify({'error': 'Recording belongs to a different song'}), 400
+
+                # Get the MB release to link (prefer Spotify-matched release, fall back to first release)
+                mb_release_id = orphan.get('spotify_matched_mb_release_id')
+                if not mb_release_id and orphan.get('mb_releases'):
+                    mb_releases = orphan['mb_releases']
+                    if mb_releases and len(mb_releases) > 0:
+                        mb_release_id = mb_releases[0].get('id')
+
+                if not mb_release_id:
+                    return jsonify({'error': 'No MB release found for orphan'}), 400
+
+                # Find or create the release
+                release_id, is_new = _find_or_create_release_with_caa(db, mb_release_id, orphan)
+
+                if not release_id:
+                    return jsonify({'error': 'Could not find or create release'}), 500
+
+                # Create recording_releases entry linking existing recording to this release
+                cur.execute("""
+                    INSERT INTO recording_releases (
+                        recording_id, release_id, track_title, track_artist_credit,
+                        spotify_track_id, spotify_track_url
+                    )
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (recording_id, release_id) DO UPDATE
+                    SET spotify_track_id = COALESCE(EXCLUDED.spotify_track_id, recording_releases.spotify_track_id),
+                        spotify_track_url = COALESCE(EXCLUDED.spotify_track_url, recording_releases.spotify_track_url)
+                    RETURNING id
+                """, (
+                    recording_id,
+                    release_id,
+                    orphan.get('mb_recording_title'),
+                    orphan.get('mb_artist_credit'),
+                    orphan.get('spotify_track_id'),
+                    orphan.get('spotify_external_url')
+                ))
+                rr_result = cur.fetchone()
+
+                # Update orphan status to 'linked' (a new status) or 'imported'
+                cur.execute("""
+                    UPDATE orphan_recordings
+                    SET status = 'linked',
+                        imported_recording_id = %s,
+                        imported_at = CURRENT_TIMESTAMP,
+                        updated_at = CURRENT_TIMESTAMP,
+                        review_notes = COALESCE(review_notes, '') || ' Linked to existing recording.'
+                    WHERE id = %s
+                """, (recording_id, orphan_id))
+
+                db.commit()
+
+                logger.info(f"Linked orphan {orphan_id} to existing recording {recording_id} via release {release_id}")
+
+                return jsonify({
+                    'success': True,
+                    'recording_id': str(recording_id),
+                    'release_id': str(release_id),
+                    'release_is_new': is_new,
+                    'recording_release_id': str(rr_result['id']) if rr_result else None
+                })
+
+    except Exception as e:
+        logger.error(f"Error linking orphan to recording: {e}")
+        return jsonify({'error': str(e)}), 500
