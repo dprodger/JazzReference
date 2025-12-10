@@ -79,14 +79,15 @@ class OrphanManager:
         with get_db_connection() as db:
             with db.cursor() as cur:
                 query = """
-                    SELECT id, title, musicbrainz_id, composer
+                    SELECT id, title, musicbrainz_id, composer, alt_titles
                     FROM songs
                     WHERE musicbrainz_id IS NOT NULL
                 """
                 params = []
 
                 if name_filter:
-                    query += " AND LOWER(title) LIKE %s"
+                    query += " AND (LOWER(title) LIKE %s OR EXISTS (SELECT 1 FROM unnest(alt_titles) AS alt WHERE LOWER(alt) LIKE %s))"
+                    params.append(f'%{name_filter.lower()}%')
                     params.append(f'%{name_filter.lower()}%')
 
                 query += " ORDER BY title"
@@ -191,16 +192,30 @@ class OrphanManager:
         """Discover orphan recordings for a song"""
         song_title = song['title']
         work_id = song['musicbrainz_id']
+        alt_titles = song.get('alt_titles') or []
 
         logger.info(f"Discovering orphans for: {song_title}")
+        if alt_titles:
+            logger.info(f"  Alternative titles: {alt_titles}")
         logger.debug(f"  Work ID: {work_id}")
 
-        recordings = self.search_mb_recordings(song_title)
+        # Search for primary title and all alternative titles
+        all_titles = [song_title] + alt_titles
+        all_recordings = {}  # Use dict to dedupe by recording ID
+
+        for title in all_titles:
+            recordings = self.search_mb_recordings(title)
+            for rec in recordings:
+                if rec['id'] not in all_recordings:
+                    all_recordings[rec['id']] = rec
+
+        recordings = list(all_recordings.values())
+
         if not recordings:
-            logger.info(f"  No recordings found with matching title")
+            logger.info(f"  No recordings found with matching title(s)")
             return []
 
-        logger.info(f"  Found {len(recordings)} recordings with matching title")
+        logger.info(f"  Found {len(recordings)} unique recordings across {len(all_titles)} title(s)")
 
         orphans = []
         for rec in recordings:
