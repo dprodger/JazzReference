@@ -12,6 +12,7 @@ struct ArtistsListView: View {
     @StateObject private var networkManager = NetworkManager()
     @State private var searchText = ""
     @State private var searchTask: Task<Void, Never>?
+    @State private var hasPerformedInitialLoad = false
     
     // Computed property to group artists by first letter
     private var groupedArtists: [(String, [Performer])] {
@@ -75,7 +76,11 @@ struct ArtistsListView: View {
                     }
                 }
                 .task {
-                    await networkManager.fetchPerformers(searchQuery: searchText)
+                    // Only load on initial appear, not when returning from detail view
+                    if !hasPerformedInitialLoad {
+                        await networkManager.fetchPerformers(searchQuery: searchText)
+                        hasPerformedInitialLoad = true
+                    }
                 }
         }
         .tint(JazzTheme.amber)

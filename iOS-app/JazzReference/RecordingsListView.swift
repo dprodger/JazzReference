@@ -12,6 +12,7 @@ struct RecordingsListView: View {
     @StateObject private var networkManager = NetworkManager()
     @State private var searchText = ""
     @State private var searchTask: Task<Void, Never>?
+    @State private var hasPerformedInitialLoad = false
     
     // Group recordings by album title for display
     private var groupedRecordings: [(String, [Recording])] {
@@ -51,8 +52,12 @@ struct RecordingsListView: View {
                     }
                 }
                 .task {
-                    await networkManager.fetchRecordingsCount()
-                    await networkManager.fetchRecordings(searchQuery: searchText)
+                    // Only load on initial appear, not when returning from detail view
+                    if !hasPerformedInitialLoad {
+                        await networkManager.fetchRecordingsCount()
+                        await networkManager.fetchRecordings(searchQuery: searchText)
+                        hasPerformedInitialLoad = true
+                    }
                 }
         }
         .tint(JazzTheme.brass)

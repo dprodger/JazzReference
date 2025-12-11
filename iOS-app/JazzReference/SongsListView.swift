@@ -15,6 +15,7 @@ struct SongsListView: View {
     @State private var searchTask: Task<Void, Never>?
     @State private var showRepertoirePicker = false
     @State private var showLoginPrompt = false
+    @State private var hasPerformedInitialLoad = false
     
     // Computed property to group songs by first letter
     private var groupedSongs: [(String, [Song])] {
@@ -62,8 +63,11 @@ struct SongsListView: View {
                 .task {
                     // Load repertoires first
                     await repertoireManager.loadRepertoires()
-                    // Then load songs for the selected repertoire
-                    await loadSongs()
+                    // Only load songs on initial appear, not when returning from detail view
+                    if !hasPerformedInitialLoad {
+                        await loadSongs()
+                        hasPerformedInitialLoad = true
+                    }
                 }
                 .onChange(of: authManager.isAuthenticated) { wasAuthenticated, isAuthenticated in
                     // Dismiss login prompt when user successfully authenticates
