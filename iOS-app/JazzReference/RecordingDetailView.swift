@@ -256,7 +256,7 @@ struct RecordingDetailView: View {
                         }
                         .padding()
                         
-                        // Learn More Section (Collapsible)
+                        // Recording Details Section (Collapsible)
                         learnMoreSection(recording)
                         
                         // Releases Section - shows all releases containing this recording
@@ -748,7 +748,7 @@ struct RecordingDetailView: View {
         
         selectedReleaseId = sorted.first?.id
     }
-    // MARK: - Learn More Section (Collapsible)
+    // MARK: - Recording Details Section (Collapsible)
     
     @ViewBuilder
     private func learnMoreSection(_ recording: Recording) -> some View {
@@ -767,12 +767,12 @@ struct RecordingDetailView: View {
                     }
                 } label: {
                     HStack {
-                        Text("Learn More")
+                        Text("Recording Details")
                             .font(JazzTheme.headline())
                             .foregroundColor(JazzTheme.charcoal)
-                        
+
                         Spacer()
-                        
+
                         Image(systemName: isLearnMoreExpanded ? "chevron.up" : "chevron.down")
                             .font(JazzTheme.subheadline())
                             .foregroundColor(JazzTheme.brass)
