@@ -8,7 +8,7 @@ JazzReference is a reference application for jazz music study, consisting of:
 - **Backend**: Flask API (Python 3.13) serving data from PostgreSQL
 - **iOS App**: SwiftUI app for browsing jazz standards, performers, and recordings
 
-The API is deployed at `https://www.approachnote.com/api`.
+The API is deployed at `https://api.approachnote.com`.
 
 ## Development Commands
 

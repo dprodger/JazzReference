@@ -14,7 +14,7 @@ class ArtistDatabaseService {
 
     // For development, you might use: http://localhost:5001
     // For production, use your deployed backend URL
-    private  let baseURL = "https://approachnote.com/api"
+    private let baseURL = "https://api.approachnote.com"
 
     private init() {}
     
@@ -78,7 +78,7 @@ class ArtistDatabaseService {
 class SongDatabaseService {
     static let shared = SongDatabaseService()
 
-    private  let baseURL = "https://approachnote.com/api"
+    private let baseURL = "https://api.approachnote.com"
 
     private init() {}
     
