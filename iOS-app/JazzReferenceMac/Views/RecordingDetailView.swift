@@ -80,24 +80,25 @@ struct RecordingDetailView: View {
             .shadow(radius: 4)
 
             VStack(alignment: .leading, spacing: 8) {
-                // Song title
-                if let songTitle = recording.songTitle {
-                    Text(songTitle)
-                        .font(.largeTitle)
-                        .fontWeight(.bold)
-                        .foregroundColor(JazzTheme.charcoal)
-                }
-
-                // Album title
+                // Recording Name (Year)
                 HStack {
                     if recording.isCanonical == true {
                         Image(systemName: "star.fill")
                             .foregroundColor(JazzTheme.gold)
                     }
-                    Text(recording.albumTitle ?? "Unknown Album")
-                        .font(.title2)
-                        .foregroundColor(JazzTheme.smokeGray)
+                    if let songTitle = recording.songTitle {
+                        let yearSuffix = recording.recordingYear.map { " (\($0))" } ?? ""
+                        Text("\(songTitle)\(yearSuffix)")
+                            .font(.largeTitle)
+                            .fontWeight(.bold)
+                            .foregroundColor(JazzTheme.charcoal)
+                    }
                 }
+
+                // Release Name
+                Text(recording.albumTitle ?? "Unknown Album")
+                    .font(.title2)
+                    .foregroundColor(JazzTheme.smokeGray)
 
                 // Leader names
                 if let performers = recording.performers {
@@ -109,21 +110,13 @@ struct RecordingDetailView: View {
                     }
                 }
 
-                // Year and label
-                HStack(spacing: 12) {
-                    if let year = recording.recordingYear {
-                        Label("\(year)", systemImage: "calendar")
-                            .font(.subheadline)
-                            .foregroundColor(JazzTheme.smokeGray)
-                    }
-
-                    if let label = recording.label {
-                        Label(label, systemImage: "building.2")
-                            .font(.subheadline)
-                            .foregroundColor(JazzTheme.smokeGray)
-                    }
+                // Label
+                if let label = recording.label {
+                    Label(label, systemImage: "building.2")
+                        .font(.subheadline)
+                        .foregroundColor(JazzTheme.smokeGray)
+                        .padding(.top, 4)
                 }
-                .padding(.top, 4)
 
                 // Authority badge
                 if recording.hasAuthority, let badgeText = recording.authorityBadgeText {

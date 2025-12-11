@@ -227,25 +227,28 @@ struct RecordingDetailView: View {
                             .shadow(radius: 8)
                             .animation(.easeInOut(duration: 0.3), value: selectedReleaseId)
                             
+                            // Recording Name (Year)
                             HStack {
                                 if recording.isCanonical == true {
                                     Image(systemName: "star.fill")
                                         .foregroundColor(JazzTheme.gold)
                                         .font(JazzTheme.title2())
                                 }
-                                Text(displayAlbumTitle)
-                                    .font(JazzTheme.largeTitle())
-                                    .bold()
-                                    .foregroundColor(JazzTheme.charcoal)
-                                    .animation(.easeInOut(duration: 0.3), value: selectedReleaseId)
+                                if let songTitle = recording.songTitle {
+                                    let yearSuffix = recording.recordingYear.map { " (\($0))" } ?? ""
+                                    Text("\(songTitle)\(yearSuffix)")
+                                        .font(JazzTheme.largeTitle())
+                                        .bold()
+                                        .foregroundColor(JazzTheme.charcoal)
+                                }
                             }
-                            
-                            if let songTitle = recording.songTitle {
-                                Text(songTitle)
-                                    .font(JazzTheme.title2())
-                                    .foregroundColor(JazzTheme.smokeGray)
-                            }
-                            
+
+                            // Release Name
+                            Text(displayAlbumTitle)
+                                .font(JazzTheme.title2())
+                                .foregroundColor(JazzTheme.smokeGray)
+                                .animation(.easeInOut(duration: 0.3), value: selectedReleaseId)
+
                             if let composer = recording.composer {
                                 Text("Composed by \(composer)")
                                     .font(JazzTheme.subheadline())
