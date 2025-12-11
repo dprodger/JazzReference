@@ -119,20 +119,31 @@ class NetworkManager: ObservableObject {
         do {
             let (data, _) = try await URLSession.shared.data(from: url)
             let decodedSongs = try JSONDecoder().decode([Song].self, from: data)
-            
+
+            // Check if cancelled before updating UI (avoids race with newer request)
+            guard !Task.isCancelled else { return }
+
             await MainActor.run {
                 self.songs = decodedSongs
                 self.isLoading = false
             }
             NetworkManager.logRequest("GET /songs\(searchQuery.isEmpty ? "" : "?search=...")", startTime: startTime)
+        } catch is CancellationError {
+            // Task was cancelled (user typed again) - silently ignore
+            return
+        } catch let error as NSError where error.code == NSURLErrorCancelled {
+            // URLSession request was cancelled - silently ignore
+            return
         } catch {
+            // Only show error if this task wasn't cancelled
+            guard !Task.isCancelled else { return }
             await MainActor.run {
                 self.errorMessage = "Failed to fetch songs: \(error.localizedDescription)"
                 self.isLoading = false
             }
         }
     }
-    
+
     func fetchPerformers(searchQuery: String = "") async {
         let startTime = Date()
         await MainActor.run {
@@ -156,13 +167,24 @@ class NetworkManager: ObservableObject {
         do {
             let (data, _) = try await URLSession.shared.data(from: url)
             let decodedPerformers = try JSONDecoder().decode([Performer].self, from: data)
-            
+
+            // Check if cancelled before updating UI (avoids race with newer request)
+            guard !Task.isCancelled else { return }
+
             await MainActor.run {
                 self.performers = decodedPerformers
                 self.isLoading = false
             }
             NetworkManager.logRequest("GET /performers\(searchQuery.isEmpty ? "" : "?search=...")", startTime: startTime)
+        } catch is CancellationError {
+            // Task was cancelled (user typed again) - silently ignore
+            return
+        } catch let error as NSError where error.code == NSURLErrorCancelled {
+            // URLSession request was cancelled - silently ignore
+            return
         } catch {
+            // Only show error if this task wasn't cancelled
+            guard !Task.isCancelled else { return }
             await MainActor.run {
                 self.errorMessage = "Failed to fetch performers: \(error.localizedDescription)"
                 self.isLoading = false
@@ -334,21 +356,32 @@ class NetworkManager: ObservableObject {
             }
             
             let decodedSongs = try JSONDecoder().decode([Song].self, from: data)
-            
+
+            // Check if cancelled before updating UI (avoids race with newer request)
+            guard !Task.isCancelled else { return }
+
             await MainActor.run {
                 self.songs = decodedSongs
                 self.isLoading = false
             }
-            
+
             let endpoint = repertoireId == "all" ?
                 "GET /songs" :
                 "GET /repertoires/\(repertoireId)/songs"
             NetworkManager.logRequest(endpoint + (searchQuery.isEmpty ? "" : "?search=..."), startTime: startTime)
-            
+
             if NetworkManager.diagnosticsEnabled {
                 print("   ↳ Returned \(decodedSongs.count) songs")
             }
+        } catch is CancellationError {
+            // Task was cancelled (user typed again) - silently ignore
+            return
+        } catch let error as NSError where error.code == NSURLErrorCancelled {
+            // URLSession request was cancelled - silently ignore
+            return
         } catch {
+            // Only show error if this task wasn't cancelled
+            guard !Task.isCancelled else { return }
             await MainActor.run {
                 self.errorMessage = "Failed to fetch songs: \(error.localizedDescription)"
                 self.isLoading = false
@@ -758,6 +791,9 @@ class NetworkManager: ObservableObject {
             let (data, _) = try await URLSession.shared.data(from: url)
             let decodedRecordings = try JSONDecoder().decode([Recording].self, from: data)
 
+            // Check if cancelled before updating UI (avoids race with newer request)
+            guard !Task.isCancelled else { return }
+
             await MainActor.run {
                 self.recordings = decodedRecordings
                 self.isLoading = false
@@ -767,7 +803,15 @@ class NetworkManager: ObservableObject {
             if NetworkManager.diagnosticsEnabled {
                 print("   ↳ Returned \(decodedRecordings.count) recordings")
             }
+        } catch is CancellationError {
+            // Task was cancelled (user typed again) - silently ignore
+            return
+        } catch let error as NSError where error.code == NSURLErrorCancelled {
+            // URLSession request was cancelled - silently ignore
+            return
         } catch {
+            // Only show error if this task wasn't cancelled
+            guard !Task.isCancelled else { return }
             await MainActor.run {
                 self.errorMessage = "Failed to fetch recordings: \(error.localizedDescription)"
                 self.isLoading = false
