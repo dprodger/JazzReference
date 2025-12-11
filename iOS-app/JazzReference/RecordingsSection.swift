@@ -402,11 +402,13 @@ struct RecordingsSection: View {
 
         // Add "More Recordings" section if there are any singles
         if !moreRecordings.isEmpty {
-            // Sort alphabetically by artist name
+            // Sort alphabetically by artist sort_name (falling back to name)
             let sortedMore = moreRecordings.sorted { rec1, rec2 in
-                let artist1 = rec1.performers?.first { $0.role == "leader" }?.name ?? "Unknown"
-                let artist2 = rec2.performers?.first { $0.role == "leader" }?.name ?? "Unknown"
-                return artist1.localizedCaseInsensitiveCompare(artist2) == .orderedAscending
+                let leader1 = rec1.performers?.first { $0.role == "leader" }
+                let leader2 = rec2.performers?.first { $0.role == "leader" }
+                let sortKey1 = leader1?.sortName ?? leader1?.name ?? "Unknown"
+                let sortKey2 = leader2?.sortName ?? leader2?.name ?? "Unknown"
+                return sortKey1.localizedCaseInsensitiveCompare(sortKey2) == .orderedAscending
             }
             result.append((groupKey: "More Recordings", recordings: sortedMore))
         }

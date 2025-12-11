@@ -382,6 +382,7 @@ struct AuthorityRecommendationsResponse: Codable {
 struct Performer: Codable, Identifiable {
     let id: String
     let name: String
+    let sortName: String?
     let instrument: String?
     let role: String?
     let biography: String?
@@ -390,6 +391,7 @@ struct Performer: Codable, Identifiable {
 
     enum CodingKeys: String, CodingKey {
         case id, name, instrument, role, biography
+        case sortName = "sort_name"
         case birthDate = "birth_date"
         case deathDate = "death_date"
     }
@@ -398,6 +400,7 @@ struct Performer: Codable, Identifiable {
 struct PerformerDetail: Codable, Identifiable {
     let id: String
     let name: String
+    let sortName: String?
     let biography: String?
     let birthDate: String?
     let deathDate: String?
@@ -410,6 +413,7 @@ struct PerformerDetail: Codable, Identifiable {
 
     enum CodingKeys: String, CodingKey {
         case id, name, biography, instruments, recordings, images
+        case sortName = "sort_name"
         case birthDate = "birth_date"
         case deathDate = "death_date"
         case externalLinks = "external_links"

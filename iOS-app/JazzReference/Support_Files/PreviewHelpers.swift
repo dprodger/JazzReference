@@ -193,36 +193,40 @@ extension Performer {
     static let preview1 = Performer(
         id: "preview-performer-1",
         name: "Dave Brubeck",
+        sortName: "Brubeck, Dave",
         instrument: "Piano",
         role: "leader",
         biography: nil,
         birthDate: nil,
         deathDate: nil
     )
-    
+
     static let preview2 = Performer(
         id: "preview-performer-2",
         name: "Paul Desmond",
+        sortName: "Desmond, Paul",
         instrument: "Alto Saxophone",
         role: "sideman",
         biography: nil,
         birthDate: nil,
         deathDate: nil
     )
-    
+
     static let preview3 = Performer(
         id: "preview-performer-3",
         name: "Joe Morello",
+        sortName: "Morello, Joe",
         instrument: "Drums",
         role: "sideman",
         biography: nil,
         birthDate: nil,
         deathDate: nil
     )
-    
+
     static let preview4 = Performer(
         id: "preview-performer-4",
         name: "Eugene Wright",
+        sortName: "Wright, Eugene",
         instrument: "Bass",
         role: "sideman",
         biography: nil,
@@ -237,6 +241,7 @@ extension PerformerDetail {
     static let preview = PerformerDetail(
         id: "preview-performer-detail-1",
         name: "Miles Davis",
+        sortName: "Davis, Miles",
         biography: "Miles Dewey Davis III was an American jazz trumpeter, bandleader, and composer. He is among the most influential and acclaimed figures in the history of jazz and 20th-century music.",
         birthDate: "1926-05-26",
         deathDate: "1991-09-28",
@@ -280,10 +285,11 @@ extension PerformerDetail {
         ],
         images: nil
     )
-    
+
     static let previewMinimal = PerformerDetail(
         id: "preview-performer-detail-2",
         name: "John Coltrane",
+        sortName: "Coltrane, John",
         biography: nil,
         birthDate: nil,
         deathDate: nil,
