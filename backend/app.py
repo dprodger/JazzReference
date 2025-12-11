@@ -76,8 +76,13 @@ def enforce_host_routing():
     Enforce that API routes are only accessible via api.approachnote.com
     and website routes are only accessible via www/root domain.
     """
-    host = request.host
+    # Check X-Forwarded-Host first (set by reverse proxies like Render)
+    # Fall back to request.host
+    host = request.headers.get('X-Forwarded-Host', request.host)
     path = request.path
+
+    # Log for debugging (remove after confirming it works)
+    logger.info(f"Host routing check: host={host}, path={path}, X-Forwarded-Host={request.headers.get('X-Forwarded-Host')}, request.host={request.host}")
 
     # Allow static files from any host
     if path.startswith('/static/'):
