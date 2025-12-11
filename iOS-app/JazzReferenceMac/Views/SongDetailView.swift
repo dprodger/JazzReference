@@ -125,7 +125,7 @@ struct SongDetailView: View {
     private func recordingsSection(_ recordings: [Recording]) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("Recordings (\(recordings.count))")
+                Text("Recordings (\(recordings.count.formatted()))")
                     .font(.headline)
                     .foregroundColor(JazzTheme.charcoal)
 

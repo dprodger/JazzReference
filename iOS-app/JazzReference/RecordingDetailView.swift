@@ -505,7 +505,7 @@ struct RecordingDetailView: View {
                     }
                 } label: {
                     HStack {
-                        Text(showAllReleases ? "Show Less" : "Show All \(releases.count) Releases")
+                        Text(showAllReleases ? "Show Less" : "Show All \(releases.count.formatted()) Releases")
                             .font(JazzTheme.subheadline())
                         Image(systemName: showAllReleases ? "chevron.up" : "chevron.down")
                             .font(JazzTheme.caption())

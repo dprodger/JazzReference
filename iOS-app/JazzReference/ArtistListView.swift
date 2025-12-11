@@ -63,7 +63,7 @@ struct ArtistsListView: View {
         NavigationStack {
             contentView
                 .background(JazzTheme.backgroundLight)
-                .jazzNavigationBar(title: "Artists (\(networkManager.performers.count))", color: JazzTheme.amber)
+                .jazzNavigationBar(title: "Artists (\(networkManager.performers.count.formatted()))", color: JazzTheme.amber)
                 .searchable(text: $searchText, prompt: "Search artists")
                 .onChange(of: searchText) { oldValue, newValue in
                     searchTask?.cancel()

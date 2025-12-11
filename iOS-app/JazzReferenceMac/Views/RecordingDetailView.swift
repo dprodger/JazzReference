@@ -214,7 +214,7 @@ struct RecordingDetailView: View {
     @ViewBuilder
     private func performersSection(_ performers: [Performer]) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Personnel (\(performers.count))")
+            Text("Personnel (\(performers.count.formatted()))")
                 .font(.headline)
                 .foregroundColor(JazzTheme.charcoal)
 
@@ -257,7 +257,7 @@ struct RecordingDetailView: View {
     @ViewBuilder
     private func releasesSection(_ releases: [Release]) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Releases (\(releases.count))")
+            Text("Releases (\(releases.count.formatted()))")
                 .font(.headline)
                 .foregroundColor(JazzTheme.charcoal)
 

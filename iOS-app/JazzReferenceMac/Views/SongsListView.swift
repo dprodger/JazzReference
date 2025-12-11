@@ -92,7 +92,7 @@ struct SongsListView: View {
             await repertoireManager.loadRepertoires()
             await loadSongs()
         }
-        .navigationTitle("Songs (\(networkManager.songs.count))")
+        .navigationTitle("Songs (\(networkManager.songs.count.formatted()))")
     }
 
     // MARK: - Helper Methods

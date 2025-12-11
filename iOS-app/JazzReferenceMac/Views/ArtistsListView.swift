@@ -61,7 +61,7 @@ struct ArtistsListView: View {
         .task {
             await networkManager.fetchPerformers()
         }
-        .navigationTitle("Artists (\(networkManager.performers.count))")
+        .navigationTitle("Artists (\(networkManager.performers.count.formatted()))")
     }
 
     // MARK: - Helper Methods

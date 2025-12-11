@@ -197,7 +197,7 @@ struct PerformerDetailView: View {
                         
                         // Recordings Section
                         VStack(alignment: .leading, spacing: 12) {
-                            Text("Recordings (\(filteredRecordings.count))")
+                            Text("Recordings (\(filteredRecordings.count.formatted()))")
                                 .font(JazzTheme.title2())
                                 .bold()
                                 .foregroundColor(JazzTheme.charcoal)

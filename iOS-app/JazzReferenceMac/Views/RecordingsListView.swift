@@ -72,7 +72,7 @@ struct RecordingsListView: View {
         .task {
             await networkManager.fetchRecordingsCount()
         }
-        .navigationTitle("Recordings")
+        .navigationTitle("Recordings (\(networkManager.recordingsCount.formatted()))")
     }
 }
 

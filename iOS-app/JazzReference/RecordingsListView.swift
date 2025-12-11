@@ -39,7 +39,7 @@ struct RecordingsListView: View {
         NavigationStack {
             contentView
                 .background(JazzTheme.backgroundLight)
-                .jazzNavigationBar(title: "Recordings (\(networkManager.recordingsCount))", color: JazzTheme.brass)
+                .jazzNavigationBar(title: "Recordings (\(networkManager.recordingsCount.formatted()))", color: JazzTheme.brass)
                 .searchable(text: $searchText, prompt: "Artist, album, or song")
                 .onChange(of: searchText) { oldValue, newValue in
                     searchTask?.cancel()
