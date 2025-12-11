@@ -7,9 +7,9 @@ logger = logging.getLogger(__name__)
 transcriptions_bp = Blueprint('transcriptions', __name__)
 
 # Transcription endpoints:
-# - GET /api/songs/<song_id>/transcriptions
-# - GET /api/recordings/<recording_id>/transcriptions
-# - GET /api/transcriptions/<transcription_id>
+# - GET /songs/<song_id>/transcriptions
+# - GET /recordings/<recording_id>/transcriptions
+# - GET /transcriptions/<transcription_id>
 
 
 
@@ -18,7 +18,7 @@ transcriptions_bp = Blueprint('transcriptions', __name__)
 # Solo Transcriptions API Endpoints
 # Add these to backend/app.py
 
-@transcriptions_bp.route('/api/songs/<song_id>/transcriptions', methods=['GET'])
+@transcriptions_bp.route('/songs/<song_id>/transcriptions', methods=['GET'])
 def get_song_transcriptions(song_id):
     """Get all solo transcriptions for a specific song"""
     try:
@@ -53,7 +53,7 @@ def get_song_transcriptions(song_id):
         return jsonify({'error': 'Failed to fetch transcriptions', 'detail': str(e)}), 500
 
 
-@transcriptions_bp.route('/api/recordings/<recording_id>/transcriptions', methods=['GET'])
+@transcriptions_bp.route('/recordings/<recording_id>/transcriptions', methods=['GET'])
 def get_recording_transcriptions(recording_id):
     """Get all solo transcriptions for a specific recording"""
     try:
@@ -88,7 +88,7 @@ def get_recording_transcriptions(recording_id):
         return jsonify({'error': 'Failed to fetch transcriptions', 'detail': str(e)}), 500
 
 
-@transcriptions_bp.route('/api/transcriptions/<transcription_id>', methods=['GET'])
+@transcriptions_bp.route('/transcriptions/<transcription_id>', methods=['GET'])
 def get_transcription_detail(transcription_id):
     """Get detailed information about a specific solo transcription"""
     try:

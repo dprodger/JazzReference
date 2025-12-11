@@ -7,9 +7,9 @@ logger = logging.getLogger(__name__)
 reports_bp = Blueprint('reports', __name__)
 
 # Report endpoints:
-# - POST /api/content-reports
+# - POST /content-reports
 
-@reports_bp.route('/api/content-reports', methods=['POST'])
+@reports_bp.route('/content-reports', methods=['POST'])
 def submit_content_report():
     """Submit a content error report"""
     try:
@@ -106,7 +106,7 @@ def submit_content_report():
         }), 500
 
 
-@reports_bp.route('/api/content-reports', methods=['GET'])
+@reports_bp.route('/content-reports', methods=['GET'])
 def get_content_reports():
     """
     Get content reports (for admin use)

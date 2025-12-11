@@ -8,12 +8,12 @@ logger = logging.getLogger(__name__)
 performers_bp = Blueprint('performers', __name__)
 
 # Performer endpoints:
-# - GET /api/performers
-# - POST /api/performers
-# - GET /api/performers/<performer_id>
-# - GET /api/performers/search
+# - GET /performers
+# - POST /performers
+# - GET /performers/<performer_id>
+# - GET /performers/search
 
-@performers_bp.route('/api/performers', methods=['GET'])
+@performers_bp.route('/performers', methods=['GET'])
 def get_performers():
     """Get all performers or search performers by name"""
     search_query = request.args.get('search', '')
@@ -44,7 +44,7 @@ def get_performers():
         logger.error(f"Error fetching performers: {e}")
         return jsonify({'error': 'Failed to fetch performers', 'detail': str(e)}), 500
 
-@performers_bp.route('/api/performers', methods=['POST'])
+@performers_bp.route('/performers', methods=['POST'])
 def create_performer():
     """Create a new performer from iOS app (typically from MusicBrainz import)"""
     try:
@@ -160,7 +160,7 @@ def create_performer():
         }), 500        
 
 
-@performers_bp.route('/api/performers/<performer_id>', methods=['GET'])
+@performers_bp.route('/performers/<performer_id>', methods=['GET'])
 def get_performer_detail(performer_id):
     """Get detailed information about a specific performer - WITH IMAGES"""
     try:
@@ -230,7 +230,7 @@ def get_performer_detail(performer_id):
         return jsonify({'error': 'Failed to fetch performer detail', 'detail': str(e)}), 500
 
 
-@performers_bp.route('/api/performers/search', methods=['GET'])
+@performers_bp.route('/performers/search', methods=['GET'])
 def search_performers():
     """
     Search for performers by name

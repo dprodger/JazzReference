@@ -7,9 +7,9 @@ logger = logging.getLogger(__name__)
 images_bp = Blueprint('images', __name__)
 
 # Image endpoints:
-# - GET /api/performers/<performer_id>/images
-# - GET /api/images/<image_id>
-@images_bp.route('/api/performers/<performer_id>/images', methods=['GET'])
+# - GET /performers/<performer_id>/images
+# - GET /images/<image_id>
+@images_bp.route('/performers/<performer_id>/images', methods=['GET'])
 def get_performer_images(performer_id):
     """Get all images for a specific performer"""
     try:
@@ -47,7 +47,7 @@ def get_performer_images(performer_id):
         return jsonify({'error': 'Failed to fetch performer images', 'detail': str(e)}), 500
 
 
-@images_bp.route('/api/images/<image_id>', methods=['GET'])
+@images_bp.route('/images/<image_id>', methods=['GET'])
 def get_image_detail(image_id):
     """Get detailed information about a specific image"""
     try:

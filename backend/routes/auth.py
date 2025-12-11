@@ -33,7 +33,7 @@ from google.auth.transport import requests as google_requests
 from google.oauth2 import id_token as google_id_token
 
 logger = logging.getLogger(__name__)
-auth_bp = Blueprint('auth', __name__, url_prefix='/api/auth')
+auth_bp = Blueprint('auth', __name__, url_prefix='/auth')
 
 # Google OAuth configuration (NEW - ADD THIS)
 GOOGLE_CLIENT_ID = os.getenv('GOOGLE_CLIENT_ID')

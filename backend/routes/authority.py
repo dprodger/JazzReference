@@ -2,9 +2,9 @@
 Song Authority Recommendations Routes
 
 Manages authority recommendations for recordings:
-- GET /api/recordings/<recording_id>/authorities - Get authorities for a recording
-- POST /api/recordings/<recording_id>/authorities - Add new authority recommendation
-- DELETE /api/authorities/<authority_id> - Delete authority recommendation
+- GET /recordings/<recording_id>/authorities - Get authorities for a recording
+- POST /recordings/<recording_id>/authorities - Add new authority recommendation
+- DELETE /authorities/<authority_id> - Delete authority recommendation
 """
 
 from flask import Blueprint, jsonify, request
@@ -22,10 +22,10 @@ authorities_bp = Blueprint('authorities', __name__)
 
 
 # =============================================================================
-# GET /api/recordings/<recording_id>/authorities
+# GET /recordings/<recording_id>/authorities
 # =============================================================================
 
-@authorities_bp.route('/api/recordings/<recording_id>/authorities', methods=['GET'])
+@authorities_bp.route('/recordings/<recording_id>/authorities', methods=['GET'])
 def get_recording_authorities(recording_id):
     """Get all authority recommendations linked to a recording"""
     try:
@@ -75,10 +75,10 @@ def get_recording_authorities(recording_id):
 
 
 # =============================================================================
-# POST /api/recordings/<recording_id>/authorities
+# POST /recordings/<recording_id>/authorities
 # =============================================================================
 
-@authorities_bp.route('/api/recordings/<recording_id>/authorities', methods=['POST'])
+@authorities_bp.route('/recordings/<recording_id>/authorities', methods=['POST'])
 def add_recording_authority(recording_id):
     """
     Add a new authority recommendation linked to a recording
@@ -165,10 +165,10 @@ def add_recording_authority(recording_id):
 
 
 # =============================================================================
-# DELETE /api/authorities/<authority_id>
+# DELETE /authorities/<authority_id>
 # =============================================================================
 
-@authorities_bp.route('/api/authorities/<authority_id>', methods=['DELETE'])
+@authorities_bp.route('/authorities/<authority_id>', methods=['DELETE'])
 def delete_authority(authority_id):
     """Delete an authority recommendation"""
     try:
@@ -207,10 +207,10 @@ def delete_authority(authority_id):
 
 
 # =============================================================================
-# GET /api/songs/<song_id>/authorities
+# GET /songs/<song_id>/authorities
 # =============================================================================
 
-@authorities_bp.route('/api/songs/<song_id>/authorities', methods=['GET'])
+@authorities_bp.route('/songs/<song_id>/authorities', methods=['GET'])
 def get_song_authorities(song_id):
     """
     Get all authority recommendations for a song
@@ -273,14 +273,11 @@ def get_song_authorities(song_id):
         return jsonify({'error': 'Failed to fetch authorities', 'detail': str(e)}), 500
         
         
-# Add this endpoint to backend/routes/authority.py
-# Place after the DELETE /api/authorities/<authority_id> endpoint
-
 # =============================================================================
-# PATCH /api/authorities/<authority_id>/link
+# PATCH /authorities/<authority_id>/link
 # =============================================================================
 
-@authorities_bp.route('/api/authorities/<authority_id>/link', methods=['PATCH'])
+@authorities_bp.route('/authorities/<authority_id>/link', methods=['PATCH'])
 def link_authority_to_recording(authority_id):
     """
     Link an unmatched authority recommendation to a recording
@@ -377,10 +374,10 @@ def link_authority_to_recording(authority_id):
 
 
 # =============================================================================
-# PATCH /api/authorities/<authority_id>/unlink
+# PATCH /authorities/<authority_id>/unlink
 # =============================================================================
 
-@authorities_bp.route('/api/authorities/<authority_id>/unlink', methods=['PATCH'])
+@authorities_bp.route('/authorities/<authority_id>/unlink', methods=['PATCH'])
 def unlink_authority_from_recording(authority_id):
     """
     Unlink an authority recommendation from its recording

@@ -7,7 +7,7 @@ import research_queue
 logger = logging.getLogger(__name__)
 research_bp = Blueprint('research', __name__)
 
-@research_bp.route('/api/songs/<song_id>/refresh', methods=['POST'])
+@research_bp.route('/songs/<song_id>/refresh', methods=['POST'])
 def refresh_song_data(song_id):
     """
     Queue a song for background research and data refresh
@@ -56,7 +56,7 @@ def refresh_song_data(song_id):
             'detail': str(e)
         }), 500
 
-@research_bp.route('/api/research/queue', methods=['GET'])
+@research_bp.route('/research/queue', methods=['GET'])
 def get_queue_status():
     """Get the current status of the research queue"""
     current_song = research_queue.get_current_song()
@@ -72,7 +72,7 @@ def get_queue_status():
     return jsonify(response)
 
 
-@research_bp.route('/api/research/queue/items', methods=['GET'])
+@research_bp.route('/research/queue/items', methods=['GET'])
 def get_queue_items():
     """
     Get a list of all songs currently in the research queue
@@ -99,7 +99,7 @@ def get_queue_items():
   
 # Add this route to routes/research.py
 
-@research_bp.route('/api/admin/research/queue-all-songs', methods=['POST'])
+@research_bp.route('/admin/research/queue-all-songs', methods=['POST'])
 def queue_all_songs_for_research():
     """
     Admin endpoint to queue songs for research

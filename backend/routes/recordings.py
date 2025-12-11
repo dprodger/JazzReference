@@ -161,7 +161,7 @@ RELEASE_ART_LARGE_SQL = """
     ) as cover_art_large"""
 
 
-@recordings_bp.route('/api/recordings/count', methods=['GET'])
+@recordings_bp.route('/recordings/count', methods=['GET'])
 def get_recordings_count():
     """
     Get total count of recordings (lightweight endpoint for UI display)
@@ -176,7 +176,7 @@ def get_recordings_count():
         return jsonify({"error": str(e)}), 500
 
 
-@recordings_bp.route('/api/recordings', methods=['GET'])
+@recordings_bp.route('/recordings', methods=['GET'])
 def get_recordings():
     """
     Get all recordings with optional search
@@ -314,7 +314,7 @@ def get_recordings():
         return jsonify({'error': 'Failed to fetch recordings'}), 500
 
 
-@recordings_bp.route('/api/recordings/<recording_id>', methods=['GET'])
+@recordings_bp.route('/recordings/<recording_id>', methods=['GET'])
 def get_recording_detail(recording_id):
     """
     Get detailed information about a specific recording, including releases
@@ -483,7 +483,7 @@ def get_recording_detail(recording_id):
         return jsonify({'error': 'Failed to fetch recording details', 'detail': str(e)}), 500
 
 
-@recordings_bp.route('/api/recordings/<recording_id>/releases', methods=['GET'])
+@recordings_bp.route('/recordings/<recording_id>/releases', methods=['GET'])
 def get_recording_releases(recording_id):
     """
     Get all releases that contain a specific recording

@@ -22,7 +22,7 @@ from middleware.auth_middleware import require_auth
 from email_service import send_password_reset_email
 
 logger = logging.getLogger(__name__)
-password_bp = Blueprint('password', __name__, url_prefix='/api/auth')
+password_bp = Blueprint('password', __name__, url_prefix='/auth')
 
 
 @password_bp.route('/forgot-password', methods=['POST'])

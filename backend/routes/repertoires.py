@@ -2,14 +2,14 @@
 User Repertoire Management Routes (Updated for Phase 5)
 
 This module handles repertoire operations with user authentication:
-- GET /api/repertoires - List user's repertoires (requires auth)
-- GET /api/repertoires/<id> - Get repertoire details (requires auth, must be owner)
-- POST /api/repertoires - Create new repertoire (requires auth)
-- PUT /api/repertoires/<id> - Update repertoire (requires auth, must be owner)
-- DELETE /api/repertoires/<id> - Delete repertoire (requires auth, must be owner)
-- GET /api/repertoires/<id>/songs - Get songs in repertoire (requires auth, must be owner)
-- POST /api/repertoires/<id>/songs/<song_id> - Add song to repertoire (requires auth, must be owner)
-- DELETE /api/repertoires/<id>/songs/<song_id> - Remove song from repertoire (requires auth, must be owner)
+- GET /repertoires - List user's repertoires (requires auth)
+- GET /repertoires/<id> - Get repertoire details (requires auth, must be owner)
+- POST /repertoires - Create new repertoire (requires auth)
+- PUT /repertoires/<id> - Update repertoire (requires auth, must be owner)
+- DELETE /repertoires/<id> - Delete repertoire (requires auth, must be owner)
+- GET /repertoires/<id>/songs - Get songs in repertoire (requires auth, must be owner)
+- POST /repertoires/<id>/songs/<song_id> - Add song to repertoire (requires auth, must be owner)
+- DELETE /repertoires/<id>/songs/<song_id> - Remove song from repertoire (requires auth, must be owner)
 """
 
 from flask import Blueprint, jsonify, request, g
@@ -24,7 +24,7 @@ from db_utils import get_db_connection
 from middleware.auth_middleware import require_auth
 
 logger = logging.getLogger(__name__)
-repertoires_bp = Blueprint('repertoires', __name__, url_prefix='/api/repertoires')
+repertoires_bp = Blueprint('repertoires', __name__, url_prefix='/repertoires')
 
 
 # =============================================================================

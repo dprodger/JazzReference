@@ -163,7 +163,7 @@ AUTHORITY_ALBUM_ART_SQL = """
 # - GET /api/songs/search
 
 
-@songs_bp.route('/api/songs', methods=['GET'])
+@songs_bp.route('/songs', methods=['GET'])
 def get_songs():
     """Get all songs or search songs by title"""
     search_query = request.args.get('search', '')
@@ -196,7 +196,7 @@ def get_songs():
 
 
 
-@songs_bp.route('/api/songs/<song_id>/summary', methods=['GET'])
+@songs_bp.route('/songs/<song_id>/summary', methods=['GET'])
 def get_song_summary(song_id):
     """
     Get song metadata, transcriptions, and featured (authoritative) recordings ONLY.
@@ -334,7 +334,7 @@ def get_song_summary(song_id):
         return jsonify({'error': 'Failed to fetch song summary', 'detail': str(e)}), 500
 
 
-@songs_bp.route('/api/songs/<song_id>/recordings', methods=['GET'])
+@songs_bp.route('/songs/<song_id>/recordings', methods=['GET'])
 def get_song_recordings(song_id):
     """
     Get all recordings for a song with performers and authority info.
@@ -449,7 +449,7 @@ def get_song_recordings(song_id):
         return jsonify({'error': 'Failed to fetch recordings', 'detail': str(e)}), 500
 
 
-@songs_bp.route('/api/songs/<song_id>', methods=['GET'])
+@songs_bp.route('/songs/<song_id>', methods=['GET'])
 def get_song_detail(song_id):
     """
     Get detailed information about a specific song with all recordings, performers, transcriptions,
@@ -657,7 +657,7 @@ def get_song_detail(song_id):
 #    - Falls back to releases table (Spotify images)
 
 
-@songs_bp.route('/api/songs', methods=['POST'])
+@songs_bp.route('/songs', methods=['POST'])
 def create_song():
     """Create a new song"""
     try:
@@ -737,7 +737,7 @@ def create_song():
         return jsonify({'error': 'Failed to create song', 'detail': str(e)}), 500
 
 
-@songs_bp.route('/api/songs/search', methods=['GET'])
+@songs_bp.route('/songs/search', methods=['GET'])
 def search_songs():
     """Search songs by title and optionally composer - returns first 20 matches"""
     search_query = request.args.get('q', '').strip()
@@ -773,7 +773,7 @@ def search_songs():
 # 2. UPDATE ENDPOINT: PATCH /api/songs/<song_id>
 # ============================================================================
 
-@songs_bp.route('/api/songs/<song_id>', methods=['PATCH'])
+@songs_bp.route('/songs/<song_id>', methods=['PATCH'])
 def update_song(song_id):
     """
     Update a song's MusicBrainz ID and/or Wikipedia URL
@@ -861,7 +861,7 @@ def update_song(song_id):
 # 3. NEW ENDPOINT: GET /api/songs/<song_id>/authority_recommendations
 # ============================================================================
 
-@songs_bp.route('/api/songs/<song_id>/authority_recommendations', methods=['GET'])
+@songs_bp.route('/songs/<song_id>/authority_recommendations', methods=['GET'])
 def get_song_authority_recommendations(song_id):
     """
     Get all authority recommendations for a song (matched and unmatched)

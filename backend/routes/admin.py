@@ -207,7 +207,7 @@ def bulk_reject_by_artist(song_id):
         return jsonify({'error': str(e)}), 500
 
 
-@admin_bp.route('/api/orphans/<song_id>')
+@admin_bp.route('/orphans/<song_id>/json')
 def api_orphans_for_song(song_id):
     """API endpoint to get orphan recordings for a song"""
     with get_db_connection() as db:
