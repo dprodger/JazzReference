@@ -3,7 +3,7 @@ Jazz Reference API Backend - Improved Version
 A Flask API with robust database connection handling
 """
 
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, jsonify
 from flask_cors import CORS
 import logging
 import os
@@ -56,11 +56,56 @@ def landing_page():
     """Serve the main landing page"""
     return render_template('index.html')
 
+# ============================================================================
+# HOST-BASED ROUTING
+# ============================================================================
+
+# Define which hosts serve which content
+API_HOSTS = ['api.approachnote.com', 'localhost:5001', '127.0.0.1:5001']
+WEB_HOSTS = ['approachnote.com', 'www.approachnote.com']
+
+# Routes that should only be served from the website (not API subdomain)
+WEB_ONLY_PATHS = ['/', '/docs']
+
+# Routes that should only be served from the API subdomain
+# (everything except web-only paths and static files)
+
+@app.before_request
+def enforce_host_routing():
+    """
+    Enforce that API routes are only accessible via api.approachnote.com
+    and website routes are only accessible via www/root domain.
+    """
+    host = request.host
+    path = request.path
+
+    # Allow static files from any host
+    if path.startswith('/static/'):
+        return None
+
+    # Allow admin routes from any host (for now)
+    if path.startswith('/admin'):
+        return None
+
+    # Check if this is an API host
+    is_api_host = any(host == h or host.endswith('.' + h) for h in API_HOSTS)
+    is_web_host = any(host == h or host.endswith('.' + h) for h in WEB_HOSTS)
+
+    # On API host: block web-only paths
+    if is_api_host and path in WEB_ONLY_PATHS:
+        return jsonify({'error': 'Not found', 'message': 'Use approachnote.com for website'}), 404
+
+    # On web host: only allow web-only paths and static files
+    if is_web_host and path not in WEB_ONLY_PATHS:
+        return jsonify({'error': 'Not found', 'message': 'Use api.approachnote.com for API'}), 404
+
+    return None
+
 # Request/response logging
 @app.before_request
 def log_request():
     """Log incoming requests"""
-    logger.info(f"{request.method} {request.path}")
+    logger.info(f"{request.method} {request.path} (Host: {request.host})")
 
 @app.after_request
 def log_response(response):
