@@ -186,7 +186,8 @@ struct RecordingsListView: View {
                         letters: sectionLetters,
                         accentColor: JazzTheme.brass,
                         onTap: { letter in
-                            withAnimation(.easeOut(duration: 0.2)) {
+                            // Use short animation to prevent conflicts during rapid scrubbing
+                            withAnimation(.easeOut(duration: 0.1)) {
                                 proxy.scrollTo(letter, anchor: .top)
                             }
                         }

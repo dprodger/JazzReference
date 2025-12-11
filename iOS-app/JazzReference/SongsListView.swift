@@ -220,7 +220,8 @@ struct SongsListView: View {
                     letters: sectionLetters,
                     accentColor: JazzTheme.burgundy,
                     onTap: { letter in
-                        withAnimation(.easeOut(duration: 0.2)) {
+                        // Use short animation to prevent conflicts during rapid scrubbing
+                        withAnimation(.easeOut(duration: 0.1)) {
                             proxy.scrollTo(letter, anchor: .top)
                         }
                     }
@@ -374,36 +375,96 @@ struct SectionHeaderView: View {
 }
 
 // Reusable custom alphabet index view - ONLY DEFINED HERE, NOT IN ArtistsListView
+// Supports both tap and drag gestures for easier navigation (iOS Contacts style)
 struct AlphabetIndexView: View {
     let letters: [String]
     var accentColor: Color = JazzTheme.burgundy
     let onTap: (String) -> Void
-    
+
+    // Track which letter is currently being touched/dragged over
+    @State private var highlightedLetter: String?
+    @State private var isDragging = false
+    @GestureState private var dragLocation: CGPoint = .zero
+
+    // Height of each letter row (used for drag calculations)
+    private let letterHeight: CGFloat = 18
+    private let letterWidth: CGFloat = 32
+
     var body: some View {
-        VStack(spacing: 2) {
-            ForEach(letters, id: \.self) { letter in
+        VStack(spacing: 0) {
+            ForEach(Array(letters.enumerated()), id: \.element) { index, letter in
                 Text(letter)
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundColor(accentColor)
-                    .frame(width: 20, height: 16)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(highlightedLetter == letter ? .white : accentColor)
+                    .frame(width: letterWidth, height: letterHeight)
                     .background(
                         RoundedRectangle(cornerRadius: 4)
-                            .fill(Color.white.opacity(0.7))
+                            .fill(highlightedLetter == letter ? accentColor : Color.white.opacity(0.7))
                     )
-                    .onTapGesture {
-                        onTap(letter)
-                        // Haptic feedback
-                        let generator = UIImpactFeedbackGenerator(style: .light)
-                        generator.impactOccurred()
-                    }
+                    .contentShape(Rectangle()) // Expand touch target to full frame
             }
         }
         .padding(.vertical, 8)
+        .padding(.horizontal, 4)
         .background(
             RoundedRectangle(cornerRadius: 8)
                 .fill(JazzTheme.backgroundLight.opacity(0.95))
-                .shadow(color: .black.opacity(0.1), radius: 2, x: -1, y: 0)
+                .shadow(color: .black.opacity(0.15), radius: 3, x: -2, y: 0)
         )
+        .gesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { value in
+                    isDragging = true
+                    let letter = letterAt(location: value.location)
+
+                    // Update visual highlight and haptic, but DON'T scroll during drag
+                    // (scrolling during drag causes SwiftUI List rendering bugs)
+                    if letter != highlightedLetter, let letter = letter {
+                        highlightedLetter = letter
+                        // Haptic feedback on letter change
+                        let generator = UIImpactFeedbackGenerator(style: .light)
+                        generator.impactOccurred()
+                    }
+                }
+                .onEnded { _ in
+                    isDragging = false
+                    // Scroll only when user lifts finger - avoids SwiftUI List bug
+                    if let letter = highlightedLetter {
+                        onTap(letter)
+                    }
+                    // Clear highlight after a short delay
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                        if !isDragging {
+                            highlightedLetter = nil
+                        }
+                    }
+                }
+        )
+        // Also support simple tap (not drag)
+        .onTapGesture { location in
+            if let letter = letterAt(location: location) {
+                highlightedLetter = letter
+                onTap(letter)
+                let generator = UIImpactFeedbackGenerator(style: .light)
+                generator.impactOccurred()
+                // Clear highlight after a short delay
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                    highlightedLetter = nil
+                }
+            }
+        }
+    }
+
+    /// Calculate which letter is at the given Y location
+    private func letterAt(location: CGPoint) -> String? {
+        // Account for vertical padding (8 points at top)
+        let adjustedY = location.y - 8
+        let index = Int(adjustedY / letterHeight)
+
+        guard index >= 0 && index < letters.count else {
+            return nil
+        }
+        return letters[index]
     }
 }
 
