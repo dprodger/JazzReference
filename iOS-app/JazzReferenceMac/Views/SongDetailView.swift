@@ -19,7 +19,7 @@ struct SongDetailView: View {
     var body: some View {
         ScrollView {
             if isLoading {
-                ProgressView("Loading...")
+                ThemedProgressView(message: "Loading...")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .padding(.top, 100)
             } else if let song = song {

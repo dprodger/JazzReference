@@ -34,8 +34,7 @@ struct AuthorityRecommendationsView: View {
         NavigationStack {
             Group {
                 if isLoading {
-                    ProgressView("Loading...")
-                        .tint(JazzTheme.brass)
+                    ThemedProgressView(message: "Loading...", tintColor: JazzTheme.brass)
                 } else if let error = errorMessage {
                     VStack(spacing: 16) {
                         Image(systemName: "exclamationmark.triangle")

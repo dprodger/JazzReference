@@ -52,8 +52,7 @@ struct PerformerDetailView: View {
             if isLoading {
                 VStack {
                     Spacer()
-                    ProgressView("Loading...")
-                        .tint(JazzTheme.amber)
+                    ThemedProgressView(message: "Loading...", tintColor: JazzTheme.amber)
                     Spacer()
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)

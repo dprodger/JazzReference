@@ -103,8 +103,7 @@ struct ArtistsListView: View {
     private var loadingView: some View {
         VStack {
             Spacer()
-            ProgressView("Loading artists...")
-                .tint(JazzTheme.amber)
+            ThemedProgressView(message: "Loading artists...", tintColor: JazzTheme.amber)
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

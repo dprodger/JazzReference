@@ -419,6 +419,24 @@ extension View {
     }
 }
 
+// MARK: - Themed Progress View
+
+/// A progress view with consistent JazzTheme styling
+/// Use this for all loading indicators to ensure consistent typography
+struct ThemedProgressView: View {
+    let message: String
+    var tintColor: Color = JazzTheme.brass
+
+    var body: some View {
+        ProgressView {
+            Text(message)
+                .font(JazzTheme.subheadline())
+                .foregroundColor(JazzTheme.charcoal)
+        }
+        .tint(tintColor)
+    }
+}
+
 // MARK: - Usage Examples
 
 struct JazzThemePreview: View {

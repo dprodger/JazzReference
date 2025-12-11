@@ -113,8 +113,7 @@ struct RecordingDetailView: View {
             if isLoading {
                 VStack {
                     Spacer()
-                    ProgressView("Loading...")
-                        .tint(JazzTheme.brass)
+                    ThemedProgressView(message: "Loading...", tintColor: JazzTheme.brass)
                     Spacer()
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
