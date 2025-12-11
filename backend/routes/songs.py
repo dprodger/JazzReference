@@ -261,6 +261,7 @@ def get_song_summary(song_id):
                             json_build_object(
                                 'id', p.id,
                                 'name', p.name,
+                                'sort_name', p.sort_name,
                                 'instrument', i.name,
                                 'role', rp.role
                             ) ORDER BY
@@ -269,7 +270,7 @@ def get_song_summary(song_id):
                                     WHEN 'sideman' THEN 2
                                     ELSE 3
                                 END,
-                                p.name
+                                COALESCE(p.sort_name, p.name)
                         ) FILTER (WHERE p.id IS NOT NULL),
                         '[]'::json
                     ) as performers,
@@ -403,6 +404,7 @@ def get_song_recordings(song_id):
                         json_build_object(
                             'id', p.id,
                             'name', p.name,
+                            'sort_name', p.sort_name,
                             'instrument', i.name,
                             'role', rp.role
                         ) ORDER BY
@@ -411,7 +413,7 @@ def get_song_recordings(song_id):
                                 WHEN 'sideman' THEN 2
                                 ELSE 3
                             END,
-                            p.name
+                            COALESCE(p.sort_name, p.name)
                     ) FILTER (WHERE p.id IS NOT NULL),
                     '[]'::json
                 ) as performers,
@@ -554,6 +556,7 @@ def get_song_detail(song_id):
                             json_build_object(
                                 'id', p.id,
                                 'name', p.name,
+                                'sort_name', p.sort_name,
                                 'instrument', i.name,
                                 'role', rp.role
                             ) ORDER BY
@@ -562,7 +565,7 @@ def get_song_detail(song_id):
                                     WHEN 'sideman' THEN 2
                                     ELSE 3
                                 END,
-                                p.name
+                                COALESCE(p.sort_name, p.name)
                         ) FILTER (WHERE p.id IS NOT NULL),
                         '[]'::json
                     ) as performers,

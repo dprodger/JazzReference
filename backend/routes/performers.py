@@ -21,7 +21,7 @@ def get_performers():
     try:
         if search_query:
             query = """
-                SELECT id, name, biography, birth_date, death_date,
+                SELECT id, name, sort_name, biography, birth_date, death_date,
                     external_links, wikipedia_url, musicbrainz_id
                 FROM performers
                 WHERE name ILIKE %s
@@ -30,7 +30,8 @@ def get_performers():
             params = (f'%{search_query}%',)
         else:
             query = """
-                SELECT id, name, biography, birth_date, death_date, external_links, wikipedia_url, musicbrainz_id
+                SELECT id, name, sort_name, biography, birth_date, death_date,
+                    external_links, wikipedia_url, musicbrainz_id
                 FROM performers
                 ORDER BY COALESCE(sort_name, name)
             """
@@ -165,7 +166,8 @@ def get_performer_detail(performer_id):
     try:
         # Get performer information
         performer_query = """
-            SELECT id, name, biography, birth_date, death_date, external_links, wikipedia_url, musicbrainz_id 
+            SELECT id, name, sort_name, biography, birth_date, death_date,
+                external_links, wikipedia_url, musicbrainz_id
             FROM performers
             WHERE id = %s
         """
@@ -254,6 +256,7 @@ def search_performers():
                     SELECT
                         id,
                         name,
+                        sort_name,
                         biography,
                         birth_date,
                         death_date,
@@ -279,6 +282,7 @@ def search_performers():
                     results.append({
                         'id': str(performer['id']),
                         'name': performer['name'],
+                        'sort_name': performer['sort_name'],
                         'biography': performer['biography'],
                         'birth_date': performer['birth_date'].isoformat() if performer['birth_date'] else None,
                         'death_date': performer['death_date'].isoformat() if performer['death_date'] else None,

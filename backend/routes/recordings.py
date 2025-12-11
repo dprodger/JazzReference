@@ -529,15 +529,16 @@ def get_recording_releases(recording_id):
                         jsonb_build_object(
                             'id', p.id,
                             'name', p.name,
+                            'sort_name', p.sort_name,
                             'instrument', i.name,
                             'role', rp.role
-                        ) ORDER BY 
-                            CASE rp.role 
-                                WHEN 'leader' THEN 1 
-                                WHEN 'sideman' THEN 2 
-                                ELSE 3 
+                        ) ORDER BY
+                            CASE rp.role
+                                WHEN 'leader' THEN 1
+                                WHEN 'sideman' THEN 2
+                                ELSE 3
                             END,
-                            p.name
+                            COALESCE(p.sort_name, p.name)
                     )
                     FROM recording_performers rp
                     JOIN performers p ON rp.performer_id = p.id
@@ -552,6 +553,7 @@ def get_recording_releases(recording_id):
                         jsonb_build_object(
                             'id', p.id,
                             'name', p.name,
+                            'sort_name', p.sort_name,
                             'role', relp.role
                         ) ORDER BY relp.role, COALESCE(p.sort_name, p.name)
                     )
