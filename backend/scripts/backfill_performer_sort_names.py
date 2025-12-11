@@ -125,8 +125,11 @@ Examples:
   # Actually update performers
   python backfill_performer_sort_names.py
 
-  # Limit to first 50 performers
-  python backfill_performer_sort_names.py --limit 50 --dry-run
+  # Skip Phase 2 (API lookups) - only use cached release data
+  python backfill_performer_sort_names.py --cache-only
+
+  # Limit API lookups in Phase 2 to first 50 performers
+  python backfill_performer_sort_names.py --limit 50
 
   # Force update even if sort_name already exists
   python backfill_performer_sort_names.py --force
@@ -144,6 +147,12 @@ Examples:
         '--force',
         action='store_true',
         help='Update performers even if they already have a sort_name'
+    )
+
+    script.parser.add_argument(
+        '--cache-only',
+        action='store_true',
+        help='Only use cached release data (skip Phase 2 API lookups)'
     )
 
     script.parser.add_argument(
@@ -165,7 +174,8 @@ Examples:
     script.print_header({
         "DRY RUN": args.dry_run,
         "FORCE": args.force,
-        "LIMIT": args.limit,
+        "CACHE ONLY": args.cache_only,
+        "LIMIT (Phase 2)": args.limit,
         "BATCH SIZE": args.batch_size,
         "API DELAY": f"{args.delay}s",
     })
@@ -175,155 +185,208 @@ Examples:
 
     # Stats tracking
     stats = {
-        'total_candidates': 0,
-        'already_has_sort_name': 0,
-        'no_mbid': 0,
-        'from_release_cache': 0,
-        'from_artist_cache': 0,
-        'api_fetched': 0,
-        'api_errors': 0,
-        'updated': 0,
-        'no_change': 0,
+        'phase1_cache_artists': 0,
+        'phase1_matched': 0,
+        'phase1_updated': 0,
+        'phase2_candidates': 0,
+        'phase2_from_artist_cache': 0,
+        'phase2_api_fetched': 0,
+        'phase2_api_errors': 0,
+        'phase2_updated': 0,
+        'phase2_skipped': 0,
     }
 
-    # Phase 1: Extract artist data from release cache files
+    # =========================================================================
+    # Phase 1: Bulk update from release cache (no API calls)
+    # =========================================================================
     script.logger.info("Phase 1: Extracting artist data from release cache files...")
     release_cache_artists = extract_artists_from_release_cache()
+    stats['phase1_cache_artists'] = len(release_cache_artists)
     script.logger.info(f"Found {len(release_cache_artists)} unique artists in release cache")
 
     with get_db_connection() as conn:
         with conn.cursor() as cur:
-            # Build query based on force mode
-            if args.force:
-                # Get all performers with musicbrainz_id
-                cur.execute("""
-                    SELECT id, name, musicbrainz_id, sort_name, artist_type, disambiguation
-                    FROM performers
-                    WHERE musicbrainz_id IS NOT NULL
-                    ORDER BY name
-                    LIMIT %s
-                """, (args.limit,))
-            else:
-                # Get only performers missing sort_name
-                cur.execute("""
-                    SELECT id, name, musicbrainz_id, sort_name, artist_type, disambiguation
-                    FROM performers
-                    WHERE musicbrainz_id IS NOT NULL
-                      AND sort_name IS NULL
-                    ORDER BY name
-                    LIMIT %s
-                """, (args.limit,))
+            # Get all MBIDs from cache that exist in our performers table
+            cache_mbids = list(release_cache_artists.keys())
 
-            performers = cur.fetchall()
-            stats['total_candidates'] = len(performers)
+            if cache_mbids:
+                script.logger.info(f"Phase 1: Matching against performers table...")
 
-            script.logger.info(f"Phase 2: Processing {len(performers)} performers...")
-
-            batch_count = 0
-
-            for performer in performers:
-                performer_id = performer['id']
-                name = performer['name']
-                mbid = performer['musicbrainz_id']
-                current_sort_name = performer['sort_name']
-
-                if not args.force and current_sort_name:
-                    stats['already_has_sort_name'] += 1
-                    continue
-
-                if not mbid:
-                    stats['no_mbid'] += 1
-                    continue
-
-                script.logger.debug(f"Processing: {name} ({mbid})")
-
-                # Try sources in order: release cache -> artist cache -> API
-                artist_data = None
-                source = None
-
-                # 1. Check release cache (extracted in Phase 1)
-                if mbid in release_cache_artists:
-                    artist_data = release_cache_artists[mbid]
-                    source = 'release_cache'
-                    stats['from_release_cache'] += 1
-                    script.logger.debug(f"  Found in release cache")
+                # Find performers that match cached MBIDs and need updating
+                if args.force:
+                    cur.execute("""
+                        SELECT id, name, musicbrainz_id, sort_name, artist_type, disambiguation
+                        FROM performers
+                        WHERE musicbrainz_id = ANY(%s)
+                    """, (cache_mbids,))
                 else:
-                    # 2. Try artist cache / API (get_artist_details handles both)
+                    cur.execute("""
+                        SELECT id, name, musicbrainz_id, sort_name, artist_type, disambiguation
+                        FROM performers
+                        WHERE musicbrainz_id = ANY(%s)
+                          AND sort_name IS NULL
+                    """, (cache_mbids,))
+
+                matched_performers = cur.fetchall()
+                stats['phase1_matched'] = len(matched_performers)
+                script.logger.info(f"Phase 1: Found {len(matched_performers)} performers to update from cache")
+
+                # Bulk update from cache
+                batch_count = 0
+                for performer in matched_performers:
+                    mbid = performer['musicbrainz_id']
+                    artist_data = release_cache_artists.get(mbid)
+
+                    if not artist_data:
+                        continue
+
+                    new_sort_name = artist_data.get('sort_name')
+                    new_artist_type = artist_data.get('artist_type')
+                    new_disambiguation = artist_data.get('disambiguation')
+
+                    # Skip if no change needed
+                    if (new_sort_name == performer['sort_name'] and
+                        new_artist_type == performer['artist_type'] and
+                        new_disambiguation == performer['disambiguation']):
+                        continue
+
+                    script.logger.info(
+                        f"  {performer['name']}: sort_name='{new_sort_name}', "
+                        f"type='{new_artist_type}' [release_cache]"
+                    )
+
+                    if not args.dry_run:
+                        cur.execute("""
+                            UPDATE performers
+                            SET sort_name = %s,
+                                artist_type = %s,
+                                disambiguation = %s,
+                                updated_at = CURRENT_TIMESTAMP
+                            WHERE id = %s
+                        """, (new_sort_name, new_artist_type, new_disambiguation, performer['id']))
+
+                        batch_count += 1
+                        if batch_count >= args.batch_size:
+                            conn.commit()
+                            script.logger.info(f"  Phase 1: Committed batch of {batch_count} updates")
+                            batch_count = 0
+
+                    stats['phase1_updated'] += 1
+
+                # Final Phase 1 commit
+                if not args.dry_run and batch_count > 0:
+                    conn.commit()
+                    script.logger.info(f"  Phase 1: Committed final batch of {batch_count} updates")
+
+            script.logger.info(f"Phase 1 complete: Updated {stats['phase1_updated']} performers from release cache")
+
+            # =========================================================================
+            # Phase 2: API lookups for remaining performers (if not --cache-only)
+            # =========================================================================
+            if args.cache_only:
+                script.logger.info("Phase 2: Skipped (--cache-only mode)")
+            else:
+                script.logger.info("Phase 2: Fetching remaining performers from MusicBrainz API...")
+
+                # Find performers still missing sort_name
+                if args.force:
+                    cur.execute("""
+                        SELECT id, name, musicbrainz_id, sort_name, artist_type, disambiguation
+                        FROM performers
+                        WHERE musicbrainz_id IS NOT NULL
+                          AND musicbrainz_id != ALL(%s)
+                        ORDER BY name
+                        LIMIT %s
+                    """, (cache_mbids if cache_mbids else [], args.limit))
+                else:
+                    cur.execute("""
+                        SELECT id, name, musicbrainz_id, sort_name, artist_type, disambiguation
+                        FROM performers
+                        WHERE musicbrainz_id IS NOT NULL
+                          AND sort_name IS NULL
+                        ORDER BY name
+                        LIMIT %s
+                    """, (args.limit,))
+
+                remaining_performers = cur.fetchall()
+                stats['phase2_candidates'] = len(remaining_performers)
+                script.logger.info(f"Phase 2: Found {len(remaining_performers)} performers needing API lookup")
+
+                batch_count = 0
+                for performer in remaining_performers:
+                    performer_id = performer['id']
+                    name = performer['name']
+                    mbid = performer['musicbrainz_id']
+
+                    if not mbid:
+                        stats['phase2_skipped'] += 1
+                        continue
+
+                    script.logger.debug(f"Processing: {name} ({mbid})")
+
+                    # Try artist cache / API
                     try:
                         api_data = mb_searcher.get_artist_details(mbid)
 
-                        if api_data:
-                            artist_data = {
-                                'sort_name': api_data.get('sort-name'),
-                                'artist_type': api_data.get('type'),
-                                'disambiguation': api_data.get('disambiguation')
-                            }
+                        if not api_data:
+                            script.logger.debug(f"  No data found for {name}")
+                            stats['phase2_api_errors'] += 1
+                            continue
 
-                            # Check if API call was made (vs artist cache hit)
-                            if mb_searcher.last_made_api_call:
-                                source = 'api'
-                                stats['api_fetched'] += 1
-                                # Additional delay after API calls
-                                time.sleep(args.delay)
-                            else:
-                                source = 'artist_cache'
-                                stats['from_artist_cache'] += 1
+                        # Check if API call was made (vs artist cache hit)
+                        if mb_searcher.last_made_api_call:
+                            source = 'api'
+                            stats['phase2_api_fetched'] += 1
+                            time.sleep(args.delay)
+                        else:
+                            source = 'artist_cache'
+                            stats['phase2_from_artist_cache'] += 1
+
+                        new_sort_name = api_data.get('sort-name')
+                        new_artist_type = api_data.get('type')
+                        new_disambiguation = api_data.get('disambiguation')
+
+                        # Skip if no change
+                        if (new_sort_name == performer['sort_name'] and
+                            new_artist_type == performer['artist_type'] and
+                            new_disambiguation == performer['disambiguation']):
+                            stats['phase2_skipped'] += 1
+                            continue
+
+                        script.logger.info(
+                            f"  {name}: sort_name='{new_sort_name}', "
+                            f"type='{new_artist_type}', "
+                            f"disambiguation='{new_disambiguation[:50] if new_disambiguation else None}...' "
+                            f"[{source}]"
+                        )
+
+                        if not args.dry_run:
+                            cur.execute("""
+                                UPDATE performers
+                                SET sort_name = %s,
+                                    artist_type = %s,
+                                    disambiguation = %s,
+                                    updated_at = CURRENT_TIMESTAMP
+                                WHERE id = %s
+                            """, (new_sort_name, new_artist_type, new_disambiguation, performer_id))
+
+                            batch_count += 1
+                            if batch_count >= args.batch_size:
+                                conn.commit()
+                                script.logger.info(f"  Phase 2: Committed batch of {batch_count} updates")
+                                batch_count = 0
+
+                        stats['phase2_updated'] += 1
 
                     except Exception as e:
                         script.logger.warning(f"  Error fetching {name} ({mbid}): {e}")
-                        stats['api_errors'] += 1
+                        stats['phase2_api_errors'] += 1
                         continue
 
-                if not artist_data:
-                    script.logger.debug(f"  No data found for {name}")
-                    stats['api_errors'] += 1
-                    continue
-
-                # Extract the fields we want
-                new_sort_name = artist_data.get('sort_name')
-                new_artist_type = artist_data.get('artist_type')
-                new_disambiguation = artist_data.get('disambiguation')
-
-                # Check if there's anything to update
-                if (new_sort_name == current_sort_name and
-                    new_artist_type == performer['artist_type'] and
-                    new_disambiguation == performer['disambiguation']):
-                    stats['no_change'] += 1
-                    script.logger.debug(f"  No change needed for {name}")
-                    continue
-
-                # Log what we're updating
-                script.logger.info(
-                    f"  {name}: sort_name='{new_sort_name}', "
-                    f"type='{new_artist_type}', "
-                    f"disambiguation='{new_disambiguation[:50] if new_disambiguation else None}...' "
-                    f"[{source}]"
-                )
-
-                if not args.dry_run:
-                    cur.execute("""
-                        UPDATE performers
-                        SET sort_name = %s,
-                            artist_type = %s,
-                            disambiguation = %s,
-                            updated_at = CURRENT_TIMESTAMP
-                        WHERE id = %s
-                    """, (new_sort_name, new_artist_type, new_disambiguation, performer_id))
-
-                    batch_count += 1
-
-                    # Commit in batches
-                    if batch_count >= args.batch_size:
-                        conn.commit()
-                        script.logger.info(f"  Committed batch of {batch_count} updates")
-                        batch_count = 0
-
-                stats['updated'] += 1
-
-            # Final commit
-            if not args.dry_run and batch_count > 0:
-                conn.commit()
-                script.logger.info(f"  Committed final batch of {batch_count} updates")
+                # Final Phase 2 commit
+                if not args.dry_run and batch_count > 0:
+                    conn.commit()
+                    script.logger.info(f"  Phase 2: Committed final batch of {batch_count} updates")
 
     # Print summary
     script.print_summary(stats)
