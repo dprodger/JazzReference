@@ -6,6 +6,7 @@ UPDATED: Recording-Centric Architecture
 - Performers come from recording_performers table (not release_performers)
 - Spotify URL and album art come from default_release or best release via subqueries
 - Dropped columns (spotify_url, spotify_track_id, album_art_*) removed from recordings table
+- Album title now comes from default release (releases.title via default_release_id)
 
 UPDATED: Release Imagery Support
 - Album art now checks release_imagery table first (CAA images)
@@ -225,7 +226,7 @@ def get_song_summary(song_id):
             featured_recordings AS (
                 SELECT
                     r.id,
-                    r.album_title,
+                    def_rel.title as album_title,
                     r.recording_date,
                     r.recording_year,
                     r.label,
@@ -279,11 +280,12 @@ def get_song_summary(song_id):
                     ) as authority_sources
                 FROM recordings r
                 INNER JOIN song_authority_recommendations sar ON r.id = sar.recording_id
+                LEFT JOIN releases def_rel ON r.default_release_id = def_rel.id
                 LEFT JOIN recording_performers rp ON r.id = rp.recording_id
                 LEFT JOIN performers p ON rp.performer_id = p.id
                 LEFT JOIN instruments i ON rp.instrument_id = i.id
                 WHERE r.song_id = %s
-                GROUP BY r.id, r.album_title, r.recording_date, r.recording_year,
+                GROUP BY r.id, def_rel.title, r.recording_date, r.recording_year,
                          r.label, r.default_release_id,
                          r.youtube_url, r.apple_music_url, r.musicbrainz_id,
                          r.is_canonical, r.notes
@@ -297,10 +299,11 @@ def get_song_summary(song_id):
                     st.youtube_url,
                     st.created_at,
                     st.updated_at,
-                    r.album_title,
+                    def_rel.title as album_title,
                     r.recording_year
                 FROM solo_transcriptions st
                 LEFT JOIN recordings r ON st.recording_id = r.id
+                LEFT JOIN releases def_rel ON r.default_release_id = def_rel.id
                 WHERE st.song_id = %s
                 ORDER BY r.recording_year DESC
             )
@@ -365,7 +368,7 @@ def get_song_recordings(song_id):
         recordings_query = f"""
             SELECT
                 r.id,
-                r.album_title,
+                def_rel.title as album_title,
                 r.recording_date,
                 r.recording_year,
                 r.label,
@@ -422,12 +425,13 @@ def get_song_recordings(song_id):
                     ARRAY[]::text[]
                 ) as authority_sources
             FROM recordings r
+            LEFT JOIN releases def_rel ON r.default_release_id = def_rel.id
             LEFT JOIN recording_performers rp ON r.id = rp.recording_id
             LEFT JOIN performers p ON rp.performer_id = p.id
             LEFT JOIN instruments i ON rp.instrument_id = i.id
             LEFT JOIN song_authority_recommendations sar ON r.id = sar.recording_id
             WHERE r.song_id = %s
-            GROUP BY r.id, r.album_title, r.recording_date, r.recording_year,
+            GROUP BY r.id, def_rel.title, r.recording_date, r.recording_year,
                      r.label, r.default_release_id,
                      r.youtube_url, r.apple_music_url, r.musicbrainz_id,
                      r.is_canonical, r.notes
@@ -513,9 +517,9 @@ def get_song_detail(song_id):
                 WHERE s.id = %s
             ),
             recordings_with_performers AS (
-                SELECT 
+                SELECT
                     r.id,
-                    r.album_title,
+                    def_rel.title as album_title,
                     r.recording_date,
                     r.recording_year,
                     r.label,
@@ -531,9 +535,9 @@ def get_song_detail(song_id):
                         (SELECT COALESCE(rr_sub.spotify_track_url, rel_sub.spotify_album_url)
                          FROM recording_releases rr_sub
                          JOIN releases rel_sub ON rr_sub.release_id = rel_sub.id
-                         WHERE rr_sub.recording_id = r.id 
+                         WHERE rr_sub.recording_id = r.id
                            AND (rr_sub.spotify_track_url IS NOT NULL OR rel_sub.spotify_album_url IS NOT NULL)
-                         ORDER BY 
+                         ORDER BY
                            CASE WHEN rr_sub.spotify_track_url IS NOT NULL THEN 0 ELSE 1 END,
                            rel_sub.release_year DESC NULLS LAST
                          LIMIT 1)
@@ -560,11 +564,11 @@ def get_song_detail(song_id):
                                 'name', p.name,
                                 'instrument', i.name,
                                 'role', rp.role
-                            ) ORDER BY 
-                                CASE rp.role 
-                                    WHEN 'leader' THEN 1 
-                                    WHEN 'sideman' THEN 2 
-                                    ELSE 3 
+                            ) ORDER BY
+                                CASE rp.role
+                                    WHEN 'leader' THEN 1
+                                    WHEN 'sideman' THEN 2
+                                    ELSE 3
                                 END,
                                 p.name
                         ) FILTER (WHERE p.id IS NOT NULL),
@@ -578,34 +582,36 @@ def get_song_detail(song_id):
                         ARRAY[]::text[]
                     ) as authority_sources
                 FROM recordings r
+                LEFT JOIN releases def_rel ON r.default_release_id = def_rel.id
                 LEFT JOIN recording_performers rp ON r.id = rp.recording_id
                 LEFT JOIN performers p ON rp.performer_id = p.id
                 LEFT JOIN instruments i ON rp.instrument_id = i.id
-                LEFT JOIN song_authority_recommendations sar 
+                LEFT JOIN song_authority_recommendations sar
                     ON r.id = sar.recording_id
                 WHERE r.song_id = %s
-                GROUP BY r.id, r.album_title, r.recording_date, r.recording_year,
+                GROUP BY r.id, def_rel.title, r.recording_date, r.recording_year,
                          r.label, r.default_release_id,
                          r.youtube_url, r.apple_music_url, r.musicbrainz_id,
                          r.is_canonical, r.notes
                 ORDER BY {recordings_order}
             ),
             transcriptions_data AS (
-                SELECT 
+                SELECT
                     st.id,
                     st.song_id,
                     st.recording_id,
                     st.youtube_url,
                     st.created_at,
                     st.updated_at,
-                    r.album_title,
+                    def_rel.title as album_title,
                     r.recording_year
                 FROM solo_transcriptions st
                 LEFT JOIN recordings r ON st.recording_id = r.id
+                LEFT JOIN releases def_rel ON r.default_release_id = def_rel.id
                 WHERE st.song_id = %s
                 ORDER BY r.recording_year DESC
             )
-            SELECT 
+            SELECT
                 (SELECT row_to_json(song_data.*) FROM song_data) as song,
                 (SELECT json_agg(recordings_with_performers.*) FROM recordings_with_performers) as recordings,
                 (SELECT json_agg(transcriptions_data.*) FROM transcriptions_data) as transcriptions
@@ -883,12 +889,13 @@ def get_song_authority_recommendations(song_id):
                 
                 # Get all recommendations with optional recording details
                 # UPDATED: Spotify URL and album art from releases with release_imagery priority
+                # UPDATED: matched_album_title now comes from default release
                 cur.execute(f"""
                     SELECT sar.id, sar.source, sar.recommendation_text, sar.source_url,
                            sar.artist_name, sar.album_title, sar.recording_year,
                            sar.itunes_album_id, sar.itunes_track_id,
                            sar.recording_id,
-                           r.album_title as matched_album_title,
+                           def_rel.title as matched_album_title,
                            r.recording_year as matched_year,
                            -- Get Spotify URL from default release or best available
                            COALESCE(
@@ -912,6 +919,7 @@ def get_song_authority_recommendations(song_id):
                            {AUTHORITY_ALBUM_ART_SQL}
                     FROM song_authority_recommendations sar
                     LEFT JOIN recordings r ON sar.recording_id = r.id
+                    LEFT JOIN releases def_rel ON r.default_release_id = def_rel.id
                     WHERE sar.song_id = %s
                     ORDER BY 
                         CASE WHEN sar.recording_id IS NOT NULL THEN 0 ELSE 1 END,

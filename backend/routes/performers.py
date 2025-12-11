@@ -184,14 +184,15 @@ def get_performer_detail(performer_id):
         """
         performer['instruments'] = db_tools.execute_query(instruments_query, (performer_id,))
         
-        # Get recordings
+        # Get recordings (album_title from default release)
         recordings_query = """
-            SELECT DISTINCT s.id as song_id, s.title as song_title, 
-                   r.id as recording_id, r.album_title, r.recording_year, 
+            SELECT DISTINCT s.id as song_id, s.title as song_title,
+                   r.id as recording_id, def_rel.title as album_title, r.recording_year,
                    r.is_canonical, rp.role
             FROM recording_performers rp
             JOIN recordings r ON rp.recording_id = r.id
             JOIN songs s ON r.song_id = s.id
+            LEFT JOIN releases def_rel ON r.default_release_id = def_rel.id
             WHERE rp.performer_id = %s
             ORDER BY r.recording_year DESC NULLS LAST, s.title
         """

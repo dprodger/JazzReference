@@ -5,6 +5,7 @@ Recording API Routes - Recording-Centric Performer Architecture
 UPDATED: Recording-Centric Architecture
 - Performers come from recording_performers table (not release_performers)
 - Spotify URL and album art come from default_release or best release
+- Album title now comes from default release (releases.title via default_release_id)
 - release_performers is now for release-specific credits (producers, engineers)
 
 UPDATED: Release Imagery Support
@@ -192,12 +193,12 @@ def get_recordings():
     
     try:
         if search_query:
-            # Search across album title, performer names, and song title
+            # Search across album title (from default release), performer names, and song title
             query = f"""
                 SELECT DISTINCT ON (r.id)
                     r.id,
                     r.song_id,
-                    r.album_title,
+                    def_rel.title as album_title,
                     r.recording_date,
                     r.recording_year,
                     r.label,
@@ -213,9 +214,9 @@ def get_recordings():
                         (SELECT COALESCE(rr.spotify_track_url, rel.spotify_album_url)
                          FROM recording_releases rr
                          JOIN releases rel ON rr.release_id = rel.id
-                         WHERE rr.recording_id = r.id 
+                         WHERE rr.recording_id = r.id
                            AND (rr.spotify_track_url IS NOT NULL OR rel.spotify_album_url IS NOT NULL)
-                         ORDER BY 
+                         ORDER BY
                            CASE WHEN rr.spotify_track_url IS NOT NULL THEN 0 ELSE 1 END,
                            rel.release_year DESC NULLS LAST
                          LIMIT 1)
@@ -238,10 +239,11 @@ def get_recordings():
                     s.composer
                 FROM recordings r
                 JOIN songs s ON r.song_id = s.id
+                LEFT JOIN releases def_rel ON r.default_release_id = def_rel.id
                 LEFT JOIN recording_performers rp ON r.id = rp.recording_id
                 LEFT JOIN performers p ON rp.performer_id = p.id
                 WHERE (
-                    r.album_title ILIKE %s OR
+                    def_rel.title ILIKE %s OR
                     p.name ILIKE %s OR
                     s.title ILIKE %s
                 )
@@ -250,15 +252,15 @@ def get_recordings():
             """
             search_pattern = f'%{search_query}%'
             recordings = db_tools.execute_query(
-                query, 
+                query,
                 (search_pattern, search_pattern, search_pattern, limit)
             )
         else:
             query = f"""
-                SELECT 
+                SELECT
                     r.id,
                     r.song_id,
-                    r.album_title,
+                    def_rel.title as album_title,
                     r.recording_date,
                     r.recording_year,
                     r.label,
@@ -274,9 +276,9 @@ def get_recordings():
                         (SELECT COALESCE(rr.spotify_track_url, rel.spotify_album_url)
                          FROM recording_releases rr
                          JOIN releases rel ON rr.release_id = rel.id
-                         WHERE rr.recording_id = r.id 
+                         WHERE rr.recording_id = r.id
                            AND (rr.spotify_track_url IS NOT NULL OR rel.spotify_album_url IS NOT NULL)
-                         ORDER BY 
+                         ORDER BY
                            CASE WHEN rr.spotify_track_url IS NOT NULL THEN 0 ELSE 1 END,
                            rel.release_year DESC NULLS LAST
                          LIMIT 1)
@@ -299,6 +301,7 @@ def get_recordings():
                     s.composer
                 FROM recordings r
                 JOIN songs s ON r.song_id = s.id
+                LEFT JOIN releases def_rel ON r.default_release_id = def_rel.id
                 ORDER BY r.recording_year DESC NULLS LAST
                 LIMIT %s
             """
@@ -336,10 +339,10 @@ def get_recording_detail(recording_id):
         # Single optimized query using CTEs for recording, releases, and authority data
         combined_query = f"""
             WITH recording_data AS (
-                SELECT 
+                SELECT
                     r.id,
                     r.song_id,
-                    r.album_title,
+                    def_rel.title as album_title,
                     r.recording_date,
                     r.recording_year,
                     r.label,
@@ -355,9 +358,9 @@ def get_recording_detail(recording_id):
                         (SELECT COALESCE(rr_sub.spotify_track_url, rel_sub.spotify_album_url)
                          FROM recording_releases rr_sub
                          JOIN releases rel_sub ON rr_sub.release_id = rel_sub.id
-                         WHERE rr_sub.recording_id = r.id 
+                         WHERE rr_sub.recording_id = r.id
                            AND (rr_sub.spotify_track_url IS NOT NULL OR rel_sub.spotify_album_url IS NOT NULL)
-                         ORDER BY 
+                         ORDER BY
                            CASE WHEN rr_sub.spotify_track_url IS NOT NULL THEN 0 ELSE 1 END,
                            rel_sub.release_year DESC NULLS LAST
                          LIMIT 1)
@@ -380,6 +383,7 @@ def get_recording_detail(recording_id):
                     s.composer
                 FROM recordings r
                 JOIN songs s ON r.song_id = s.id
+                LEFT JOIN releases def_rel ON r.default_release_id = def_rel.id
                 WHERE r.id = %s
             ),
             -- Get all releases for this recording with performer counts (from recording_performers)

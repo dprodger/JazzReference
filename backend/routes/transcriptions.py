@@ -23,19 +23,20 @@ def get_song_transcriptions(song_id):
     """Get all solo transcriptions for a specific song"""
     try:
         query = """
-            SELECT 
+            SELECT
                 st.id,
                 st.song_id,
                 st.recording_id,
                 st.youtube_url,
                 st.created_at,
                 st.updated_at,
-                r.album_title,
+                def_rel.title as album_title,
                 r.recording_year,
                 s.title as song_title
             FROM solo_transcriptions st
             JOIN songs s ON st.song_id = s.id
             JOIN recordings r ON st.recording_id = r.id
+            LEFT JOIN releases def_rel ON r.default_release_id = def_rel.id
             WHERE st.song_id = %s
             ORDER BY r.recording_year DESC
         """
@@ -57,7 +58,7 @@ def get_recording_transcriptions(recording_id):
     """Get all solo transcriptions for a specific recording"""
     try:
         query = """
-            SELECT 
+            SELECT
                 st.id,
                 st.song_id,
                 st.recording_id,
@@ -65,11 +66,12 @@ def get_recording_transcriptions(recording_id):
                 st.created_at,
                 st.updated_at,
                 s.title as song_title,
-                r.album_title,
+                def_rel.title as album_title,
                 r.recording_year
             FROM solo_transcriptions st
             JOIN songs s ON st.song_id = s.id
             JOIN recordings r ON st.recording_id = r.id
+            LEFT JOIN releases def_rel ON r.default_release_id = def_rel.id
             WHERE st.recording_id = %s
             ORDER BY st.created_at DESC
         """
@@ -91,7 +93,7 @@ def get_transcription_detail(transcription_id):
     """Get detailed information about a specific solo transcription"""
     try:
         query = """
-            SELECT 
+            SELECT
                 st.id,
                 st.song_id,
                 st.recording_id,
@@ -100,12 +102,13 @@ def get_transcription_detail(transcription_id):
                 st.updated_at,
                 s.title as song_title,
                 s.composer,
-                r.album_title,
+                def_rel.title as album_title,
                 r.recording_year,
                 r.label
             FROM solo_transcriptions st
             JOIN songs s ON st.song_id = s.id
             JOIN recordings r ON st.recording_id = r.id
+            LEFT JOIN releases def_rel ON r.default_release_id = def_rel.id
             WHERE st.id = %s
         """
         

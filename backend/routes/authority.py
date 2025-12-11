@@ -228,7 +228,7 @@ def get_song_authorities(song_id):
                 
                 # Get all authority recommendations for this song
                 cur.execute("""
-                    SELECT 
+                    SELECT
                         sar.id,
                         sar.song_id,
                         sar.recording_id,
@@ -242,12 +242,13 @@ def get_song_authorities(song_id):
                         sar.itunes_track_id,
                         sar.captured_at,
                         sar.created_at,
-                        r.album_title as matched_album_title,
+                        def_rel.title as matched_album_title,
                         r.recording_year as matched_year
                     FROM song_authority_recommendations sar
                     LEFT JOIN recordings r ON sar.recording_id = r.id
+                    LEFT JOIN releases def_rel ON r.default_release_id = def_rel.id
                     WHERE sar.song_id = %s
-                    ORDER BY 
+                    ORDER BY
                         CASE WHEN sar.recording_id IS NOT NULL THEN 0 ELSE 1 END,
                         sar.source,
                         sar.artist_name
