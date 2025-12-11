@@ -349,15 +349,11 @@ def get_song_recordings(song_id):
         if sort_by == 'name':
             recordings_order = """
                 (
-                    SELECT COALESCE(
-                        SUBSTRING(p2.name FROM '([^ ]+)$'),
-                        p2.name,
-                        'ZZZ'
-                    )
+                    SELECT COALESCE(p2.sort_name, p2.name, 'ZZZ')
                     FROM recording_performers rp2
                     JOIN performers p2 ON rp2.performer_id = p2.id
                     WHERE rp2.recording_id = r.id AND rp2.role = 'leader'
-                    ORDER BY p2.name
+                    ORDER BY COALESCE(p2.sort_name, p2.name)
                     LIMIT 1
                 ) ASC NULLS LAST,
                 r.recording_year ASC NULLS LAST
@@ -481,18 +477,14 @@ def get_song_detail(song_id):
         
         # Build ORDER BY clause based on sort preference
         if sort_by == 'name':
-            # Sort alphabetically by leader's last name (extract last word of name)
+            # Sort alphabetically by leader's sort_name (or name as fallback)
             recordings_order = """
                 (
-                    SELECT COALESCE(
-                        SUBSTRING(p2.name FROM '([^ ]+)$'),
-                        p2.name,
-                        'ZZZ'
-                    )
+                    SELECT COALESCE(p2.sort_name, p2.name, 'ZZZ')
                     FROM recording_performers rp2
                     JOIN performers p2 ON rp2.performer_id = p2.id
                     WHERE rp2.recording_id = r.id AND rp2.role = 'leader'
-                    ORDER BY p2.name
+                    ORDER BY COALESCE(p2.sort_name, p2.name)
                     LIMIT 1
                 ) ASC NULLS LAST,
                 r.recording_year ASC NULLS LAST

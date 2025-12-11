@@ -553,7 +553,7 @@ def get_recording_releases(recording_id):
                             'id', p.id,
                             'name', p.name,
                             'role', relp.role
-                        ) ORDER BY relp.role, p.name
+                        ) ORDER BY relp.role, COALESCE(p.sort_name, p.name)
                     )
                     FROM release_performers relp
                     JOIN performers p ON relp.performer_id = p.id

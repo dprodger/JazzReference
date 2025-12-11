@@ -656,7 +656,7 @@ def get_existing_recordings_for_song(song_id):
                 LEFT JOIN recording_performers rp ON rec.id = rp.recording_id AND rp.role = 'leader'
                 LEFT JOIN performers p ON rp.performer_id = p.id
                 WHERE rec.song_id = %s
-                ORDER BY rec.recording_year, p.name
+                ORDER BY rec.recording_year, COALESCE(p.sort_name, p.name)
             """, (song_id,))
 
             recordings = []

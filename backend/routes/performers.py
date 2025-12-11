@@ -21,18 +21,18 @@ def get_performers():
     try:
         if search_query:
             query = """
-                SELECT id, name, biography, birth_date, death_date, 
+                SELECT id, name, biography, birth_date, death_date,
                     external_links, wikipedia_url, musicbrainz_id
                 FROM performers
                 WHERE name ILIKE %s
-                ORDER BY name
+                ORDER BY COALESCE(sort_name, name)
             """
             params = (f'%{search_query}%',)
         else:
             query = """
                 SELECT id, name, biography, birth_date, death_date, external_links, wikipedia_url, musicbrainz_id
                 FROM performers
-                ORDER BY name
+                ORDER BY COALESCE(sort_name, name)
             """
             params = None
         
@@ -251,7 +251,7 @@ def search_performers():
                 # Search for performers with names containing the search term (case-insensitive)
                 # Use ILIKE for case-insensitive matching
                 cur.execute("""
-                    SELECT 
+                    SELECT
                         id,
                         name,
                         biography,
@@ -260,11 +260,11 @@ def search_performers():
                         musicbrainz_id
                     FROM performers
                     WHERE LOWER(name) LIKE LOWER(%s)
-                    ORDER BY 
+                    ORDER BY
                         -- Exact matches first
                         CASE WHEN LOWER(name) = LOWER(%s) THEN 0 ELSE 1 END,
-                        -- Then by name
-                        name
+                        -- Then by sort_name (falling back to name)
+                        COALESCE(sort_name, name)
                     LIMIT 10
                 """, (f'%{name}%', name))
                 
