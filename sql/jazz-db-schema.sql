@@ -28,6 +28,9 @@ CREATE TABLE songs (
 CREATE TABLE performers (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name VARCHAR(255) NOT NULL,
+    sort_name VARCHAR(255),           -- MusicBrainz sort name (e.g., "Davis, Miles")
+    artist_type VARCHAR(50),          -- MusicBrainz type: Person, Group, Orchestra, etc.
+    disambiguation VARCHAR(500),      -- MusicBrainz disambiguation text
     biography TEXT,
     birth_date DATE,
     death_date DATE,
@@ -1695,3 +1698,26 @@ COMMENT ON COLUMN releases.cover_art_checked_at IS
 
 -- Check indexes
 -- SELECT indexname FROM pg_indexes WHERE tablename = 'release_imagery';
+
+
+-- ============================================================================
+-- Migration: Add MusicBrainz metadata fields to performers
+-- Description: Adds sort_name, artist_type, and disambiguation fields
+-- ============================================================================
+
+-- Add sort_name column (e.g., "Davis, Miles" for "Miles Davis")
+ALTER TABLE performers ADD COLUMN IF NOT EXISTS sort_name VARCHAR(255);
+
+-- Add artist_type column (Person, Group, Orchestra, etc.)
+ALTER TABLE performers ADD COLUMN IF NOT EXISTS artist_type VARCHAR(50);
+
+-- Add disambiguation column (helpful text to identify artist)
+ALTER TABLE performers ADD COLUMN IF NOT EXISTS disambiguation VARCHAR(500);
+
+-- Add index for sort_name since it will be used for sorting
+CREATE INDEX IF NOT EXISTS idx_performers_sort_name ON performers(sort_name) WHERE sort_name IS NOT NULL;
+
+-- Add comments for documentation
+COMMENT ON COLUMN performers.sort_name IS 'MusicBrainz sort name for sorting (e.g., "Davis, Miles" for "Miles Davis")';
+COMMENT ON COLUMN performers.artist_type IS 'MusicBrainz artist type: Person, Group, Orchestra, Choir, Character, Other';
+COMMENT ON COLUMN performers.disambiguation IS 'MusicBrainz disambiguation text to help identify artist (e.g., "jazz trumpeter, bandleader")';

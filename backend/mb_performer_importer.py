@@ -312,7 +312,14 @@ class PerformerImporter:
                 
                 if not performer_id:
                     # Need to create this performer (not in DB)
-                    performer_id = self._create_performer(conn, performer_name, performer_mbid)
+                    performer_id = self._create_performer(
+                        conn,
+                        performer_name,
+                        performer_mbid,
+                        sort_name=performer_data.get('sort_name'),
+                        artist_type=performer_data.get('artist_type'),
+                        disambiguation=performer_data.get('disambiguation')
+                    )
                     if performer_id:
                         # Add to cache for future lookups in this batch
                         if performer_mbid:
@@ -449,35 +456,40 @@ class PerformerImporter:
             
             return {row['performer_id'] for row in cur.fetchall()}
     
-    def _create_performer(self, conn, name: str, mbid: str = None) -> str:
+    def _create_performer(self, conn, name: str, mbid: str = None,
+                          sort_name: str = None, artist_type: str = None,
+                          disambiguation: str = None) -> str:
         """
         Create a new performer in the database.
-        
+
         Called only when batch lookup confirms performer doesn't exist.
         Uses savepoint to handle potential conflicts gracefully.
-        
+
         Args:
             conn: Database connection
             name: Performer name
             mbid: Optional MusicBrainz ID
-            
+            sort_name: Optional MusicBrainz sort name (e.g., "Davis, Miles")
+            artist_type: Optional MusicBrainz artist type (Person, Group, etc.)
+            disambiguation: Optional MusicBrainz disambiguation text
+
         Returns:
             New performer ID, or None on failure
         """
         if self.dry_run:
             logger.info(f"  [DRY RUN] Would create performer: {name}")
             return None
-        
+
         with conn.cursor() as cur:
             # Use savepoint for atomic insert attempt
             cur.execute("SAVEPOINT create_performer")
             try:
                 cur.execute("""
-                    INSERT INTO performers (name, musicbrainz_id)
-                    VALUES (%s, %s)
+                    INSERT INTO performers (name, musicbrainz_id, sort_name, artist_type, disambiguation)
+                    VALUES (%s, %s, %s, %s, %s)
                     RETURNING id
-                """, (name, mbid))
-                
+                """, (name, mbid, sort_name, artist_type, disambiguation))
+
                 result = cur.fetchone()
                 cur.execute("RELEASE SAVEPOINT create_performer")
                 if result:
@@ -488,7 +500,7 @@ class PerformerImporter:
                 # Rollback to savepoint and try to find existing performer
                 cur.execute("ROLLBACK TO SAVEPOINT create_performer")
                 logger.debug(f"  INSERT failed for {name}, looking up: {e}")
-                
+
                 # Try to find by MBID first
                 if mbid:
                     cur.execute("""
@@ -497,7 +509,7 @@ class PerformerImporter:
                     result = cur.fetchone()
                     if result:
                         return result['id']
-                
+
                 # Try to find by name
                 cur.execute("""
                     SELECT id FROM performers WHERE LOWER(name) = LOWER(%s)
@@ -505,7 +517,7 @@ class PerformerImporter:
                 result = cur.fetchone()
                 if result:
                     return result['id']
-        
+
         return None    
     # ========================================================================
     # Helper methods for performer counts and logging
@@ -598,9 +610,12 @@ class PerformerImporter:
                 performer_id = self.get_or_create_performer(
                     conn,
                     credit['name'],
-                    credit.get('mbid')
+                    credit.get('mbid'),
+                    sort_name=credit.get('sort_name'),
+                    artist_type=credit.get('artist_type'),
+                    disambiguation=credit.get('disambiguation')
                 )
-                
+
                 if not performer_id:
                     continue
                 
@@ -628,35 +643,38 @@ class PerformerImporter:
     def _extract_release_credits(self, release_details):
         """Extract non-performer credits from release data"""
         credits = []
-        
+
         relations = release_details.get('relations') or []
-        
+
         for relation in relations:
             if not relation or not isinstance(relation, dict):
                 continue
-            
+
             rel_type = relation.get('type', '')
             target_type = relation.get('target-type', '')
-            
+
             # Only process artist relationships
             if target_type != 'artist':
                 continue
-            
+
             # Only process non-performer roles
-            if rel_type not in ['producer', 'engineer', 'mix', 'mastering', 
+            if rel_type not in ['producer', 'engineer', 'mix', 'mastering',
                                'recording', 'programming']:
                 continue
-            
+
             artist = relation.get('artist')
             if not artist or not isinstance(artist, dict):
                 continue
-            
+
             credits.append({
                 'name': artist.get('name'),
                 'mbid': artist.get('id'),
+                'sort_name': artist.get('sort-name'),
+                'artist_type': artist.get('type'),
+                'disambiguation': artist.get('disambiguation'),
                 'role': rel_type
             })
-        
+
         return credits
     
     # ========================================================================
@@ -724,7 +742,15 @@ class PerformerImporter:
             return performers_with_instruments
         else:
             return [
-                {'name': a['name'], 'mbid': a['mbid'], 'instruments': [], 'role': 'performer'}
+                {
+                    'name': a['name'],
+                    'mbid': a['mbid'],
+                    'sort_name': a.get('sort_name'),
+                    'artist_type': a.get('artist_type'),
+                    'disambiguation': a.get('disambiguation'),
+                    'instruments': [],
+                    'role': 'performer'
+                }
                 for a in artists_from_credits
             ]
     
@@ -823,7 +849,7 @@ class PerformerImporter:
         """Parse artist credits to extract artist info"""
         if not artist_credits:
             return []
-        
+
         artists = []
         for credit in artist_credits:
             if isinstance(credit, dict) and 'artist' in credit:
@@ -831,45 +857,47 @@ class PerformerImporter:
                 artists.append({
                     'name': artist.get('name'),
                     'mbid': artist.get('id'),
-                    'sort_name': artist.get('sort-name')
+                    'sort_name': artist.get('sort-name'),
+                    'artist_type': artist.get('type'),
+                    'disambiguation': artist.get('disambiguation')
                 })
-        
+
         return artists
     
     def parse_artist_relationships(self, relations):
         """Parse MusicBrainz artist relationships to extract performer info"""
         if not relations:
             return []
-        
+
         performers = []
-        
+
         for relation in relations:
             if not relation or not isinstance(relation, dict):
                 continue
-            
+
             rel_type = relation.get('type', 'unknown')
             target_type = relation.get('target-type', 'unknown')
-            
+
             # Only process artist relationships
             if target_type != 'artist':
                 continue
-            
+
             if 'artist' not in relation:
                 continue
-            
+
             artist = relation.get('artist')
             if not artist or not isinstance(artist, dict):
                 continue
-            
+
             artist_name = artist.get('name')
             artist_mbid = artist.get('id')
-            
+
             if not artist_name:
                 continue
-            
+
             instruments = []
             role = rel_type
-            
+
             if rel_type == 'instrument':
                 # Extract instrument names from attributes
                 attributes = relation.get('attributes') or []
@@ -882,14 +910,17 @@ class PerformerImporter:
                 instruments.append('vocals')
             elif rel_type not in ['engineer', 'producer', 'mix', 'mastering']:
                 continue
-            
+
             performers.append({
                 'name': artist_name,
                 'mbid': artist_mbid,
+                'sort_name': artist.get('sort-name'),
+                'artist_type': artist.get('type'),
+                'disambiguation': artist.get('disambiguation'),
                 'instruments': instruments,
                 'role': role
             })
-        
+
         return performers
     
     def parse_release_artist_credits(self, release_data, target_recording_id=None):
@@ -936,6 +967,9 @@ class PerformerImporter:
                                 performers.append({
                                     'name': artist.get('name'),
                                     'mbid': artist.get('id'),
+                                    'sort_name': artist.get('sort-name'),
+                                    'artist_type': artist.get('type'),
+                                    'disambiguation': artist.get('disambiguation'),
                                     'instruments': [],
                                     'role': 'performer'
                                 })
@@ -949,7 +983,8 @@ class PerformerImporter:
     # Database helper methods
     # ========================================================================
     
-    def get_or_create_performer(self, conn, artist_name, artist_mbid=None):
+    def get_or_create_performer(self, conn, artist_name, artist_mbid=None,
+                                sort_name=None, artist_type=None, disambiguation=None):
         """Get existing performer or create new one"""
         with conn.cursor() as cur:
             # Try to find by MusicBrainz ID first
@@ -959,35 +994,35 @@ class PerformerImporter:
                     WHERE musicbrainz_id = %s
                 """, (artist_mbid,))
                 result = cur.fetchone()
-                
+
                 if result:
                     return result['id']
-            
+
             # Try to find by name
             cur.execute("""
                 SELECT id FROM performers
                 WHERE name ILIKE %s
             """, (artist_name,))
             result = cur.fetchone()
-            
+
             if result:
                 return result['id']
-            
+
             # Create new performer
             if self.dry_run:
                 logger.info(f"  [DRY RUN] Would create performer: {artist_name}")
                 return None
-            
+
             cur.execute("""
-                INSERT INTO performers (name, musicbrainz_id)
-                VALUES (%s, %s)
+                INSERT INTO performers (name, musicbrainz_id, sort_name, artist_type, disambiguation)
+                VALUES (%s, %s, %s, %s, %s)
                 RETURNING id
-            """, (artist_name, artist_mbid))
-            
+            """, (artist_name, artist_mbid, sort_name, artist_type, disambiguation))
+
             performer_id = cur.fetchone()['id']
             logger.info(f"  Created performer: {artist_name}")
             self.stats['performers_created'] += 1
-            
+
             return performer_id
     
     def get_or_create_instrument(self, conn, instrument_name):
