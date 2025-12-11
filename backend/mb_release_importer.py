@@ -386,17 +386,20 @@ class MBReleaseImporter:
                     if rel.get('id'):
                         all_mb_release_ids.append(rel.get('id'))
             
-            # 1. Batch fetch: recordings with performers (skip performer import)
+            # 1. Batch fetch: recordings with performers for THIS song (skip performer import)
             recordings_with_performers = self._get_recordings_with_performers(
-                conn, mb_recording_ids
+                conn, mb_recording_ids, song['id']
             )
             self.logger.debug(f"  Pre-fetched {len(recordings_with_performers)} recordings with performers")
             
-            # 2. Batch fetch: existing recordings by MB ID
+            # 2. Batch fetch: existing recordings by MB ID for THIS song
+            # NOTE: We filter by song_id to handle medley recordings correctly.
+            # A medley in MusicBrainz is one recording linked to multiple works,
+            # but we create separate recording entries for each song.
             existing_recordings = self._get_existing_recordings_batch(
-                conn, mb_recording_ids
+                conn, mb_recording_ids, song['id']
             )
-            self.logger.debug(f"  Pre-fetched {len(existing_recordings)} existing recordings")
+            self.logger.debug(f"  Pre-fetched {len(existing_recordings)} existing recordings for this song")
             
             # 3. Batch fetch: existing releases by MB ID
             existing_releases_all = self._get_existing_release_ids(
@@ -449,57 +452,71 @@ class MBReleaseImporter:
             'stats': self.stats
         }
     
-    def _get_recordings_with_performers(self, conn, mb_recording_ids: List[str]) -> Set[str]:
+    def _get_recordings_with_performers(self, conn, mb_recording_ids: List[str],
+                                         song_id: str) -> Set[str]:
         """
-        Get set of MusicBrainz recording IDs that already have performers linked.
-        
+        Get set of MusicBrainz recording IDs that already have performers linked
+        for a specific song.
+
         OPTIMIZATION: Single query to check all recordings at once.
         This allows us to skip add_performers_to_recording() entirely for
         recordings that already have performers, saving 4 DB queries each.
-        
+
+        NOTE: We filter by song_id because medley recordings may have performers
+        linked for one song but not another.
+
         Args:
             conn: Database connection
             mb_recording_ids: List of MusicBrainz recording IDs to check
-            
+            song_id: The song ID to filter by
+
         Returns:
-            Set of MB recording IDs that have at least one performer
+            Set of MB recording IDs that have at least one performer for this song
         """
         if not mb_recording_ids:
             return set()
-        
+
         with conn.cursor() as cur:
             cur.execute("""
                 SELECT DISTINCT r.musicbrainz_id
                 FROM recordings r
                 INNER JOIN recording_performers rp ON r.id = rp.recording_id
                 WHERE r.musicbrainz_id = ANY(%s)
-            """, (mb_recording_ids,))
-            
+                  AND r.song_id = %s
+            """, (mb_recording_ids, song_id))
+
             return {row['musicbrainz_id'] for row in cur.fetchall()}
     
-    def _get_existing_recordings_batch(self, conn, mb_recording_ids: List[str]) -> Dict[str, str]:
+    def _get_existing_recordings_batch(self, conn, mb_recording_ids: List[str],
+                                        song_id: str) -> Dict[str, str]:
         """
-        Batch fetch existing recordings by MusicBrainz ID.
-        
+        Batch fetch existing recordings by MusicBrainz ID for a specific song.
+
         OPTIMIZATION: Single query for all recordings instead of one per recording.
-        
+
+        NOTE: We filter by song_id because medley recordings in MusicBrainz are
+        linked to multiple works (songs). Each song should have its own recording
+        entry in our database, even if they share the same MB recording ID.
+
         Args:
             conn: Database connection
             mb_recording_ids: List of MusicBrainz recording IDs
-            
+            song_id: The song ID to filter by
+
         Returns:
             Dict mapping MB recording ID -> our database recording ID
         """
         if not mb_recording_ids:
             return {}
-        
+
         with conn.cursor() as cur:
             cur.execute("""
                 SELECT musicbrainz_id, id
                 FROM recordings
                 WHERE musicbrainz_id = ANY(%s)
-            """, (mb_recording_ids,))
-            
+                  AND song_id = %s
+            """, (mb_recording_ids, song_id))
+
             return {row['musicbrainz_id']: row['id'] for row in cur.fetchall()}
     
     def _get_all_recording_release_links(self, conn, recording_ids: List[str]) -> Dict[str, Set[str]]:
