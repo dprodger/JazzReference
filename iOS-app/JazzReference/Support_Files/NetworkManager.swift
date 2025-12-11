@@ -64,7 +64,7 @@ import SwiftUI
 import Combine
 
 class NetworkManager: ObservableObject {
-    static let baseURL = "https://www.approachnote.com/api"
+    static let baseURL = "https://approachnote.com/api"
     @Published var songs: [Song] = []
     @Published var performers: [Performer] = []
     @Published var isLoading = false

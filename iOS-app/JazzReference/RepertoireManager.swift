@@ -64,6 +64,12 @@ class RepertoireManager: ObservableObject {
     
     /// Load all repertoires from the API (requires authentication)
     func loadRepertoires() async {
+        // Skip if already loading (prevents duplicate concurrent requests)
+        guard !isLoading else {
+            print("📚 Already loading repertoires - skipping duplicate request")
+            return
+        }
+
         // Check authentication
         guard let authManager = authManager,
               authManager.isAuthenticated else {

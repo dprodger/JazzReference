@@ -6,7 +6,9 @@
 //
 
 import SwiftUI
+#if os(iOS)
 import UIKit
+#endif
 
 struct JazzTheme {
     // MARK: - Typography
@@ -173,6 +175,7 @@ struct JazzTheme {
         }
     }
 
+    #if os(iOS)
     // MARK: - UIKit Font Helpers
 
     /// Returns a UIFont for the heading style (for UIKit components like navigation bars)
@@ -241,9 +244,11 @@ struct JazzTheme {
         UINavigationBar.appearance().scrollEdgeAppearance = appearance
         UINavigationBar.appearance().compactAppearance = appearance
     }
+    #endif
 }
 
-// MARK: - Navigation Bar Styling
+#if os(iOS)
+// MARK: - Navigation Bar Styling (iOS)
 
 /// Helper view that finds and configures the parent UINavigationController
 struct NavigationBarConfigurator: UIViewControllerRepresentable {
@@ -311,6 +316,7 @@ extension View {
             }
     }
 }
+#endif
 
 extension JazzTheme {
     // MARK: - Primary Colors

@@ -22,9 +22,14 @@ class AuthenticationManager: ObservableObject {
     @Published var errorMessage: String?
     
     // MARK: - Private Properties
-    
+
     private var accessToken: String?
     private let keychainHelper = KeychainHelper.shared
+
+    // Token refresh serialization - prevents race conditions when multiple
+    // requests fail with 401 and try to refresh simultaneously
+    private var isRefreshingToken = false
+    private var refreshWaiters: [CheckedContinuation<Bool, Never>] = []
     
     // MARK: - Initialization
     
@@ -54,44 +59,74 @@ class AuthenticationManager: ObservableObject {
     }
     
     /// Refresh the access token using the stored refresh token
+    /// This method is serialized - if a refresh is already in progress,
+    /// callers will wait for the result instead of starting a new refresh
     private func refreshAccessToken() async -> Bool {
+        // If a refresh is already in progress, wait for its result
+        if isRefreshingToken {
+            print("🔄 Token refresh already in progress - waiting for result")
+            return await withCheckedContinuation { continuation in
+                refreshWaiters.append(continuation)
+            }
+        }
+
+        // Mark that we're now refreshing
+        isRefreshingToken = true
+
+        // Perform the actual refresh
+        let result = await performTokenRefresh()
+
+        // Notify all waiters of the result
+        let waiters = refreshWaiters
+        refreshWaiters.removeAll()
+        isRefreshingToken = false
+
+        for waiter in waiters {
+            waiter.resume(returning: result)
+        }
+
+        return result
+    }
+
+    /// Actually performs the token refresh network request
+    private func performTokenRefresh() async -> Bool {
         guard let refreshToken = keychainHelper.load(forKey: "refresh_token") else {
             print("❌ No refresh token available")
             return false
         }
-        
+
         let url = URL(string: "\(NetworkManager.baseURL)/auth/refresh-token")!
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        
+
         let body: [String: String] = ["refresh_token": refreshToken]
         request.httpBody = try? JSONSerialization.data(withJSONObject: body)
-        
+
         do {
             let (data, response) = try await URLSession.shared.data(for: request)
-            
+
             guard let httpResponse = response as? HTTPURLResponse else {
                 throw URLError(.badServerResponse)
             }
-            
+
             if httpResponse.statusCode == 200 {
                 struct RefreshResponse: Codable {
                     let accessToken: String
                     let refreshToken: String
-                    
+
                     enum CodingKeys: String, CodingKey {
                         case accessToken = "access_token"
                         case refreshToken = "refresh_token"
                     }
                 }
-                
+
                 let refreshResponse = try JSONDecoder().decode(RefreshResponse.self, from: data)
-                
+
                 // Save new tokens
                 saveTokens(accessToken: refreshResponse.accessToken,
                           refreshToken: refreshResponse.refreshToken)
-                
+
                 print("✅ Access token refreshed successfully")
                 return true
             } else {
@@ -381,6 +416,15 @@ class AuthenticationManager: ObservableObject {
             throw URLError(.badServerResponse)
         }
         
+        // Check for redirect - Authorization header gets stripped on cross-origin redirects
+        if let responseURL = httpResponse.url, responseURL != url {
+            print("🔀 Redirect detected: \(url.absoluteString) → \(responseURL.absoluteString)")
+            if httpResponse.statusCode == 401 {
+                print("⚠️ 401 after redirect - Authorization header was likely stripped!")
+                print("   💡 Fix: Update baseURL to use the final URL directly (avoid redirects)")
+            }
+        }
+
         // If unauthorized, try to refresh token and retry
         if httpResponse.statusCode == 401 {
             print("⚠️ 401 Unauthorized - attempting token refresh")
