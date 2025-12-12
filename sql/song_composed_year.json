@@ -1,0 +1,2053 @@
+[
+	{
+		"id": "b62a99af-357a-4df3-a8a4-7feedeafeda0",
+		"title": "Along Came Betty",
+		"composer": "Benny Golson",
+		"composed_year": 1958,
+		"composed_key": null
+	},
+	{
+		"id": "bf8189da-d1ae-4283-8795-d3133bb1fec0",
+		"title": "Billie’s Bounce",
+		"composer": "Charlie Parker",
+		"composed_year": 1944,
+		"composed_key": null
+	},
+	{
+		"id": "e0673b2a-5c6c-4467-abd6-ba74ab790067",
+		"title": "Birdland",
+		"composer": "Joe Zawinul",
+		"composed_year": 1976,
+		"composed_key": null
+	},
+	{
+		"id": "710b3005-c389-4365-b885-56e3f1dc1762",
+		"title": "Black and Blue",
+		"composer": "Fats Waller",
+		"composed_year": 1929,
+		"composed_key": null
+	},
+	{
+		"id": "9e3a5b18-1f38-462e-9e34-dea319b7fcb2",
+		"title": "Black Velvet",
+		"composer": "Illinois Jacquet, Jimmy Mundy",
+		"composed_year": 1949,
+		"composed_key": null
+	},
+	{
+		"id": "248dc56d-b79c-4960-af57-615af3edf349",
+		"title": "Bluesette",
+		"composer": "Toots Thielemans and Norman Gimbel",
+		"composed_year": 1962,
+		"composed_key": null
+	},
+	{
+		"id": "0aaa7321-9f93-4dce-a3df-9f41176d1f09",
+		"title": "Cantaloupe Island",
+		"composer": "Herbie Hancock",
+		"composed_year": 1964,
+		"composed_key": null
+	},
+	{
+		"id": "7fd01c5e-b3ff-4aaf-a9b2-3c0cfeed0ca1",
+		"title": "Cherokee",
+		"composer": "Ray Noble",
+		"composed_year": 1938,
+		"composed_key": null
+	},
+	{
+		"id": "c7c56fc5-68bc-4fc1-b0d1-7c4941941d07",
+		"title": "Ev’ry Time We Say Goodbye",
+		"composer": "Cole Porter",
+		"composed_year": 1944,
+		"composed_key": null
+	},
+	{
+		"id": "f488f691-6c89-460f-891f-d89ccfdeb764",
+		"title": "Hopopono",
+		"composer": "Nick Blacka, Chris Illingworth, Rob Turner",
+		"composed_year": 2013,
+		"composed_key": null
+	},
+	{
+		"id": "4d2bac0c-e2bc-4aae-8f3e-7185b75005cb",
+		"title": "If I Were a Bell",
+		"composer": "Frank Loesser",
+		"composed_year": 1950,
+		"composed_key": null
+	},
+	{
+		"id": "e169c89b-5620-4a60-b4a4-3900616a22c6",
+		"title": "Moment’s Notice",
+		"composer": "John Coltrane",
+		"composed_year": 1957,
+		"composed_key": null
+	},
+	{
+		"id": "1a9897bc-0194-4611-a7d5-0396003a29b3",
+		"title": "My Heart Stood Still",
+		"composer": "Richard Rodgers and Lorenz Hart",
+		"composed_year": 1927,
+		"composed_key": null
+	},
+	{
+		"id": "c87feb94-114c-4102-9ef4-b454c6db529d",
+		"title": "Nice Work If You Can Get It",
+		"composer": "George Gershwin and Ira Gershwin",
+		"composed_year": 1937,
+		"composed_key": null
+	},
+	{
+		"id": "6ded10b0-29ed-4b70-8a2c-305839e3878c",
+		"title": "Poinciana (Song of the Tree)",
+		"composer": "Nat Simon, Buddy Bernier",
+		"composed_year": 1936,
+		"composed_key": null
+	},
+	{
+		"id": "14b7668a-5893-43c8-b55b-d294f3e20c65",
+		"title": "A Child Is Born",
+		"composer": "Thad Jones",
+		"composed_year": 1969,
+		"composed_key": null
+	},
+	{
+		"id": "d9dbcf9e-98df-41a0-a328-d28fd0a1d458",
+		"title": "Fly Me to the Moon",
+		"composer": "Bart Howard",
+		"composed_year": 1954,
+		"composed_key": null
+	},
+	{
+		"id": "8a65b0d2-b8b5-41c0-b15b-67cac5be24c8",
+		"title": "Here’s That Rainy Day",
+		"composer": "Jimmy Van Heusen, Johnny Burke",
+		"composed_year": 1959,
+		"composed_key": null
+	},
+	{
+		"id": "72659bbd-f723-410f-bc9a-3a1a42d0def0",
+		"title": "It Don’t Mean a Thing (If It Ain’t Got That Swing)",
+		"composer": "Duke Ellington and Irving Mills",
+		"composed_year": 1931,
+		"composed_key": null
+	},
+	{
+		"id": "e57faa02-f057-40a5-ba1a-1e42e58c485e",
+		"title": "It’s a Sin to Tell a Lie",
+		"composer": "Billy Mayhew",
+		"composed_year": 1936,
+		"composed_key": null
+	},
+	{
+		"id": "c841580b-0e8b-476c-9323-52cc4907d6e3",
+		"title": "Solea",
+		"composer": "Gil Evans",
+		"composed_year": 1960,
+		"composed_key": null
+	},
+	{
+		"id": "1b4080e1-28b8-40ee-b6f9-b517555c04d3",
+		"title": "These Foolish Things (Remind Me of You)",
+		"composer": "Jack Strachey, Harry Link, and Holt Marvell",
+		"composed_year": 1935,
+		"composed_key": null
+	},
+	{
+		"id": "54b273b2-e3d6-440d-93c4-8cf5f551200a",
+		"title": "Strasbourg/St. Denis",
+		"composer": "Roy Hargrove",
+		"composed_year": 2007,
+		"composed_key": null
+	},
+	{
+		"id": "85a39693-8bd3-43d0-8a8a-0416a3c7480b",
+		"title": "Epistrophy",
+		"composer": "Thelonious Monk and Kenny Clarke",
+		"composed_year": 1942,
+		"composed_key": null
+	},
+	{
+		"id": "ad0924d0-f029-4c47-b082-ee0a348e1805",
+		"title": "Moanin’",
+		"composer": "Bobby Timmons",
+		"composed_year": 1958,
+		"composed_key": null
+	},
+	{
+		"id": "aa286c63-27a2-47f3-97f1-a58a415cb125",
+		"title": "Now’s the Time",
+		"composer": "Charlie Parker",
+		"composed_year": 1944,
+		"composed_key": null
+	},
+	{
+		"id": "c2621159-0434-4066-aa5e-0698beba4179",
+		"title": "Stompin’ at the Savoy",
+		"composer": "Benny Goodman, Chick Webb, Edgar Sampson, and Andy Razaf",
+		"composed_year": 1934,
+		"composed_key": null
+	},
+	{
+		"id": "a4eff3ef-a6fe-483d-a984-6e2319215fd5",
+		"title": "’Round Midnight",
+		"composer": "Thelonious Monk, Cootie Williams, and Bernie Hanighen",
+		"composed_year": 1944,
+		"composed_key": null
+	},
+	{
+		"id": "2054bc9f-438e-4525-957f-27dccec4860b",
+		"title": "’S Wonderful",
+		"composer": "George Gershwin and Ira Gershwin",
+		"composed_year": 1927,
+		"composed_key": null
+	},
+	{
+		"id": "66e3ae1e-fef3-4687-ba6d-65e2fa3950da",
+		"title": "C Jam Blues",
+		"composer": "Duke Ellington",
+		"composed_year": 1942,
+		"composed_key": null
+	},
+	{
+		"id": "ab7a8866-145f-45ec-8a75-07d512fa86eb",
+		"title": "I Can’t Get Started",
+		"composer": "Vernon Duke and Ira Gershwin",
+		"composed_year": 1936,
+		"composed_key": null
+	},
+	{
+		"id": "4cd44879-2c61-41d7-b6b8-29ac2c1fb650",
+		"title": "One o’Clock Jump",
+		"composer": "Count Basie",
+		"composed_year": 1937,
+		"composed_key": null
+	},
+	{
+		"id": "11bdcf66-62c1-4fc6-b21c-a766ce8c29aa",
+		"title": "Struttin’ with Some Barbecue",
+		"composer": "Lil Hardin Armstrong",
+		"composed_year": 1927,
+		"composed_key": null
+	},
+	{
+		"id": "aaa7fd34-7c65-4d23-b54d-c8c7c6f951ed",
+		"title": "We’ll Meet Again",
+		"composer": "Hugh Charles, Ross Parker",
+		"composed_year": 1939,
+		"composed_key": null
+	},
+	{
+		"id": "e63c9716-883e-4573-8a9b-f07bdfc708b5",
+		"title": "Well, You Needn’t",
+		"composer": "Thelonious Monk",
+		"composed_year": 1947,
+		"composed_key": null
+	},
+	{
+		"id": "e24615c8-4c10-4b57-9a9f-7801d17d52f7",
+		"title": "What’s New?",
+		"composer": "Bob Haggart and Johnny Burke",
+		"composed_year": 1938,
+		"composed_key": null
+	},
+	{
+		"id": "b6284c76-4c58-4d15-90e3-75c81d66c9ad",
+		"title": "You Don’t Know What Love Is",
+		"composer": "Gene de Paul and Don Raye",
+		"composed_year": 1941,
+		"composed_key": null
+	},
+	{
+		"id": "7a61182e-a597-4df3-a498-40cf998d0df9",
+		"title": "Angel Eyes",
+		"composer": "Matt Dennis and Earl Brent",
+		"composed_year": 1946,
+		"composed_key": null
+	},
+	{
+		"id": "f9135fd6-71cb-4c5f-bbd9-a560e9d6af9e",
+		"title": "All Blues",
+		"composer": "Miles Davis",
+		"composed_year": 1959,
+		"composed_key": null
+	},
+	{
+		"id": "320cf787-b0bf-4e84-9371-4c16f0e27095",
+		"title": "All of You",
+		"composer": "Cole Porter",
+		"composed_year": 1954,
+		"composed_key": null
+	},
+	{
+		"id": "782f9e76-96ef-41e6-9dc3-8115bbf89bc0",
+		"title": "All the Things You Are",
+		"composer": "Jerome Kern and Oscar Hammerstein II",
+		"composed_year": 1939,
+		"composed_key": null
+	},
+	{
+		"id": "22071447-7133-4d98-b556-789218ac6b48",
+		"title": "Almost Like Being in Love",
+		"composer": "Frederick Loewe and Alan Jay Lerner",
+		"composed_year": 1947,
+		"composed_key": null
+	},
+	{
+		"id": "7907eb84-8770-4b14-be81-0a96ceef31e7",
+		"title": "Alone Together",
+		"composer": "Arthur Schwartz and Howard Dietz",
+		"composed_year": 1939,
+		"composed_key": null
+	},
+	{
+		"id": "1fab7d72-030f-4a28-9952-bbadbff69f08",
+		"title": "An Affair to Remember",
+		"composer": "Harry Warren",
+		"composed_year": 1957,
+		"composed_key": "FΔ"
+	},
+	{
+		"id": "073a6271-89dc-4dd5-a5ef-434ae2d29725",
+		"title": "April in Paris",
+		"composer": "Vernon Duke and E. Y. Harburg",
+		"composed_year": 1932,
+		"composed_key": null
+	},
+	{
+		"id": "8ccf3142-c716-42a9-8114-0f62b03c7381",
+		"title": "Autumn in New York",
+		"composer": "Vernon Duke",
+		"composed_year": 1944,
+		"composed_key": null
+	},
+	{
+		"id": "a08f35cd-ddb5-49c1-a5cd-962f8da7c7f2",
+		"title": "Basin Street Blues",
+		"composer": "Spencer Williams",
+		"composed_year": 1928,
+		"composed_key": null
+	},
+	{
+		"id": "fbcc4e8a-19a3-4912-a7b5-c84672a145dd",
+		"title": "Beale Street Blues",
+		"composer": "W. C. Handy",
+		"composed_year": 1923,
+		"composed_key": null
+	},
+	{
+		"id": "e8a21999-2b00-4f48-92ff-4f4e35893f8b",
+		"title": "Bemsha Swing",
+		"composer": "Thelonious Monk and Denzil Best",
+		"composed_year": 1948,
+		"composed_key": null
+	},
+	{
+		"id": "e82f87c8-86a8-4c3d-b424-a487e393119b",
+		"title": "Blue Bossa",
+		"composer": "Kenny Dorham",
+		"composed_year": 1963,
+		"composed_key": null
+	},
+	{
+		"id": "eea1bcd2-6c45-4e7f-ac45-95a99564f529",
+		"title": "Blue in Green",
+		"composer": "Miles Davis (disputed authorship with Bill Evans)",
+		"composed_year": 1958,
+		"composed_key": null
+	},
+	{
+		"id": "8b916cbd-9196-41c9-9580-e5cf93247573",
+		"title": "Blue Monk",
+		"composer": "Thelonious Monk",
+		"composed_year": 1954,
+		"composed_key": null
+	},
+	{
+		"id": "fe2bdcf9-6d10-4bec-add6-31dcde9daeb6",
+		"title": "Indiana",
+		"composer": "James F. Hanley and Ballard MacDonald",
+		"composed_year": 1944,
+		"composed_key": null
+	},
+	{
+		"id": "5514c14c-ec3f-4ea0-b816-a1c5508229aa",
+		"title": "Lament",
+		"composer": "J. J. Johnson",
+		"composed_year": 1954,
+		"composed_key": null
+	},
+	{
+		"id": "cf441abf-119b-41d8-8a84-bba81fb39dfa",
+		"title": "Liza",
+		"composer": "George Gershwin and Ira Gershwin",
+		"composed_year": 1932,
+		"composed_key": null
+	},
+	{
+		"id": "cc4bcdc5-31e2-4b7c-9878-9027fcd1d4ac",
+		"title": "On a Clear Day (You Can See Forever)",
+		"composer": "Burton Lane, Alan Jay Lerner",
+		"composed_year": 1965,
+		"composed_key": null
+	},
+	{
+		"id": "bbd46dec-f428-4359-bc69-61d3174372ac",
+		"title": "Stardust",
+		"composer": "Hoagy Carmichael and Mitchell Parish",
+		"composed_year": 1927,
+		"composed_key": null
+	},
+	{
+		"id": "16eaa827-46f8-40a1-bd8e-c1762091f11e",
+		"title": "After You’ve Gone",
+		"composer": "Turner Layton and Henry Creamer",
+		"composed_year": 1918,
+		"composed_key": null
+	},
+	{
+		"id": "c1c11ad5-78f8-40c5-ad0c-1977d671f133",
+		"title": "Blue Moon",
+		"composer": "Richard Rodgers and Lorenz Hart",
+		"composed_year": 1934,
+		"composed_key": null
+	},
+	{
+		"id": "37b21fc6-f05e-4f35-951f-d60e20673f3e",
+		"title": "Blue Skies",
+		"composer": "Irving Berlin",
+		"composed_year": 1926,
+		"composed_key": null
+	},
+	{
+		"id": "97bbaec0-395f-40ae-b5cd-25c3d6ca0785",
+		"title": "Blue, Turning Grey Over You",
+		"composer": "Fats Waller",
+		"composed_year": 1930,
+		"composed_key": null
+	},
+	{
+		"id": "2e287025-9996-4fe3-aea6-872cd5f0b70c",
+		"title": "Born to be Blue",
+		"composer": "Mel Tormé",
+		"composed_year": 1946,
+		"composed_key": null
+	},
+	{
+		"id": "bc215e88-62b9-48c3-ab9d-3bc658745f5d",
+		"title": "But Beautiful",
+		"composer": "Jimmy Van Heusen and Johnny Burke",
+		"composed_year": 1947,
+		"composed_key": null
+	},
+	{
+		"id": "3bcb14ba-6dac-4662-a2ce-e61949f9cfd6",
+		"title": "But Not for Me",
+		"composer": "George Gershwin and Ira Gershwin",
+		"composed_year": 1930,
+		"composed_key": null
+	},
+	{
+		"id": "36805e74-a776-4c52-a03e-4109e413b802",
+		"title": "Solar",
+		"composer": "Miles Davis",
+		"composed_year": 1954,
+		"composed_key": null
+	},
+	{
+		"id": "cc4ceb4d-70ea-4d0c-b205-388a952170de",
+		"title": "Song for My Father",
+		"composer": "Horace Silver",
+		"composed_year": 1964,
+		"composed_key": null
+	},
+	{
+		"id": "11c3b50a-823a-43a0-b40a-bba37b9252c1",
+		"title": "Things Ain’t What They Used to Be",
+		"composer": "Mercer Ellington, Ted Persons",
+		"composed_year": 1942,
+		"composed_key": null
+	},
+	{
+		"id": "e8664c90-3c0c-40f9-999e-79ada062bde0",
+		"title": "Who Can I Turn To (When Nobody Needs Me)",
+		"composer": "Leslie Bricusse, Anthony Newley",
+		"composed_year": 1953,
+		"composed_key": null
+	},
+	{
+		"id": "8f6315ef-5bd6-40e1-95f2-6fecae20c7ec",
+		"title": "I Let a Song Go Out of My Heart",
+		"composer": "Duke Ellington, Henry Nemo, John Redmond, and Irving Mills",
+		"composed_year": 1938,
+		"composed_key": null
+	},
+	{
+		"id": "f9c4fa68-498b-4c1e-bb15-04be2c5b4537",
+		"title": "Autumn Leaves",
+		"composer": "Joseph Kosma (music), Jacques Prévert (French lyrics), Johnny Mercer (English lyrics)",
+		"composed_year": 1945,
+		"composed_key": null
+	},
+	{
+		"id": "9b1887a1-7bf5-44e7-b538-574397539b77",
+		"title": "By the River Sainte Marie",
+		"composer": "Edgar Leslie, Harry Warren",
+		"composed_year": 1931,
+		"composed_key": null
+	},
+	{
+		"id": "f6998b1b-2db0-4f5f-bab1-114011f847a5",
+		"title": "Bye Bye Blackbird",
+		"composer": "Ray Henderson and Mort Dixon",
+		"composed_year": 1926,
+		"composed_key": null
+	},
+	{
+		"id": "df7a1ebb-457e-4c26-94aa-886bb9eb2a50",
+		"title": "Caravan",
+		"composer": "Juan Tizol and Duke Ellington",
+		"composed_year": 1937,
+		"composed_key": null
+	},
+	{
+		"id": "0ee310ec-4e78-4545-81ce-0142afbddf5c",
+		"title": "Con Alma",
+		"composer": "Dizzy Gillespie",
+		"composed_year": 1954,
+		"composed_key": null
+	},
+	{
+		"id": "62eeaf0d-b400-4548-9383-f993f8ca3ec1",
+		"title": "Corcovado",
+		"composer": "Antonio Carlos Jobim",
+		"composed_year": 1962,
+		"composed_key": "CΔ"
+	},
+	{
+		"id": "e9e69f7c-54fd-46ae-a61a-51d805ed0612",
+		"title": "I Can’t Give You Anything but Love, Baby",
+		"composer": "Jimmy McHugh, Dorothy Fields",
+		"composed_year": 1928,
+		"composed_key": null
+	},
+	{
+		"id": "3a2fbdf8-d798-4080-9fb7-cddb43f6d6cf",
+		"title": "Lady Bird",
+		"composer": "Tadd Dameron",
+		"composed_year": 1948,
+		"composed_key": null
+	},
+	{
+		"id": "087986e6-0509-4f8b-a834-d1a8e6d5ecbe",
+		"title": "Manhã de Carnaval",
+		"composer": "Luiz Bonfá and Antônio Maria",
+		"composed_year": 1959,
+		"composed_key": null
+	},
+	{
+		"id": "2bebeeaf-d045-4b59-870d-44ee3c209a65",
+		"title": "O Grande Amor",
+		"composer": "Antônio Carlos Jobim",
+		"composed_year": 1963,
+		"composed_key": null
+	},
+	{
+		"id": "3c59c48a-b098-4373-82e1-19545265867d",
+		"title": "Si tu vois ma mère",
+		"composer": "Sidney Bechet",
+		"composed_year": 1952,
+		"composed_key": null
+	},
+	{
+		"id": "e1212ef2-d7b0-419e-b3c3-2b4c3b122e74",
+		"title": "Someone to Light Up My Life",
+		"composer": "Antônio Carlos Jobim, Gene Lees, Vinicius de Moraes",
+		"composed_year": 1969,
+		"composed_key": null
+	},
+	{
+		"id": "4d98faa9-ab04-48fc-9da0-bdae7505d065",
+		"title": "Sunday in New York",
+		"composer": "Peter Nero, Carroll Coates",
+		"composed_year": 1964,
+		"composed_key": null
+	},
+	{
+		"id": "aa542c35-26f1-4363-ae53-31d91f0e064a",
+		"title": "Who Cares?",
+		"composer": "George Gershwin",
+		"composed_year": 1931,
+		"composed_key": null
+	},
+	{
+		"id": "92fb003d-b30e-4f27-8b98-9718f894bf1a",
+		"title": "A Foggy Day (in London Town)",
+		"composer": "George Gershwin, Ira Gershwin",
+		"composed_year": 1937,
+		"composed_key": null
+	},
+	{
+		"id": "be430477-ea4b-4dd8-9bdc-18d741692a25",
+		"title": "Ain’t Misbehavin’",
+		"composer": "Fats Waller and Harry Brooks",
+		"composed_year": 1929,
+		"composed_key": null
+	},
+	{
+		"id": "9c6c0a3c-04dd-47b3-afff-c1b22f34264d",
+		"title": "Bags’ Groove",
+		"composer": "Milt Jackson",
+		"composed_year": 1952,
+		"composed_key": null
+	},
+	{
+		"id": "b338f723-14cd-4134-b9e4-ad913f623763",
+		"title": "Chelsea Bridge",
+		"composer": "Billy Strayhorn",
+		"composed_year": 1941,
+		"composed_key": null
+	},
+	{
+		"id": "4e9ccff5-94cf-44ec-9c0a-4030bb55ae2e",
+		"title": "Christmas Time Is Here",
+		"composer": "Vince Guaraldi, Lee Mendelson",
+		"composed_year": 1965,
+		"composed_key": null
+	},
+	{
+		"id": "6d7d9fe1-b63d-4af2-8d6b-bc771e28c138",
+		"title": "Come Rain or Come Shine",
+		"composer": "Harold Arlen and Johnny Mercer",
+		"composed_year": 1946,
+		"composed_key": null
+	},
+	{
+		"id": "5cf0e6a4-80ff-4e05-bee6-5f9ec150efd2",
+		"title": "Come Sunday",
+		"composer": "Duke Ellington",
+		"composed_year": 1958,
+		"composed_key": null
+	},
+	{
+		"id": "ba00b55c-bf72-49bb-8b84-2e7d2c90623d",
+		"title": "Do Nothin’ Till You Hear from Me",
+		"composer": "Duke Ellington and Bob Russell",
+		"composed_year": 1943,
+		"composed_key": null
+	},
+	{
+		"id": "a7f58467-a0b4-4d23-a7e0-037f30dc095f",
+		"title": "Don’cha Go ’Way Mad",
+		"composer": "Illinois Jacquet, Jimmy Mundy",
+		"composed_year": 1950,
+		"composed_key": null
+	},
+	{
+		"id": "a8c8998d-bc96-4eda-88a5-851753fff9d7",
+		"title": "Don’t Blame Me",
+		"composer": "Jimmy McHugh and Dorothy Fields",
+		"composed_year": 1933,
+		"composed_key": null
+	},
+	{
+		"id": "6e28a3a5-4d32-40e6-ba22-f4472bbf9ea1",
+		"title": "Don’t Get Around Much Anymore",
+		"composer": "Duke Ellington and Bob Russell",
+		"composed_year": 1940,
+		"composed_key": null
+	},
+	{
+		"id": "d705ac2a-f097-471f-a4fc-6f797d07075d",
+		"title": "Easy to Love",
+		"composer": "Cole Porter",
+		"composed_year": 1936,
+		"composed_key": null
+	},
+	{
+		"id": "01cd1b13-a8b1-43a5-9b04-5a599b337883",
+		"title": "Embraceable You",
+		"composer": "George Gershwin and Ira Gershwin",
+		"composed_year": 1928,
+		"composed_key": null
+	},
+	{
+		"id": "3f0ed17f-28b6-4e05-9675-533a50529172",
+		"title": "Groovin’ High",
+		"composer": "Dizzy Gillespie",
+		"composed_year": 1944,
+		"composed_key": null
+	},
+	{
+		"id": "c89b9bcc-6999-4360-b167-69ebd80a97df",
+		"title": "I’ll Remember April",
+		"composer": "Gene de Paul, Patricia Johnston, and Don Raye",
+		"composed_year": 1944,
+		"composed_key": null
+	},
+	{
+		"id": "66ae66f0-14e9-4bdb-b156-37b60ededc76",
+		"title": "I’m in the Mood for Love",
+		"composer": "Jimmy McHugh and Dorothy Fields",
+		"composed_year": 1935,
+		"composed_key": null
+	},
+	{
+		"id": "0a698505-2196-4dc2-9c80-ea635f651841",
+		"title": "I’ve Found a New Baby",
+		"composer": "Jack Palmer and Spencer Williams",
+		"composed_year": 1926,
+		"composed_key": null
+	},
+	{
+		"id": "b18a601e-182b-4a27-9d58-53446147cabf",
+		"title": "Lonely Woman",
+		"composer": "Ornette Coleman",
+		"composed_year": 1959,
+		"composed_key": null
+	},
+	{
+		"id": "8588fd7c-a0d0-45ce-b605-c2997e43f114",
+		"title": "Lover Man",
+		"composer": "Jimmy Davis, Roger Ramirez, and Jimmy Sherman",
+		"composed_year": 1942,
+		"composed_key": null
+	},
+	{
+		"id": "0fcc9851-e4a7-49ef-bf52-b48d4da528f1",
+		"title": "Solitude",
+		"composer": "Duke Ellington, Eddie DeLange, and Irving Mills",
+		"composed_year": 1990,
+		"composed_key": null
+	},
+	{
+		"id": "46067452-d53b-481c-9eb7-5bad4c69fdd1",
+		"title": "Stormy Weather",
+		"composer": "Harold Arlen and Ted Koehler",
+		"composed_year": 1933,
+		"composed_key": null
+	},
+	{
+		"id": "69ee17b6-fae6-4835-9844-a24e2d10651b",
+		"title": "(I Don’t Stand) A Ghost of a Chance",
+		"composer": "Victor Young, Ned Washington, and Bing Crosby",
+		"composed_year": 1932,
+		"composed_key": null
+	},
+	{
+		"id": "026279f2-2ac8-4401-bca5-d5654840365d",
+		"title": "Airegin",
+		"composer": "Sonny Rollins",
+		"composed_year": 1954,
+		"composed_key": null
+	},
+	{
+		"id": "be6964aa-f430-45c3-8113-3a60dd75f90e",
+		"title": "Alfie",
+		"composer": "Burt Bacharach and Hal David",
+		"composed_year": 1965,
+		"composed_key": null
+	},
+	{
+		"id": "3c2c4f5b-ae67-442b-b207-3885770067c4",
+		"title": "All of Me",
+		"composer": "Gerald Marks and Seymour Simons",
+		"composed_year": 1932,
+		"composed_key": null
+	},
+	{
+		"id": "c791b3e4-ef90-4275-b257-af64b9f1104b",
+		"title": "Emily",
+		"composer": "Johnny Mandel and Johnny Mercer",
+		"composed_year": 1964,
+		"composed_key": null
+	},
+	{
+		"id": "7131a4a5-1f28-412b-ad73-031793db3164",
+		"title": "Everything Happens to Me",
+		"composer": "Matt Dennis and Tom Adair",
+		"composed_year": 1941,
+		"composed_key": null
+	},
+	{
+		"id": "add13d9b-ed87-4dbf-8d31-1b74cb17644e",
+		"title": "Everything I Love",
+		"composer": "Cole Porter",
+		"composed_year": 1941,
+		"composed_key": null
+	},
+	{
+		"id": "774300a3-c3e2-4fca-9f58-e87537fdedec",
+		"title": "Evidence",
+		"composer": "Thelonious Monk",
+		"composed_year": 1948,
+		"composed_key": null
+	},
+	{
+		"id": "e44502ea-9451-40c0-900d-2d0c2361430c",
+		"title": "Exactly Like You",
+		"composer": "Jimmy McHugh and Dorothy Fields",
+		"composed_year": 1930,
+		"composed_key": null
+	},
+	{
+		"id": "56d6b903-bf31-40b3-b54b-38faf287d635",
+		"title": "Falling in Love with Love",
+		"composer": "Richard Rodgers and Lorenz Hart",
+		"composed_year": 1938,
+		"composed_key": null
+	},
+	{
+		"id": "de2c1998-ab18-4b3d-a444-6b3ebca2c5cd",
+		"title": "Fascinating Rhythm",
+		"composer": "George Gershwin and Ira Gershwin",
+		"composed_year": 1924,
+		"composed_key": null
+	},
+	{
+		"id": "8727497d-a8cb-4856-8048-0683130bca47",
+		"title": "Footprints",
+		"composer": "Wayne Shorter",
+		"composed_year": 1966,
+		"composed_key": null
+	},
+	{
+		"id": "1f1352f4-e506-426f-b83a-18779ec09d5e",
+		"title": "Georgia on My Mind",
+		"composer": "Hoagy Carmichael and Stuart Gorrell",
+		"composed_year": 1930,
+		"composed_key": null
+	},
+	{
+		"id": "edd235b6-e2c5-473e-86f7-d59ce1e79485",
+		"title": "Giant Steps",
+		"composer": "John Coltrane",
+		"composed_year": 1959,
+		"composed_key": null
+	},
+	{
+		"id": "25b20d12-7040-4e1b-b9f6-7e4419c30d59",
+		"title": "God Bless the Child",
+		"composer": "Billie Holiday and Arthur Herzog Jr.",
+		"composed_year": 1941,
+		"composed_key": null
+	},
+	{
+		"id": "7541a699-f0dd-47ad-bd96-6522ad06fd75",
+		"title": "Gone with the Wind",
+		"composer": "Allie Wrubel and Herb Magidson",
+		"composed_year": 1937,
+		"composed_key": null
+	},
+	{
+		"id": "099e7d1f-0ae6-4a8f-be10-0b5a313ec34c",
+		"title": "Good Bait",
+		"composer": "Tadd Dameron",
+		"composed_year": 1945,
+		"composed_key": null
+	},
+	{
+		"id": "8fd459c2-2c77-4b5f-81b1-857fd2b5280b",
+		"title": "Good Morning Heartache",
+		"composer": "Irene Higginbotham, Ervin Drake, and Dan Fisher",
+		"composed_year": 1946,
+		"composed_key": null
+	},
+	{
+		"id": "89d65b05-3f3f-403a-801f-925646a5fa2a",
+		"title": "Goodbye Pork Pie Hat",
+		"composer": "Charles Mingus",
+		"composed_year": 1959,
+		"composed_key": null
+	},
+	{
+		"id": "dc7811d4-cca4-4f61-b19b-92789f1cb58c",
+		"title": "Have You Met Miss Jones?",
+		"composer": "Richard Rodgers and Lorenz Hart",
+		"composed_year": 1937,
+		"composed_key": null
+	},
+	{
+		"id": "b4e6ae89-ea4c-4a81-98c1-539bd2a8a5c7",
+		"title": "Honeysuckle Rose",
+		"composer": "Fats Waller and Andy Razaf",
+		"composed_year": 1928,
+		"composed_key": null
+	},
+	{
+		"id": "bc318b6c-e487-4a78-a8b0-5839eb691266",
+		"title": "Hot House",
+		"composer": "Tadd Dameron",
+		"composed_year": 1945,
+		"composed_key": null
+	},
+	{
+		"id": "0dbd4ebb-10a2-49af-a650-9c916010407d",
+		"title": "How Deep Is the Ocean?",
+		"composer": "Irving Berlin",
+		"composed_year": 1932,
+		"composed_key": null
+	},
+	{
+		"id": "52bae72b-86f8-4e00-94f9-3f62268a00d9",
+		"title": "How High the Moon",
+		"composer": "Morgan Lewis and Nancy Hamilton",
+		"composed_year": 1940,
+		"composed_key": null
+	},
+	{
+		"id": "5bd960ea-a596-47d2-bf1b-ba67fc4ec48b",
+		"title": "The Very Thought of You",
+		"composer": "Ray Noble",
+		"composed_year": 1934,
+		"composed_key": null
+	},
+	{
+		"id": "40f03976-cc37-4e1b-80a3-aa3189b75edb",
+		"title": "Blues in the Night",
+		"composer": "Harold Arlen and Johnny Mercer",
+		"composed_year": 1941,
+		"composed_key": null
+	},
+	{
+		"id": "760b5a8d-b141-4a68-8f4b-071939eee8da",
+		"title": "Body and Soul",
+		"composer": "Johnny Green, Edward Heyman, Robert Sour, and Frank Eyton",
+		"composed_year": 1930,
+		"composed_key": null
+	},
+	{
+		"id": "7dec8ecb-89a0-426d-8ac7-2af8eb7654e5",
+		"title": "Gee, Baby, Ain’t I Good to You?",
+		"composer": "Andy Razaf and Don Redman",
+		"composed_year": 1929,
+		"composed_key": null
+	},
+	{
+		"id": "530926de-c8c0-4274-89e3-43cacdc23f14",
+		"title": "How Long Has This Been Going On?",
+		"composer": "George Gershwin and Ira Gershwin",
+		"composed_year": 1928,
+		"composed_key": null
+	},
+	{
+		"id": "f638f2c4-89f9-47e4-a85c-f53de157c987",
+		"title": "I Concentrate on You",
+		"composer": "Cole Porter",
+		"composed_year": 1939,
+		"composed_key": null
+	},
+	{
+		"id": "459d1f59-a9be-4063-8637-cf0d70e77e68",
+		"title": "I Cover the Waterfront",
+		"composer": "Johnny Green and Edward Heyman",
+		"composed_year": 1933,
+		"composed_key": null
+	},
+	{
+		"id": "32f3a71a-fa62-4a75-a734-0a237f80b156",
+		"title": "I Didn’t Know What Time It Was",
+		"composer": "Richard Rodgers and Lorenz Hart",
+		"composed_year": 1939,
+		"composed_key": null
+	},
+	{
+		"id": "5a2b1dd3-5179-43f0-aaaf-ec2b07e40e1c",
+		"title": "I Fall in Love Too Easily",
+		"composer": "Jule Styne and Sammy Cahn",
+		"composed_year": 1944,
+		"composed_key": null
+	},
+	{
+		"id": "48f0aac2-8079-4502-b6d9-ad89a27f76cb",
+		"title": "I Got It Bad (and That Ain’t Good)",
+		"composer": "Duke Ellington and Paul Francis Webster",
+		"composed_year": 1941,
+		"composed_key": null
+	},
+	{
+		"id": "3e9baaae-cf48-4533-bc57-e32d6d501eb8",
+		"title": "I Got Rhythm",
+		"composer": "George Gershwin and Ira Gershwin",
+		"composed_year": 1930,
+		"composed_key": null
+	},
+	{
+		"id": "a480dffa-efc3-4b02-b1c3-9d018e58a0ef",
+		"title": "I Hear a Rhapsody",
+		"composer": "George Fragos, Jack Baker, and Dick Gasparre",
+		"composed_year": 1940,
+		"composed_key": null
+	},
+	{
+		"id": "745da889-1f76-45a4-ba5e-1564bc81b387",
+		"title": "I Love You",
+		"composer": "Cole Porter",
+		"composed_year": 1944,
+		"composed_key": null
+	},
+	{
+		"id": "d23d71fc-3d40-48d8-b091-b2bb2da65cfa",
+		"title": "I Mean You",
+		"composer": "Thelonious Monk",
+		"composed_year": 1946,
+		"composed_key": null
+	},
+	{
+		"id": "4425fb51-3fd4-489b-abfb-af5b63a0be59",
+		"title": "I Only Have Eyes for You",
+		"composer": "Harry Warren and Al Dubin",
+		"composed_year": 1934,
+		"composed_key": null
+	},
+	{
+		"id": "a1540b5f-90e2-4bbd-8cda-71b674d352c5",
+		"title": "I Remember Clifford",
+		"composer": "Benny Golson",
+		"composed_year": 1958,
+		"composed_key": null
+	},
+	{
+		"id": "36800980-633d-479a-a26f-8abce1623486",
+		"title": "I Should Care",
+		"composer": "Axel Stordahl, Paul Weston, and Sammy Cahn",
+		"composed_year": 1944,
+		"composed_key": null
+	},
+	{
+		"id": "65da653e-21d7-4956-a15a-55599e1cddae",
+		"title": "I Surrender, Dear",
+		"composer": "Harry Barris and Gordon Clifford",
+		"composed_year": 1931,
+		"composed_key": null
+	},
+	{
+		"id": "1133e57f-9659-4796-b909-02b918bb95e3",
+		"title": "I Thought about You",
+		"composer": "Jimmy Van Heusen and Johnny Mercer",
+		"composed_year": 1939,
+		"composed_key": null
+	},
+	{
+		"id": "0e59393b-0d04-4b4c-8468-1822c6cf7502",
+		"title": "I Want to Be Happy",
+		"composer": "Vincent Youmans and Irving Caesar",
+		"composed_year": 1930,
+		"composed_key": null
+	},
+	{
+		"id": "63ac7ce7-6af2-4037-bc21-fa2373389da5",
+		"title": "If I Should Lose You",
+		"composer": "Ralph Rainger and Leo Robin",
+		"composed_year": 1949,
+		"composed_key": null
+	},
+	{
+		"id": "afeadaf6-1c76-4530-a000-e0d4022b9549",
+		"title": "If You Could See Me Now",
+		"composer": "Tadd Dameron and Carl Sigman",
+		"composed_year": 1946,
+		"composed_key": null
+	},
+	{
+		"id": "4e346140-2a47-448d-8ed4-60128e894005",
+		"title": "Impressions",
+		"composer": "John Coltrane",
+		"composed_year": 1961,
+		"composed_key": null
+	},
+	{
+		"id": "d4a92004-5818-4366-a735-77089cd8411b",
+		"title": "In a Sentimental Mood",
+		"composer": "Duke Ellington",
+		"composed_year": 1935,
+		"composed_key": null
+	},
+	{
+		"id": "e9c31870-3bd6-45be-9993-0975cd8dcf49",
+		"title": "In Your Own Sweet Way",
+		"composer": "Dave Brubeck",
+		"composed_year": 1952,
+		"composed_key": null
+	},
+	{
+		"id": "3ffd9f4f-ecb8-4f38-b11d-97ccdc56ab5c",
+		"title": "East of the Sun (and West of the Moon)",
+		"composer": "Brooks Bowman",
+		"composed_year": 1934,
+		"composed_key": null
+	},
+	{
+		"id": "786db3ad-ef76-4587-9da4-cb937e94fe29",
+		"title": "Easy Living",
+		"composer": "Ralph Rainger and Leo Robin",
+		"composed_year": 1937,
+		"composed_key": null
+	},
+	{
+		"id": "4bb10810-7ab8-4840-a81e-b313069b5985",
+		"title": "Invitation",
+		"composer": "Bronisław Kaper and Paul Francis Webster",
+		"composed_year": 1957,
+		"composed_key": null
+	},
+	{
+		"id": "30afc228-b25d-436d-9f2c-2b90f8dc7155",
+		"title": "It Could Happen to You",
+		"composer": "Jimmy Van Heusen and Johnny Burke",
+		"composed_year": 1943,
+		"composed_key": null
+	},
+	{
+		"id": "e8914e06-d108-474c-a398-bc8fa59f4488",
+		"title": "It Had to Be You",
+		"composer": "Isham Jones and Gus Kahn",
+		"composed_year": 1924,
+		"composed_key": null
+	},
+	{
+		"id": "94e79073-e81e-415a-8dde-11fcf7d9233c",
+		"title": "It Might as Well Be Spring",
+		"composer": "Richard Rodgers and Oscar Hammerstein II",
+		"composed_year": 1945,
+		"composed_key": null
+	},
+	{
+		"id": "3aa063fd-cd3a-40ed-9099-14e905980dba",
+		"title": "It Never Entered My Mind",
+		"composer": "Richard Rodgers and Lorenz Hart",
+		"composed_year": 1940,
+		"composed_key": null
+	},
+	{
+		"id": "c749316e-b956-4fb3-b711-f2a6e9614d3d",
+		"title": "Joy Spring",
+		"composer": "Clifford Brown",
+		"composed_year": 1954,
+		"composed_key": null
+	},
+	{
+		"id": "da8c7bdf-91e8-4f8e-b373-904caa526eb6",
+		"title": "Just Friends",
+		"composer": "John Klenner and Sam M. Lewis",
+		"composed_year": 1948,
+		"composed_key": null
+	},
+	{
+		"id": "a75c3144-2a10-40c8-a0d9-310c9b4aaebc",
+		"title": "Just One of Those Things",
+		"composer": "Cole Porter",
+		"composed_year": 1935,
+		"composed_key": null
+	},
+	{
+		"id": "86995ed1-c2fa-4619-a30c-5427e4792ea3",
+		"title": "Just You, Just Me",
+		"composer": "Jesse Greer and Raymond Klages",
+		"composed_year": 1929,
+		"composed_key": null
+	},
+	{
+		"id": "311c231b-680f-41cb-9139-18de7625c395",
+		"title": "Killer Joe",
+		"composer": "Benny Golson",
+		"composed_year": 1960,
+		"composed_key": null
+	},
+	{
+		"id": "2b035cf2-85b5-4071-bd05-1b4c0de17fac",
+		"title": "King Porter Stomp",
+		"composer": "Jelly Roll Morton",
+		"composed_year": 1923,
+		"composed_key": null
+	},
+	{
+		"id": "2f8962af-f458-46b8-b755-2d8b58a101e2",
+		"title": "Laura",
+		"composer": "David Raksin and Johnny Mercer",
+		"composed_year": 1944,
+		"composed_key": null
+	},
+	{
+		"id": "4fe8bae0-9083-484d-b50c-83abafa3185c",
+		"title": "Lester Leaps In",
+		"composer": "Lester Young",
+		"composed_year": 1939,
+		"composed_key": null
+	},
+	{
+		"id": "de8ae6af-8a15-4bbb-95e1-b386fd6b53da",
+		"title": "Like Someone in Love",
+		"composer": "Jimmy Van Heusen and Johnny Burke",
+		"composed_year": 1944,
+		"composed_key": null
+	},
+	{
+		"id": "d9749e43-ac99-4f0a-af81-a87d92b88866",
+		"title": "Limehouse Blues",
+		"composer": "Philip Braham and Douglas Furber",
+		"composed_year": 1924,
+		"composed_key": null
+	},
+	{
+		"id": "28086aa9-3405-42cf-996f-bfbde5b2ece4",
+		"title": "Lotus Blossom",
+		"composer": "Billy Strayhorn",
+		"composed_year": 1957,
+		"composed_key": null
+	},
+	{
+		"id": "97df0490-43a9-4fbb-863a-3f658ea4c09f",
+		"title": "Love for Sale",
+		"composer": "Cole Porter",
+		"composed_year": 1930,
+		"composed_key": null
+	},
+	{
+		"id": "b24a4c48-5ff6-40d1-8288-11233306a9ad",
+		"title": "Love Is Here to Stay",
+		"composer": "George Gershwin and Ira Gershwin",
+		"composed_year": 1937,
+		"composed_key": null
+	},
+	{
+		"id": "403436f5-0a23-4ec5-8d5d-77e641aef54c",
+		"title": "Lover",
+		"composer": "Richard Rodgers and Lorenz Hart",
+		"composed_year": 1932,
+		"composed_key": null
+	},
+	{
+		"id": "72a7aafb-89df-47c7-a4c1-b14051adb114",
+		"title": "Lover, Come Back to Me",
+		"composer": "Sigmund Romberg and Oscar Hammerstein II",
+		"composed_year": 1928,
+		"composed_key": null
+	},
+	{
+		"id": "8d34fafc-0c76-4293-97d7-a709ea856582",
+		"title": "Lullaby of Birdland",
+		"composer": "George Shearing and George David Weiss",
+		"composed_year": 1952,
+		"composed_key": null
+	},
+	{
+		"id": "5fa532d0-4dcf-4127-af3b-d34efc0ccaca",
+		"title": "Lush Life",
+		"composer": "Billy Strayhorn",
+		"composed_year": 1933,
+		"composed_key": null
+	},
+	{
+		"id": "56e0a2f4-3335-49fc-a534-0a4da0004c08",
+		"title": "Mack the Knife",
+		"composer": "Kurt Weill and Bertolt Brecht",
+		"composed_year": 1955,
+		"composed_key": null
+	},
+	{
+		"id": "87796f86-e0cd-458d-8f1f-5b877a22f53c",
+		"title": "Confirmation",
+		"composer": "Charlie Parker",
+		"composed_year": 1946,
+		"composed_key": null
+	},
+	{
+		"id": "a62bff3f-1c5a-4864-a2be-22d9b3e92d6e",
+		"title": "Cotton Tail",
+		"composer": "Duke Ellington",
+		"composed_year": 1940,
+		"composed_key": null
+	},
+	{
+		"id": "ed5c93b9-5d35-47d6-a90f-4d9e9e82d5c1",
+		"title": "Dancing in the Dark",
+		"composer": "Arthur Schwartz",
+		"composed_year": 1931,
+		"composed_key": null
+	},
+	{
+		"id": "ad246186-362d-4752-92ce-b52af4f37775",
+		"title": "Darn That Dream",
+		"composer": "Jimmy Van Heusen and Eddie DeLange",
+		"composed_year": 1939,
+		"composed_key": null
+	},
+	{
+		"id": "0c865a64-fde9-42f3-a773-4b484bfaf902",
+		"title": "How Insensitive",
+		"composer": "Antonio Carlos Jobim and Vinicius de Moraes",
+		"composed_year": 1963,
+		"composed_key": null
+	},
+	{
+		"id": "75227203-e552-46e4-84f1-09cb21056a35",
+		"title": "Maiden Voyage",
+		"composer": "Herbie Hancock",
+		"composed_year": 1965,
+		"composed_key": null
+	},
+	{
+		"id": "de02fd2b-1cb6-4481-8303-feae04033232",
+		"title": "Mean to Me",
+		"composer": "Fred E. Ahlert and Roy Turk",
+		"composed_year": 1929,
+		"composed_key": null
+	},
+	{
+		"id": "eb32725a-9dd3-40cd-8609-77d549e6d6f1",
+		"title": "Meditation",
+		"composer": "Antonio Carlos Jobim and Newton Mendonça",
+		"composed_year": 1963,
+		"composed_key": null
+	},
+	{
+		"id": "28236d8c-4d6a-45ba-afef-380bd0e0d6b7",
+		"title": "Memories of You",
+		"composer": "Eubie Blake and Andy Razaf",
+		"composed_year": 1930,
+		"composed_key": null
+	},
+	{
+		"id": "ec59580e-4c6b-48fa-afb4-0c0c36f0a220",
+		"title": "Milestones",
+		"composer": "Miles Davis",
+		"composed_year": 1947,
+		"composed_key": null
+	},
+	{
+		"id": "18bbdb8b-f875-4544-bf12-0ed940c44d65",
+		"title": "Misty",
+		"composer": "Erroll Garner and Johnny Burke",
+		"composed_year": 1954,
+		"composed_key": null
+	},
+	{
+		"id": "4503b137-59b5-44a5-8820-89b1260405a9",
+		"title": "Mood Indigo",
+		"composer": "Duke Ellington, Barney Bigard, and Irving Mills",
+		"composed_year": 1930,
+		"composed_key": null
+	},
+	{
+		"id": "0a11ad3d-dab5-4dac-a939-b798a0655ba6",
+		"title": "Moonlight in Vermont",
+		"composer": "Karl Suessdorf and John Blackburn",
+		"composed_year": 1944,
+		"composed_key": null
+	},
+	{
+		"id": "76fe48b0-985a-4941-926b-b4f24abd52f0",
+		"title": "Moose the Mooche",
+		"composer": "Charlie Parker",
+		"composed_year": 1946,
+		"composed_key": null
+	},
+	{
+		"id": "946741df-2495-4d03-98b9-900d308f018a",
+		"title": "More Than You Know",
+		"composer": "Vincent Youmans, Billy Rose, and Edward Eliscu",
+		"composed_year": 1936,
+		"composed_key": null
+	},
+	{
+		"id": "49e75036-45dc-4685-a649-fddadc4d7eea",
+		"title": "Muskrat Ramble",
+		"composer": "Kid Ory and Ray Gilbert",
+		"composed_year": 1926,
+		"composed_key": null
+	},
+	{
+		"id": "717cedc7-6862-480d-a212-ffe43704a1a0",
+		"title": "My Favorite Things",
+		"composer": "Richard Rodgers and Oscar Hammerstein II",
+		"composed_year": 1959,
+		"composed_key": null
+	},
+	{
+		"id": "cd109aab-2e45-418a-a04c-440e1bbaeadf",
+		"title": "My Foolish Heart",
+		"composer": "Victor Young and Ned Washington",
+		"composed_year": 1949,
+		"composed_key": null
+	},
+	{
+		"id": "7b1b6306-58a6-4563-a2e4-184d4638e04a",
+		"title": "My Funny Valentine",
+		"composer": "Richard Rodgers (music) and Lorenz Hart (lyrics)",
+		"composed_year": 1937,
+		"composed_key": null
+	},
+	{
+		"id": "dac1b544-da0f-4a08-9d8f-0ac632c866b3",
+		"title": "Speak Low",
+		"composer": "Kurt Weill and Ogden Nash",
+		"composed_year": 1942,
+		"composed_key": null
+	},
+	{
+		"id": "d5c1e66d-b26b-4ba4-9abe-d367ab104494",
+		"title": "My Old Flame",
+		"composer": "Arthur Johnston and Sam Coslow",
+		"composed_year": 1934,
+		"composed_key": null
+	},
+	{
+		"id": "7707a777-031a-444b-bc5a-38012856038b",
+		"title": "My One and Only Love",
+		"composer": "Guy Wood and Robert Mellin",
+		"composed_year": 1953,
+		"composed_key": null
+	},
+	{
+		"id": "30a146b3-5769-47e2-99bb-3d696226590a",
+		"title": "My Romance",
+		"composer": "Richard Rodgers and Lorenz Hart",
+		"composed_year": 1935,
+		"composed_key": null
+	},
+	{
+		"id": "8362d445-d576-42ca-be07-452333a77fd4",
+		"title": "Naima",
+		"composer": "John Coltrane",
+		"composed_year": 1959,
+		"composed_key": null
+	},
+	{
+		"id": "bf613b1e-299e-4220-84ea-cd38dcc0be58",
+		"title": "Nardis",
+		"composer": "Miles Davis",
+		"composed_year": 1958,
+		"composed_key": null
+	},
+	{
+		"id": "b588936e-2f23-4890-a744-c19dabb55410",
+		"title": "Nature Boy",
+		"composer": "Eden Ahbez",
+		"composed_year": 1947,
+		"composed_key": null
+	},
+	{
+		"id": "4b901a25-93e2-40c7-a5a8-7942ededa832",
+		"title": "Night and Day",
+		"composer": "Cole Porter",
+		"composed_year": 1932,
+		"composed_key": null
+	},
+	{
+		"id": "8e7f78a8-5d13-494f-b4e6-cd8bb0959eca",
+		"title": "Night in Tunisia",
+		"composer": "Dizzy Gillespie and Frank Paparelli",
+		"composed_year": 1945,
+		"composed_key": null
+	},
+	{
+		"id": "158584f6-839f-4196-b9c3-8bc49974baac",
+		"title": "Night Train",
+		"composer": "Jimmy Forrest",
+		"composed_year": 1951,
+		"composed_key": null
+	},
+	{
+		"id": "41dee9c8-f5c8-4bd6-8d17-4995e1fd689b",
+		"title": "Nuages",
+		"composer": "Django Reinhardt",
+		"composed_year": 1940,
+		"composed_key": null
+	},
+	{
+		"id": "63b2a06f-081d-47b7-af6e-d4bd27f4d825",
+		"title": "Oh, Lady Be Good!",
+		"composer": "George Gershwin and Ira Gershwin",
+		"composed_year": 1924,
+		"composed_key": null
+	},
+	{
+		"id": "2c152c65-135f-4931-9336-aa6be2a6e6c1",
+		"title": "Oleo",
+		"composer": "Sonny Rollins",
+		"composed_year": 1954,
+		"composed_key": null
+	},
+	{
+		"id": "ba462eba-fe76-46db-b912-b7da43a2cd39",
+		"title": "On Green Dolphin Street",
+		"composer": "Bronisław Kaper and Ned Washington",
+		"composed_year": 1947,
+		"composed_key": null
+	},
+	{
+		"id": "d80e7fc4-94d7-4b77-968b-696fd002fa6e",
+		"title": "On the Sunny Side of the Street",
+		"composer": "Jimmy McHugh and Dorothy Fields",
+		"composed_year": 1930,
+		"composed_key": null
+	},
+	{
+		"id": "76f77a03-c19b-45f4-a525-c28f6cedaf85",
+		"title": "Once I Loved",
+		"composer": "Antonio Carlos Jobim and Vinicius de Moraes",
+		"composed_year": 1965,
+		"composed_key": null
+	},
+	{
+		"id": "088ebc1c-681e-4d77-9b36-336ddd98144f",
+		"title": "One Note Samba",
+		"composer": "Antonio Carlos Jobim and Newton Mendonça",
+		"composed_year": 1961,
+		"composed_key": null
+	},
+	{
+		"id": "70a47716-82cb-4c65-bf7d-e74693aadf94",
+		"title": "Ornithology",
+		"composer": "Charlie Parker and Benny Harris",
+		"composed_year": 1946,
+		"composed_key": null
+	},
+	{
+		"id": "eaa9045d-3f33-4225-b76e-1fae05b780d8",
+		"title": "Out of Nowhere",
+		"composer": "Johnny Green and Edward Heyman",
+		"composed_year": 1931,
+		"composed_key": null
+	},
+	{
+		"id": "22dc9fbe-3839-4830-8b92-b6659128cc20",
+		"title": "Over the Rainbow",
+		"composer": "Harold Arlen and E. Y. Harburg",
+		"composed_year": 1938,
+		"composed_key": null
+	},
+	{
+		"id": "acfd2083-3ad3-456a-8235-fec4618145bc",
+		"title": "Peace",
+		"composer": "Horace Silver",
+		"composed_year": 1959,
+		"composed_key": null
+	},
+	{
+		"id": "021b877c-8172-4735-abb9-07ae41fdf91e",
+		"title": "Pennies from Heaven",
+		"composer": "Arthur Johnston and Johnny Burke",
+		"composed_year": 1936,
+		"composed_key": null
+	},
+	{
+		"id": "a765a330-fc03-498a-ab9c-fbd4deccaf0e",
+		"title": "Perdido",
+		"composer": "Juan Tizol",
+		"composed_year": 1941,
+		"composed_key": null
+	},
+	{
+		"id": "3de6dd0d-c919-4e16-8873-458f58df85b3",
+		"title": "Polka Dots and Moonbeams",
+		"composer": "Jimmy Van Heusen and Johnny Burke",
+		"composed_year": 1940,
+		"composed_key": null
+	},
+	{
+		"id": "e45f52a8-44dd-4c95-9adc-e19d22fd32dc",
+		"title": "Prelude to a Kiss",
+		"composer": "Duke Ellington and Irving Gordon",
+		"composed_year": 1938,
+		"composed_key": null
+	},
+	{
+		"id": "c9f02abd-d4ca-4857-b811-c22b6be1c21a",
+		"title": "Rhythm-a-ning",
+		"composer": "Thelonious Monk",
+		"composed_year": 1941,
+		"composed_key": null
+	},
+	{
+		"id": "8dd875f5-8813-41f9-a9a2-e82926d19d49",
+		"title": "Royal Garden Blues",
+		"composer": "Clarence Williams and Spencer Williams",
+		"composed_year": 1919,
+		"composed_key": null
+	},
+	{
+		"id": "f4471200-9c12-4339-be7e-4e3b9538d1b7",
+		"title": "Days of Wine and Roses",
+		"composer": "Henry Mancini and Johnny Mercer",
+		"composed_year": 1963,
+		"composed_key": null
+	},
+	{
+		"id": "ebf96931-74a7-462a-a5a8-e6d6eee1a90b",
+		"title": "Misterioso",
+		"composer": "Thelonious Monk",
+		"composed_year": 1948,
+		"composed_key": null
+	},
+	{
+		"id": "b87619b1-1888-4a06-9d71-b606d12188cb",
+		"title": "Ruby, My Dear",
+		"composer": "Thelonious Monk",
+		"composed_year": 1948,
+		"composed_key": null
+	},
+	{
+		"id": "d6d7d598-3804-422a-9295-bce5fe8bf4e0",
+		"title": "Satin Doll",
+		"composer": "Duke Ellington and Billy Strayhorn",
+		"composed_year": 1953,
+		"composed_key": null
+	},
+	{
+		"id": "bce236df-c74b-4674-a403-a6bf30422218",
+		"title": "Scrapple from the Apple",
+		"composer": "Charlie Parker",
+		"composed_year": 1947,
+		"composed_key": null
+	},
+	{
+		"id": "f0cf5292-2bdc-42b2-8837-1a133c2eae4f",
+		"title": "Secret Love",
+		"composer": "Sammy Fain and Paul Francis Webster",
+		"composed_year": 1953,
+		"composed_key": null
+	},
+	{
+		"id": "886093ec-30a6-49d1-bc37-7ecb93baa2a1",
+		"title": "Skylark",
+		"composer": "Hoagy Carmichael and Johnny Mercer",
+		"composed_year": 1941,
+		"composed_key": null
+	},
+	{
+		"id": "9948e64b-cc96-4060-a2e9-929606e7cd57",
+		"title": "Smile",
+		"composer": "Charles Chaplin, John Turner, and Geoffrey Parsons",
+		"composed_year": 1954,
+		"composed_key": null
+	},
+	{
+		"id": "087e1cf7-5284-429a-9bca-97c92e359f8a",
+		"title": "So What",
+		"composer": "Miles Davis",
+		"composed_year": 1959,
+		"composed_key": null
+	},
+	{
+		"id": "97b440fa-e283-4af3-826f-00f8449e9592",
+		"title": "Softly, as in a Morning Sunrise",
+		"composer": "Sigmund Romberg and Oscar Hammerstein II",
+		"composed_year": 1928,
+		"composed_key": null
+	},
+	{
+		"id": "8e1df894-f4a1-41a5-ad87-d13f6c0153cb",
+		"title": "Some of These Days",
+		"composer": "Shelton Brooks",
+		"composed_year": 1911,
+		"composed_key": null
+	},
+	{
+		"id": "768016cb-4d45-4400-84a2-d788a7002dd7",
+		"title": "Someday My Prince Will Come",
+		"composer": "Frank Churchill and Larry Morey",
+		"composed_year": 1957,
+		"composed_key": null
+	},
+	{
+		"id": "6f20c8fe-e8cb-4734-8310-02c730b55052",
+		"title": "Someone to Watch over Me",
+		"composer": "George Gershwin and Ira Gershwin",
+		"composed_year": 1926,
+		"composed_key": null
+	},
+	{
+		"id": "0fa608da-67d4-4ef0-92db-86a9cb94b5fd",
+		"title": "Sophisticated Lady",
+		"composer": "Duke Ellington, Irving Mills, and Mitchell Parish",
+		"composed_year": 1932,
+		"composed_key": null
+	},
+	{
+		"id": "39887012-0de7-4e7b-8d74-4c9f237d1fd7",
+		"title": "Soul Eyes",
+		"composer": "Mal Waldron",
+		"composed_year": 1957,
+		"composed_key": null
+	},
+	{
+		"id": "cdced1ba-327a-4e5d-be60-8c6cd56bbd93",
+		"title": "Spring Can Really Hang You Up the Most",
+		"composer": "Tommy Wolf and Fran Landesman",
+		"composed_year": 1957,
+		"composed_key": null
+	},
+	{
+		"id": "1117b603-6bc6-4f1f-9705-e243c832fdd7",
+		"title": "Spring Is Here",
+		"composer": "Richard Rodgers and Lorenz Hart",
+		"composed_year": 1938,
+		"composed_key": null
+	},
+	{
+		"id": "4fada542-c7c8-4453-a2cb-ccfeef3fbf40",
+		"title": "St. James Infirmary Blues",
+		"composer": "Traditional",
+		"composed_year": 1928,
+		"composed_key": null
+	},
+	{
+		"id": "4208afed-245a-49f7-a23e-38dc671c4f54",
+		"title": "St. Louis Blues",
+		"composer": "W. C. Handy",
+		"composed_year": 1913,
+		"composed_key": null
+	},
+	{
+		"id": "7764e27e-bcc7-4321-a291-774ac7ec122e",
+		"title": "St. Thomas",
+		"composer": "Sonny Rollins",
+		"composed_year": 1956,
+		"composed_key": null
+	},
+	{
+		"id": "842711b9-3d93-4bdf-8d77-d5ee24ad31d8",
+		"title": "Star Eyes",
+		"composer": "Gene de Paul and Don Raye",
+		"composed_year": 1950,
+		"composed_key": null
+	},
+	{
+		"id": "d5e08163-1d8a-47be-8500-950693c486ce",
+		"title": "Stella by Starlight",
+		"composer": "Victor Young and Ned Washington",
+		"composed_year": 1944,
+		"composed_key": null
+	},
+	{
+		"id": "495260db-6c3b-48e5-b02b-5b85dd0e9e3a",
+		"title": "Stolen Moments",
+		"composer": "Oliver Nelson",
+		"composed_year": 1960,
+		"composed_key": null
+	},
+	{
+		"id": "24230a9d-5d8d-4e7e-bafe-5d95fb271f2a",
+		"title": "Smoke Gets in Your Eyes",
+		"composer": "Jerome Kern and Otto Harbach",
+		"composed_year": 1933,
+		"composed_key": null
+	},
+	{
+		"id": "604e2933-9c9a-4269-9d14-46bbf5f4f144",
+		"title": "Old Folks",
+		"composer": "Willard Robison and Dedette Lee Hill",
+		"composed_year": 1938,
+		"composed_key": null
+	},
+	{
+		"id": "fc276795-060b-492b-848c-4e694b0145cf",
+		"title": "Straight, No Chaser",
+		"composer": "Thelonious Monk",
+		"composed_year": 1951,
+		"composed_key": null
+	},
+	{
+		"id": "872d7739-5ea8-4852-bc8d-f752b1a4a5a2",
+		"title": "Summertime",
+		"composer": "George Gershwin and DuBose Heyward",
+		"composed_year": 1934,
+		"composed_key": null
+	},
+	{
+		"id": "047df704-c42c-4e1b-b24d-2edaabbc9852",
+		"title": "Sweet Georgia Brown",
+		"composer": "Ben Bernie, Maceo Pinkard, and Kenneth Casey",
+		"composed_year": 1925,
+		"composed_key": null
+	},
+	{
+		"id": "72acdf81-55fd-4321-ae35-0d19f2b9547f",
+		"title": "Take Five",
+		"composer": "Paul Desmond",
+		"composed_year": 1959,
+		"composed_key": null
+	},
+	{
+		"id": "86e71fda-6466-4df4-a542-8a66b98f9f4b",
+		"title": "Take the A Train",
+		"composer": "Billy Strayhorn",
+		"composed_year": 1939,
+		"composed_key": null
+	},
+	{
+		"id": "62a981dc-7527-490c-b721-a69af6b22494",
+		"title": "Tea for Two",
+		"composer": "Vincent Youmans and Irving Caesar",
+		"composed_year": 1924,
+		"composed_key": null
+	},
+	{
+		"id": "a4ae0fa0-0463-4f58-a684-856ba14fe24f",
+		"title": "Teach Me Tonight",
+		"composer": "Gene de Paul, Sammy Cahn",
+		"composed_year": 1954,
+		"composed_key": null
+	},
+	{
+		"id": "540d9a35-83fe-4ddd-b505-fed8c3ba2ee1",
+		"title": "Tenderly",
+		"composer": "Jack Lawrence and Walter Gross",
+		"composed_year": 1946,
+		"composed_key": null
+	},
+	{
+		"id": "647b901f-be67-4820-857d-2eccc3b1119c",
+		"title": "The Girl from Ipanema",
+		"composer": "Antonio Carlos Jobim and Vinicius de Moraes",
+		"composed_year": 1961,
+		"composed_key": null
+	},
+	{
+		"id": "1e7485eb-885b-4af1-bf13-5c5b15ef0179",
+		"title": "The Jitterbug Waltz",
+		"composer": "Fats Waller",
+		"composed_year": 1942,
+		"composed_key": null
+	},
+	{
+		"id": "17c26c33-313b-4f20-9fbf-583e94f25ad4",
+		"title": "The Lady Is a Tramp",
+		"composer": "Richard Rodgers and Lorenz Hart",
+		"composed_year": 1937,
+		"composed_key": null
+	},
+	{
+		"id": "3fd62558-0273-4dfd-a1b8-ff9cebd14a7c",
+		"title": "The Man I Love",
+		"composer": "George Gershwin and Ira Gershwin",
+		"composed_year": 1924,
+		"composed_key": null
+	},
+	{
+		"id": "0c6dd5d1-60d8-4890-87ec-bcde7c3b3f03",
+		"title": "The Peacocks",
+		"composer": "Jimmy Rowles",
+		"composed_year": 1974,
+		"composed_key": null
+	},
+	{
+		"id": "f80e2fc5-83eb-46f0-90c3-86d836f2dddb",
+		"title": "The Shadow of Your Smile",
+		"composer": "Johnny Mandel and Paul Francis Webster",
+		"composed_year": 1965,
+		"composed_key": null
+	},
+	{
+		"id": "9e8c7443-8716-4bcc-ba77-7002ee6a6476",
+		"title": "The Song Is You",
+		"composer": "Jerome Kern and Oscar Hammerstein II",
+		"composed_year": 1942,
+		"composed_key": null
+	},
+	{
+		"id": "7dcba094-77b8-4082-ac55-960d8798de58",
+		"title": "There Will Never Be Another You",
+		"composer": "Harry Warren and Mack Gordon",
+		"composed_year": 1939,
+		"composed_key": null
+	},
+	{
+		"id": "ff73c933-8a8f-402b-a8b8-6eb4b36d08a1",
+		"title": "There’s No You",
+		"composer": "Hal Hopper",
+		"composed_year": 1944,
+		"composed_key": null
+	},
+	{
+		"id": "8588a7f8-0343-4957-b413-c95efdf1bcd1",
+		"title": "They Didn’t Believe Me",
+		"composer": "Jerome Kern",
+		"composed_year": 1915,
+		"composed_key": null
+	},
+	{
+		"id": "45bbbded-32ee-41ae-85d8-328f56a32b6e",
+		"title": "Tiger Rag",
+		"composer": "Nick LaRocca",
+		"composed_year": 1917,
+		"composed_key": null
+	},
+	{
+		"id": "b24601b6-ec43-43ea-81af-fb896f52e611",
+		"title": "Time after Time",
+		"composer": "Jule Styne and Sammy Cahn",
+		"composed_year": 1946,
+		"composed_key": null
+	},
+	{
+		"id": "9e90b00e-bd4d-4f32-915c-ecc0e34497bb",
+		"title": "Tin Roof Blues",
+		"composer": "New Orleans Rhythm Kings",
+		"composed_year": 1923,
+		"composed_key": null
+	},
+	{
+		"id": "7f5939a3-0759-42bf-be7d-30c41e54dd5e",
+		"title": "Waltz for Debby",
+		"composer": "Bill Evans and Gene Lees",
+		"composed_year": 1956,
+		"composed_key": null
+	},
+	{
+		"id": "e414980b-ff8f-4d24-bc9c-7caf54dca8a5",
+		"title": "Watermelon Man",
+		"composer": "Herbie Hancock",
+		"composed_year": 1962,
+		"composed_key": null
+	},
+	{
+		"id": "eb5b648a-f9c7-4fb7-829d-499972929fac",
+		"title": "Wave",
+		"composer": "Antonio Carlos Jobim",
+		"composed_year": 1967,
+		"composed_key": null
+	},
+	{
+		"id": "242ba8c5-cc54-4747-84bc-8f42dd865427",
+		"title": "What Is This Thing Called Love?",
+		"composer": "Cole Porter",
+		"composed_year": 1929,
+		"composed_key": null
+	},
+	{
+		"id": "ff4a1f53-517e-4b38-b8b5-b845b2958092",
+		"title": "Desafinado",
+		"composer": "Antonio Carlos Jobim and Newton Mendonça",
+		"composed_year": 1961,
+		"composed_key": null
+	},
+	{
+		"id": "544921fb-939f-425b-8316-37d2dc5cb1d9",
+		"title": "They Can’t Take That Away from Me",
+		"composer": "George Gershwin and Ira Gershwin",
+		"composed_year": 1937,
+		"composed_key": null
+	},
+	{
+		"id": "cb95d013-a644-4c84-926b-6e16cdfcfd58",
+		"title": "When the Saints Go Marching In",
+		"composer": "Traditional",
+		"composed_year": 1928,
+		"composed_key": null
+	},
+	{
+		"id": "777170ef-a78b-4a6b-912d-e273d4e66238",
+		"title": "Whisper Not",
+		"composer": "Benny Golson",
+		"composed_year": 1956,
+		"composed_key": null
+	},
+	{
+		"id": "61ecdec5-78c2-4820-8c1e-8497bd3cfb27",
+		"title": "Willow Weep for Me",
+		"composer": "Ann Ronell",
+		"composed_year": 1932,
+		"composed_key": null
+	},
+	{
+		"id": "8a5a3a61-22e6-4b67-881e-a3d386e07ad3",
+		"title": "Yardbird Suite",
+		"composer": "Charlie Parker",
+		"composed_year": 1946,
+		"composed_key": null
+	},
+	{
+		"id": "d3196b28-edfe-45ff-9763-0d91aa01bfa9",
+		"title": "Yesterdays",
+		"composer": "Jerome Kern and Otto Harbach",
+		"composed_year": 1938,
+		"composed_key": null
+	},
+	{
+		"id": "b7322324-a9c6-45d2-8f97-b010682e77f5",
+		"title": "You Stepped Out of a Dream",
+		"composer": "Nacio Herb Brown and Gus Kahn",
+		"composed_year": 1940,
+		"composed_key": null
+	},
+	{
+		"id": "f5b20be5-05b8-4809-8b1d-9e0c421393ac",
+		"title": "You’d Be So Nice to Come Home To",
+		"composer": "Cole Porter",
+		"composed_year": 1943,
+		"composed_key": null
+	},
+	{
+		"id": "87774196-c2cb-48ea-89ab-344e7ede2409",
+		"title": "Dinah",
+		"composer": "Harry Akst and Sam M. Lewis",
+		"composed_year": 1925,
+		"composed_key": null
+	},
+	{
+		"id": "5fb3412c-4eda-45d3-8929-8fce4d703a2d",
+		"title": "Django",
+		"composer": "John Lewis",
+		"composed_year": 1954,
+		"composed_key": null
+	},
+	{
+		"id": "d131bb35-4135-4516-b35d-408955e71c7d",
+		"title": "The Nearness of You",
+		"composer": "Hoagy Carmichael and Ned Washington",
+		"composed_year": 1938,
+		"composed_key": null
+	},
+	{
+		"id": "bf1c0036-6dc4-4f20-8480-4783a7a77b46",
+		"title": "Do You Know What It Means to Miss New Orleans",
+		"composer": "Louis Alter and Eddie DeLange",
+		"composed_year": 1946,
+		"composed_key": null
+	},
+	{
+		"id": "a82e8ef2-b708-4975-a254-bd2dcee05682",
+		"title": "Dolphin Dance",
+		"composer": "Herbie Hancock",
+		"composed_year": 1965,
+		"composed_key": null
+	},
+	{
+		"id": "75ca2cbc-da8c-43d5-ac77-19161cbcaf14",
+		"title": "Donna Lee",
+		"composer": "Charlie Parker",
+		"composed_year": 1947,
+		"composed_key": null
+	},
+	{
+		"id": "bd93a330-2e00-4e3a-9166-7e0d6147ebca",
+		"title": "You Go to My Head",
+		"composer": "J. Fred Coots and Haven Gillespie",
+		"composed_year": 1938,
+		"composed_key": null
+	},
+	{
+		"id": "301cebd5-eee7-4380-836b-fea75bd58715",
+		"title": "In a Mellow Tone",
+		"composer": "Duke Ellington",
+		"composed_year": 1939,
+		"composed_key": null
+	},
+	{
+		"id": "fb6d9024-d26d-47e3-87b6-2640bdf3f8fa",
+		"title": "The Way You Look Tonight",
+		"composer": "Jerome Kern and Dorothy Fields",
+		"composed_year": 1936,
+		"composed_key": null
+	},
+	{
+		"id": "b7cdb537-7469-4feb-8368-8b59d2264aa9",
+		"title": "There Is No Greater Love",
+		"composer": "Isham Jones and Marty Symes",
+		"composed_year": 1936,
+		"composed_key": null
+	}
+]
