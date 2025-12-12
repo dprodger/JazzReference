@@ -170,14 +170,21 @@ struct SongDetailView: View {
             VStack(alignment: .leading, spacing: 16) {
             // Song Information Header
             VStack(alignment: .leading, spacing: 12) {
-                Text(song.title)
-                    .font(JazzTheme.largeTitle())
-                    .bold()
-                    .foregroundColor(JazzTheme.charcoal)
-                    .onLongPressGesture {
-                        showRefreshConfirmation = true
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(song.title)
+                        .font(JazzTheme.largeTitle())
+                        .bold()
+                        .foregroundColor(JazzTheme.charcoal)
+                    if let year = song.composedYear {
+                        Text("(\(String(year)))")
+                            .font(JazzTheme.title2())
+                            .foregroundColor(JazzTheme.smokeGray)
                     }
-                
+                }
+                .onLongPressGesture {
+                    showRefreshConfirmation = true
+                }
+
                 if let composer = song.composer {
                     HStack {
                         Image(systemName: "music.note.list")
@@ -185,11 +192,6 @@ struct SongDetailView: View {
                         Text(composer)
                             .font(JazzTheme.title3())
                             .foregroundColor(JazzTheme.smokeGray)
-                        if let year = song.composedYear {
-                            Text("(\(String(year)))")
-                                .font(JazzTheme.title3())
-                                .foregroundColor(JazzTheme.smokeGray)
-                        }
                     }
                 }
 

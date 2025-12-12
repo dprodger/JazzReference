@@ -233,22 +233,18 @@ struct SongsListView: View {
     
     private func songRowView(song: Song) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(song.title)
-                .font(JazzTheme.headline())
-                .foregroundColor(JazzTheme.charcoal)
-            if let composer = song.composer {
-                HStack(spacing: 4) {
-                    if let year = song.composedYear {
-                        Text("(\(String(year)))")
-                            .font(JazzTheme.subheadline())
-                            .foregroundColor(JazzTheme.smokeGray)
-                    }
-                    Text(composer)
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text(song.title)
+                    .font(JazzTheme.headline())
+                    .foregroundColor(JazzTheme.charcoal)
+                if let year = song.composedYear {
+                    Text("(\(String(year)))")
                         .font(JazzTheme.subheadline())
                         .foregroundColor(JazzTheme.smokeGray)
                 }
-            } else if let year = song.composedYear {
-                Text("(\(String(year)))")
+            }
+            if let composer = song.composer {
+                Text(composer)
                     .font(JazzTheme.subheadline())
                     .foregroundColor(JazzTheme.smokeGray)
             }
