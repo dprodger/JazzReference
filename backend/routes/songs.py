@@ -171,7 +171,7 @@ def get_songs():
     try:
         if search_query:
             query = """
-                SELECT id, title, composer, structure, musicbrainz_id, wikipedia_url, song_reference, external_references, 
+                SELECT id, title, composer, composed_year, composed_key, structure, musicbrainz_id, wikipedia_url, song_reference, external_references,
                        created_at, updated_at
                 FROM songs
                 WHERE title ILIKE %s OR composer ILIKE %s
@@ -180,7 +180,7 @@ def get_songs():
             params = (f'%{search_query}%', f'%{search_query}%')
         else:
             query = """
-                SELECT id, title, composer, structure, musicbrainz_id, wikipedia_url, song_reference, external_references,
+                SELECT id, title, composer, composed_year, composed_key, structure, musicbrainz_id, wikipedia_url, song_reference, external_references,
                        created_at, updated_at
                 FROM songs
                 ORDER BY title
@@ -213,7 +213,8 @@ def get_song_summary(song_id):
         combined_query = f"""
             WITH song_data AS (
                 SELECT
-                    s.id, s.title, s.composer, s.structure, s.song_reference,
+                    s.id, s.title, s.composer, s.composed_year, s.composed_key,
+                    s.structure, s.song_reference,
                     s.musicbrainz_id, s.wikipedia_url, s.external_references,
                     s.created_at, s.updated_at,
                     (SELECT COUNT(*)
@@ -499,13 +500,14 @@ def get_song_detail(song_id):
         # UPDATED: Album art now uses release_imagery priority
         combined_query = f"""
             WITH song_data AS (
-                SELECT 
-                    s.id, s.title, s.composer, s.structure, s.song_reference,
-                    s.musicbrainz_id, s.wikipedia_url, s.external_references, 
+                SELECT
+                    s.id, s.title, s.composer, s.composed_year, s.composed_key,
+                    s.structure, s.song_reference,
+                    s.musicbrainz_id, s.wikipedia_url, s.external_references,
                     s.created_at, s.updated_at,
                     -- NEW: Count total authority recommendations for this song
-                    (SELECT COUNT(*) 
-                     FROM song_authority_recommendations 
+                    (SELECT COUNT(*)
+                     FROM song_authority_recommendations
                      WHERE song_id = s.id) as authority_recommendation_count
                 FROM songs s
                 WHERE s.id = %s
