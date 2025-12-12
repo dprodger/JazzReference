@@ -150,9 +150,8 @@ struct SongDetailView: View {
         let hasWikipedia = song.wikipediaUrl != nil
         let hasMusicbrainz = song.musicbrainzId != nil
         let hasJazzStandards = song.externalReferences?["jazzstandards"] != nil
-        let hasExternalRefs = !song.externalReferencesList.isEmpty
-        
-        return hasStructure || hasWikipedia || hasMusicbrainz || hasJazzStandards || hasExternalRefs
+
+        return hasStructure || hasWikipedia || hasMusicbrainz || hasJazzStandards
     }
     
     // MARK: - Check if song has authoritative recordings
@@ -291,20 +290,6 @@ struct SongDetailView: View {
                         entityId: song.id,
                         entityName: song.title
                     )
-                    
-                    // External References Section
-                    let externalRefs = song.externalReferencesList
-                    if !externalRefs.isEmpty {
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("References")
-                                .font(JazzTheme.headline())
-                                .foregroundColor(JazzTheme.charcoal)
-                            
-                            ForEach(externalRefs) { ref in
-                                ExternalReferenceRow(reference: ref)
-                            }
-                        }
-                    }
                 }
                 .padding()
                 .background(JazzTheme.cardBackground)
