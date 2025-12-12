@@ -852,4 +852,61 @@ class NetworkManager: ObservableObject {
         return nil
     }
     #endif
+
+    // MARK: - Content Reports
+
+    /// Submit a content error report to the API
+    /// - Parameters:
+    ///   - entityType: Type of entity (e.g., "recording", "performer")
+    ///   - entityId: ID of the entity
+    ///   - entityName: Human-readable name of the entity
+    ///   - externalSource: Source being reported (e.g., "spotify", "wikipedia")
+    ///   - externalUrl: The URL being reported as incorrect
+    ///   - explanation: User's explanation of the issue
+    /// - Returns: True if report was submitted successfully
+    static func submitContentReport(
+        entityType: String,
+        entityId: String,
+        entityName: String,
+        externalSource: String,
+        externalUrl: String,
+        explanation: String
+    ) async throws -> Bool {
+        guard let url = URL(string: "\(baseURL)/content-reports") else {
+            throw URLError(.badURL)
+        }
+
+        let requestBody: [String: Any] = [
+            "entity_type": entityType,
+            "entity_id": entityId,
+            "entity_name": entityName,
+            "external_source": externalSource,
+            "external_url": externalUrl,
+            "explanation": explanation,
+            "reporter_platform": "ios",
+            "reporter_app_version": Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
+        ]
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            return false
+        }
+
+        if (200...299).contains(httpResponse.statusCode) {
+            return true
+        } else {
+            // Log error for debugging
+            if let errorDict = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let errorMessage = errorDict["error"] as? String {
+                print("API Error submitting content report: \(errorMessage)")
+            }
+            return false
+        }
+    }
 }

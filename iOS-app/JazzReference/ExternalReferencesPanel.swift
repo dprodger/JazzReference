@@ -215,7 +215,7 @@ struct ExternalReferencesPanel: View {
     private func submitLinkReport(entityType: String, entityId: String, entityName: String, externalSource: String, externalUrl: String, explanation: String) {
         Task {
             do {
-                let success = try await sendReportToAPI(
+                let success = try await NetworkManager.submitContentReport(
                     entityType: entityType,
                     entityId: entityId,
                     entityName: entityName,
@@ -223,53 +223,19 @@ struct ExternalReferencesPanel: View {
                     externalUrl: externalUrl,
                     explanation: explanation
                 )
-                
+
                 if success {
                     submissionAlertMessage = "Thank you for your report. We will review it shortly."
                 } else {
                     submissionAlertMessage = "Failed to submit report. Please try again later."
                 }
                 showingSubmissionAlert = true
-                
+
             } catch {
                 submissionAlertMessage = "Failed to submit report: \(error.localizedDescription)"
                 showingSubmissionAlert = true
             }
         }
-    }
-    
-    // MARK: - API call
-    private func sendReportToAPI(entityType: String, entityId: String, entityName: String, externalSource: String, externalUrl: String, explanation: String) async throws -> Bool {
-        
-        // Get API base URL from environment or use default
-        let baseURL = ProcessInfo.processInfo.environment["API_BASE_URL"] ?? NetworkManager.baseURL
-        
-        guard let url = URL(string: "\(baseURL)/report-bad-reference") else {
-            throw URLError(.badURL)
-        }
-        
-        let requestBody: [String: Any] = [
-            "entity_type": entityType,
-            "entity_id": entityId,
-            "entity_name": entityName,
-            "external_source": externalSource,
-            "external_url": externalUrl,
-            "explanation": explanation
-        ]
-        
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
-        
-        let (_, response) = try await URLSession.shared.data(for: request)
-        
-        guard let httpResponse = response as? HTTPURLResponse else {
-            return false
-        }
-        
-        // Consider 200-299 as success
-        return (200...299).contains(httpResponse.statusCode)
     }
 }
 
