@@ -81,7 +81,8 @@ extension Recording {
         notes: "The definitive recording that made this song famous worldwide.",
         performers: [Performer.preview1, Performer.preview2, Performer.preview3],
         composer: "Paul Desmond",
-        releases: [Release.preview, Release.previewNoSpotify]
+        releases: [Release.preview, Release.previewNoSpotify],
+        transcriptions: [SoloTranscription.preview1]
     )
     
     static let preview2 = Recording(
@@ -108,9 +109,10 @@ extension Recording {
         notes: "Live recording from their Japan tour.",
         performers: [Performer.preview1, Performer.preview4],
         composer: "Paul Desmond",
-        releases: nil
+        releases: nil,
+        transcriptions: nil
     )
-    
+
     static let previewMinimal = Recording(
         id: "preview-recording-3",
         songId: nil,
@@ -135,7 +137,8 @@ extension Recording {
         notes: nil,
         performers: nil,
         composer: nil,
-        releases: nil
+        releases: nil,
+        transcriptions: nil
     )
 }
 

@@ -129,8 +129,11 @@ struct Recording: Codable, Identifiable {
     // Releases this recording appears on (only populated on recording detail)
     let releases: [Release]?
 
+    // Transcriptions for this recording (only populated on recording detail)
+    let transcriptions: [SoloTranscription]?
+
     enum CodingKeys: String, CodingKey {
-        case id, label, notes, composer, performers, releases
+        case id, label, notes, composer, performers, releases, transcriptions
         case songId = "song_id"
         case songTitle = "song_title"
         case albumTitle = "album_title"

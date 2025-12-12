@@ -298,6 +298,11 @@ struct RecordingDetailView: View {
                                     .padding()
                             }
                         }
+
+                        // Transcriptions Section
+                        if let transcriptions = recording.transcriptions, !transcriptions.isEmpty {
+                            TranscriptionsSection(transcriptions: transcriptions)
+                        }
                     }
                     .padding(.vertical)
                 }
