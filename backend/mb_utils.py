@@ -1227,3 +1227,135 @@ def update_song_wikipedia_url(song_id: str, mb_searcher: MusicBrainzSearcher = N
     except Exception as e:
         logger.error(f"Error updating Wikipedia URL: {e}")
         return False
+
+
+def update_song_composed_year(song_id: str, mb_searcher: MusicBrainzSearcher = None, dry_run: bool = False) -> bool:
+    """
+    Update song composed_year from MusicBrainz if not already set
+
+    Extracts the earliest recording date from MusicBrainz work data as an
+    approximation of the composition year.
+
+    Args:
+        song_id: UUID of the song
+        mb_searcher: Optional MusicBrainzSearcher instance (creates new one if not provided)
+        dry_run: If True, show what would be done without making changes
+
+    Returns:
+        bool: True if composed_year was updated (or would be in dry-run), False otherwise
+    """
+    from db_utils import get_db_connection
+
+    def extract_year_from_date(date_str):
+        """Extract year from a date string (YYYY, YYYY-MM, or YYYY-MM-DD)"""
+        if not date_str:
+            return None
+        try:
+            return int(date_str[:4])
+        except (ValueError, TypeError):
+            return None
+
+    try:
+        # Check if song has musicbrainz_id and current composed_year
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT musicbrainz_id, second_mb_id, composed_year, title FROM songs WHERE id = %s",
+                    (song_id,)
+                )
+                row = cur.fetchone()
+
+                if not row:
+                    return False
+
+                mb_id = row['musicbrainz_id']
+                second_mb_id = row['second_mb_id']
+                current_year = row['composed_year']
+                song_title = row['title']
+
+                # Skip if no MusicBrainz ID or already has composed_year
+                if not mb_id:
+                    logger.debug("Song has no MusicBrainz ID, skipping composed_year update")
+                    return False
+
+                if current_year:
+                    logger.debug(f"Song already has composed_year: {current_year}")
+                    return False
+
+        # Create MusicBrainzSearcher if not provided
+        if mb_searcher is None:
+            mb_searcher = MusicBrainzSearcher()
+
+        def get_year_from_work_data(work_data):
+            """Extract composition year from MusicBrainz work data"""
+            if not work_data:
+                return None
+
+            # Strategy 1: Check composer/lyricist/writer relations for begin date
+            composer_year = None
+            for relation in work_data.get('relations', []):
+                rel_type = relation.get('type')
+                if rel_type in ('composer', 'lyricist', 'writer'):
+                    begin_date = relation.get('begin')
+                    if begin_date:
+                        year = extract_year_from_date(begin_date)
+                        if year and (composer_year is None or year < composer_year):
+                            composer_year = year
+
+            if composer_year:
+                return composer_year
+
+            # Strategy 2: Fall back to earliest recording date
+            earliest_year = None
+            for relation in work_data.get('relations', []):
+                if relation.get('type') == 'performance':
+                    recording = relation.get('recording', {})
+                    first_release = recording.get('first-release-date')
+                    if first_release:
+                        year = extract_year_from_date(first_release)
+                        if year and (earliest_year is None or year < earliest_year):
+                            earliest_year = year
+
+                    begin_date = relation.get('begin')
+                    if begin_date:
+                        year = extract_year_from_date(begin_date)
+                        if year and (earliest_year is None or year < earliest_year):
+                            earliest_year = year
+
+            return earliest_year
+
+        # Get year from primary MusicBrainz ID
+        work_data = mb_searcher.get_work_recordings(mb_id)
+        earliest_year = get_year_from_work_data(work_data)
+
+        # Also check second_mb_id if present, use earlier year
+        if second_mb_id:
+            second_work_data = mb_searcher.get_work_recordings(second_mb_id)
+            second_year = get_year_from_work_data(second_work_data)
+            if second_year:
+                if earliest_year is None or second_year < earliest_year:
+                    earliest_year = second_year
+
+        if not earliest_year:
+            logger.debug("No composition year found in MusicBrainz work data")
+            return False
+
+        # Update song with composed_year
+        if dry_run:
+            logger.info(f"[DRY RUN] Would update composed_year for '{song_title}': {earliest_year}")
+            return True
+        else:
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        "UPDATE songs SET composed_year = %s, updated_at = CURRENT_TIMESTAMP WHERE id = %s",
+                        (earliest_year, song_id)
+                    )
+                    conn.commit()
+
+            logger.info(f"✓ Updated composed_year for '{song_title}': {earliest_year}")
+            return True
+
+    except Exception as e:
+        logger.error(f"Error updating composed_year: {e}")
+        return False

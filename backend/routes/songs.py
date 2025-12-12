@@ -670,25 +670,37 @@ def create_song():
         
         title = safe_strip(data.get('title'))
         composer = safe_strip(data.get('composer'))
+        composed_year = data.get('composed_year')
+        composed_key = safe_strip(data.get('composed_key'))
         structure = safe_strip(data.get('structure'))
         song_reference = safe_strip(data.get('song_reference'))
         musicbrainz_id = safe_strip(data.get('musicbrainz_id'))
         wikipedia_url = safe_strip(data.get('wikipedia_url'))
         external_references = data.get('external_references')
-        
+
         if not title:
             return jsonify({'error': 'Title is required'}), 400
-        
+
         # Build dynamic INSERT
         fields = ['title']
         values = [title]
         placeholders = ['%s']
-        
+
         if composer:
             fields.append('composer')
             values.append(composer)
             placeholders.append('%s')
-        
+
+        if composed_year is not None:
+            fields.append('composed_year')
+            values.append(int(composed_year))
+            placeholders.append('%s')
+
+        if composed_key:
+            fields.append('composed_key')
+            values.append(composed_key)
+            placeholders.append('%s')
+
         if structure:
             fields.append('structure')
             values.append(structure)
@@ -720,8 +732,9 @@ def create_song():
         query = f"""
             INSERT INTO songs ({', '.join(fields)})
             VALUES ({', '.join(placeholders)})
-            RETURNING id, title, composer, structure, musicbrainz_id, wikipedia_url, 
-                      song_reference, external_references, created_at, updated_at
+            RETURNING id, title, composer, composed_year, composed_key, structure,
+                      musicbrainz_id, wikipedia_url, song_reference, external_references,
+                      created_at, updated_at
         """
         
         result = db_tools.execute_query(query, values, fetch_one=True)

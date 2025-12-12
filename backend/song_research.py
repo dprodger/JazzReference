@@ -14,7 +14,7 @@ from typing import Dict, Any
 from mb_release_importer import MBReleaseImporter
 from spotify_utils import SpotifyMatcher
 from db_utils import get_db_connection
-from mb_utils import MusicBrainzSearcher, update_song_composer, update_song_wikipedia_url
+from mb_utils import MusicBrainzSearcher, update_song_composer, update_song_wikipedia_url, update_song_composed_year
 import research_queue
 
 logger = logging.getLogger(__name__)
@@ -104,7 +104,13 @@ def research_song(song_id: str, song_name: str) -> Dict[str, Any]:
         wikipedia_updated = update_song_wikipedia_url(str(song_id))
         if not wikipedia_updated:
             logger.debug("Wikipedia URL not updated (already set or not found)")
-        
+
+        # Step 1.7: Update composed_year from MusicBrainz if needed
+        logger.info("Checking for composed_year update...")
+        composed_year_updated = update_song_composed_year(str(song_id))
+        if not composed_year_updated:
+            logger.debug("Composed year not updated (already set or not found)")
+
         # Step 2: Match Spotify releases and tracks
         # SpotifyMatcher uses default cache settings: 30 days expiration, no force_refresh
         # This minimizes API calls and speeds up repeated research operations
