@@ -239,7 +239,7 @@ struct SongsListView: View {
             if let composer = song.composer {
                 HStack(spacing: 4) {
                     if let year = song.composedYear {
-                        Text("(\(year))")
+                        Text("(\(String(year)))")
                             .font(JazzTheme.subheadline())
                             .foregroundColor(JazzTheme.smokeGray)
                     }
@@ -248,7 +248,7 @@ struct SongsListView: View {
                         .foregroundColor(JazzTheme.smokeGray)
                 }
             } else if let year = song.composedYear {
-                Text("(\(year))")
+                Text("(\(String(year)))")
                     .font(JazzTheme.subheadline())
                     .foregroundColor(JazzTheme.smokeGray)
             }
