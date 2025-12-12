@@ -32,9 +32,12 @@ def normalize_group_name(group_name):
     """
     if not group_name:
         return ""
-    
+
     name = group_name.lower().strip()
-    
+
+    # Strip leading articles (the, a, an)
+    name = re.sub(r'^(?:the|a|an)\s+', '', name)
+
     # Patterns to remove (order matters - try longest first)
     # Note: (?:and|&) handles both "and" and "&" which MusicBrainz uses interchangeably
     patterns = [
