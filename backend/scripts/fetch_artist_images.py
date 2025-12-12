@@ -29,6 +29,10 @@ import time
 from pathlib import Path
 from datetime import datetime
 
+# Add the backend directory to the path so imports work from any directory
+backend_dir = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(backend_dir))
+
 # Third-party imports
 from bs4 import BeautifulSoup
 
@@ -86,7 +90,6 @@ class ImageFetcher:
         
         # Initialize Wikipedia searcher with caching
         self.wiki_searcher = WikipediaSearcher(
-            cache_dir='cache/wikipedia',
             cache_days=7,
             force_refresh=force_refresh
         )

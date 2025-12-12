@@ -17,12 +17,17 @@ import logging
 import json
 import time
 from datetime import datetime
+from pathlib import Path
+
+# Add the backend directory to the path so imports work from any directory
+backend_dir = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(backend_dir))
 
 # Third-party imports
 import requests
 
 
-# Local imports - adjust path as needed
+# Local imports
 from wiki_utils import WikipediaSearcher
 from db_utils import get_db_connection
 
@@ -77,7 +82,6 @@ class PerformerReferenceVerifier:
         }
         
         self.wiki_searcher = WikipediaSearcher(
-            cache_dir='cache/wikipedia',
             cache_days=7,
             force_refresh=force_refresh
         )

@@ -384,7 +384,7 @@ class WikipediaSearcher:
                 # Remove disambiguation parentheses like "(saxophonist)"
                 page_name = re.sub(r'\s*\([^)]*\)\s*$', '', page_title_text).strip().lower()
                 performer_name_lower = performer_name.lower()
-                
+
                 name_match = False
                 if page_name == performer_name_lower:
                     confidence_score += 30
@@ -395,7 +395,34 @@ class WikipediaSearcher:
                     reasons.append(f"Partial name match")
                     name_match = True
                 else:
-                    # Name doesn't match - this is suspicious
+                    # Name doesn't match - check how different the names are
+                    # Split into parts and compare
+                    performer_parts = set(performer_name_lower.split())
+                    page_parts = set(page_name.split())
+
+                    # Check if last names match (most important for identification)
+                    performer_last = performer_name_lower.split()[-1] if performer_name_lower.split() else ""
+                    page_last = page_name.split()[-1] if page_name.split() else ""
+
+                    # If last names are different and not similar, this is likely wrong person
+                    if performer_last and page_last and performer_last != page_last:
+                        # Use Levenshtein-like similarity: how many edits to transform one to other?
+                        # Simple approximation: longest common substring ratio
+                        similarity = self._string_similarity(performer_last, page_last)
+
+                        if similarity < 0.8:
+                            # Last names are clearly different - reject this page
+                            logger.debug(f"Last name mismatch: '{performer_last}' vs '{page_last}' (similarity: {similarity:.2f})")
+                            return {
+                                'valid': False,
+                                'confidence': 'high',
+                                'reason': f"Name mismatch: expected '{performer_name}', page is about '{page_title_text}'",
+                                'score': 0
+                            }
+
+                    # Names don't match but might be related (e.g., stage name vs birth name)
+                    # Apply a penalty but don't reject outright
+                    confidence_score -= 20
                     reasons.append(f"Name mismatch: expected '{performer_name}', page is '{page_title_text}'")
             
             # Look for infobox (strong signal this is a musician page)
@@ -504,11 +531,11 @@ class WikipediaSearcher:
     def _word_in_text(self, word, text):
         """
         Check if a word exists in text as a complete word (not as part of another word)
-        
+
         Args:
             word: The word to search for (case-insensitive)
             text: The text to search in (should already be lowercased)
-            
+
         Returns:
             bool: True if word is found as a complete word
         """
@@ -516,6 +543,58 @@ class WikipediaSearcher:
         # \b ensures we match whole words only
         pattern = r'\b' + re.escape(word.lower()) + r'\b'
         return bool(re.search(pattern, text.lower()))
+
+    def _string_similarity(self, s1, s2):
+        """
+        Calculate similarity ratio between two strings for name matching.
+        Returns a value between 0 and 1, where 1 means identical.
+
+        Uses Levenshtein edit distance - counts minimum insertions, deletions,
+        and substitutions needed to transform one string to another.
+
+        This catches cases like "Catney" vs "McArtney" which share characters
+        but are clearly different names (edit distance = 2: insert 'm', substitute 'c'->'r').
+
+        Args:
+            s1: First string
+            s2: Second string
+
+        Returns:
+            float: Similarity ratio between 0 and 1
+        """
+        if not s1 or not s2:
+            return 0.0
+        if s1 == s2:
+            return 1.0
+
+        # Levenshtein distance using dynamic programming
+        len1, len2 = len(s1), len(s2)
+
+        # Create distance matrix
+        dp = [[0] * (len2 + 1) for _ in range(len1 + 1)]
+
+        # Initialize base cases
+        for i in range(len1 + 1):
+            dp[i][0] = i
+        for j in range(len2 + 1):
+            dp[0][j] = j
+
+        # Fill in the matrix
+        for i in range(1, len1 + 1):
+            for j in range(1, len2 + 1):
+                if s1[i-1] == s2[j-1]:
+                    dp[i][j] = dp[i-1][j-1]  # No operation needed
+                else:
+                    dp[i][j] = 1 + min(
+                        dp[i-1][j],      # Deletion
+                        dp[i][j-1],      # Insertion
+                        dp[i-1][j-1]     # Substitution
+                    )
+
+        edit_distance = dp[len1][len2]
+        # Similarity is 1 - (edit_distance / max_length)
+        max_len = max(len1, len2)
+        return 1.0 - (edit_distance / max_len)
 
 
     def search_wikipedia(self, performer_name, context):
