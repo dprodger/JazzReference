@@ -452,18 +452,35 @@ def get_recording_detail(recording_id):
                 FROM song_authority_recommendations sar
                 WHERE sar.recording_id = %s
                 ORDER BY sar.source
+            ),
+            -- Transcriptions for this recording
+            transcriptions_data AS (
+                SELECT
+                    st.id,
+                    st.song_id,
+                    st.recording_id,
+                    st.youtube_url,
+                    st.created_at,
+                    st.updated_at,
+                    s.title as song_title,
+                    s.composer
+                FROM solo_transcriptions st
+                JOIN songs s ON st.song_id = s.id
+                WHERE st.recording_id = %s
+                ORDER BY st.created_at DESC
             )
-            SELECT 
+            SELECT
                 (SELECT row_to_json(recording_data.*) FROM recording_data) as recording,
                 (SELECT COALESCE(json_agg(performers_data.*), '[]'::json) FROM performers_data) as performers,
                 (SELECT COALESCE(json_agg(releases_data.*), '[]'::json) FROM releases_data) as releases,
-                (SELECT COALESCE(json_agg(authority_data.*), '[]'::json) FROM authority_data) as authority_recommendations
+                (SELECT COALESCE(json_agg(authority_data.*), '[]'::json) FROM authority_data) as authority_recommendations,
+                (SELECT COALESCE(json_agg(transcriptions_data.*), '[]'::json) FROM transcriptions_data) as transcriptions
         """
-        
-        # Execute the single query with recording_id passed 4 times (for each CTE)
+
+        # Execute the single query with recording_id passed 5 times (for each CTE)
         result = db_tools.execute_query(
-            combined_query, 
-            (recording_id, recording_id, recording_id, recording_id), 
+            combined_query,
+            (recording_id, recording_id, recording_id, recording_id, recording_id),
             fetch_one=True
         )
         
@@ -475,7 +492,8 @@ def get_recording_detail(recording_id):
         recording_dict['performers'] = result['performers'] if result['performers'] else []
         recording_dict['releases'] = result['releases'] if result['releases'] else []
         recording_dict['authority_recommendations'] = result['authority_recommendations'] if result['authority_recommendations'] else []
-        
+        recording_dict['transcriptions'] = result['transcriptions'] if result['transcriptions'] else []
+
         return jsonify(recording_dict)
         
     except Exception as e:
