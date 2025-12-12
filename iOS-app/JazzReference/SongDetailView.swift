@@ -186,7 +186,7 @@ struct SongDetailView: View {
                             .font(JazzTheme.title3())
                             .foregroundColor(JazzTheme.smokeGray)
                         if let year = song.composedYear {
-                            Text("(\(year))")
+                            Text("(\(String(year)))")
                                 .font(JazzTheme.title3())
                                 .foregroundColor(JazzTheme.smokeGray)
                         }

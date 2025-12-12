@@ -154,7 +154,7 @@ struct RecordingDetailView: View {
                                             },
                                             placeholder: {
                                                 Rectangle()
-                                                    .fill(Color(.systemGray5))
+                                                    .fill(JazzTheme.cardBackground)
                                                     .aspectRatio(1, contentMode: .fit)
                                                     .cornerRadius(12)
                                                     .overlay(
@@ -182,7 +182,7 @@ struct RecordingDetailView: View {
                                             },
                                             placeholder: {
                                                 Rectangle()
-                                                    .fill(Color(.systemGray5))
+                                                    .fill(JazzTheme.cardBackground)
                                                     .aspectRatio(1, contentMode: .fit)
                                                     .cornerRadius(12)
                                                     .overlay(
@@ -582,17 +582,17 @@ struct RecordingDetailView: View {
     }
     
     // MARK: - Album Art Placeholder
-    
+
     private var albumArtPlaceholder: some View {
         Rectangle()
-            .fill(Color(.systemGray5))
+            .fill(JazzTheme.cardBackground)
             .frame(maxWidth: .infinity)
             .aspectRatio(1, contentMode: .fit)
             .cornerRadius(12)
             .overlay(
                 Image(systemName: "music.note")
                     .font(.system(size: 80))
-                    .foregroundColor(.secondary)
+                    .foregroundColor(JazzTheme.smokeGray)
             )
     }
     
@@ -740,7 +740,7 @@ struct RecordingDetailView: View {
                             DetailRow(
                                 icon: "calendar",
                                 label: "Year",
-                                value: "\(year)"
+                                value: String(year)
                             )
                         }
                         

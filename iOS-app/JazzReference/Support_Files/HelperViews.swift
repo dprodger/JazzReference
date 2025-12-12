@@ -151,7 +151,7 @@ struct AuthorityRecordingRow: View {
                     // Year and label
                     HStack(spacing: 8) {
                         if let year = recording.recordingYear {
-                            Text("\(year)")
+                            Text(String(year))
                                 .font(JazzTheme.subheadline())
                                 .foregroundColor(JazzTheme.smokeGray)
                         }

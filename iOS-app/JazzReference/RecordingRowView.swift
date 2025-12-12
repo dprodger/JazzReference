@@ -59,9 +59,9 @@ struct RecordingRowView: View {
                             },
                             placeholder: {
                                 ZStack {
-                                    Color(.systemGray5)
+                                    JazzTheme.cardBackground
                                     ProgressView()
-                                        .tint(.secondary)
+                                        .tint(JazzTheme.brass)
                                 }
                                 .frame(width: 150, height: 150)
                             }
@@ -70,9 +70,9 @@ struct RecordingRowView: View {
                     } else {
                         Image(systemName: "opticaldisc")
                             .font(JazzTheme.largeTitle())
-                            .foregroundColor(.secondary)
+                            .foregroundColor(JazzTheme.smokeGray)
                             .frame(width: 150, height: 150)
-                            .background(Color(.systemGray5))
+                            .background(JazzTheme.cardBackground)
                             .opacity(showingBackCover ? 0 : 1)
                     }
 
@@ -89,9 +89,9 @@ struct RecordingRowView: View {
                             },
                             placeholder: {
                                 ZStack {
-                                    Color(.systemGray5)
+                                    JazzTheme.cardBackground
                                     ProgressView()
-                                        .tint(.secondary)
+                                        .tint(JazzTheme.brass)
                                 }
                                 .frame(width: 150, height: 150)
                             }
@@ -158,6 +158,7 @@ struct RecordingRowView: View {
             Text(recording.albumTitle ?? "Unknown Album")
                 .font(JazzTheme.subheadline())
                 .fontWeight(.medium)
+                .foregroundColor(JazzTheme.charcoal)
                 .lineLimit(2)
                 .frame(width: 150, alignment: .leading)
 
@@ -165,7 +166,7 @@ struct RecordingRowView: View {
             if let year = recording.recordingYear {
                 Text(String(format: "%d", year))
                     .font(JazzTheme.caption())
-                    .foregroundColor(.secondary)
+                    .foregroundColor(JazzTheme.smokeGray)
                     .frame(width: 150, alignment: .leading)
             }
         }

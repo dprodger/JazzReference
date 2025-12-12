@@ -403,16 +403,16 @@ struct AuthorityRowView: View {
             
             // Year
             if let year = authority.recordingYear {
-                Text("(\(year))")
+                Text("(\(String(year)))")
                     .font(JazzTheme.caption())
-                    .foregroundColor(.secondary)
+                    .foregroundColor(JazzTheme.smokeGray)
             }
-            
+
             // Recommendation text
             if let text = authority.recommendationText, !text.isEmpty {
                 Text(text)
                     .font(JazzTheme.caption())
-                    .foregroundColor(.secondary)
+                    .foregroundColor(JazzTheme.smokeGray)
                     .lineLimit(3)
                     .padding(.top, 4)
             }
@@ -473,12 +473,12 @@ struct UnmatchedAuthorityRowView: View {
                 
                 // Year
                 if let year = authority.recordingYear {
-                    Text("(\(year))")
+                    Text("(\(String(year)))")
                         .font(JazzTheme.caption())
-                        .foregroundColor(.secondary)
+                        .foregroundColor(JazzTheme.smokeGray)
                 }
             }
-            
+
             // Link hint icon
             Image(systemName: "link.badge.plus")
                 .font(JazzTheme.title3())
