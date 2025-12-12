@@ -15,6 +15,8 @@ struct Song: Identifiable, Codable {
     let id: String
     let title: String
     let composer: String?
+    let composedYear: Int?
+    let composedKey: String?
     let structure: String?
     let songReference: String?
     let musicbrainzId: String?
@@ -38,6 +40,8 @@ struct Song: Identifiable, Codable {
 
     enum CodingKeys: String, CodingKey {
         case id, title, composer, structure
+        case composedYear = "composed_year"
+        case composedKey = "composed_key"
         case songReference = "song_reference"
         case musicbrainzId = "musicbrainz_id"
         case wikipediaUrl = "wikipedia_url"

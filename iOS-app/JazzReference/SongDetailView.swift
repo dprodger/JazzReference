@@ -147,11 +147,12 @@ struct SongDetailView: View {
     
     private func hasSummaryContent(for song: Song) -> Bool {
         let hasStructure = song.structure != nil
+        let hasComposedKey = song.composedKey != nil
         let hasWikipedia = song.wikipediaUrl != nil
         let hasMusicbrainz = song.musicbrainzId != nil
         let hasJazzStandards = song.externalReferences?["jazzstandards"] != nil
 
-        return hasStructure || hasWikipedia || hasMusicbrainz || hasJazzStandards
+        return hasStructure || hasComposedKey || hasWikipedia || hasMusicbrainz || hasJazzStandards
     }
     
     // MARK: - Check if song has authoritative recordings
@@ -184,9 +185,14 @@ struct SongDetailView: View {
                         Text(composer)
                             .font(JazzTheme.title3())
                             .foregroundColor(JazzTheme.smokeGray)
+                        if let year = song.composedYear {
+                            Text("(\(year))")
+                                .font(JazzTheme.title3())
+                                .foregroundColor(JazzTheme.smokeGray)
+                        }
                     }
                 }
-                
+
                 // Song Reference (if available)
                 if let songRef = song.songReference {
                     HStack(alignment: .top, spacing: 8) {
@@ -281,7 +287,25 @@ struct SongDetailView: View {
                         .background(Color(.systemBackground))
                         .cornerRadius(8)
                     }
-                    
+
+                    // Composed Key
+                    if let composedKey = song.composedKey {
+                        HStack(spacing: 8) {
+                            Image(systemName: "tuningfork")
+                                .foregroundColor(JazzTheme.brass)
+                            Text("Original Key:")
+                                .font(JazzTheme.headline())
+                                .foregroundColor(JazzTheme.charcoal)
+                            Text(composedKey)
+                                .font(JazzTheme.body())
+                                .foregroundColor(JazzTheme.smokeGray)
+                        }
+                        .padding()
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Color(.systemBackground))
+                        .cornerRadius(8)
+                    }
+
                     // External References Panel (Learn More)
                     ExternalReferencesPanel(
                         wikipediaUrl: song.wikipediaUrl,

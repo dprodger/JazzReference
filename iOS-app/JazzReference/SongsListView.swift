@@ -237,7 +237,18 @@ struct SongsListView: View {
                 .font(JazzTheme.headline())
                 .foregroundColor(JazzTheme.charcoal)
             if let composer = song.composer {
-                Text(composer)
+                HStack(spacing: 4) {
+                    if let year = song.composedYear {
+                        Text("(\(year))")
+                            .font(JazzTheme.subheadline())
+                            .foregroundColor(JazzTheme.smokeGray)
+                    }
+                    Text(composer)
+                        .font(JazzTheme.subheadline())
+                        .foregroundColor(JazzTheme.smokeGray)
+                }
+            } else if let year = song.composedYear {
+                Text("(\(year))")
                     .font(JazzTheme.subheadline())
                     .foregroundColor(JazzTheme.smokeGray)
             }
