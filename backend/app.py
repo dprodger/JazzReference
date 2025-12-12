@@ -85,7 +85,7 @@ def enforce_host_routing():
     host_normalized = host.lower().split(':')[0] if host else ''
 
     # Log for debugging (remove after confirming it works)
-    logger.info(f"Host routing: host_normalized={host_normalized}, path={path}, raw_host={host}, request.host={request.host}")
+    logger.debug(f"Host routing: host_normalized={host_normalized}, path={path}, raw_host={host}, request.host={request.host}")
 
     # Allow static files from any host
     if path.startswith('/static/'):
@@ -101,7 +101,7 @@ def enforce_host_routing():
     # Check if this is a web host (www or root domain, but not api)
     is_web_host = ('approachnote.com' in host_normalized) and ('api.' not in host_normalized)
 
-    logger.info(f"Host check: is_api_host={is_api_host}, is_web_host={is_web_host}")
+    logger.debug(f"Host check: is_api_host={is_api_host}, is_web_host={is_web_host}")
 
     # On API host: block web-only paths
     if is_api_host and path in WEB_ONLY_PATHS:
