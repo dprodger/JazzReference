@@ -74,6 +74,7 @@ iOS-app/JazzReference/
 ├── Support_Files/
 │   ├── NetworkManager.swift  # API client (async/await)
 │   ├── Models.swift          # Data models
+│   ├── PreviewHelpers.swift  # SwiftUI preview data (MUST update when Models.swift changes)
 │   └── JazzTheme.swift       # UI theming
 ├── Auth/
 │   ├── AuthenticationManager.swift
@@ -82,6 +83,13 @@ iOS-app/JazzReference/
 ├── *DetailView.swift         # Detail views
 └── RepertoireManager.swift   # User repertoire state
 ```
+
+### iOS Model Changes Checklist
+
+When adding or modifying fields in `Models.swift`:
+1. Update the struct definition with the new field
+2. Update the `CodingKeys` enum if the API field name differs
+3. **Update `PreviewHelpers.swift`** - add the new field to ALL preview instances of that model (e.g., `Recording.preview1`, `Recording.preview2`, `Recording.previewMinimal`)
 
 ### Database Schema
 
