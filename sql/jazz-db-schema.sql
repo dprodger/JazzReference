@@ -12,6 +12,8 @@ CREATE TABLE songs (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     title VARCHAR(255) NOT NULL,
     composer VARCHAR(500),
+    composed_year INTEGER, -- Year the song was originally composed
+    composed_key VARCHAR(10), -- Original key (e.g., C, Bb, F#m)
     song_reference TEXT, -- written background information about the song
     structure TEXT, -- Chord progressions, form description
     external_references JSONB, -- Store Wikipedia links, book references, etc.
