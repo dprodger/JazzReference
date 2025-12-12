@@ -20,13 +20,13 @@ Data
 * running jazz_song_research, not sure I'm getting wikipedia on finding a new song
 * when running fetch_artist_images.py, it looks like it's slow either sleeping, or with db connection
 * consider pulling from https://thejazztome.info/about/
-* recoridngDetailView seems to have backend URLs in it -- clean that up?    
-* API should use dedicated domain (api.approachnote.com) rather than www.approachnote.com/api -- fix that thruout
-* Fix Sendgrid domain stuff and update remainder of emails    
-     
+* recoridngDetailView seems to have backend URLs in it -- clean that up?
+* Fix Sendgrid domain stuff and update remainder of emails
 
-	
+
+
 Done:
+* API should use dedicated domain (api.approachnote.com) rather than www.approachnote.com/api -- fix that thruout
 * fix the default (I type in a song name; get to that song; then go back -- the text box has my song name, but the page has no search restriction)
 * amend fetch_artist_images to gather for all artists?
 * Ensure multiple images perform ok
