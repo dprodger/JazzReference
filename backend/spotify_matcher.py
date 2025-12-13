@@ -1039,14 +1039,18 @@ class SpotifyMatcher:
                     # Release has album URL, but check if recordings need track IDs
                     # This handles the case where recordings were deleted and recreated
                     existing_album_id = release.get('spotify_album_id')
-                    if existing_album_id:
-                        with get_db_connection() as conn:
-                            # Check if any recordings for this release need track matching
-                            recordings = self.get_recordings_for_release(song['id'], release['id'])
-                            needs_track_match = any(not r.get('spotify_track_id') for r in recordings)
+                    self.logger.debug(f"[{i}/{len(releases)}] {title} - checking existing album: {existing_album_id}")
 
-                            if needs_track_match:
-                                self.logger.info(f"[{i}/{len(releases)}] {title} ({artist_name or 'Unknown'}, {year or 'Unknown'}) - ⊙ Has album URL, matching tracks for new recordings...")
+                    if existing_album_id:
+                        # Check if any recordings for this release need track matching
+                        recordings = self.get_recordings_for_release(song['id'], release['id'])
+                        self.logger.debug(f"    Found {len(recordings)} recordings for release")
+                        needs_track_match = any(not r.get('spotify_track_id') for r in recordings)
+                        self.logger.debug(f"    Needs track match: {needs_track_match}")
+
+                        if needs_track_match:
+                            self.logger.info(f"[{i}/{len(releases)}] {title} ({artist_name or 'Unknown'}, {year or 'Unknown'}) - ⊙ Has album URL, matching tracks for new recordings...")
+                            with get_db_connection() as conn:
                                 track_matched = self.match_tracks_for_release(
                                     conn,
                                     song['id'],
@@ -1059,7 +1063,7 @@ class SpotifyMatcher:
                                     self.stats['releases_with_spotify'] += 1
                                 else:
                                     self.stats['releases_no_match'] += 1
-                                continue
+                            continue
 
                     self.logger.info(f"[{i}/{len(releases)}] {title} ({artist_name or 'Unknown'}, {year or 'Unknown'}) - ⊙ Already has Spotify URL, skipping")
                     self.stats['releases_skipped'] += 1
