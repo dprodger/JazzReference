@@ -60,13 +60,13 @@ class SpotifyMatcher:
     Handles matching recordings to Spotify tracks with fuzzy validation and caching
     """
     
-    def __init__(self, dry_run=False, strict_mode=False, force_refresh=False, 
-                 artist_filter=False, cache_days=30, logger=None, 
+    def __init__(self, dry_run=False, strict_mode=False, force_refresh=False,
+                 artist_filter=False, cache_days=30, logger=None,
                  rate_limit_delay=0.2, max_retries=3,
-                 progress_callback=None):
+                 progress_callback=None, rematch=False):
         """
         Initialize Spotify Matcher
-        
+
         Args:
             dry_run: If True, show what would be matched without making changes
             artist_filter: Filter to recordings by specific artist
@@ -77,10 +77,12 @@ class SpotifyMatcher:
             rate_limit_delay: Base delay between API calls (seconds)
             max_retries: Maximum number of retries for rate-limited requests
             progress_callback: Optional callback(phase, current, total) for progress tracking
+            rematch: If True, re-evaluate releases that already have Spotify URLs
         """
         self.dry_run = dry_run
         self.artist_filter = artist_filter
         self.strict_mode = strict_mode
+        self.rematch = rematch
         self.logger = logger or logging.getLogger(__name__)
         self.progress_callback = progress_callback
         
@@ -1015,11 +1017,12 @@ class SpotifyMatcher:
                 title = release['title'] or 'Unknown Album'
                 year = release['release_year']
                 
-                # Get artist - prefer artist_credit, fall back to performers
-                # Use extract_primary_artist to avoid overly long search queries
+                # Get artist - prefer artist_credit (full credit from MusicBrainz release)
+                # This preserves ensemble names like "Gene Krupa & His Orchestra"
+                # which would otherwise be truncated by extract_primary_artist
                 artist_credit = release.get('artist_credit')
-                artist_name = self.extract_primary_artist(artist_credit) if artist_credit else None
-                
+                artist_name = artist_credit
+
                 if not artist_name:
                     performers = release.get('performers') or []
                     leaders = [p['name'] for p in performers if p.get('role') == 'leader']
@@ -1031,13 +1034,38 @@ class SpotifyMatcher:
                 self.logger.debug(f"    Artist: {artist_name or 'Unknown'}")
                 self.logger.debug(f"    Year: {year or 'Unknown'}")
                 
-                # Check if already has Spotify URL
-                if release['spotify_album_url']:
+                # Check if already has Spotify URL (skip unless rematch mode)
+                if release['spotify_album_url'] and not self.rematch:
+                    # Release has album URL, but check if recordings need track IDs
+                    # This handles the case where recordings were deleted and recreated
+                    existing_album_id = release.get('spotify_album_id')
+                    if existing_album_id:
+                        with get_db_connection() as conn:
+                            # Check if any recordings for this release need track matching
+                            recordings = self.get_recordings_for_release(song['id'], release['id'])
+                            needs_track_match = any(not r.get('spotify_track_id') for r in recordings)
+
+                            if needs_track_match:
+                                self.logger.info(f"[{i}/{len(releases)}] {title} ({artist_name or 'Unknown'}, {year or 'Unknown'}) - ⊙ Has album URL, matching tracks for new recordings...")
+                                track_matched = self.match_tracks_for_release(
+                                    conn,
+                                    song['id'],
+                                    release['id'],
+                                    existing_album_id,
+                                    song['title'],
+                                    alt_titles=song.get('alt_titles')
+                                )
+                                if track_matched:
+                                    self.stats['releases_with_spotify'] += 1
+                                else:
+                                    self.stats['releases_no_match'] += 1
+                                continue
+
                     self.logger.info(f"[{i}/{len(releases)}] {title} ({artist_name or 'Unknown'}, {year or 'Unknown'}) - ⊙ Already has Spotify URL, skipping")
                     self.stats['releases_skipped'] += 1
-                    # Note: default_release_id was set when this release was first matched
-                    # No need to check again - avoids unnecessary DB round-trip
                     continue
+                elif release['spotify_album_url'] and self.rematch:
+                    self.logger.info(f"[{i}/{len(releases)}] {title} ({artist_name or 'Unknown'}, {year or 'Unknown'}) - ↻ Re-matching...")
                 
                 # Search Spotify for album (with song title for track verification fallback)
                 spotify_match = self.search_spotify_album(title, artist_name, song['title'])
