@@ -136,7 +136,7 @@ def get_releases_for_song(song_id: str, artist_filter: str = None) -> List[dict]
     
     Returns:
         List of release dicts with 'id', 'title', 'artist_credit', 'release_year',
-        'spotify_album_url', 'performers' (list with 'name' and 'role')
+        'spotify_album_url', 'spotify_album_id', 'performers' (list with 'name' and 'role')
     """
     with get_db_connection() as conn:
         with conn.cursor() as cur:
@@ -147,6 +147,7 @@ def get_releases_for_song(song_id: str, artist_filter: str = None) -> List[dict]
                     rel.artist_credit,
                     rel.release_year,
                     rel.spotify_album_url,
+                    rel.spotify_album_id,
                     -- Get performers from the linked recording (not from release)
                     (SELECT json_agg(
                         json_build_object(
@@ -186,7 +187,7 @@ def get_releases_for_song(song_id: str, artist_filter: str = None) -> List[dict]
                 params.append(artist_filter)
             
             query += """
-                GROUP BY rel.id, rel.title, rel.artist_credit, rel.release_year, rel.spotify_album_url, rr.recording_id
+                GROUP BY rel.id, rel.title, rel.artist_credit, rel.release_year, rel.spotify_album_url, rel.spotify_album_id, rr.recording_id
                 ORDER BY rel.release_year
             """
             
