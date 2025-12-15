@@ -548,6 +548,12 @@ struct SongDetailView: View {
     }
     
     private func loadSongData() async {
+        // Guard: Don't reload if we already have data for the current song
+        // This preserves state when navigating back from RecordingDetailView
+        if song != nil && song?.id == currentSongId && !isLoading {
+            return
+        }
+
         #if DEBUG
         if ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1" {
             let networkManager = NetworkManager()
