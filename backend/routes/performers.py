@@ -186,17 +186,59 @@ def get_performer_detail(performer_id):
         """
         performer['instruments'] = db_tools.execute_query(instruments_query, (performer_id,))
         
-        # Get recordings (album_title from default release)
-        recordings_query = """
+        # Get recordings (album_title, artist_credit, and album art from default release)
+        # Support sort parameter: 'year' (default) or 'name' (by song title)
+        sort_by = request.args.get('sort', 'year')
+
+        if sort_by == 'name':
+            order_clause = "s.title ASC, r.recording_year DESC NULLS LAST"
+        else:
+            order_clause = "r.recording_year DESC NULLS LAST, s.title ASC"
+
+        recordings_query = f"""
             SELECT DISTINCT s.id as song_id, s.title as song_title,
-                   r.id as recording_id, def_rel.title as album_title, r.recording_year,
-                   r.is_canonical, rp.role
+                   r.id as recording_id, def_rel.title as album_title,
+                   def_rel.artist_credit as artist_credit,
+                   r.recording_year,
+                   r.is_canonical, rp.role,
+                   COALESCE(
+                       (SELECT ri.image_url_small FROM release_imagery ri
+                        WHERE ri.release_id = r.default_release_id AND ri.type = 'Front'),
+                       (SELECT rel_sub.cover_art_small FROM releases rel_sub
+                        WHERE rel_sub.id = r.default_release_id AND rel_sub.cover_art_small IS NOT NULL),
+                       (SELECT ri.image_url_small
+                        FROM recording_releases rr_sub
+                        JOIN release_imagery ri ON rr_sub.release_id = ri.release_id
+                        WHERE rr_sub.recording_id = r.id AND ri.type = 'Front'
+                        LIMIT 1),
+                       (SELECT rel_sub.cover_art_small
+                        FROM recording_releases rr_sub
+                        JOIN releases rel_sub ON rr_sub.release_id = rel_sub.id
+                        WHERE rr_sub.recording_id = r.id AND rel_sub.cover_art_small IS NOT NULL
+                        ORDER BY rel_sub.release_year DESC NULLS LAST LIMIT 1)
+                   ) as best_cover_art_small,
+                   COALESCE(
+                       (SELECT ri.image_url_medium FROM release_imagery ri
+                        WHERE ri.release_id = r.default_release_id AND ri.type = 'Front'),
+                       (SELECT rel_sub.cover_art_medium FROM releases rel_sub
+                        WHERE rel_sub.id = r.default_release_id AND rel_sub.cover_art_medium IS NOT NULL),
+                       (SELECT ri.image_url_medium
+                        FROM recording_releases rr_sub
+                        JOIN release_imagery ri ON rr_sub.release_id = ri.release_id
+                        WHERE rr_sub.recording_id = r.id AND ri.type = 'Front'
+                        LIMIT 1),
+                       (SELECT rel_sub.cover_art_medium
+                        FROM recording_releases rr_sub
+                        JOIN releases rel_sub ON rr_sub.release_id = rel_sub.id
+                        WHERE rr_sub.recording_id = r.id AND rel_sub.cover_art_medium IS NOT NULL
+                        ORDER BY rel_sub.release_year DESC NULLS LAST LIMIT 1)
+                   ) as best_cover_art_medium
             FROM recording_performers rp
             JOIN recordings r ON rp.recording_id = r.id
             JOIN songs s ON r.song_id = s.id
             LEFT JOIN releases def_rel ON r.default_release_id = def_rel.id
             WHERE rp.performer_id = %s
-            ORDER BY r.recording_year DESC NULLS LAST, s.title
+            ORDER BY {order_clause}
         """
         performer['recordings'] = db_tools.execute_query(recordings_query, (performer_id,))
         
