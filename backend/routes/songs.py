@@ -33,38 +33,107 @@ songs_bp = Blueprint('songs', __name__)
 #   3. release_imagery (CAA) for any linked release
 #   4. releases table (Spotify) for any linked release
 
-# ============================================================================
-# ALBUM ART SQL FRAGMENTS - Simplified using JOINs (not subqueries)
-# ============================================================================
-# Requires: LEFT JOIN release_imagery def_ri ON def_ri.release_id = r.default_release_id AND def_ri.type = 'Front'
-#           (and def_rel already joined for default release)
-# Prefers release_imagery over releases.cover_art_* (CAA over Spotify)
-
 ALBUM_ART_SMALL_SQL = """
-    COALESCE(def_ri.image_url_small, def_rel.cover_art_small) as best_cover_art_small"""
+    COALESCE(
+        -- 1. release_imagery (Front) for default release
+        (SELECT ri.image_url_small FROM release_imagery ri 
+         WHERE ri.release_id = r.default_release_id AND ri.type = 'Front'),
+        -- 2. releases table for default release
+        (SELECT rel_sub.cover_art_small FROM releases rel_sub 
+         WHERE rel_sub.id = r.default_release_id AND rel_sub.cover_art_small IS NOT NULL),
+        -- 3. release_imagery (Front) for any linked release
+        (SELECT ri.image_url_small 
+         FROM recording_releases rr_sub 
+         JOIN release_imagery ri ON rr_sub.release_id = ri.release_id
+         WHERE rr_sub.recording_id = r.id AND ri.type = 'Front'
+         LIMIT 1),
+        -- 4. releases table for any linked release
+        (SELECT rel_sub.cover_art_small 
+         FROM recording_releases rr_sub 
+         JOIN releases rel_sub ON rr_sub.release_id = rel_sub.id
+         WHERE rr_sub.recording_id = r.id AND rel_sub.cover_art_small IS NOT NULL
+         ORDER BY rel_sub.release_year DESC NULLS LAST LIMIT 1)
+    ) as best_cover_art_small"""
 
 ALBUM_ART_MEDIUM_SQL = """
-    COALESCE(def_ri.image_url_medium, def_rel.cover_art_medium) as best_cover_art_medium"""
+    COALESCE(
+        (SELECT ri.image_url_medium FROM release_imagery ri 
+         WHERE ri.release_id = r.default_release_id AND ri.type = 'Front'),
+        (SELECT rel_sub.cover_art_medium FROM releases rel_sub 
+         WHERE rel_sub.id = r.default_release_id AND rel_sub.cover_art_medium IS NOT NULL),
+        (SELECT ri.image_url_medium 
+         FROM recording_releases rr_sub 
+         JOIN release_imagery ri ON rr_sub.release_id = ri.release_id
+         WHERE rr_sub.recording_id = r.id AND ri.type = 'Front'
+         LIMIT 1),
+        (SELECT rel_sub.cover_art_medium 
+         FROM recording_releases rr_sub 
+         JOIN releases rel_sub ON rr_sub.release_id = rel_sub.id
+         WHERE rr_sub.recording_id = r.id AND rel_sub.cover_art_medium IS NOT NULL
+         ORDER BY rel_sub.release_year DESC NULLS LAST LIMIT 1)
+    ) as best_cover_art_medium"""
 
 ALBUM_ART_LARGE_SQL = """
-    COALESCE(def_ri.image_url_large, def_rel.cover_art_large) as best_cover_art_large"""
+    COALESCE(
+        (SELECT ri.image_url_large FROM release_imagery ri
+         WHERE ri.release_id = r.default_release_id AND ri.type = 'Front'),
+        (SELECT rel_sub.cover_art_large FROM releases rel_sub
+         WHERE rel_sub.id = r.default_release_id AND rel_sub.cover_art_large IS NOT NULL),
+        (SELECT ri.image_url_large
+         FROM recording_releases rr_sub
+         JOIN release_imagery ri ON rr_sub.release_id = ri.release_id
+         WHERE rr_sub.recording_id = r.id AND ri.type = 'Front'
+         LIMIT 1),
+        (SELECT rel_sub.cover_art_large
+         FROM recording_releases rr_sub
+         JOIN releases rel_sub ON rr_sub.release_id = rel_sub.id
+         WHERE rr_sub.recording_id = r.id AND rel_sub.cover_art_large IS NOT NULL
+         ORDER BY rel_sub.release_year DESC NULLS LAST LIMIT 1)
+    ) as best_cover_art_large"""
 
-# ============================================================================
-# BACK COVER ART SQL FRAGMENTS - Simplified using JOINs (not subqueries)
-# ============================================================================
-# Requires: LEFT JOIN release_imagery def_ri_back ON def_ri_back.release_id = r.default_release_id AND def_ri_back.type = 'Back'
-
+# Back cover art (CAA only - no Spotify fallback)
 BACK_COVER_SMALL_SQL = """
-    def_ri_back.image_url_small as back_cover_art_small"""
+    COALESCE(
+        (SELECT ri.image_url_small FROM release_imagery ri
+         WHERE ri.release_id = r.default_release_id AND ri.type = 'Back'),
+        (SELECT ri.image_url_small
+         FROM recording_releases rr_sub
+         JOIN release_imagery ri ON rr_sub.release_id = ri.release_id
+         WHERE rr_sub.recording_id = r.id AND ri.type = 'Back'
+         LIMIT 1)
+    ) as back_cover_art_small"""
 
 BACK_COVER_MEDIUM_SQL = """
-    def_ri_back.image_url_medium as back_cover_art_medium"""
+    COALESCE(
+        (SELECT ri.image_url_medium FROM release_imagery ri
+         WHERE ri.release_id = r.default_release_id AND ri.type = 'Back'),
+        (SELECT ri.image_url_medium
+         FROM recording_releases rr_sub
+         JOIN release_imagery ri ON rr_sub.release_id = ri.release_id
+         WHERE rr_sub.recording_id = r.id AND ri.type = 'Back'
+         LIMIT 1)
+    ) as back_cover_art_medium"""
 
 BACK_COVER_LARGE_SQL = """
-    def_ri_back.image_url_large as back_cover_art_large"""
+    COALESCE(
+        (SELECT ri.image_url_large FROM release_imagery ri
+         WHERE ri.release_id = r.default_release_id AND ri.type = 'Back'),
+        (SELECT ri.image_url_large
+         FROM recording_releases rr_sub
+         JOIN release_imagery ri ON rr_sub.release_id = ri.release_id
+         WHERE rr_sub.recording_id = r.id AND ri.type = 'Back'
+         LIMIT 1)
+    ) as back_cover_art_large"""
 
 HAS_BACK_COVER_SQL = """
-    (def_ri_back.id IS NOT NULL) as has_back_cover"""
+    EXISTS(
+        SELECT 1 FROM release_imagery ri
+        WHERE ri.release_id = r.default_release_id AND ri.type = 'Back'
+    ) OR EXISTS(
+        SELECT 1 FROM recording_releases rr_sub
+        JOIN release_imagery ri ON rr_sub.release_id = ri.release_id
+        WHERE rr_sub.recording_id = r.id AND ri.type = 'Back'
+    ) as has_back_cover"""
 
 # For authority recommendations - uses 'r' alias for recordings
 AUTHORITY_ALBUM_ART_SQL = """
@@ -85,19 +154,6 @@ AUTHORITY_ALBUM_ART_SQL = """
          ORDER BY rel.release_year DESC NULLS LAST
          LIMIT 1)
     ) as matched_album_art"""
-
-# ============================================================================
-# SQL FRAGMENTS FOR SPOTIFY URL CONSTRUCTION (from IDs)
-# ============================================================================
-# Spotify URLs are deterministic: https://open.spotify.com/{type}/{id}
-# We store only IDs and construct URLs on-demand using JOINs (not subqueries)
-# Requires: LEFT JOIN recording_releases def_rr ON def_rr.recording_id = r.id AND def_rr.release_id = r.default_release_id
-#           (and def_rel already joined for default release)
-SPOTIFY_URL_SQL = """
-    CASE
-        WHEN def_rr.spotify_track_id IS NOT NULL THEN 'https://open.spotify.com/track/' || def_rr.spotify_track_id
-        WHEN def_rel.spotify_album_id IS NOT NULL THEN 'https://open.spotify.com/album/' || def_rel.spotify_album_id
-    END as best_spotify_url"""
 
 
 # All song-related endpoints:
@@ -152,14 +208,7 @@ def get_song_summary(song_id):
 
     The full recordings list should be loaded separately via /api/songs/<song_id>/recordings
     """
-    import time
-    start_time = time.time()
-    logger.info(f"[TIMING] get_song_summary started for song_id={song_id}")
-
     try:
-        query_start = time.time()
-        logger.info(f"[TIMING] About to build query at {query_start - start_time:.3f}s")
-
         # Query for song + transcriptions + featured recordings only
         combined_query = f"""
             WITH song_data AS (
@@ -184,7 +233,29 @@ def get_song_summary(song_id):
                     r.recording_year,
                     r.label,
                     r.default_release_id,
-                    {SPOTIFY_URL_SQL},
+                    COALESCE(
+                        (SELECT CASE
+                             WHEN rr_sub.spotify_track_id IS NOT NULL THEN 'https://open.spotify.com/track/' || rr_sub.spotify_track_id
+                             WHEN rel_sub.spotify_album_id IS NOT NULL THEN 'https://open.spotify.com/album/' || rel_sub.spotify_album_id
+                         END
+                         FROM releases rel_sub
+                         LEFT JOIN recording_releases rr_sub ON rr_sub.release_id = rel_sub.id AND rr_sub.recording_id = r.id
+                         WHERE rel_sub.id = r.default_release_id
+                           AND (rel_sub.spotify_album_id IS NOT NULL OR rr_sub.spotify_track_id IS NOT NULL)
+                        ),
+                        (SELECT CASE
+                             WHEN rr_sub.spotify_track_id IS NOT NULL THEN 'https://open.spotify.com/track/' || rr_sub.spotify_track_id
+                             WHEN rel_sub.spotify_album_id IS NOT NULL THEN 'https://open.spotify.com/album/' || rel_sub.spotify_album_id
+                         END
+                         FROM recording_releases rr_sub
+                         JOIN releases rel_sub ON rr_sub.release_id = rel_sub.id
+                         WHERE rr_sub.recording_id = r.id
+                           AND (rr_sub.spotify_track_id IS NOT NULL OR rel_sub.spotify_album_id IS NOT NULL)
+                         ORDER BY
+                           CASE WHEN rr_sub.spotify_track_id IS NOT NULL THEN 0 ELSE 1 END,
+                           rel_sub.release_year DESC NULLS LAST
+                         LIMIT 1)
+                    ) as best_spotify_url,
                     {ALBUM_ART_SMALL_SQL},
                     {ALBUM_ART_MEDIUM_SQL},
                     {ALBUM_ART_LARGE_SQL},
@@ -219,17 +290,11 @@ def get_song_summary(song_id):
                 FROM recordings r
                 INNER JOIN song_authority_recommendations sar ON r.id = sar.recording_id
                 LEFT JOIN releases def_rel ON r.default_release_id = def_rel.id
-                LEFT JOIN recording_releases def_rr ON def_rr.recording_id = r.id AND def_rr.release_id = r.default_release_id
-                LEFT JOIN release_imagery def_ri ON def_ri.release_id = r.default_release_id AND def_ri.type = 'Front'
                 LEFT JOIN recording_performers rp ON r.id = rp.recording_id
                 LEFT JOIN performers p ON rp.performer_id = p.id
                 LEFT JOIN instruments i ON rp.instrument_id = i.id
                 WHERE r.song_id = %s
-                GROUP BY r.id, def_rel.title, def_rel.artist_credit, def_rel.spotify_album_id,
-                         def_rel.cover_art_small, def_rel.cover_art_medium, def_rel.cover_art_large,
-                         def_rr.spotify_track_id,
-                         def_ri.image_url_small, def_ri.image_url_medium, def_ri.image_url_large,
-                         r.recording_date, r.recording_year,
+                GROUP BY r.id, def_rel.title, def_rel.artist_credit, r.recording_date, r.recording_year,
                          r.label, r.default_release_id,
                          r.youtube_url, r.apple_music_url, r.musicbrainz_id,
                          r.is_canonical, r.notes
@@ -257,9 +322,7 @@ def get_song_summary(song_id):
                 (SELECT json_agg(transcriptions_data.*) FROM transcriptions_data) as transcriptions
         """
 
-        logger.info(f"[TIMING] Query built at {time.time() - start_time:.3f}s, about to execute")
         result = db_tools.execute_query(combined_query, (song_id, song_id, song_id), fetch_one=True)
-        logger.info(f"[TIMING] Query executed at {time.time() - start_time:.3f}s")
 
         if not result or not result['song']:
             return jsonify({'error': 'Song not found'}), 404
@@ -272,11 +335,9 @@ def get_song_summary(song_id):
         song_dict['transcriptions'] = transcriptions
         song_dict['transcription_count'] = len(transcriptions)
 
-        logger.info(f"[TIMING] Response ready at {time.time() - start_time:.3f}s")
         return jsonify(song_dict)
 
     except Exception as e:
-        logger.error(f"[TIMING] Error at {time.time() - start_time:.3f}s: {e}")
         logger.error(f"Error fetching song summary: {e}")
         return jsonify({'error': 'Failed to fetch song summary', 'detail': str(e)}), 500
 
@@ -318,7 +379,29 @@ def get_song_recordings(song_id):
                 r.recording_year,
                 r.label,
                 r.default_release_id,
-                {SPOTIFY_URL_SQL},
+                COALESCE(
+                    (SELECT CASE
+                         WHEN rr_sub.spotify_track_id IS NOT NULL THEN 'https://open.spotify.com/track/' || rr_sub.spotify_track_id
+                         WHEN rel_sub.spotify_album_id IS NOT NULL THEN 'https://open.spotify.com/album/' || rel_sub.spotify_album_id
+                     END
+                     FROM releases rel_sub
+                     LEFT JOIN recording_releases rr_sub ON rr_sub.release_id = rel_sub.id AND rr_sub.recording_id = r.id
+                     WHERE rel_sub.id = r.default_release_id
+                       AND (rel_sub.spotify_album_id IS NOT NULL OR rr_sub.spotify_track_id IS NOT NULL)
+                    ),
+                    (SELECT CASE
+                         WHEN rr_sub.spotify_track_id IS NOT NULL THEN 'https://open.spotify.com/track/' || rr_sub.spotify_track_id
+                         WHEN rel_sub.spotify_album_id IS NOT NULL THEN 'https://open.spotify.com/album/' || rel_sub.spotify_album_id
+                     END
+                     FROM recording_releases rr_sub
+                     JOIN releases rel_sub ON rr_sub.release_id = rel_sub.id
+                     WHERE rr_sub.recording_id = r.id
+                       AND (rr_sub.spotify_track_id IS NOT NULL OR rel_sub.spotify_album_id IS NOT NULL)
+                     ORDER BY
+                       CASE WHEN rr_sub.spotify_track_id IS NOT NULL THEN 0 ELSE 1 END,
+                       rel_sub.release_year DESC NULLS LAST
+                     LIMIT 1)
+                ) as best_spotify_url,
                 {ALBUM_ART_SMALL_SQL},
                 {ALBUM_ART_MEDIUM_SQL},
                 {ALBUM_ART_LARGE_SQL},
@@ -356,20 +439,12 @@ def get_song_recordings(song_id):
                 ) as authority_sources
             FROM recordings r
             LEFT JOIN releases def_rel ON r.default_release_id = def_rel.id
-            LEFT JOIN recording_releases def_rr ON def_rr.recording_id = r.id AND def_rr.release_id = r.default_release_id
-            LEFT JOIN release_imagery def_ri ON def_ri.release_id = r.default_release_id AND def_ri.type = 'Front'
-            LEFT JOIN release_imagery def_ri_back ON def_ri_back.release_id = r.default_release_id AND def_ri_back.type = 'Back'
             LEFT JOIN recording_performers rp ON r.id = rp.recording_id
             LEFT JOIN performers p ON rp.performer_id = p.id
             LEFT JOIN instruments i ON rp.instrument_id = i.id
             LEFT JOIN song_authority_recommendations sar ON r.id = sar.recording_id
             WHERE r.song_id = %s
-            GROUP BY r.id, def_rel.title, def_rel.artist_credit, def_rel.spotify_album_id,
-                     def_rel.cover_art_small, def_rel.cover_art_medium, def_rel.cover_art_large,
-                     def_rr.spotify_track_id,
-                     def_ri.image_url_small, def_ri.image_url_medium, def_ri.image_url_large,
-                     def_ri_back.id, def_ri_back.image_url_small, def_ri_back.image_url_medium, def_ri_back.image_url_large,
-                     r.recording_date, r.recording_year,
+            GROUP BY r.id, def_rel.title, def_rel.artist_credit, r.recording_date, r.recording_year,
                      r.label, r.default_release_id,
                      r.youtube_url, r.apple_music_url, r.musicbrainz_id,
                      r.is_canonical, r.notes
@@ -461,7 +536,29 @@ def get_song_detail(song_id):
                     r.label,
                     r.default_release_id,
                     -- Spotify URL from default release or best available
-                    {SPOTIFY_URL_SQL},
+                    COALESCE(
+                        (SELECT CASE
+                             WHEN rr_sub.spotify_track_id IS NOT NULL THEN 'https://open.spotify.com/track/' || rr_sub.spotify_track_id
+                             WHEN rel_sub.spotify_album_id IS NOT NULL THEN 'https://open.spotify.com/album/' || rel_sub.spotify_album_id
+                         END
+                         FROM releases rel_sub
+                         LEFT JOIN recording_releases rr_sub ON rr_sub.release_id = rel_sub.id AND rr_sub.recording_id = r.id
+                         WHERE rel_sub.id = r.default_release_id
+                           AND (rel_sub.spotify_album_id IS NOT NULL OR rr_sub.spotify_track_id IS NOT NULL)
+                        ),
+                        (SELECT CASE
+                             WHEN rr_sub.spotify_track_id IS NOT NULL THEN 'https://open.spotify.com/track/' || rr_sub.spotify_track_id
+                             WHEN rel_sub.spotify_album_id IS NOT NULL THEN 'https://open.spotify.com/album/' || rel_sub.spotify_album_id
+                         END
+                         FROM recording_releases rr_sub
+                         JOIN releases rel_sub ON rr_sub.release_id = rel_sub.id
+                         WHERE rr_sub.recording_id = r.id
+                           AND (rr_sub.spotify_track_id IS NOT NULL OR rel_sub.spotify_album_id IS NOT NULL)
+                         ORDER BY
+                           CASE WHEN rr_sub.spotify_track_id IS NOT NULL THEN 0 ELSE 1 END,
+                           rel_sub.release_year DESC NULLS LAST
+                         LIMIT 1)
+                    ) as best_spotify_url,
                     -- Album art with release_imagery priority
                     {ALBUM_ART_SMALL_SQL},
                     {ALBUM_ART_MEDIUM_SQL},
@@ -504,21 +601,13 @@ def get_song_detail(song_id):
                     ) as authority_sources
                 FROM recordings r
                 LEFT JOIN releases def_rel ON r.default_release_id = def_rel.id
-                LEFT JOIN recording_releases def_rr ON def_rr.recording_id = r.id AND def_rr.release_id = r.default_release_id
-                LEFT JOIN release_imagery def_ri ON def_ri.release_id = r.default_release_id AND def_ri.type = 'Front'
-                LEFT JOIN release_imagery def_ri_back ON def_ri_back.release_id = r.default_release_id AND def_ri_back.type = 'Back'
                 LEFT JOIN recording_performers rp ON r.id = rp.recording_id
                 LEFT JOIN performers p ON rp.performer_id = p.id
                 LEFT JOIN instruments i ON rp.instrument_id = i.id
                 LEFT JOIN song_authority_recommendations sar
                     ON r.id = sar.recording_id
                 WHERE r.song_id = %s
-                GROUP BY r.id, def_rel.title, def_rel.artist_credit, def_rel.spotify_album_id,
-                         def_rel.cover_art_small, def_rel.cover_art_medium, def_rel.cover_art_large,
-                         def_rr.spotify_track_id,
-                         def_ri.image_url_small, def_ri.image_url_medium, def_ri.image_url_large,
-                         def_ri_back.id, def_ri_back.image_url_small, def_ri_back.image_url_medium, def_ri_back.image_url_large,
-                         r.recording_date, r.recording_year,
+                GROUP BY r.id, def_rel.title, def_rel.artist_credit, r.recording_date, r.recording_year,
                          r.label, r.default_release_id,
                          r.youtube_url, r.apple_music_url, r.musicbrainz_id,
                          r.is_canonical, r.notes
@@ -839,21 +928,21 @@ def get_song_authority_recommendations(song_id):
                            sar.recording_id,
                            def_rel.title as matched_album_title,
                            r.recording_year as matched_year,
-                           -- Get Spotify URL from default release or best available (constructed from IDs)
+                           -- Get Spotify URL from default release or best available
                            COALESCE(
-                               (SELECT CASE WHEN rr.spotify_track_id IS NOT NULL
-                                            THEN 'https://open.spotify.com/track/' || rr.spotify_track_id
-                                            WHEN rel.spotify_album_id IS NOT NULL
-                                            THEN 'https://open.spotify.com/album/' || rel.spotify_album_id END
+                               (SELECT CASE
+                                    WHEN rr.spotify_track_id IS NOT NULL THEN 'https://open.spotify.com/track/' || rr.spotify_track_id
+                                    WHEN rel.spotify_album_id IS NOT NULL THEN 'https://open.spotify.com/album/' || rel.spotify_album_id
+                                END
                                 FROM releases rel
                                 LEFT JOIN recording_releases rr ON rr.release_id = rel.id AND rr.recording_id = r.id
                                 WHERE rel.id = r.default_release_id
                                   AND (rel.spotify_album_id IS NOT NULL OR rr.spotify_track_id IS NOT NULL)
                                ),
-                               (SELECT CASE WHEN rr.spotify_track_id IS NOT NULL
-                                            THEN 'https://open.spotify.com/track/' || rr.spotify_track_id
-                                            WHEN rel.spotify_album_id IS NOT NULL
-                                            THEN 'https://open.spotify.com/album/' || rel.spotify_album_id END
+                               (SELECT CASE
+                                    WHEN rr.spotify_track_id IS NOT NULL THEN 'https://open.spotify.com/track/' || rr.spotify_track_id
+                                    WHEN rel.spotify_album_id IS NOT NULL THEN 'https://open.spotify.com/album/' || rel.spotify_album_id
+                                END
                                 FROM recording_releases rr
                                 JOIN releases rel ON rr.release_id = rel.id
                                 WHERE rr.recording_id = r.id
