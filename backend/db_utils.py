@@ -473,6 +473,11 @@ def execute_query(query, params=None, fetch_one=False, fetch_all=True):
                 cur.execute("SET statement_timeout = '30s'")
                 logger.info(f"[DB] Set statement_timeout to 30s, now executing query")
 
+                # Log the full query for debugging
+                logger.info(f"[DB] FULL QUERY:\n{query}")
+                if params:
+                    logger.info(f"[DB] PARAMS: {params}")
+
                 cur.execute(query, params)
                 
                 if fetch_one:
