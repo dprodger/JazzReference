@@ -288,7 +288,7 @@ def get_song_summary(song_id):
                 LEFT JOIN performers p ON rp.performer_id = p.id
                 LEFT JOIN instruments i ON rp.instrument_id = i.id
                 WHERE r.song_id = %s
-                GROUP BY r.id, def_rel.title, r.recording_date, r.recording_year,
+                GROUP BY r.id, def_rel.title, def_rel.artist_credit, r.recording_date, r.recording_year,
                          r.label, r.default_release_id,
                          r.youtube_url, r.apple_music_url, r.musicbrainz_id,
                          r.is_canonical, r.notes
@@ -432,7 +432,7 @@ def get_song_recordings(song_id):
             LEFT JOIN instruments i ON rp.instrument_id = i.id
             LEFT JOIN song_authority_recommendations sar ON r.id = sar.recording_id
             WHERE r.song_id = %s
-            GROUP BY r.id, def_rel.title, r.recording_date, r.recording_year,
+            GROUP BY r.id, def_rel.title, def_rel.artist_credit, r.recording_date, r.recording_year,
                      r.label, r.default_release_id,
                      r.youtube_url, r.apple_music_url, r.musicbrainz_id,
                      r.is_canonical, r.notes
@@ -589,7 +589,7 @@ def get_song_detail(song_id):
                 LEFT JOIN song_authority_recommendations sar
                     ON r.id = sar.recording_id
                 WHERE r.song_id = %s
-                GROUP BY r.id, def_rel.title, r.recording_date, r.recording_year,
+                GROUP BY r.id, def_rel.title, def_rel.artist_credit, r.recording_date, r.recording_year,
                          r.label, r.default_release_id,
                          r.youtube_url, r.apple_music_url, r.musicbrainz_id,
                          r.is_canonical, r.notes
