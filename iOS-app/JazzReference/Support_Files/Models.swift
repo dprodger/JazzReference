@@ -93,10 +93,11 @@ struct Recording: Codable, Identifiable {
     let songId: String?
     let songTitle: String?
     let albumTitle: String?
+    let artistCredit: String?  // Artist credit from the default release
     let recordingDate: String?
     let recordingYear: Int?
     let label: String?
-    
+
     // NEW: Default release for this recording (provides Spotify/album art)
     let defaultReleaseId: String?
     
@@ -137,6 +138,7 @@ struct Recording: Codable, Identifiable {
         case songId = "song_id"
         case songTitle = "song_title"
         case albumTitle = "album_title"
+        case artistCredit = "artist_credit"
         case recordingDate = "recording_date"
         case recordingYear = "recording_year"
         case defaultReleaseId = "default_release_id"

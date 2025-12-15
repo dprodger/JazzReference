@@ -15,8 +15,13 @@ struct RecordingRowView: View {
 
     @State private var showingBackCover = false
 
-    // Extract lead artist from performers
-    private var leadArtist: String {
+    // Get artist name - prefer artist_credit from default release, fall back to performers
+    private var artistName: String {
+        // Use artist_credit from the default release if available
+        if let artistCredit = recording.artistCredit, !artistCredit.isEmpty {
+            return artistCredit
+        }
+        // Fall back to performers lookup
         if let performers = recording.performers {
             // First try to find a performer with "leader" role
             if let leader = performers.first(where: { $0.role?.lowercased() == "leader" }) {
@@ -146,7 +151,7 @@ struct RecordingRowView: View {
 
             // Artist name (shown when grouping by year)
             if showArtistName {
-                Text(leadArtist)
+                Text(artistName)
                     .font(JazzTheme.subheadline())
                     .fontWeight(.semibold)
                     .foregroundColor(JazzTheme.brass)
