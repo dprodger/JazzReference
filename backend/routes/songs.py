@@ -159,34 +159,14 @@ AUTHORITY_ALBUM_ART_SQL = """
 # SQL FRAGMENTS FOR SPOTIFY URL CONSTRUCTION (from IDs)
 # ============================================================================
 # Spotify URLs are deterministic: https://open.spotify.com/{type}/{id}
-# We store only IDs and construct URLs on-demand
-
+# We store only IDs and construct URLs on-demand using JOINs (not subqueries)
+# Requires: LEFT JOIN recording_releases def_rr ON def_rr.recording_id = r.id AND def_rr.release_id = r.default_release_id
+#           (and def_rel already joined for default release)
 SPOTIFY_URL_SQL = """
-    COALESCE(
-        -- 1. From default release (track preferred, then album)
-        (SELECT CASE
-             WHEN rr_sub.spotify_track_id IS NOT NULL THEN 'https://open.spotify.com/track/' || rr_sub.spotify_track_id
-             WHEN rel_sub.spotify_album_id IS NOT NULL THEN 'https://open.spotify.com/album/' || rel_sub.spotify_album_id
-         END
-         FROM releases rel_sub
-         LEFT JOIN recording_releases rr_sub ON rr_sub.release_id = rel_sub.id AND rr_sub.recording_id = r.id
-         WHERE rel_sub.id = r.default_release_id
-           AND (rel_sub.spotify_album_id IS NOT NULL OR rr_sub.spotify_track_id IS NOT NULL)
-        ),
-        -- 2. From any linked release (track preferred, then album)
-        (SELECT CASE
-             WHEN rr_sub.spotify_track_id IS NOT NULL THEN 'https://open.spotify.com/track/' || rr_sub.spotify_track_id
-             WHEN rel_sub.spotify_album_id IS NOT NULL THEN 'https://open.spotify.com/album/' || rel_sub.spotify_album_id
-         END
-         FROM recording_releases rr_sub
-         JOIN releases rel_sub ON rr_sub.release_id = rel_sub.id
-         WHERE rr_sub.recording_id = r.id
-           AND (rr_sub.spotify_track_id IS NOT NULL OR rel_sub.spotify_album_id IS NOT NULL)
-         ORDER BY
-           CASE WHEN rr_sub.spotify_track_id IS NOT NULL THEN 0 ELSE 1 END,
-           rel_sub.release_year DESC NULLS LAST
-         LIMIT 1)
-    ) as best_spotify_url"""
+    CASE
+        WHEN def_rr.spotify_track_id IS NOT NULL THEN 'https://open.spotify.com/track/' || def_rr.spotify_track_id
+        WHEN def_rel.spotify_album_id IS NOT NULL THEN 'https://open.spotify.com/album/' || def_rel.spotify_album_id
+    END as best_spotify_url"""
 
 
 # All song-related endpoints:
@@ -301,11 +281,13 @@ def get_song_summary(song_id):
                 FROM recordings r
                 INNER JOIN song_authority_recommendations sar ON r.id = sar.recording_id
                 LEFT JOIN releases def_rel ON r.default_release_id = def_rel.id
+                LEFT JOIN recording_releases def_rr ON def_rr.recording_id = r.id AND def_rr.release_id = r.default_release_id
                 LEFT JOIN recording_performers rp ON r.id = rp.recording_id
                 LEFT JOIN performers p ON rp.performer_id = p.id
                 LEFT JOIN instruments i ON rp.instrument_id = i.id
                 WHERE r.song_id = %s
-                GROUP BY r.id, def_rel.title, def_rel.artist_credit, r.recording_date, r.recording_year,
+                GROUP BY r.id, def_rel.title, def_rel.artist_credit, def_rel.spotify_album_id,
+                         def_rr.spotify_track_id, r.recording_date, r.recording_year,
                          r.label, r.default_release_id,
                          r.youtube_url, r.apple_music_url, r.musicbrainz_id,
                          r.is_canonical, r.notes
@@ -428,12 +410,14 @@ def get_song_recordings(song_id):
                 ) as authority_sources
             FROM recordings r
             LEFT JOIN releases def_rel ON r.default_release_id = def_rel.id
+            LEFT JOIN recording_releases def_rr ON def_rr.recording_id = r.id AND def_rr.release_id = r.default_release_id
             LEFT JOIN recording_performers rp ON r.id = rp.recording_id
             LEFT JOIN performers p ON rp.performer_id = p.id
             LEFT JOIN instruments i ON rp.instrument_id = i.id
             LEFT JOIN song_authority_recommendations sar ON r.id = sar.recording_id
             WHERE r.song_id = %s
-            GROUP BY r.id, def_rel.title, def_rel.artist_credit, r.recording_date, r.recording_year,
+            GROUP BY r.id, def_rel.title, def_rel.artist_credit, def_rel.spotify_album_id,
+                     def_rr.spotify_track_id, r.recording_date, r.recording_year,
                      r.label, r.default_release_id,
                      r.youtube_url, r.apple_music_url, r.musicbrainz_id,
                      r.is_canonical, r.notes
@@ -568,13 +552,15 @@ def get_song_detail(song_id):
                     ) as authority_sources
                 FROM recordings r
                 LEFT JOIN releases def_rel ON r.default_release_id = def_rel.id
+                LEFT JOIN recording_releases def_rr ON def_rr.recording_id = r.id AND def_rr.release_id = r.default_release_id
                 LEFT JOIN recording_performers rp ON r.id = rp.recording_id
                 LEFT JOIN performers p ON rp.performer_id = p.id
                 LEFT JOIN instruments i ON rp.instrument_id = i.id
                 LEFT JOIN song_authority_recommendations sar
                     ON r.id = sar.recording_id
                 WHERE r.song_id = %s
-                GROUP BY r.id, def_rel.title, def_rel.artist_credit, r.recording_date, r.recording_year,
+                GROUP BY r.id, def_rel.title, def_rel.artist_credit, def_rel.spotify_album_id,
+                         def_rr.spotify_track_id, r.recording_date, r.recording_year,
                          r.label, r.default_release_id,
                          r.youtube_url, r.apple_music_url, r.musicbrainz_id,
                          r.is_canonical, r.notes
