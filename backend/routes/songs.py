@@ -221,7 +221,14 @@ def get_song_summary(song_id):
 
     The full recordings list should be loaded separately via /api/songs/<song_id>/recordings
     """
+    import time
+    start_time = time.time()
+    logger.info(f"[TIMING] get_song_summary started for song_id={song_id}")
+
     try:
+        query_start = time.time()
+        logger.info(f"[TIMING] About to build query at {query_start - start_time:.3f}s")
+
         # Query for song + transcriptions + featured recordings only
         combined_query = f"""
             WITH song_data AS (
@@ -315,7 +322,9 @@ def get_song_summary(song_id):
                 (SELECT json_agg(transcriptions_data.*) FROM transcriptions_data) as transcriptions
         """
 
+        logger.info(f"[TIMING] Query built at {time.time() - start_time:.3f}s, about to execute")
         result = db_tools.execute_query(combined_query, (song_id, song_id, song_id), fetch_one=True)
+        logger.info(f"[TIMING] Query executed at {time.time() - start_time:.3f}s")
 
         if not result or not result['song']:
             return jsonify({'error': 'Song not found'}), 404
@@ -328,9 +337,11 @@ def get_song_summary(song_id):
         song_dict['transcriptions'] = transcriptions
         song_dict['transcription_count'] = len(transcriptions)
 
+        logger.info(f"[TIMING] Response ready at {time.time() - start_time:.3f}s")
         return jsonify(song_dict)
 
     except Exception as e:
+        logger.error(f"[TIMING] Error at {time.time() - start_time:.3f}s: {e}")
         logger.error(f"Error fetching song summary: {e}")
         return jsonify({'error': 'Failed to fetch song summary', 'detail': str(e)}), 500
 

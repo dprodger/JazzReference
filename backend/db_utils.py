@@ -448,21 +448,31 @@ def get_db_connection():
 def execute_query(query, params=None, fetch_one=False, fetch_all=True):
     """
     Execute a query with proper error handling
-    
+
     Args:
         query: SQL query string
         params: Query parameters tuple
         fetch_one: If True, return only first result
         fetch_all: If True, return all results (ignored if fetch_one is True)
-    
+
     Returns:
         Query results or None
     """
     start_time = time.time()
-    
+    logger.info(f"[DB] execute_query called, USE_POOLING={USE_POOLING}")
+
     try:
         with get_db_connection() as conn:
             with conn.cursor() as cur:
+                # Log connection info and set explicit timeout
+                cur.execute("SHOW statement_timeout")
+                timeout_result = cur.fetchone()
+                logger.info(f"[DB] Current statement_timeout: {timeout_result}")
+
+                # Set a shorter timeout explicitly for this query
+                cur.execute("SET statement_timeout = '30s'")
+                logger.info(f"[DB] Set statement_timeout to 30s, now executing query")
+
                 cur.execute(query, params)
                 
                 if fetch_one:
