@@ -459,25 +459,12 @@ def execute_query(query, params=None, fetch_one=False, fetch_all=True):
         Query results or None
     """
     start_time = time.time()
-    logger.info(f"[DB] execute_query called, USE_POOLING={USE_POOLING}")
 
     try:
         with get_db_connection() as conn:
             with conn.cursor() as cur:
-                # Log connection info and set explicit timeout
-                cur.execute("SHOW statement_timeout")
-                timeout_result = cur.fetchone()
-                logger.info(f"[DB] Current statement_timeout: {timeout_result}")
-
-                # Set a shorter timeout explicitly for this query
+                # Set a 30s statement timeout for each query
                 cur.execute("SET statement_timeout = '30s'")
-                logger.info(f"[DB] Set statement_timeout to 30s, now executing query")
-
-                # Log the full query for debugging
-                logger.info(f"[DB] FULL QUERY:\n{query}")
-                if params:
-                    logger.info(f"[DB] PARAMS: {params}")
-
                 cur.execute(query, params)
                 
                 if fetch_one:
