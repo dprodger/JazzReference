@@ -33,107 +33,38 @@ songs_bp = Blueprint('songs', __name__)
 #   3. release_imagery (CAA) for any linked release
 #   4. releases table (Spotify) for any linked release
 
+# ============================================================================
+# ALBUM ART SQL FRAGMENTS - Simplified using JOINs (not subqueries)
+# ============================================================================
+# Requires: LEFT JOIN release_imagery def_ri ON def_ri.release_id = r.default_release_id AND def_ri.type = 'Front'
+#           (and def_rel already joined for default release)
+# Prefers release_imagery over releases.cover_art_* (CAA over Spotify)
+
 ALBUM_ART_SMALL_SQL = """
-    COALESCE(
-        -- 1. release_imagery (Front) for default release
-        (SELECT ri.image_url_small FROM release_imagery ri 
-         WHERE ri.release_id = r.default_release_id AND ri.type = 'Front'),
-        -- 2. releases table for default release
-        (SELECT rel_sub.cover_art_small FROM releases rel_sub 
-         WHERE rel_sub.id = r.default_release_id AND rel_sub.cover_art_small IS NOT NULL),
-        -- 3. release_imagery (Front) for any linked release
-        (SELECT ri.image_url_small 
-         FROM recording_releases rr_sub 
-         JOIN release_imagery ri ON rr_sub.release_id = ri.release_id
-         WHERE rr_sub.recording_id = r.id AND ri.type = 'Front'
-         LIMIT 1),
-        -- 4. releases table for any linked release
-        (SELECT rel_sub.cover_art_small 
-         FROM recording_releases rr_sub 
-         JOIN releases rel_sub ON rr_sub.release_id = rel_sub.id
-         WHERE rr_sub.recording_id = r.id AND rel_sub.cover_art_small IS NOT NULL
-         ORDER BY rel_sub.release_year DESC NULLS LAST LIMIT 1)
-    ) as best_cover_art_small"""
+    COALESCE(def_ri.image_url_small, def_rel.cover_art_small) as best_cover_art_small"""
 
 ALBUM_ART_MEDIUM_SQL = """
-    COALESCE(
-        (SELECT ri.image_url_medium FROM release_imagery ri 
-         WHERE ri.release_id = r.default_release_id AND ri.type = 'Front'),
-        (SELECT rel_sub.cover_art_medium FROM releases rel_sub 
-         WHERE rel_sub.id = r.default_release_id AND rel_sub.cover_art_medium IS NOT NULL),
-        (SELECT ri.image_url_medium 
-         FROM recording_releases rr_sub 
-         JOIN release_imagery ri ON rr_sub.release_id = ri.release_id
-         WHERE rr_sub.recording_id = r.id AND ri.type = 'Front'
-         LIMIT 1),
-        (SELECT rel_sub.cover_art_medium 
-         FROM recording_releases rr_sub 
-         JOIN releases rel_sub ON rr_sub.release_id = rel_sub.id
-         WHERE rr_sub.recording_id = r.id AND rel_sub.cover_art_medium IS NOT NULL
-         ORDER BY rel_sub.release_year DESC NULLS LAST LIMIT 1)
-    ) as best_cover_art_medium"""
+    COALESCE(def_ri.image_url_medium, def_rel.cover_art_medium) as best_cover_art_medium"""
 
 ALBUM_ART_LARGE_SQL = """
-    COALESCE(
-        (SELECT ri.image_url_large FROM release_imagery ri
-         WHERE ri.release_id = r.default_release_id AND ri.type = 'Front'),
-        (SELECT rel_sub.cover_art_large FROM releases rel_sub
-         WHERE rel_sub.id = r.default_release_id AND rel_sub.cover_art_large IS NOT NULL),
-        (SELECT ri.image_url_large
-         FROM recording_releases rr_sub
-         JOIN release_imagery ri ON rr_sub.release_id = ri.release_id
-         WHERE rr_sub.recording_id = r.id AND ri.type = 'Front'
-         LIMIT 1),
-        (SELECT rel_sub.cover_art_large
-         FROM recording_releases rr_sub
-         JOIN releases rel_sub ON rr_sub.release_id = rel_sub.id
-         WHERE rr_sub.recording_id = r.id AND rel_sub.cover_art_large IS NOT NULL
-         ORDER BY rel_sub.release_year DESC NULLS LAST LIMIT 1)
-    ) as best_cover_art_large"""
+    COALESCE(def_ri.image_url_large, def_rel.cover_art_large) as best_cover_art_large"""
 
-# Back cover art (CAA only - no Spotify fallback)
+# ============================================================================
+# BACK COVER ART SQL FRAGMENTS - Simplified using JOINs (not subqueries)
+# ============================================================================
+# Requires: LEFT JOIN release_imagery def_ri_back ON def_ri_back.release_id = r.default_release_id AND def_ri_back.type = 'Back'
+
 BACK_COVER_SMALL_SQL = """
-    COALESCE(
-        (SELECT ri.image_url_small FROM release_imagery ri
-         WHERE ri.release_id = r.default_release_id AND ri.type = 'Back'),
-        (SELECT ri.image_url_small
-         FROM recording_releases rr_sub
-         JOIN release_imagery ri ON rr_sub.release_id = ri.release_id
-         WHERE rr_sub.recording_id = r.id AND ri.type = 'Back'
-         LIMIT 1)
-    ) as back_cover_art_small"""
+    def_ri_back.image_url_small as back_cover_art_small"""
 
 BACK_COVER_MEDIUM_SQL = """
-    COALESCE(
-        (SELECT ri.image_url_medium FROM release_imagery ri
-         WHERE ri.release_id = r.default_release_id AND ri.type = 'Back'),
-        (SELECT ri.image_url_medium
-         FROM recording_releases rr_sub
-         JOIN release_imagery ri ON rr_sub.release_id = ri.release_id
-         WHERE rr_sub.recording_id = r.id AND ri.type = 'Back'
-         LIMIT 1)
-    ) as back_cover_art_medium"""
+    def_ri_back.image_url_medium as back_cover_art_medium"""
 
 BACK_COVER_LARGE_SQL = """
-    COALESCE(
-        (SELECT ri.image_url_large FROM release_imagery ri
-         WHERE ri.release_id = r.default_release_id AND ri.type = 'Back'),
-        (SELECT ri.image_url_large
-         FROM recording_releases rr_sub
-         JOIN release_imagery ri ON rr_sub.release_id = ri.release_id
-         WHERE rr_sub.recording_id = r.id AND ri.type = 'Back'
-         LIMIT 1)
-    ) as back_cover_art_large"""
+    def_ri_back.image_url_large as back_cover_art_large"""
 
 HAS_BACK_COVER_SQL = """
-    EXISTS(
-        SELECT 1 FROM release_imagery ri
-        WHERE ri.release_id = r.default_release_id AND ri.type = 'Back'
-    ) OR EXISTS(
-        SELECT 1 FROM recording_releases rr_sub
-        JOIN release_imagery ri ON rr_sub.release_id = ri.release_id
-        WHERE rr_sub.recording_id = r.id AND ri.type = 'Back'
-    ) as has_back_cover"""
+    (def_ri_back.id IS NOT NULL) as has_back_cover"""
 
 # For authority recommendations - uses 'r' alias for recordings
 AUTHORITY_ALBUM_ART_SQL = """
@@ -289,12 +220,16 @@ def get_song_summary(song_id):
                 INNER JOIN song_authority_recommendations sar ON r.id = sar.recording_id
                 LEFT JOIN releases def_rel ON r.default_release_id = def_rel.id
                 LEFT JOIN recording_releases def_rr ON def_rr.recording_id = r.id AND def_rr.release_id = r.default_release_id
+                LEFT JOIN release_imagery def_ri ON def_ri.release_id = r.default_release_id AND def_ri.type = 'Front'
                 LEFT JOIN recording_performers rp ON r.id = rp.recording_id
                 LEFT JOIN performers p ON rp.performer_id = p.id
                 LEFT JOIN instruments i ON rp.instrument_id = i.id
                 WHERE r.song_id = %s
                 GROUP BY r.id, def_rel.title, def_rel.artist_credit, def_rel.spotify_album_id,
-                         def_rr.spotify_track_id, r.recording_date, r.recording_year,
+                         def_rel.cover_art_small, def_rel.cover_art_medium, def_rel.cover_art_large,
+                         def_rr.spotify_track_id,
+                         def_ri.image_url_small, def_ri.image_url_medium, def_ri.image_url_large,
+                         r.recording_date, r.recording_year,
                          r.label, r.default_release_id,
                          r.youtube_url, r.apple_music_url, r.musicbrainz_id,
                          r.is_canonical, r.notes
@@ -422,13 +357,19 @@ def get_song_recordings(song_id):
             FROM recordings r
             LEFT JOIN releases def_rel ON r.default_release_id = def_rel.id
             LEFT JOIN recording_releases def_rr ON def_rr.recording_id = r.id AND def_rr.release_id = r.default_release_id
+            LEFT JOIN release_imagery def_ri ON def_ri.release_id = r.default_release_id AND def_ri.type = 'Front'
+            LEFT JOIN release_imagery def_ri_back ON def_ri_back.release_id = r.default_release_id AND def_ri_back.type = 'Back'
             LEFT JOIN recording_performers rp ON r.id = rp.recording_id
             LEFT JOIN performers p ON rp.performer_id = p.id
             LEFT JOIN instruments i ON rp.instrument_id = i.id
             LEFT JOIN song_authority_recommendations sar ON r.id = sar.recording_id
             WHERE r.song_id = %s
             GROUP BY r.id, def_rel.title, def_rel.artist_credit, def_rel.spotify_album_id,
-                     def_rr.spotify_track_id, r.recording_date, r.recording_year,
+                     def_rel.cover_art_small, def_rel.cover_art_medium, def_rel.cover_art_large,
+                     def_rr.spotify_track_id,
+                     def_ri.image_url_small, def_ri.image_url_medium, def_ri.image_url_large,
+                     def_ri_back.id, def_ri_back.image_url_small, def_ri_back.image_url_medium, def_ri_back.image_url_large,
+                     r.recording_date, r.recording_year,
                      r.label, r.default_release_id,
                      r.youtube_url, r.apple_music_url, r.musicbrainz_id,
                      r.is_canonical, r.notes
@@ -564,6 +505,8 @@ def get_song_detail(song_id):
                 FROM recordings r
                 LEFT JOIN releases def_rel ON r.default_release_id = def_rel.id
                 LEFT JOIN recording_releases def_rr ON def_rr.recording_id = r.id AND def_rr.release_id = r.default_release_id
+                LEFT JOIN release_imagery def_ri ON def_ri.release_id = r.default_release_id AND def_ri.type = 'Front'
+                LEFT JOIN release_imagery def_ri_back ON def_ri_back.release_id = r.default_release_id AND def_ri_back.type = 'Back'
                 LEFT JOIN recording_performers rp ON r.id = rp.recording_id
                 LEFT JOIN performers p ON rp.performer_id = p.id
                 LEFT JOIN instruments i ON rp.instrument_id = i.id
@@ -571,7 +514,11 @@ def get_song_detail(song_id):
                     ON r.id = sar.recording_id
                 WHERE r.song_id = %s
                 GROUP BY r.id, def_rel.title, def_rel.artist_credit, def_rel.spotify_album_id,
-                         def_rr.spotify_track_id, r.recording_date, r.recording_year,
+                         def_rel.cover_art_small, def_rel.cover_art_medium, def_rel.cover_art_large,
+                         def_rr.spotify_track_id,
+                         def_ri.image_url_small, def_ri.image_url_medium, def_ri.image_url_large,
+                         def_ri_back.id, def_ri_back.image_url_small, def_ri_back.image_url_medium, def_ri_back.image_url_large,
+                         r.recording_date, r.recording_year,
                          r.label, r.default_release_id,
                          r.youtube_url, r.apple_music_url, r.musicbrainz_id,
                          r.is_canonical, r.notes
