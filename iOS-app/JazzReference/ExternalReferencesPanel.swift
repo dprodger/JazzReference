@@ -268,7 +268,7 @@ struct ExternalLinkButton: View {
                     .foregroundColor(JazzTheme.smokeGray)
             }
             .padding()
-            .background(Color(.systemBackground))
+            .background(Color.white)
             .cornerRadius(8)
         }
         .simultaneousGesture(
