@@ -446,9 +446,12 @@ struct PerformerRecording: Codable, Identifiable {
     let songTitle: String
     let recordingId: String
     let albumTitle: String?
+    let artistCredit: String?
     let recordingYear: Int?
     let isCanonical: Bool?
     let role: String?
+    let bestCoverArtSmall: String?
+    let bestCoverArtMedium: String?
 
     var id: String { recordingId }
 
@@ -457,9 +460,12 @@ struct PerformerRecording: Codable, Identifiable {
         case songTitle = "song_title"
         case recordingId = "recording_id"
         case albumTitle = "album_title"
+        case artistCredit = "artist_credit"
         case recordingYear = "recording_year"
         case isCanonical = "is_canonical"
         case role
+        case bestCoverArtSmall = "best_cover_art_small"
+        case bestCoverArtMedium = "best_cover_art_medium"
     }
 }
 

@@ -270,27 +270,36 @@ extension PerformerDetail {
                 songTitle: "So What",
                 recordingId: "rec-1",
                 albumTitle: "Kind of Blue",
+                artistCredit: "Miles Davis",
                 recordingYear: 1959,
                 isCanonical: true,
-                role: "leader"
+                role: "leader",
+                bestCoverArtSmall: "https://i.scdn.co/image/ab67616d00004851example",
+                bestCoverArtMedium: "https://i.scdn.co/image/ab67616d00001e02example"
             ),
             PerformerRecording(
                 songId: "song-2",
                 songTitle: "All Blues",
                 recordingId: "rec-2",
                 albumTitle: "Kind of Blue",
+                artistCredit: "Miles Davis",
                 recordingYear: 1959,
                 isCanonical: true,
-                role: "leader"
+                role: "leader",
+                bestCoverArtSmall: "https://i.scdn.co/image/ab67616d00004851example",
+                bestCoverArtMedium: "https://i.scdn.co/image/ab67616d00001e02example"
             ),
             PerformerRecording(
                 songId: "song-3",
                 songTitle: "Round Midnight",
                 recordingId: "rec-3",
                 albumTitle: "Round About Midnight",
+                artistCredit: "Miles Davis",
                 recordingYear: 1957,
                 isCanonical: false,
-                role: "leader"
+                role: "leader",
+                bestCoverArtSmall: nil,
+                bestCoverArtMedium: nil
             )
         ],
         images: nil

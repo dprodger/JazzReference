@@ -624,9 +624,14 @@ struct SongDetailView: View {
 // MARK: - Authoritative Recording Card
 struct AuthoritativeRecordingCard: View {
     let recording: Recording
-    
-    // Extract lead artist from performers
-    private var leadArtist: String {
+
+    // Get artist name - prefer artist_credit from default release, fall back to performers
+    private var artistName: String {
+        // Use artist_credit from the default release if available
+        if let artistCredit = recording.artistCredit, !artistCredit.isEmpty {
+            return artistCredit
+        }
+        // Fall back to performers lookup
         if let performers = recording.performers {
             // First try to find a performer with "leader" role
             if let leader = performers.first(where: { $0.role?.lowercased() == "leader" }) {
@@ -686,8 +691,8 @@ struct AuthoritativeRecordingCard: View {
             
             // Recording Info - fixed height for consistent card sizing
             VStack(alignment: .leading, spacing: 4) {
-                // Lead Artist
-                Text(leadArtist)
+                // Artist Name
+                Text(artistName)
                     .font(JazzTheme.subheadline())
                     .fontWeight(.semibold)
                     .foregroundColor(JazzTheme.brass)

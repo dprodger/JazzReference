@@ -19,33 +19,8 @@ struct PerformerDetailView: View {
     @State private var isLoading = true
     @State private var selectedFilter: RecordingFilter = .all
     @State private var isBiographicalInfoExpanded = false
-    @State private var searchText = ""
-    
-    private var filteredRecordings: [PerformerRecording] {
-        guard let recordings = performer?.recordings else { return [] }
-        
-        var result: [PerformerRecording]
-        
-        switch selectedFilter {
-        case .all:
-            result = recordings
-        case .leader:
-            result = recordings.filter { $0.role?.lowercased() == "leader" }
-        case .sideman:
-            result = recordings.filter { $0.role?.lowercased() == "sideman" }
-        }
-        
-        // Apply search filter
-        if !searchText.isEmpty {
-            let query = searchText.lowercased()
-            result = result.filter { recording in
-                recording.songTitle.lowercased().contains(query) ||
-                (recording.albumTitle?.lowercased().contains(query) ?? false)
-            }
-        }
-        
-        return result
-    }
+    @State private var recordingSortOrder: PerformerRecordingSortOrder = .year
+    @State private var isRecordingsReloading = false
     
     var body: some View {
         ScrollView {
@@ -193,60 +168,25 @@ struct PerformerDetailView: View {
                         .padding(.top, 8)
                         
                         Divider()
-                        
-                        // Recordings Section
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("Recordings (\(filteredRecordings.count.formatted()))")
-                                .font(JazzTheme.title2())
-                                .bold()
-                                .foregroundColor(JazzTheme.charcoal)
-                                .padding(.horizontal)
-                            
-                            // Search Field
-                            HStack {
-                                Image(systemName: "magnifyingglass")
-                                    .foregroundColor(JazzTheme.smokeGray)
-                                TextField("Search recordings...", text: $searchText)
-                                    .textFieldStyle(.plain)
-                                if !searchText.isEmpty {
-                                    Button(action: { searchText = "" }) {
-                                        Image(systemName: "xmark.circle.fill")
-                                            .foregroundColor(JazzTheme.smokeGray)
+
+                        // Recordings Section (mirrors SongDetailView layout)
+                        PerformerRecordingsSection(
+                            recordings: performer.recordings ?? [],
+                            performerName: performer.name,
+                            sortOrder: $recordingSortOrder,
+                            selectedFilter: $selectedFilter,
+                            isReloading: isRecordingsReloading,
+                            onSortOrderChanged: { newOrder in
+                                Task {
+                                    isRecordingsReloading = true
+                                    let networkManager = NetworkManager()
+                                    if let updatedPerformer = await networkManager.fetchPerformerDetail(id: performerId, sortBy: newOrder) {
+                                        self.performer = updatedPerformer
                                     }
+                                    isRecordingsReloading = false
                                 }
                             }
-                            .padding(10)
-                            .background(JazzTheme.cardBackground)
-                            .cornerRadius(8)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 8)
-                                    .stroke(JazzTheme.smokeGray.opacity(0.3), lineWidth: 1)
-                            )
-                            .padding(.horizontal)
-                            
-                            // Filter Picker - styled with Jazz Theme
-                            Picker("Filter", selection: $selectedFilter) {
-                                ForEach(RecordingFilter.allCases, id: \.self) { filter in
-                                    Text(filter.rawValue).tag(filter)
-                                }
-                            }
-                            .pickerStyle(.segmented)
-                            .padding(.horizontal)
-                            .tint(JazzTheme.burgundy)
-                            
-                            if !filteredRecordings.isEmpty {
-                                ForEach(filteredRecordings) { recording in
-                                    NavigationLink(destination: RecordingDetailView(recordingId: recording.recordingId)) {
-                                        PerformerRecordingRowView(recording: recording)
-                                    }
-                                    .buttonStyle(.plain)
-                                }
-                            } else {
-                                Text("No recordings found")
-                                    .foregroundColor(JazzTheme.smokeGray)
-                                    .padding()
-                            }
-                        }
+                        )
                     }
                 }
                 .padding(.vertical)
@@ -277,63 +217,6 @@ struct PerformerDetailView: View {
             performer = await networkManager.fetchPerformerDetail(id: performerId)
             isLoading = false
         }
-    }
-}
-
-struct PerformerRecordingRowView: View {
-    let recording: PerformerRecording
-    
-    var body: some View {
-        HStack(spacing: 12) {
-            // Canonical indicator
-            if recording.isCanonical == true {
-                Image(systemName: "star.fill")
-                    .foregroundColor(JazzTheme.gold)
-                    .font(JazzTheme.subheadline())
-                    .frame(width: 20)
-            } else {
-                Spacer()
-                    .frame(width: 20)
-            }
-            
-            VStack(alignment: .leading, spacing: 4) {
-                // Song title
-                Text(recording.songTitle)
-                    .font(JazzTheme.headline())
-                    .foregroundColor(JazzTheme.charcoal)
-                    .lineLimit(1)
-                
-                // Album name
-                if let albumTitle = recording.albumTitle {
-                    Text(albumTitle)
-                        .font(JazzTheme.subheadline())
-                        .foregroundColor(JazzTheme.smokeGray)
-                        .lineLimit(1)
-                }
-                
-                // Role
-                if let role = recording.role {
-                    Text(role.capitalized)
-                        .font(JazzTheme.caption())
-                        .foregroundColor(JazzTheme.smokeGray)
-                }
-            }
-            
-            Spacer()
-            
-            // Year
-            if let year = recording.recordingYear {
-                Text(String(year))
-                    .font(JazzTheme.subheadline())
-                    .foregroundColor(JazzTheme.smokeGray)
-                    .frame(minWidth: 40, alignment: .trailing)
-            }
-        }
-        .padding(.vertical, 12)
-        .padding(.horizontal, 16)
-        .background(JazzTheme.cardBackground)
-        .cornerRadius(8)
-        .padding(.horizontal)
     }
 }
 

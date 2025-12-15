@@ -245,16 +245,20 @@ class NetworkManager: ObservableObject {
     }
     
     func fetchPerformerDetail(id: String) async -> PerformerDetail? {
+        return await fetchPerformerDetail(id: id, sortBy: .year)
+    }
+
+    func fetchPerformerDetail(id: String, sortBy: PerformerRecordingSortOrder) async -> PerformerDetail? {
         let startTime = Date()
-        guard let url = URL(string: "\(NetworkManager.baseURL)/performers/\(id)") else {
+        guard let url = URL(string: "\(NetworkManager.baseURL)/performers/\(id)?sort=\(sortBy.rawValue)") else {
             return nil
         }
-        
+
         do {
             let (data, _) = try await URLSession.shared.data(from: url)
             let performer = try JSONDecoder().decode(PerformerDetail.self, from: data)
-            NetworkManager.logRequest("GET /performers/\(id)", startTime: startTime)
-            
+            NetworkManager.logRequest("GET /performers/\(id)?sort=\(sortBy.rawValue)", startTime: startTime)
+
             // Log additional info about what was returned
             if NetworkManager.diagnosticsEnabled {
                 print("   ↳ Returned performer with \(performer.recordings?.count ?? 0) recordings")
