@@ -228,6 +228,7 @@ def get_song_summary(song_id):
                 SELECT
                     r.id,
                     def_rel.title as album_title,
+                    def_rel.artist_credit as artist_credit,
                     r.recording_date,
                     r.recording_year,
                     r.label,
@@ -367,6 +368,7 @@ def get_song_recordings(song_id):
             SELECT
                 r.id,
                 def_rel.title as album_title,
+                def_rel.artist_credit as artist_credit,
                 r.recording_date,
                 r.recording_year,
                 r.label,
@@ -516,6 +518,7 @@ def get_song_detail(song_id):
                 SELECT
                     r.id,
                     def_rel.title as album_title,
+                    def_rel.artist_credit as artist_credit,
                     r.recording_date,
                     r.recording_year,
                     r.label,
