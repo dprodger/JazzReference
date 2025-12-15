@@ -13,6 +13,10 @@ import Combine
 
 struct RecordingDetailView: View {
     let recordingId: String
+
+    // Persistent network manager to prevent request cancellation during refresh
+    @StateObject private var networkManager = NetworkManager()
+
     @State private var recording: Recording?
     @State private var isLoading = true
     @State private var reportingInfo: ReportingInfo?
@@ -318,6 +322,9 @@ struct RecordingDetailView: View {
             }
         }
         .background(JazzTheme.backgroundLight)
+        .refreshable {
+            await forceRefreshRecordingData()
+        }
         .jazzNavigationBar(title: displayAlbumTitle, color: JazzTheme.brass)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
@@ -366,21 +373,36 @@ struct RecordingDetailView: View {
         .task {
             #if DEBUG
             if ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1" {
-                let networkManager = NetworkManager()
                 recording = networkManager.fetchRecordingDetailSync(id: recordingId)
                 autoSelectFirstRelease()
                 isLoading = false
                 return
             }
             #endif
-            
-            let networkManager = NetworkManager()
-            recording = await networkManager.fetchRecordingDetail(id: recordingId)
-            autoSelectFirstRelease()
-            isLoading = false
+
+            await loadRecordingData()
         }
     }
     
+    // MARK: - Data Loading
+
+    /// Load recording data from the API
+    private func loadRecordingData() async {
+        recording = await networkManager.fetchRecordingDetail(id: recordingId)
+        autoSelectFirstRelease()
+        isLoading = false
+    }
+
+    /// Force refresh recording data from the API (used by pull-to-refresh)
+    /// Note: Does NOT set isLoading=true to avoid replacing content with loading spinner
+    /// Only updates data if fetch succeeds - keeps existing data on failure
+    private func forceRefreshRecordingData() async {
+        if let fetchedRecording = await networkManager.fetchRecordingDetail(id: recordingId) {
+            recording = fetchedRecording
+            autoSelectFirstRelease()
+        }
+    }
+
     // MARK: - Submit link report to API
     private func submitLinkReport(entityType: String, entityId: String, entityName: String, externalSource: String, externalUrl: String, explanation: String) {
         Task {

@@ -108,8 +108,10 @@ struct SongsListView: View {
         VStack(spacing: 0) {
             // Always show current repertoire header
             currentRepertoireBanner
-            
-            if networkManager.isLoading {
+
+            // Only show full loading view on initial load (no songs yet)
+            // During pull-to-refresh, keep showing the list
+            if networkManager.isLoading && networkManager.songs.isEmpty {
                 loadingView
             } else if let error = networkManager.errorMessage {
                 errorView(error: error)
@@ -214,6 +216,9 @@ struct SongsListView: View {
             .listStyle(.plain)
             .scrollContentBackground(.hidden)
             .background(JazzTheme.backgroundLight)
+            .refreshable {
+                await loadSongs()
+            }
             .overlay(alignment: .trailing) {
                 // Custom alphabet index overlay
                 AlphabetIndexView(

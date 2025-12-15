@@ -17,7 +17,10 @@ struct SongDetailView: View {
     let songId: String
     let allSongs: [Song]
     let repertoireId: String
-    
+
+    // Persistent network manager to prevent request cancellation during refresh
+    @StateObject private var networkManager = NetworkManager()
+
     @State private var currentSongId: String
     @State private var song: Song?
     @State private var isLoading = true
@@ -92,7 +95,6 @@ struct SongDetailView: View {
         isLoading = true
         isRecordingsLoading = true
         Task {
-            let networkManager = NetworkManager()
             // Phase 1: Load summary (fast) - includes song metadata, transcriptions, featured recordings
             let fetchedSong = await networkManager.fetchSongSummary(id: currentSongId)
             await MainActor.run {
@@ -119,9 +121,8 @@ struct SongDetailView: View {
     
     private func refreshSongData() {
         isRefreshing = true
-        
+
         Task {
-            let networkManager = NetworkManager()
             let success = await networkManager.refreshSongData(songId: currentSongId)
             
             await MainActor.run {
@@ -232,7 +233,7 @@ struct SongDetailView: View {
                     onSortOrderChanged: { [self] newOrder in
                         Task {
                             isRecordingsReloading = true
-                            if let recordings = await NetworkManager().fetchSongRecordings(id: currentSongId, sortBy: newOrder) {
+                            if let recordings = await networkManager.fetchSongRecordings(id: currentSongId, sortBy: newOrder) {
                                 self.song?.recordings = recordings
                             }
                             isRecordingsReloading = false
@@ -425,6 +426,9 @@ struct SongDetailView: View {
                 notFoundView
             }
         }
+        .refreshable {
+            await forceRefreshSongData()
+        }
     }
     
     private var loadingView: some View {
@@ -542,11 +546,37 @@ struct SongDetailView: View {
     }
     
     // MARK: - Data Loading
-    
+
     private func loadInitialData() {
         // Empty - using .task instead for async loading
     }
-    
+
+    /// Force refresh song data from the API (used by pull-to-refresh)
+    /// Note: Does NOT set isLoading=true to avoid replacing content with loading spinner
+    /// Only updates data if fetch succeeds - keeps existing data on failure
+    private func forceRefreshSongData() async {
+        isRecordingsLoading = true
+
+        // Phase 1: Load summary (fast) - only update if successful
+        if let fetchedSong = await networkManager.fetchSongSummary(id: currentSongId) {
+            await MainActor.run {
+                song = fetchedSong
+                transcriptions = fetchedSong.transcriptions ?? []
+            }
+        }
+
+        // Phase 2: Load all recordings in background
+        if let recordings = await networkManager.fetchSongRecordings(id: currentSongId, sortBy: recordingSortOrder) {
+            await MainActor.run {
+                self.song?.recordings = recordings
+            }
+        }
+
+        await MainActor.run {
+            isRecordingsLoading = false
+        }
+    }
+
     private func loadSongData() async {
         // Guard: Don't reload if we already have data for the current song
         // This preserves state when navigating back from RecordingDetailView
@@ -556,7 +586,6 @@ struct SongDetailView: View {
 
         #if DEBUG
         if ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1" {
-            let networkManager = NetworkManager()
             song = networkManager.fetchSongDetailSync(id: currentSongId)
             transcriptions = song?.transcriptions ?? []
             isLoading = false
@@ -564,8 +593,6 @@ struct SongDetailView: View {
             return
         }
         #endif
-
-        let networkManager = NetworkManager()
 
         // Phase 1: Load summary (fast) - includes song metadata, transcriptions, featured recordings
         let fetchedSong = await networkManager.fetchSongSummary(id: currentSongId)
