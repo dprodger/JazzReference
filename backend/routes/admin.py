@@ -408,23 +408,21 @@ def _import_single_orphan(db, song, orphan):
         release_id, is_new = _find_or_create_release_with_caa(db, mb_release_id, orphan)
 
         if release_id:
-            # Create recording_releases entry (with Spotify data if available)
+            # Create recording_releases entry (with Spotify track ID if available)
             cur.execute("""
                 INSERT INTO recording_releases (
                     recording_id, release_id, track_title, track_artist_credit,
-                    spotify_track_id, spotify_track_url
+                    spotify_track_id
                 )
-                VALUES (%s, %s, %s, %s, %s, %s)
+                VALUES (%s, %s, %s, %s, %s)
                 ON CONFLICT (recording_id, release_id) DO UPDATE
-                SET spotify_track_id = COALESCE(EXCLUDED.spotify_track_id, recording_releases.spotify_track_id),
-                    spotify_track_url = COALESCE(EXCLUDED.spotify_track_url, recording_releases.spotify_track_url)
+                SET spotify_track_id = COALESCE(EXCLUDED.spotify_track_id, recording_releases.spotify_track_id)
             """, (
                 recording_id,
                 release_id,
                 orphan.get('mb_recording_title'),
                 orphan.get('mb_artist_credit'),
-                spotify_track_id if spotify_track_id else None,
-                orphan.get('spotify_external_url') if spotify_track_id else None
+                spotify_track_id if spotify_track_id else None
             ))
             if spotify_track_id:
                 logger.info(f"Linked recording to release with Spotify: {spotify_track_id}"
@@ -640,8 +638,12 @@ def get_existing_recordings_for_song(song_id):
                             'title', rel.title,
                             'year', rel.release_year,
                             'mb_release_id', rel.musicbrainz_release_id,
-                            'spotify_album_url', rel.spotify_album_url,
-                            'spotify_track_url', rr.spotify_track_url,
+                            'spotify_album_id', rel.spotify_album_id,
+                            'spotify_album_url', CASE WHEN rel.spotify_album_id IS NOT NULL
+                                THEN 'https://open.spotify.com/album/' || rel.spotify_album_id END,
+                            'spotify_track_id', rr.spotify_track_id,
+                            'spotify_track_url', CASE WHEN rr.spotify_track_id IS NOT NULL
+                                THEN 'https://open.spotify.com/track/' || rr.spotify_track_id END,
                             'album_art_small', COALESCE(
                                 (SELECT ri.image_url_small FROM release_imagery ri
                                  WHERE ri.release_id = rel.id AND ri.type = 'Front' LIMIT 1),
@@ -666,7 +668,7 @@ def get_existing_recordings_for_song(song_id):
                 rec['releases'] = rec['releases'] or []
                 # Add a flag for whether any release has Spotify
                 rec['has_spotify'] = any(
-                    r.get('spotify_album_url') or r.get('spotify_track_url')
+                    r.get('spotify_album_id') or r.get('spotify_track_id')
                     for r in rec['releases']
                 )
                 recordings.append(rec)
@@ -744,20 +746,18 @@ def link_orphan_to_existing_recording(orphan_id):
                 cur.execute("""
                     INSERT INTO recording_releases (
                         recording_id, release_id, track_title, track_artist_credit,
-                        spotify_track_id, spotify_track_url
+                        spotify_track_id
                     )
-                    VALUES (%s, %s, %s, %s, %s, %s)
+                    VALUES (%s, %s, %s, %s, %s)
                     ON CONFLICT (recording_id, release_id) DO UPDATE
-                    SET spotify_track_id = COALESCE(EXCLUDED.spotify_track_id, recording_releases.spotify_track_id),
-                        spotify_track_url = COALESCE(EXCLUDED.spotify_track_url, recording_releases.spotify_track_url)
+                    SET spotify_track_id = COALESCE(EXCLUDED.spotify_track_id, recording_releases.spotify_track_id)
                     RETURNING id
                 """, (
                     recording_id,
                     release_id,
                     orphan.get('mb_recording_title'),
                     orphan.get('mb_artist_credit'),
-                    orphan.get('spotify_track_id'),
-                    orphan.get('spotify_external_url')
+                    orphan.get('spotify_track_id')
                 ))
                 rr_result = cur.fetchone()
 

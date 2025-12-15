@@ -1034,9 +1034,9 @@ class SpotifyMatcher:
                 self.logger.debug(f"    Artist: {artist_name or 'Unknown'}")
                 self.logger.debug(f"    Year: {year or 'Unknown'}")
                 
-                # Check if already has Spotify URL (skip unless rematch mode)
-                if release['spotify_album_url'] and not self.rematch:
-                    # Release has album URL, but check if recordings need track IDs
+                # Check if already has Spotify ID (skip unless rematch mode)
+                if release.get('spotify_album_id') and not self.rematch:
+                    # Release has album ID, but check if recordings need track IDs
                     # This handles the case where recordings were deleted and recreated
                     existing_album_id = release.get('spotify_album_id')
                     self.logger.debug(f"[{i}/{len(releases)}] {title} - checking existing album: {existing_album_id}")
@@ -1065,10 +1065,10 @@ class SpotifyMatcher:
                                     self.stats['releases_no_match'] += 1
                             continue
 
-                    self.logger.info(f"[{i}/{len(releases)}] {title} ({artist_name or 'Unknown'}, {year or 'Unknown'}) - ⊙ Already has Spotify URL, skipping")
+                    self.logger.info(f"[{i}/{len(releases)}] {title} ({artist_name or 'Unknown'}, {year or 'Unknown'}) - ⊙ Already has Spotify ID, skipping")
                     self.stats['releases_skipped'] += 1
                     continue
-                elif release['spotify_album_url'] and self.rematch:
+                elif release.get('spotify_album_id') and self.rematch:
                     self.logger.info(f"[{i}/{len(releases)}] {title} ({artist_name or 'Unknown'}, {year or 'Unknown'}) - ↻ Re-matching...")
                 
                 # Search Spotify for album (with song title for track verification fallback)

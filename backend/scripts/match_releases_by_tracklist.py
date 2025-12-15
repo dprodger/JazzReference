@@ -140,7 +140,7 @@ class TrackListMatcher:
                     JOIN recordings rec ON rr.recording_id = rec.id
                     JOIN recording_performers rp ON rec.id = rp.recording_id
                     JOIN performers p ON rp.performer_id = p.id
-                    WHERE rel.spotify_album_url IS NULL
+                    WHERE rel.spotify_album_id IS NULL
                       AND LOWER(p.name) = LOWER(%s)
                     ORDER BY rel.title
                 """, (artist_name,))
@@ -753,7 +753,7 @@ class TrackListMatcher:
 
             if tracks_updated > 0:
                 self.stats['tracks_updated'] += tracks_updated
-                self.logger.debug(f"    Updated {tracks_updated} recording_releases with Spotify track URLs")
+                self.logger.debug(f"    Updated {tracks_updated} recording_releases with Spotify track IDs")
 
 
 def main() -> bool:

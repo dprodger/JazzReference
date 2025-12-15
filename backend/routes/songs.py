@@ -155,6 +155,49 @@ AUTHORITY_ALBUM_ART_SQL = """
          LIMIT 1)
     ) as matched_album_art"""
 
+# ============================================================================
+# SQL FRAGMENTS FOR SPOTIFY URL CONSTRUCTION (from IDs)
+# ============================================================================
+# Spotify URLs are deterministic: https://open.spotify.com/{type}/{id}
+# We store only IDs and construct URLs on-demand
+
+SPOTIFY_URL_SQL = """
+    COALESCE(
+        -- 1. Track URL from default release
+        (SELECT CASE WHEN rr_sub.spotify_track_id IS NOT NULL
+                     THEN 'https://open.spotify.com/track/' || rr_sub.spotify_track_id END
+         FROM releases rel_sub
+         LEFT JOIN recording_releases rr_sub ON rr_sub.release_id = rel_sub.id AND rr_sub.recording_id = r.id
+         WHERE rel_sub.id = r.default_release_id
+           AND (rel_sub.spotify_album_id IS NOT NULL OR rr_sub.spotify_track_id IS NOT NULL)
+        ),
+        -- 2. Album URL from default release (if no track URL)
+        (SELECT CASE WHEN rel_sub.spotify_album_id IS NOT NULL
+                     THEN 'https://open.spotify.com/album/' || rel_sub.spotify_album_id END
+         FROM releases rel_sub
+         WHERE rel_sub.id = r.default_release_id
+           AND rel_sub.spotify_album_id IS NOT NULL
+        ),
+        -- 3. Track URL from any linked release
+        (SELECT CASE WHEN rr_sub.spotify_track_id IS NOT NULL
+                     THEN 'https://open.spotify.com/track/' || rr_sub.spotify_track_id END
+         FROM recording_releases rr_sub
+         JOIN releases rel_sub ON rr_sub.release_id = rel_sub.id
+         WHERE rr_sub.recording_id = r.id
+           AND rr_sub.spotify_track_id IS NOT NULL
+         ORDER BY rel_sub.release_year DESC NULLS LAST
+         LIMIT 1),
+        -- 4. Album URL from any linked release (if no track URL)
+        (SELECT CASE WHEN rel_sub.spotify_album_id IS NOT NULL
+                     THEN 'https://open.spotify.com/album/' || rel_sub.spotify_album_id END
+         FROM recording_releases rr_sub
+         JOIN releases rel_sub ON rr_sub.release_id = rel_sub.id
+         WHERE rr_sub.recording_id = r.id
+           AND rel_sub.spotify_album_id IS NOT NULL
+         ORDER BY rel_sub.release_year DESC NULLS LAST
+         LIMIT 1)
+    ) as best_spotify_url"""
+
 
 # All song-related endpoints:
 # - GET /api/songs
@@ -233,23 +276,7 @@ def get_song_summary(song_id):
                     r.recording_year,
                     r.label,
                     r.default_release_id,
-                    COALESCE(
-                        (SELECT COALESCE(rr_sub.spotify_track_url, rel_sub.spotify_album_url)
-                         FROM releases rel_sub
-                         LEFT JOIN recording_releases rr_sub ON rr_sub.release_id = rel_sub.id AND rr_sub.recording_id = r.id
-                         WHERE rel_sub.id = r.default_release_id
-                           AND (rel_sub.spotify_album_url IS NOT NULL OR rr_sub.spotify_track_url IS NOT NULL)
-                        ),
-                        (SELECT COALESCE(rr_sub.spotify_track_url, rel_sub.spotify_album_url)
-                         FROM recording_releases rr_sub
-                         JOIN releases rel_sub ON rr_sub.release_id = rel_sub.id
-                         WHERE rr_sub.recording_id = r.id
-                           AND (rr_sub.spotify_track_url IS NOT NULL OR rel_sub.spotify_album_url IS NOT NULL)
-                         ORDER BY
-                           CASE WHEN rr_sub.spotify_track_url IS NOT NULL THEN 0 ELSE 1 END,
-                           rel_sub.release_year DESC NULLS LAST
-                         LIMIT 1)
-                    ) as best_spotify_url,
+                    {SPOTIFY_URL_SQL},
                     {ALBUM_ART_SMALL_SQL},
                     {ALBUM_ART_MEDIUM_SQL},
                     {ALBUM_ART_LARGE_SQL},
@@ -373,23 +400,7 @@ def get_song_recordings(song_id):
                 r.recording_year,
                 r.label,
                 r.default_release_id,
-                COALESCE(
-                    (SELECT COALESCE(rr_sub.spotify_track_url, rel_sub.spotify_album_url)
-                     FROM releases rel_sub
-                     LEFT JOIN recording_releases rr_sub ON rr_sub.release_id = rel_sub.id AND rr_sub.recording_id = r.id
-                     WHERE rel_sub.id = r.default_release_id
-                       AND (rel_sub.spotify_album_url IS NOT NULL OR rr_sub.spotify_track_url IS NOT NULL)
-                    ),
-                    (SELECT COALESCE(rr_sub.spotify_track_url, rel_sub.spotify_album_url)
-                     FROM recording_releases rr_sub
-                     JOIN releases rel_sub ON rr_sub.release_id = rel_sub.id
-                     WHERE rr_sub.recording_id = r.id
-                       AND (rr_sub.spotify_track_url IS NOT NULL OR rel_sub.spotify_album_url IS NOT NULL)
-                     ORDER BY
-                       CASE WHEN rr_sub.spotify_track_url IS NOT NULL THEN 0 ELSE 1 END,
-                       rel_sub.release_year DESC NULLS LAST
-                     LIMIT 1)
-                ) as best_spotify_url,
+                {SPOTIFY_URL_SQL},
                 {ALBUM_ART_SMALL_SQL},
                 {ALBUM_ART_MEDIUM_SQL},
                 {ALBUM_ART_LARGE_SQL},
@@ -524,23 +535,7 @@ def get_song_detail(song_id):
                     r.label,
                     r.default_release_id,
                     -- Spotify URL from default release or best available
-                    COALESCE(
-                        (SELECT COALESCE(rr_sub.spotify_track_url, rel_sub.spotify_album_url)
-                         FROM releases rel_sub
-                         LEFT JOIN recording_releases rr_sub ON rr_sub.release_id = rel_sub.id AND rr_sub.recording_id = r.id
-                         WHERE rel_sub.id = r.default_release_id
-                           AND (rel_sub.spotify_album_url IS NOT NULL OR rr_sub.spotify_track_url IS NOT NULL)
-                        ),
-                        (SELECT COALESCE(rr_sub.spotify_track_url, rel_sub.spotify_album_url)
-                         FROM recording_releases rr_sub
-                         JOIN releases rel_sub ON rr_sub.release_id = rel_sub.id
-                         WHERE rr_sub.recording_id = r.id
-                           AND (rr_sub.spotify_track_url IS NOT NULL OR rel_sub.spotify_album_url IS NOT NULL)
-                         ORDER BY
-                           CASE WHEN rr_sub.spotify_track_url IS NOT NULL THEN 0 ELSE 1 END,
-                           rel_sub.release_year DESC NULLS LAST
-                         LIMIT 1)
-                    ) as best_spotify_url,
+                    {SPOTIFY_URL_SQL},
                     -- Album art with release_imagery priority
                     {ALBUM_ART_SMALL_SQL},
                     {ALBUM_ART_MEDIUM_SQL},
@@ -910,21 +905,27 @@ def get_song_authority_recommendations(song_id):
                            sar.recording_id,
                            def_rel.title as matched_album_title,
                            r.recording_year as matched_year,
-                           -- Get Spotify URL from default release or best available
+                           -- Get Spotify URL from default release or best available (constructed from IDs)
                            COALESCE(
-                               (SELECT COALESCE(rr.spotify_track_url, rel.spotify_album_url)
+                               (SELECT CASE WHEN rr.spotify_track_id IS NOT NULL
+                                            THEN 'https://open.spotify.com/track/' || rr.spotify_track_id
+                                            WHEN rel.spotify_album_id IS NOT NULL
+                                            THEN 'https://open.spotify.com/album/' || rel.spotify_album_id END
                                 FROM releases rel
                                 LEFT JOIN recording_releases rr ON rr.release_id = rel.id AND rr.recording_id = r.id
                                 WHERE rel.id = r.default_release_id
-                                  AND (rel.spotify_album_url IS NOT NULL OR rr.spotify_track_url IS NOT NULL)
+                                  AND (rel.spotify_album_id IS NOT NULL OR rr.spotify_track_id IS NOT NULL)
                                ),
-                               (SELECT COALESCE(rr.spotify_track_url, rel.spotify_album_url)
+                               (SELECT CASE WHEN rr.spotify_track_id IS NOT NULL
+                                            THEN 'https://open.spotify.com/track/' || rr.spotify_track_id
+                                            WHEN rel.spotify_album_id IS NOT NULL
+                                            THEN 'https://open.spotify.com/album/' || rel.spotify_album_id END
                                 FROM recording_releases rr
                                 JOIN releases rel ON rr.release_id = rel.id
-                                WHERE rr.recording_id = r.id 
-                                  AND (rr.spotify_track_url IS NOT NULL OR rel.spotify_album_url IS NOT NULL)
-                                ORDER BY 
-                                  CASE WHEN rr.spotify_track_url IS NOT NULL THEN 0 ELSE 1 END,
+                                WHERE rr.recording_id = r.id
+                                  AND (rr.spotify_track_id IS NOT NULL OR rel.spotify_album_id IS NOT NULL)
+                                ORDER BY
+                                  CASE WHEN rr.spotify_track_id IS NOT NULL THEN 0 ELSE 1 END,
                                   rel.release_year DESC NULLS LAST
                                 LIMIT 1)
                            ) as matched_spotify_url,

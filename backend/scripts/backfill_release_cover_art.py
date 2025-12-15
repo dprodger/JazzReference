@@ -147,7 +147,7 @@ class ReleaseArtworkBackfill:
             return None
 
     def find_releases_without_art(self, cur):
-        """Find releases that have Spotify track URLs but no cover art"""
+        """Find releases that have Spotify track IDs but no cover art"""
         limit_clause = f"LIMIT {self.limit}" if self.limit else ""
 
         cur.execute(f"""
@@ -157,17 +157,23 @@ class ReleaseArtworkBackfill:
                 rel.release_year,
                 rel.cover_art_small,
                 rel.spotify_album_id,
-                (SELECT rr.spotify_track_url
+                (SELECT rr.spotify_track_id
                  FROM recording_releases rr
                  WHERE rr.release_id = rel.id
-                   AND rr.spotify_track_url IS NOT NULL
+                   AND rr.spotify_track_id IS NOT NULL
+                 LIMIT 1) as spotify_track_id,
+                (SELECT CASE WHEN rr.spotify_track_id IS NOT NULL
+                             THEN 'https://open.spotify.com/track/' || rr.spotify_track_id END
+                 FROM recording_releases rr
+                 WHERE rr.release_id = rel.id
+                   AND rr.spotify_track_id IS NOT NULL
                  LIMIT 1) as spotify_track_url
             FROM releases rel
             WHERE rel.cover_art_small IS NULL
               AND EXISTS (
                   SELECT 1 FROM recording_releases rr
                   WHERE rr.release_id = rel.id
-                    AND rr.spotify_track_url IS NOT NULL
+                    AND rr.spotify_track_id IS NOT NULL
               )
             ORDER BY rel.release_year DESC NULLS LAST
             {limit_clause}
@@ -175,14 +181,13 @@ class ReleaseArtworkBackfill:
         return cur.fetchall()
 
     def update_release_art(self, cur, release_id, album_art):
-        """Update release with album artwork"""
+        """Update release with album artwork (URL is constructed from ID, not stored)"""
         cur.execute("""
             UPDATE releases
             SET cover_art_small = %s,
                 cover_art_medium = %s,
                 cover_art_large = %s,
                 spotify_album_id = COALESCE(spotify_album_id, %s),
-                spotify_album_url = COALESCE(spotify_album_url, %s),
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = %s
         """, (
@@ -190,7 +195,6 @@ class ReleaseArtworkBackfill:
             album_art.get('medium'),
             album_art.get('large'),
             album_art.get('album_id'),
-            album_art.get('album_url'),
             release_id
         ))
 

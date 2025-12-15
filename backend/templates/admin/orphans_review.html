@@ -1352,7 +1352,7 @@
                                 <div class="recording-option-release">
                                     ${rel.album_art_small ? `<img src="${rel.album_art_small}" alt="">` : ''}
                                     <span>${rel.title} (${rel.year || '?'})</span>
-                                    ${rel.spotify_album_url || rel.spotify_track_url ? '<span class="spotify-badge">Spotify</span>' : ''}
+                                    ${rel.spotify_album_id || rel.spotify_track_id ? '<span class="spotify-badge">Spotify</span>' : ''}
                                 </div>
                             `).join('') : '<em>No releases linked</em>'}
                         </div>

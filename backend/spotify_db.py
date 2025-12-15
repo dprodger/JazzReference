@@ -53,32 +53,33 @@ def get_recordings_for_song(song_id: str, artist_filter: str = None) -> List[dic
     """
     with get_db_connection() as conn:
         with conn.cursor() as cur:
-            # Base query - get Spotify URL from default release or best available
+            # Base query - get Spotify URL from default release or best available (constructed from IDs)
             query = """
-                SELECT 
+                SELECT
                     r.id,
                     r.album_title,
                     r.recording_year,
-                    -- Get Spotify URL from default release, or best available release
+                    -- Get Spotify URL from default release, or best available release (constructed from IDs)
                     COALESCE(
-                        (SELECT COALESCE(rr.spotify_track_url, rel.spotify_album_url)
+                        (SELECT CASE WHEN rr.spotify_track_id IS NOT NULL
+                                     THEN 'https://open.spotify.com/track/' || rr.spotify_track_id
+                                     WHEN rel.spotify_album_id IS NOT NULL
+                                     THEN 'https://open.spotify.com/album/' || rel.spotify_album_id END
                          FROM releases rel
                          LEFT JOIN recording_releases rr ON rr.release_id = rel.id AND rr.recording_id = r.id
                          WHERE rel.id = r.default_release_id
-                           AND (rel.spotify_album_url IS NOT NULL OR EXISTS (
-                               SELECT 1 FROM recording_releases rr2 
-                               WHERE rr2.release_id = rel.id 
-                                 AND rr2.recording_id = r.id 
-                                 AND rr2.spotify_track_url IS NOT NULL
-                           ))
+                           AND (rel.spotify_album_id IS NOT NULL OR rr.spotify_track_id IS NOT NULL)
                         ),
-                        (SELECT COALESCE(rr.spotify_track_url, rel.spotify_album_url)
+                        (SELECT CASE WHEN rr.spotify_track_id IS NOT NULL
+                                     THEN 'https://open.spotify.com/track/' || rr.spotify_track_id
+                                     WHEN rel.spotify_album_id IS NOT NULL
+                                     THEN 'https://open.spotify.com/album/' || rel.spotify_album_id END
                          FROM recording_releases rr
                          JOIN releases rel ON rr.release_id = rel.id
-                         WHERE rr.recording_id = r.id 
-                           AND (rr.spotify_track_url IS NOT NULL OR rel.spotify_album_url IS NOT NULL)
-                         ORDER BY 
-                           CASE WHEN rr.spotify_track_url IS NOT NULL THEN 0 ELSE 1 END,
+                         WHERE rr.recording_id = r.id
+                           AND (rr.spotify_track_id IS NOT NULL OR rel.spotify_album_id IS NOT NULL)
+                         ORDER BY
+                           CASE WHEN rr.spotify_track_id IS NOT NULL THEN 0 ELSE 1 END,
                            rel.release_year DESC NULLS LAST
                          LIMIT 1)
                     ) as spotify_url,
@@ -136,7 +137,7 @@ def get_releases_for_song(song_id: str, artist_filter: str = None) -> List[dict]
     
     Returns:
         List of release dicts with 'id', 'title', 'artist_credit', 'release_year',
-        'spotify_album_url', 'spotify_album_id', 'performers' (list with 'name' and 'role')
+        'spotify_album_url' (constructed from ID), 'spotify_album_id', 'performers' (list with 'name' and 'role')
     """
     with get_db_connection() as conn:
         with conn.cursor() as cur:
@@ -146,7 +147,8 @@ def get_releases_for_song(song_id: str, artist_filter: str = None) -> List[dict]
                     rel.title,
                     rel.artist_credit,
                     rel.release_year,
-                    rel.spotify_album_url,
+                    CASE WHEN rel.spotify_album_id IS NOT NULL
+                         THEN 'https://open.spotify.com/album/' || rel.spotify_album_id END as spotify_album_url,
                     rel.spotify_album_id,
                     -- Get performers from the linked recording (not from release)
                     (SELECT json_agg(
@@ -187,7 +189,7 @@ def get_releases_for_song(song_id: str, artist_filter: str = None) -> List[dict]
                 params.append(artist_filter)
             
             query += """
-                GROUP BY rel.id, rel.title, rel.artist_credit, rel.release_year, rel.spotify_album_url, rel.spotify_album_id, rr.recording_id
+                GROUP BY rel.id, rel.title, rel.artist_credit, rel.release_year, rel.spotify_album_id, rr.recording_id
                 ORDER BY rel.release_year
             """
             
@@ -196,13 +198,16 @@ def get_releases_for_song(song_id: str, artist_filter: str = None) -> List[dict]
 
 
 def get_releases_without_artwork() -> List[dict]:
-    """Get releases with Spotify URL but no cover artwork"""
+    """Get releases with Spotify ID but no cover artwork"""
     with get_db_connection() as conn:
         with conn.cursor() as cur:
             cur.execute("""
-                SELECT id, title, spotify_album_url, spotify_album_id
+                SELECT id, title,
+                       CASE WHEN spotify_album_id IS NOT NULL
+                            THEN 'https://open.spotify.com/album/' || spotify_album_id END as spotify_album_url,
+                       spotify_album_id
                 FROM releases
-                WHERE spotify_album_url IS NOT NULL
+                WHERE spotify_album_id IS NOT NULL
                   AND cover_art_medium IS NULL
                 ORDER BY title
             """)
@@ -243,45 +248,44 @@ def get_recordings_for_release(song_id: str, release_id: str) -> List[dict]:
 def update_release_spotify_data(conn, release_id: str, spotify_data: dict,
                                 dry_run: bool = False, log: logging.Logger = None):
     """
-    Update release with Spotify album URL, ID, and cover artwork
-    
+    Update release with Spotify album ID and cover artwork
+    (URL is constructed on-demand from ID, not stored)
+
     Args:
         conn: Database connection
         release_id: Our release ID
-        spotify_data: Dict with 'url', 'id', 'album_art' keys
+        spotify_data: Dict with 'id', 'album_art' keys (url is ignored - constructed from ID)
         dry_run: If True, don't actually update
         log: Logger instance
     """
     log = log or logger
-    
+
+    album_id = spotify_data.get('id')
     if dry_run:
-        log.info(f"    [DRY RUN] Would update release with: {spotify_data['url']}")
+        log.info(f"    [DRY RUN] Would update release with Spotify ID: {album_id}")
         if spotify_data.get('album_art', {}).get('medium'):
             log.info(f"    [DRY RUN] Would add cover artwork")
         return
-    
+
     with conn.cursor() as cur:
-        album_id = spotify_data.get('id')
         album_art = spotify_data.get('album_art', {})
-        
+
         cur.execute("""
             UPDATE releases
-            SET spotify_album_url = %s,
-                spotify_album_id = %s,
+            SET spotify_album_id = %s,
                 cover_art_small = %s,
                 cover_art_medium = %s,
                 cover_art_large = %s,
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = %s
         """, (
-            spotify_data['url'],
             album_id,
             album_art.get('small'),
             album_art.get('medium'),
             album_art.get('large'),
             release_id
         ))
-        
+
         conn.commit()
 
 
@@ -313,34 +317,34 @@ def update_release_artwork(conn, release_id: str, album_art: dict,
 
 
 def update_recording_release_track_id(conn, recording_id: str, release_id: str,
-                                      track_id: str, track_url: str,
+                                      track_id: str, track_url: str = None,
                                       dry_run: bool = False, log: logging.Logger = None):
     """
-    Update the recording_releases junction table with Spotify track info
-    
+    Update the recording_releases junction table with Spotify track ID
+    (URL is constructed on-demand from ID, not stored)
+
     Args:
         conn: Database connection
         recording_id: Our recording ID
-        release_id: Our release ID  
+        release_id: Our release ID
         track_id: Spotify track ID
-        track_url: Spotify track URL
+        track_url: Deprecated - ignored (URL constructed from ID)
         dry_run: If True, don't actually update
         log: Logger instance
     """
     log = log or logger
-    
+
     if dry_run:
         log.debug(f"      [DRY RUN] Would update recording_releases with track: {track_id}")
         return
-    
+
     with conn.cursor() as cur:
         cur.execute("""
             UPDATE recording_releases
-            SET spotify_track_id = %s,
-                spotify_track_url = %s
+            SET spotify_track_id = %s
             WHERE recording_id = %s AND release_id = %s
-        """, (track_id, track_url, recording_id, release_id))
-        
+        """, (track_id, recording_id, release_id))
+
         conn.commit()
 
 
