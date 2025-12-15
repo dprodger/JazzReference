@@ -163,38 +163,28 @@ AUTHORITY_ALBUM_ART_SQL = """
 
 SPOTIFY_URL_SQL = """
     COALESCE(
-        -- 1. Track URL from default release
-        (SELECT CASE WHEN rr_sub.spotify_track_id IS NOT NULL
-                     THEN 'https://open.spotify.com/track/' || rr_sub.spotify_track_id END
+        -- 1. From default release (track preferred, then album)
+        (SELECT CASE
+             WHEN rr_sub.spotify_track_id IS NOT NULL THEN 'https://open.spotify.com/track/' || rr_sub.spotify_track_id
+             WHEN rel_sub.spotify_album_id IS NOT NULL THEN 'https://open.spotify.com/album/' || rel_sub.spotify_album_id
+         END
          FROM releases rel_sub
          LEFT JOIN recording_releases rr_sub ON rr_sub.release_id = rel_sub.id AND rr_sub.recording_id = r.id
          WHERE rel_sub.id = r.default_release_id
            AND (rel_sub.spotify_album_id IS NOT NULL OR rr_sub.spotify_track_id IS NOT NULL)
         ),
-        -- 2. Album URL from default release (if no track URL)
-        (SELECT CASE WHEN rel_sub.spotify_album_id IS NOT NULL
-                     THEN 'https://open.spotify.com/album/' || rel_sub.spotify_album_id END
-         FROM releases rel_sub
-         WHERE rel_sub.id = r.default_release_id
-           AND rel_sub.spotify_album_id IS NOT NULL
-        ),
-        -- 3. Track URL from any linked release
-        (SELECT CASE WHEN rr_sub.spotify_track_id IS NOT NULL
-                     THEN 'https://open.spotify.com/track/' || rr_sub.spotify_track_id END
+        -- 2. From any linked release (track preferred, then album)
+        (SELECT CASE
+             WHEN rr_sub.spotify_track_id IS NOT NULL THEN 'https://open.spotify.com/track/' || rr_sub.spotify_track_id
+             WHEN rel_sub.spotify_album_id IS NOT NULL THEN 'https://open.spotify.com/album/' || rel_sub.spotify_album_id
+         END
          FROM recording_releases rr_sub
          JOIN releases rel_sub ON rr_sub.release_id = rel_sub.id
          WHERE rr_sub.recording_id = r.id
-           AND rr_sub.spotify_track_id IS NOT NULL
-         ORDER BY rel_sub.release_year DESC NULLS LAST
-         LIMIT 1),
-        -- 4. Album URL from any linked release (if no track URL)
-        (SELECT CASE WHEN rel_sub.spotify_album_id IS NOT NULL
-                     THEN 'https://open.spotify.com/album/' || rel_sub.spotify_album_id END
-         FROM recording_releases rr_sub
-         JOIN releases rel_sub ON rr_sub.release_id = rel_sub.id
-         WHERE rr_sub.recording_id = r.id
-           AND rel_sub.spotify_album_id IS NOT NULL
-         ORDER BY rel_sub.release_year DESC NULLS LAST
+           AND (rr_sub.spotify_track_id IS NOT NULL OR rel_sub.spotify_album_id IS NOT NULL)
+         ORDER BY
+           CASE WHEN rr_sub.spotify_track_id IS NOT NULL THEN 0 ELSE 1 END,
+           rel_sub.release_year DESC NULLS LAST
          LIMIT 1)
     ) as best_spotify_url"""
 
