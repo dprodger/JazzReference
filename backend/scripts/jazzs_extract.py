@@ -487,18 +487,40 @@ class JazzStandardsRecommendationExtractor:
             data = response.json()
 
             if data.get('resultCount', 0) > 0:
-                # Find best match - prefer exact artist match
+                # Collect all candidate matches with artist name matching
                 artist_lower = artist_name.lower()
+                candidates = []
                 for result in data['results']:
                     result_artist = result.get('artistName', '').lower()
                     # Check if artist names match reasonably well
                     if artist_lower in result_artist or result_artist in artist_lower:
-                        logger.debug(f"        ✓ Search found: {result.get('artistName')} - {result.get('collectionName')}")
-                        return result
+                        candidates.append(result)
 
-                # If no exact artist match, return first result
-                result = data['results'][0]
-                logger.debug(f"        ✓ Search found (first result): {result.get('artistName')} - {result.get('collectionName')}")
+                # If no artist matches, use all results as candidates
+                if not candidates:
+                    candidates = data['results']
+
+                # If we have multiple candidates, prefer one with best DB match
+                if len(candidates) > 1:
+                    best_candidate = None
+                    best_score = 0
+                    for candidate in candidates:
+                        album_name = candidate.get('collectionName', '')
+                        itunes_artist = candidate.get('artistName', '')
+                        if album_name:
+                            # Use iTunes result artist for better matching
+                            score = self._album_db_match_score(album_name, itunes_artist)
+                            if score > best_score:
+                                best_score = score
+                                best_candidate = candidate
+
+                    if best_candidate and best_score > 0:
+                        logger.debug(f"        ✓ Search found (DB match, score={best_score}): {best_candidate.get('artistName')} - {best_candidate.get('collectionName')}")
+                        return best_candidate
+
+                # Return first candidate
+                result = candidates[0]
+                logger.debug(f"        ✓ Search found: {result.get('artistName')} - {result.get('collectionName')}")
                 return result
             else:
                 logger.debug(f"        iTunes search returned no results")
@@ -507,6 +529,76 @@ class JazzStandardsRecommendationExtractor:
         except Exception as e:
             logger.warning(f"Error searching iTunes: {e}")
             return None
+
+    def _album_db_match_score(self, album_name: str, artist_name: str) -> int:
+        """
+        Score how well an album matches releases in our DB for this song.
+        Returns a score based on keyword overlap (higher is better).
+        """
+        if not hasattr(self, 'current_song_title'):
+            return 0
+
+        try:
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    song_title = self.current_song_title.lower()
+
+                    # Get all releases linked to recordings of this song
+                    cur.execute("""
+                        SELECT rel.title, rel.artist_credit
+                        FROM releases rel
+                        JOIN recording_releases rr ON rel.id = rr.release_id
+                        JOIN recordings r ON rr.recording_id = r.id
+                        JOIN songs s ON r.song_id = s.id
+                        WHERE LOWER(s.title) = %s
+                    """, (song_title,))
+                    releases = cur.fetchall()
+
+                    # Compare iTunes album with DB releases using keyword matching
+                    album_words = set(self._extract_keywords(album_name))
+                    artist_words = set(self._extract_keywords(artist_name))
+
+                    best_score = 0
+                    best_release = None
+
+                    for rel in releases:
+                        db_title_words = set(self._extract_keywords(rel['title']))
+                        db_artist_words = set(self._extract_keywords(rel['artist_credit'] or ''))
+
+                        # Check for significant word overlap
+                        title_overlap = album_words & db_title_words
+                        artist_overlap = artist_words & db_artist_words
+
+                        # Score = title matches * 3 + artist matches
+                        # Bonus: +5 if ALL db title words appear in iTunes album (full containment)
+                        if len(artist_overlap) >= 1:
+                            score = len(title_overlap) * 3 + len(artist_overlap)
+                            # Bonus for full containment
+                            if db_title_words and db_title_words <= album_words:
+                                score += 5
+                            if score > best_score:
+                                best_score = score
+                                best_release = rel['title']
+
+                    if best_score > 0:
+                        logger.debug(f"        DB match score={best_score} for '{best_release}'")
+
+                    return best_score
+        except Exception as e:
+            logger.debug(f"        DB check error: {e}")
+            return 0
+
+    def _extract_keywords(self, text: str) -> list:
+        """Extract significant keywords from text (skip common words)."""
+        if not text:
+            return []
+        # Common words to skip - note: 'live' is NOT skipped as it's meaningful for album titles
+        stop_words = {'the', 'a', 'an', 'at', 'in', 'on', 'of', 'to', 'and', 'for', 'with', 'by', 'feat', 'featuring'}
+        words = text.lower().split()
+        # Remove punctuation and filter stop words, keep words 3+ chars
+        import re
+        return [re.sub(r'[^\w]', '', w) for w in words
+                if len(w) >= 3 and re.sub(r'[^\w]', '', w).lower() not in stop_words]
 
     def parse_itunes_panel(self, table_elem) -> List[Dict]:
         """

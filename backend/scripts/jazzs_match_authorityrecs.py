@@ -59,10 +59,11 @@ class AuthorityRecommendationMatcher:
     """Matches authority recommendations to recordings in the database"""
     
     def __init__(self, dry_run: bool = False, min_confidence: str = 'medium',
-                 song_name: Optional[str] = None):
+                 song_name: Optional[str] = None, strategy: str = 'performer'):
         self.dry_run = dry_run
         self.min_confidence = min_confidence
         self.song_name = song_name
+        self.strategy = strategy  # 'performer' or 'release'
         self.stats = {
             'recommendations_processed': 0,
             'high_confidence_matches': 0,
@@ -142,7 +143,7 @@ class AuthorityRecommendationMatcher:
     ) -> Tuple[str, float, Dict]:
         """
         Calculate match confidence level and detailed scores.
-        
+
         Returns:
             (confidence_level, overall_score, details_dict)
             confidence_level: 'high', 'medium', 'low', or 'none'
@@ -151,35 +152,56 @@ class AuthorityRecommendationMatcher:
             'artist_score': 0.0,
             'album_score': 0.0,
             'year_match': False,
+            'release_year_match': False,  # Matches a linked release year
             'itunes_match': False  # Keep for future but always False for now
         }
-        
+
         # Note: recordings table doesn't store iTunes IDs separately
         # Future enhancement: could extract from apple_music_url
-        
+
         # Compare artist names
         details['artist_score'] = self.compare_artists(
             recommendation.get('artist_name'),
             recording.get('artist_name')
         )
-        
+
         # Compare album titles
         details['album_score'] = self.compare_albums(
             recommendation.get('album_title'),
             recording.get('album_title')
         )
-        
-        # Compare years
+
+        # Compare years - check both recording year and linked release years
         details['year_match'] = self.compare_years(
             recommendation.get('recording_year'),
             recording.get('recording_year')
         )
-        
+
+        # Also check if recommendation year matches any linked release year
+        rec_year = recommendation.get('recording_year')
+        linked_years = recording.get('linked_release_years', [])
+        if rec_year and linked_years:
+            for release_year in linked_years:
+                if self.compare_years(rec_year, release_year):
+                    details['release_year_match'] = True
+                    break
+
         # Determine confidence level
         # Note: iTunes matching not currently available (recordings don't store iTunes IDs)
+        year_matches = details['year_match'] or details['release_year_match']
+
+        # Check if album lengths are similar (to avoid substring false positives from partial_ratio)
+        # e.g., "Louis Armstrong" would give 100% match for "The Essential Louis Armstrong"
+        rec_album = self.normalize_string(recommendation.get('album_title', ''))
+        db_album = self.normalize_string(recording.get('album_title', ''))
+        albums_similar_length = (
+            min(len(rec_album), len(db_album)) >= 0.7 * max(len(rec_album), len(db_album))
+            if rec_album and db_album else False
+        )
+
         if (details['artist_score'] >= self.thresholds['artist_medium'] and
               details['album_score'] >= self.thresholds['album_medium'] and
-              details['year_match']):
+              year_matches):
             confidence = 'high'
             overall_score = 90.0
         elif (details['artist_score'] >= self.thresholds['artist_medium'] and
@@ -188,16 +210,29 @@ class AuthorityRecommendationMatcher:
             overall_score = 85.0
         elif (details['artist_score'] >= self.thresholds['artist_low'] and
               details['album_score'] >= self.thresholds['album_high'] and
-              details['year_match']):
+              year_matches):
             confidence = 'medium'
             overall_score = 80.0
+        # New rule: Very high album match (>=95%) + release year match = medium confidence
+        # This handles cases where album is unmistakably correct but artist format differs
+        elif (details['album_score'] >= 95 and year_matches):
+            confidence = 'medium'
+            overall_score = 75.0
+        # New rule: Exact album match (100%) with artist >= 60% = medium confidence
+        # This handles cases like "Louis Armstrong & His Orchestra" vs "Louis Armstrong"
+        # where the album title is unmistakably correct despite artist name variations
+        # An exact album match is a strong enough signal to warrant medium confidence
+        elif (details['album_score'] >= 100 and details['artist_score'] >= 60 and albums_similar_length):
+            confidence = 'medium'
+            # Weight album heavily since exact match is strong signal
+            overall_score = 0.7 * details['album_score'] + 0.3 * details['artist_score']
         elif details['artist_score'] >= self.thresholds['artist_low']:
             confidence = 'low'
             overall_score = details['artist_score']
         else:
             confidence = 'none'
             overall_score = details['artist_score']
-        
+
         return confidence, overall_score, details
     
     def find_matching_recordings(self, recommendation: Dict) -> List[Tuple[Dict, str, float, Dict]]:
@@ -341,7 +376,45 @@ class AuthorityRecommendationMatcher:
                                 logger.debug(f"  → {rec.get('artist_names', 'No artist')} - {rec.get('album_title', 'No album')} ({rec.get('recording_year', 'No year')})")
                         else:
                             logger.debug(f"No recordings found via release.artist_credit fallback either")
-                    
+
+                    # Additional search: Find recordings by album title match
+                    # This ensures we don't miss recordings with matching albums due to LIMIT 50
+                    album_title = recommendation.get('album_title', '')
+                    if album_title and len(album_title) > 5:
+                        album_search = album_title.lower()
+                        cur.execute("""
+                            SELECT DISTINCT
+                                r.id,
+                                r.album_title,
+                                r.recording_year,
+                                r.label,
+                                rel.artist_credit as artist_names,
+                                rel.artist_credit as primary_artist
+                            FROM recordings r
+                            JOIN songs s ON r.song_id = s.id
+                            LEFT JOIN releases rel ON r.default_release_id = rel.id
+                            LEFT JOIN recording_releases rr ON r.id = rr.recording_id
+                            LEFT JOIN releases rel2 ON rr.release_id = rel2.id
+                            WHERE s.id = %s
+                              AND (
+                                  LOWER(r.album_title) LIKE %s
+                                  OR LOWER(rel.title) LIKE %s
+                                  OR LOWER(rel2.title) LIKE %s
+                              )
+                            LIMIT 20
+                        """, (song_id, f'%{album_search}%', f'%{album_search}%', f'%{album_search}%'))
+
+                        album_matches = cur.fetchall()
+                        if album_matches:
+                            # Add any new recordings not already in the list
+                            existing_ids = {r['id'] for r in recordings}
+                            new_matches = [r for r in album_matches if r['id'] not in existing_ids]
+                            if new_matches:
+                                logger.debug(f"Found {len(new_matches)} additional recordings via album title match")
+                                for rec in new_matches:
+                                    logger.debug(f"  → {rec.get('artist_names', 'No artist')} - {rec.get('album_title', 'No album')} ({rec.get('recording_year', 'No year')})")
+                                recordings = list(recordings) + new_matches
+
                     matches = []
                     for recording in recordings:
                         # Create a dict with artist_name for matching
@@ -381,11 +454,13 @@ class AuthorityRecommendationMatcher:
                         linked_releases = cur.fetchall()
 
                         # Find the best matching album title from all linked releases
+                        # Also collect all linked release years for year matching
                         best_album_title = rec_dict.get('album_title', '')
                         best_album_score = self.compare_albums(
                             recommendation.get('album_title'),
                             best_album_title
                         )
+                        linked_release_years = [rel['release_year'] for rel in linked_releases if rel.get('release_year')]
 
                         for linked_rel in linked_releases:
                             linked_album_score = self.compare_albums(
@@ -411,6 +486,9 @@ class AuthorityRecommendationMatcher:
                             logger.debug(f"  Using linked release album: '{best_album_title}' (score: {best_album_score:.1f}%) instead of '{rec_dict.get('album_title')}'")
                             rec_dict['album_title'] = best_album_title
 
+                        # Store linked release years for year matching
+                        rec_dict['linked_release_years'] = linked_release_years
+
                         confidence, score, details = self.calculate_match_confidence(
                             recommendation,
                             rec_dict
@@ -424,9 +502,12 @@ class AuthorityRecommendationMatcher:
                         logger.debug(f"  Album: {details['album_score']:.1f}% similarity")
                         logger.debug(f"    Recommend: '{recommendation.get('album_title')}'")
                         logger.debug(f"    Recording: '{rec_dict.get('album_title')}'")
-                        logger.debug(f"  Year: {'MATCH ✓' if details['year_match'] else 'NO MATCH ✗'}")
+                        year_status = 'MATCH ✓' if details['year_match'] else ('RELEASE MATCH ✓' if details.get('release_year_match') else 'NO MATCH ✗')
+                        logger.debug(f"  Year: {year_status}")
                         logger.debug(f"    Recommend: {recommendation.get('recording_year')}")
                         logger.debug(f"    Recording: {rec_dict.get('recording_year')}")
+                        if rec_dict.get('linked_release_years'):
+                            logger.debug(f"    Linked releases: {rec_dict.get('linked_release_years')}")
                         logger.debug(f"  → RESULT: {confidence.upper()} confidence ({score:.1f}%)")
                         
                         if confidence != 'none':
@@ -441,6 +522,122 @@ class AuthorityRecommendationMatcher:
             logger.error(f"Error finding matches: {e}", exc_info=True)
             return []
     
+    def find_matching_recordings_via_release(self, recommendation: Dict) -> List[Tuple[Dict, str, float, Dict]]:
+        """
+        Find matching recordings by first matching to releases, then finding recordings.
+
+        This is a release-first approach:
+        1. Find releases matching album_title + artist_credit + year
+        2. Find recordings of this song that are on those releases
+        3. Return matches with confidence scores
+
+        Returns:
+            List of (recording, confidence_level, overall_score, details)
+        """
+        song_id = recommendation['song_id']
+        artist_name = recommendation.get('artist_name', '')
+        album_title = recommendation.get('album_title', '')
+        rec_year = recommendation.get('recording_year')
+
+        if not album_title:
+            logger.debug("No album title in recommendation, skipping release-based matching")
+            return []
+
+        try:
+            with get_db_connection() as db:
+                with db.cursor() as cur:
+                    # Normalize for matching
+                    normalized_album = album_title.lower()
+                    stripped_album = strip_accents(album_title).lower()
+                    normalized_artist = artist_name.lower() if artist_name else ''
+                    stripped_artist = strip_accents(artist_name).lower() if artist_name else ''
+
+                    # Find releases that match the album title
+                    # Then join to find recordings of this song on those releases
+                    cur.execute("""
+                        SELECT DISTINCT
+                            r.id as recording_id,
+                            r.album_title as recording_album,
+                            r.recording_year,
+                            rel.id as release_id,
+                            rel.title as release_title,
+                            rel.artist_credit,
+                            rel.release_year
+                        FROM releases rel
+                        JOIN recording_releases rr ON rel.id = rr.release_id
+                        JOIN recordings r ON rr.recording_id = r.id
+                        WHERE r.song_id = %s
+                          AND (
+                              LOWER(rel.title) LIKE %s
+                              OR LOWER(rel.title) LIKE %s
+                          )
+                        LIMIT 50
+                    """, (song_id, f'%{normalized_album}%', f'%{stripped_album}%'))
+
+                    results = cur.fetchall()
+
+                    if results:
+                        logger.debug(f"Found {len(results)} recordings via release match")
+                        for res in results:
+                            logger.debug(f"  → {res['artist_credit']} - {res['release_title']} ({res['release_year']})")
+                    else:
+                        logger.debug(f"No recordings found via release match for album: {album_title}")
+                        return []
+
+                    matches = []
+                    for result in results:
+                        # Build a recording dict for comparison
+                        rec_dict = {
+                            'id': result['recording_id'],
+                            'album_title': result['release_title'],  # Use release title
+                            'recording_year': result['recording_year'],
+                            'artist_name': result['artist_credit'],  # Use release artist credit
+                            'linked_release_years': [result['release_year']] if result['release_year'] else []
+                        }
+
+                        # Get all linked release years for this recording
+                        cur.execute("""
+                            SELECT DISTINCT rel.release_year
+                            FROM recording_releases rr
+                            JOIN releases rel ON rr.release_id = rel.id
+                            WHERE rr.recording_id = %s AND rel.release_year IS NOT NULL
+                        """, (result['recording_id'],))
+                        all_years = [row['release_year'] for row in cur.fetchall()]
+                        rec_dict['linked_release_years'] = all_years
+
+                        confidence, score, details = self.calculate_match_confidence(
+                            recommendation,
+                            rec_dict
+                        )
+
+                        # Log detailed comparison
+                        logger.debug(f"\nComparing with release: {rec_dict['artist_name']} - {rec_dict['album_title']}")
+                        logger.debug(f"  Artist: {details['artist_score']:.1f}% similarity")
+                        logger.debug(f"    Recommend: '{recommendation.get('artist_name')}'")
+                        logger.debug(f"    Release: '{rec_dict['artist_name']}'")
+                        logger.debug(f"  Album: {details['album_score']:.1f}% similarity")
+                        logger.debug(f"    Recommend: '{recommendation.get('album_title')}'")
+                        logger.debug(f"    Release: '{rec_dict['album_title']}'")
+                        year_status = 'MATCH ✓' if details['year_match'] else ('RELEASE MATCH ✓' if details.get('release_year_match') else 'NO MATCH ✗')
+                        logger.debug(f"  Year: {year_status}")
+                        logger.debug(f"    Recommend: {recommendation.get('recording_year')}")
+                        logger.debug(f"    Release: {result['release_year']}")
+                        if rec_dict.get('linked_release_years'):
+                            logger.debug(f"    All release years: {rec_dict['linked_release_years']}")
+                        logger.debug(f"  → RESULT: {confidence.upper()} confidence ({score:.1f}%)")
+
+                        if confidence != 'none':
+                            matches.append((rec_dict, confidence, score, details))
+
+                    # Sort by confidence level first, then by score
+                    confidence_order = {'high': 3, 'medium': 2, 'low': 1, 'none': 0}
+                    matches.sort(key=lambda x: (confidence_order.get(x[1], 0), x[2]), reverse=True)
+                    return matches
+
+        except Exception as e:
+            logger.error(f"Error finding matches via release: {e}", exc_info=True)
+            return []
+
     def update_recommendation_recording_id(self, recommendation_id: str, recording_id: str) -> bool:
         """Update recording_id in song_authority_recommendations"""
         if self.dry_run:
@@ -475,9 +672,12 @@ class AuthorityRecommendationMatcher:
         logger.info(f"Recommendation: {artist_name}" +
                     (f" - {album_title}" if album_title else ""))
         logger.debug(f"  Details: artist='{artist_name}', album='{album_title}', year={recommendation.get('recording_year')}")
-        
-        # Find matching recordings
-        matches = self.find_matching_recordings(recommendation)
+
+        # Find matching recordings using selected strategy
+        if self.strategy == 'release':
+            matches = self.find_matching_recordings_via_release(recommendation)
+        else:
+            matches = self.find_matching_recordings(recommendation)
         
         if not matches:
             logger.info("  No matches found with sufficient confidence")
@@ -599,6 +799,7 @@ class AuthorityRecommendationMatcher:
         logger.info("MATCH AUTHORITY RECOMMENDATIONS TO RECORDINGS")
         logger.info("="*80)
         logger.info(f"Mode: {'DRY RUN' if self.dry_run else 'LIVE'}")
+        logger.info(f"Strategy: {self.strategy}")
         logger.info(f"Minimum confidence: {self.min_confidence}")
         if self.song_name:
             logger.info(f"Song filter: '{self.song_name}'")
@@ -702,7 +903,14 @@ Confidence Levels:
         metavar='SONG_NAME',
         help='Limit to recommendations for a specific song title (case-insensitive)'
     )
-    
+
+    parser.add_argument(
+        '--strategy',
+        choices=['performer', 'release'],
+        default='performer',
+        help='Matching strategy: "performer" searches by artist first, "release" searches by album first (default: performer)'
+    )
+
     args = parser.parse_args()
     
     # Set logging level
@@ -716,7 +924,8 @@ Confidence Levels:
     matcher = AuthorityRecommendationMatcher(
         dry_run=dry_run,
         min_confidence=args.min_confidence,
-        song_name=args.name
+        song_name=args.name,
+        strategy=args.strategy
     )
     
     try:
