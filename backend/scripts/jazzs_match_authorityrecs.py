@@ -231,26 +231,57 @@ class AuthorityRecommendationMatcher:
                     name_parts = artist_name.split()
                     last_name = name_parts[-1].lower() if name_parts else normalized_artist
 
+                    # Split combined artist names (e.g., "Warren Vache & Brian Lemon" -> ["Warren Vache", "Brian Lemon"])
+                    # This helps match recordings with multiple performers
+                    import re
+                    artist_parts = re.split(r'\s*[&/,]\s*', artist_name)
+                    artist_parts = [p.strip() for p in artist_parts if p.strip()]
+
+                    # Build dynamic WHERE clause for each artist part
+                    where_conditions = [
+                        "LOWER(p.name) LIKE %s",
+                        "LOWER(%s) LIKE '%%' || LOWER(p.name) || '%%'",
+                        "LOWER(p.name) LIKE '%%' || LOWER(%s) || '%%'",
+                        "LOWER(p.name) LIKE %s",
+                        "LOWER(p.name) LIKE %s"
+                    ]
+                    params = [f'%{normalized_artist}%', artist_name, artist_name,
+                              f'%{stripped_artist}%', f'%{last_name}%']
+
+                    # Add conditions for each artist part (for combined names like "A & B")
+                    for part in artist_parts:
+                        if len(part) > 3:  # Skip very short parts
+                            stripped_part = strip_accents(part).lower()
+                            part_last_name = part.split()[-1].lower() if part.split() else part.lower()
+                            where_conditions.append("LOWER(p.name) LIKE %s")
+                            params.append(f'%{stripped_part}%')
+                            if len(part_last_name) > 3:
+                                where_conditions.append("LOWER(p.name) LIKE %s")
+                                params.append(f'%{part_last_name}%')
+
+                    where_clause = " OR ".join(where_conditions)
+
                     # Get recordings with their primary performer (usually the leader)
                     # Filter to only those where at least one performer name is somewhat similar
-                    # Search by: full name, accent-stripped name, or last name
-                    cur.execute("""
+                    # Search by: full name, accent-stripped name, last name, or individual artist parts
+                    query = f"""
                         WITH matching_performers AS (
                             SELECT DISTINCT p.id, p.name
                             FROM performers p
-                            WHERE LOWER(p.name) LIKE %s
-                               OR LOWER(%s) LIKE '%%' || LOWER(p.name) || '%%'
-                               OR LOWER(p.name) LIKE '%%' || LOWER(%s) || '%%'
-                               OR LOWER(p.name) LIKE %s
-                               OR LOWER(p.name) LIKE %s
+                            WHERE {where_clause}
                         )
                         SELECT
                             r.id,
                             r.album_title,
                             r.recording_year,
                             r.label,
-                            STRING_AGG(DISTINCT p.name, ' / ' ORDER BY p.name) as artist_names,
-                            -- Get primary performer as main artist
+                            -- Get ALL performers on the recording (not just matched ones)
+                            (SELECT STRING_AGG(DISTINCT p2.name, ' / ' ORDER BY p2.name)
+                             FROM recording_performers rp2
+                             JOIN performers p2 ON rp2.performer_id = p2.id
+                             WHERE rp2.recording_id = r.id
+                            ) as artist_names,
+                            -- Get primary performer as main artist (leader role)
                             (SELECT p2.name
                              FROM recording_performers rp2
                              JOIN performers p2 ON rp2.performer_id = p2.id
@@ -259,30 +290,127 @@ class AuthorityRecommendationMatcher:
                              LIMIT 1
                             ) as primary_artist
                         FROM recordings r
-                        JOIN recording_performers rp ON r.id = rp.recording_id
-                        JOIN matching_performers p ON rp.performer_id = p.id
-                        WHERE r.song_id = %s
-                        GROUP BY r.id
+                        WHERE r.id IN (
+                            SELECT DISTINCT rp.recording_id
+                            FROM recording_performers rp
+                            JOIN matching_performers mp ON rp.performer_id = mp.id
+                            JOIN recordings rec ON rp.recording_id = rec.id
+                            WHERE rec.song_id = %s
+                        )
                         LIMIT 50
-                    """, (f'%{normalized_artist}%', artist_name, artist_name,
-                          f'%{stripped_artist}%', f'%{last_name}%', song_id))
+                    """
+                    params.append(song_id)
+                    cur.execute(query, params)
                     
                     recordings = cur.fetchall()
-                    
+
                     if recordings:
-                        logger.debug(f"Found {len(recordings)} recordings with similar artist names")
+                        logger.debug(f"Found {len(recordings)} recordings via performer match")
                         for rec in recordings:
                             logger.debug(f"  → {rec.get('artist_names', 'No artist')} - {rec.get('album_title', 'No album')} ({rec.get('recording_year', 'No year')})")
                     else:
-                        logger.debug(f"No recordings found for artist name similar to: {artist_name}")
+                        logger.debug(f"No recordings found via performer match for: {artist_name}")
+
+                        # Fallback: Search by release.artist_credit when performer match fails
+                        # This handles cases where the main artist isn't in recording_performers
+                        logger.debug(f"Trying fallback: searching by release.artist_credit...")
+                        cur.execute("""
+                            SELECT
+                                r.id,
+                                r.album_title,
+                                r.recording_year,
+                                r.label,
+                                rel.artist_credit as artist_names,
+                                rel.artist_credit as primary_artist
+                            FROM recordings r
+                            JOIN releases rel ON r.default_release_id = rel.id
+                            WHERE r.song_id = %s
+                              AND (
+                                  LOWER(rel.artist_credit) LIKE %s
+                                  OR LOWER(rel.artist_credit) LIKE %s
+                                  OR LOWER(%s) LIKE '%%' || LOWER(rel.artist_credit) || '%%'
+                              )
+                            LIMIT 50
+                        """, (song_id, f'%{normalized_artist}%', f'%{stripped_artist}%', artist_name))
+
+                        recordings = cur.fetchall()
+
+                        if recordings:
+                            logger.debug(f"Found {len(recordings)} recordings via release.artist_credit fallback")
+                            for rec in recordings:
+                                logger.debug(f"  → {rec.get('artist_names', 'No artist')} - {rec.get('album_title', 'No album')} ({rec.get('recording_year', 'No year')})")
+                        else:
+                            logger.debug(f"No recordings found via release.artist_credit fallback either")
                     
                     matches = []
                     for recording in recordings:
                         # Create a dict with artist_name for matching
                         rec_dict = dict(recording)
-                        # Use primary artist if available, otherwise all artist names
-                        rec_dict['artist_name'] = recording['primary_artist'] or recording['artist_names']
-                        
+
+                        # Compare against both primary artist and combined artist names,
+                        # use whichever gives the better match. This handles cases like
+                        # "Warren Vache & Brian Lemon" matching "Brian Lemon / Warren Vaché"
+                        primary_artist = recording.get('primary_artist', '')
+                        all_artists = recording.get('artist_names', '')
+
+                        primary_score = self.compare_artists(
+                            recommendation.get('artist_name'),
+                            primary_artist
+                        ) if primary_artist else 0
+
+                        all_artists_score = self.compare_artists(
+                            recommendation.get('artist_name'),
+                            all_artists
+                        ) if all_artists else 0
+
+                        if all_artists_score > primary_score:
+                            rec_dict['artist_name'] = all_artists
+                            if all_artists_score > primary_score + 10:  # Significant improvement
+                                logger.debug(f"  Using combined artists: '{all_artists}' (score: {all_artists_score:.1f}%) instead of '{primary_artist}' ({primary_score:.1f}%)")
+                        else:
+                            rec_dict['artist_name'] = primary_artist or all_artists
+
+                        # Get all linked releases for this recording to find best album match
+                        # This handles cases where a recording appears on multiple releases
+                        cur.execute("""
+                            SELECT rel.title, rel.artist_credit, rel.release_year
+                            FROM recording_releases rr
+                            JOIN releases rel ON rr.release_id = rel.id
+                            WHERE rr.recording_id = %s
+                        """, (recording['id'],))
+                        linked_releases = cur.fetchall()
+
+                        # Find the best matching album title from all linked releases
+                        best_album_title = rec_dict.get('album_title', '')
+                        best_album_score = self.compare_albums(
+                            recommendation.get('album_title'),
+                            best_album_title
+                        )
+
+                        for linked_rel in linked_releases:
+                            linked_album_score = self.compare_albums(
+                                recommendation.get('album_title'),
+                                linked_rel['title']
+                            )
+                            if linked_album_score > best_album_score:
+                                best_album_score = linked_album_score
+                                best_album_title = linked_rel['title']
+                                # Also use artist_credit from matching release if better
+                                linked_artist_score = self.compare_artists(
+                                    recommendation.get('artist_name'),
+                                    linked_rel['artist_credit']
+                                )
+                                if linked_artist_score > self.compare_artists(
+                                    recommendation.get('artist_name'),
+                                    rec_dict['artist_name']
+                                ):
+                                    rec_dict['artist_name'] = linked_rel['artist_credit']
+
+                        # Use the best matching album title for comparison
+                        if best_album_title != rec_dict.get('album_title'):
+                            logger.debug(f"  Using linked release album: '{best_album_title}' (score: {best_album_score:.1f}%) instead of '{rec_dict.get('album_title')}'")
+                            rec_dict['album_title'] = best_album_title
+
                         confidence, score, details = self.calculate_match_confidence(
                             recommendation,
                             rec_dict
