@@ -273,12 +273,13 @@ class AuthorityRecommendationMatcher:
                     artist_parts = [p.strip() for p in artist_parts if p.strip()]
 
                     # Build dynamic WHERE clause for each artist part
+                    # Use unaccent() to handle accented characters (e.g., "Mel Tormé" matches "Mel Torme")
                     where_conditions = [
-                        "LOWER(p.name) LIKE %s",
-                        "LOWER(%s) LIKE '%%' || LOWER(p.name) || '%%'",
-                        "LOWER(p.name) LIKE '%%' || LOWER(%s) || '%%'",
-                        "LOWER(p.name) LIKE %s",
-                        "LOWER(p.name) LIKE %s"
+                        "unaccent(LOWER(p.name)) LIKE %s",
+                        "LOWER(%s) LIKE '%%' || unaccent(LOWER(p.name)) || '%%'",
+                        "unaccent(LOWER(p.name)) LIKE '%%' || LOWER(%s) || '%%'",
+                        "unaccent(LOWER(p.name)) LIKE %s",
+                        "unaccent(LOWER(p.name)) LIKE %s"
                     ]
                     params = [f'%{normalized_artist}%', artist_name, artist_name,
                               f'%{stripped_artist}%', f'%{last_name}%']
@@ -288,10 +289,10 @@ class AuthorityRecommendationMatcher:
                         if len(part) > 3:  # Skip very short parts
                             stripped_part = strip_accents(part).lower()
                             part_last_name = part.split()[-1].lower() if part.split() else part.lower()
-                            where_conditions.append("LOWER(p.name) LIKE %s")
+                            where_conditions.append("unaccent(LOWER(p.name)) LIKE %s")
                             params.append(f'%{stripped_part}%')
                             if len(part_last_name) > 3:
-                                where_conditions.append("LOWER(p.name) LIKE %s")
+                                where_conditions.append("unaccent(LOWER(p.name)) LIKE %s")
                                 params.append(f'%{part_last_name}%')
 
                     where_clause = " OR ".join(where_conditions)
@@ -361,9 +362,9 @@ class AuthorityRecommendationMatcher:
                             JOIN releases rel ON r.default_release_id = rel.id
                             WHERE r.song_id = %s
                               AND (
-                                  LOWER(rel.artist_credit) LIKE %s
-                                  OR LOWER(rel.artist_credit) LIKE %s
-                                  OR LOWER(%s) LIKE '%%' || LOWER(rel.artist_credit) || '%%'
+                                  unaccent(LOWER(rel.artist_credit)) LIKE %s
+                                  OR unaccent(LOWER(rel.artist_credit)) LIKE %s
+                                  OR LOWER(%s) LIKE '%%' || unaccent(LOWER(rel.artist_credit)) || '%%'
                               )
                             LIMIT 50
                         """, (song_id, f'%{normalized_artist}%', f'%{stripped_artist}%', artist_name))
@@ -381,7 +382,7 @@ class AuthorityRecommendationMatcher:
                     # This ensures we don't miss recordings with matching albums due to LIMIT 50
                     album_title = recommendation.get('album_title', '')
                     if album_title and len(album_title) > 5:
-                        album_search = album_title.lower()
+                        album_search = strip_accents(album_title).lower()
                         cur.execute("""
                             SELECT DISTINCT
                                 r.id,
@@ -397,9 +398,9 @@ class AuthorityRecommendationMatcher:
                             LEFT JOIN releases rel2 ON rr.release_id = rel2.id
                             WHERE s.id = %s
                               AND (
-                                  LOWER(r.album_title) LIKE %s
-                                  OR LOWER(rel.title) LIKE %s
-                                  OR LOWER(rel2.title) LIKE %s
+                                  unaccent(LOWER(r.album_title)) LIKE %s
+                                  OR unaccent(LOWER(rel.title)) LIKE %s
+                                  OR unaccent(LOWER(rel2.title)) LIKE %s
                               )
                             LIMIT 20
                         """, (song_id, f'%{album_search}%', f'%{album_search}%', f'%{album_search}%'))
@@ -554,6 +555,7 @@ class AuthorityRecommendationMatcher:
 
                     # Find releases that match the album title
                     # Then join to find recordings of this song on those releases
+                    # Use unaccent() to handle accented characters in database
                     cur.execute("""
                         SELECT DISTINCT
                             r.id as recording_id,
@@ -568,8 +570,8 @@ class AuthorityRecommendationMatcher:
                         JOIN recordings r ON rr.recording_id = r.id
                         WHERE r.song_id = %s
                           AND (
-                              LOWER(rel.title) LIKE %s
-                              OR LOWER(rel.title) LIKE %s
+                              unaccent(LOWER(rel.title)) LIKE %s
+                              OR unaccent(LOWER(rel.title)) LIKE %s
                           )
                         LIMIT 50
                     """, (song_id, f'%{normalized_album}%', f'%{stripped_album}%'))

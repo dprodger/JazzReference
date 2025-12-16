@@ -3,6 +3,10 @@
 -- Enable UUID extension for generating unique IDs
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
+-- Enable unaccent extension for accent-insensitive text matching
+-- (e.g., "Mel Tormé" matches "Mel Torme")
+CREATE EXTENSION IF NOT EXISTS unaccent;
+
 -- ============================================================================
 -- CORE TABLES
 -- ============================================================================
