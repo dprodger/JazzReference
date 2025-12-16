@@ -474,7 +474,9 @@ class JazzStandardsRecommendationExtractor:
         """
         try:
             # Build search query - combine artist and song title
-            query = f"{artist_name} {song_title}".replace(' ', '+')
+            # Use urllib.parse.quote_plus to properly encode special chars like &
+            from urllib.parse import quote_plus
+            query = quote_plus(f"{artist_name} {song_title}")
             url = f"https://itunes.apple.com/search?term={query}&entity=song&limit=10&country=US"
             logger.debug(f"        Searching iTunes: {artist_name} + {song_title}")
 
