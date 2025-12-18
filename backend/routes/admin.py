@@ -1105,9 +1105,9 @@ def diagnose_mb_recording(song_id):
     try:
         with get_db_connection() as db:
             with db.cursor() as cur:
-                # Get song info including Work ID
+                # Get song info including Work IDs (primary and secondary)
                 cur.execute("""
-                    SELECT id, title, musicbrainz_id
+                    SELECT id, title, musicbrainz_id, second_mb_id
                     FROM songs WHERE id = %s
                 """, (song_id,))
                 song = cur.fetchone()
@@ -1116,10 +1116,17 @@ def diagnose_mb_recording(song_id):
                     return jsonify({'error': 'Song not found'}), 404
 
                 song = dict(song)
+                # Collect all valid work IDs for this song
+                our_work_ids = [song['musicbrainz_id']] if song['musicbrainz_id'] else []
+                if song.get('second_mb_id'):
+                    our_work_ids.append(song['second_mb_id'])
+
                 diagnosis['song'] = {
                     'id': str(song['id']),
                     'title': song['title'],
-                    'work_id': song['musicbrainz_id']
+                    'work_id': song['musicbrainz_id'],
+                    'second_work_id': song.get('second_mb_id'),
+                    'all_work_ids': our_work_ids
                 }
 
                 # Get the recommendation if provided
@@ -1204,26 +1211,34 @@ def diagnose_mb_recording(song_id):
                 ]
 
                 linked_to_our_work = False
+                matched_work_title = None
                 linked_works = []
                 for rel in work_links:
                     work = rel.get('work', {})
                     work_id = work.get('id')
                     work_title = work.get('title')
+                    # Check against both primary and secondary work IDs
+                    is_ours = work_id in our_work_ids
                     linked_works.append({
                         'id': work_id,
                         'title': work_title,
-                        'is_ours': work_id == song['musicbrainz_id']
+                        'is_ours': is_ours
                     })
-                    if work_id == song['musicbrainz_id']:
+                    if is_ours:
                         linked_to_our_work = True
+                        matched_work_title = work_title
 
                 diagnosis['mb_data']['linked_works'] = linked_works
 
                 if linked_to_our_work:
+                    # Show which work ID matched (primary or secondary)
+                    work_note = ""
+                    if matched_work_title and matched_work_title.lower() != song['title'].lower():
+                        work_note = f" (via alternate title: {matched_work_title})"
                     diagnosis['checks'].append({
                         'name': 'Linked to Work',
                         'passed': True,
-                        'detail': f"Recording IS linked to '{song['title']}' in MusicBrainz"
+                        'detail': f"Recording IS linked to '{song['title']}' in MusicBrainz{work_note}"
                     })
                 elif linked_works:
                     diagnosis['checks'].append({
