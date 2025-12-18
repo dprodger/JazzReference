@@ -22,8 +22,11 @@ import sys
 import argparse
 import logging
 import unicodedata
+import re
+import requests
 from typing import Dict, List, Optional, Tuple
 from pathlib import Path
+from urllib.parse import quote_plus
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -72,8 +75,16 @@ class AuthorityRecommendationMatcher:
             'no_matches': 0,
             'multiple_matches': 0,
             'updated': 0,
-            'errors': 0
+            'errors': 0,
+            'itunes_lookups': 0,
+            'itunes_enriched_matches': 0
         }
+
+        # Setup HTTP session for iTunes API calls
+        self.session = requests.Session()
+        self.session.headers.update({
+            'User-Agent': 'JazzReferenceApp/1.0'
+        })
         
         # Matching thresholds
         self.thresholds = {
@@ -97,7 +108,73 @@ class AuthorityRecommendationMatcher:
         if s.startswith("the "):
             s = s[4:]
         return s
-    
+
+    def fetch_itunes_metadata(self, itunes_album_id: int) -> Optional[Dict]:
+        """
+        Fetch album metadata from iTunes API.
+
+        Args:
+            itunes_album_id: The iTunes collection/album ID
+
+        Returns:
+            Dict with artistName, collectionName, releaseDate, etc. or None if lookup fails
+        """
+        try:
+            url = f"https://itunes.apple.com/lookup?id={itunes_album_id}&country=US"
+            logger.debug(f"  Fetching iTunes metadata for album ID: {itunes_album_id}")
+
+            response = self.session.get(url, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+
+            self.stats['itunes_lookups'] += 1
+
+            if data.get('resultCount', 0) > 0:
+                metadata = data['results'][0]
+                logger.debug(f"    iTunes: {metadata.get('artistName')} - {metadata.get('collectionName')}")
+                return metadata
+            else:
+                logger.debug(f"    iTunes API returned no results for album ID: {itunes_album_id}")
+                return None
+
+        except Exception as e:
+            logger.warning(f"Error fetching iTunes metadata: {e}")
+            return None
+
+    def enrich_recommendation_from_itunes(self, recommendation: Dict) -> Optional[Dict]:
+        """
+        Create an enriched copy of a recommendation using iTunes metadata.
+
+        If the recommendation has an itunes_album_id, fetch metadata from iTunes
+        and return a new dict with the iTunes artist/album names.
+
+        Returns:
+            Enriched recommendation dict, or None if no iTunes data available
+        """
+        itunes_album_id = recommendation.get('itunes_album_id')
+        if not itunes_album_id:
+            return None
+
+        itunes_data = self.fetch_itunes_metadata(itunes_album_id)
+        if not itunes_data:
+            return None
+
+        # Create enriched copy with iTunes metadata
+        enriched = dict(recommendation)
+        enriched['artist_name'] = itunes_data.get('artistName', recommendation.get('artist_name'))
+        enriched['album_title'] = itunes_data.get('collectionName', recommendation.get('album_title'))
+
+        # Extract year from releaseDate if available
+        release_date = itunes_data.get('releaseDate', '')
+        if release_date:
+            year_match = re.search(r'(\d{4})', release_date)
+            if year_match:
+                enriched['recording_year'] = int(year_match.group(1))
+
+        logger.info(f"  iTunes enrichment: {enriched['artist_name']} - {enriched['album_title']}")
+
+        return enriched
+
     def compare_artists(self, artist1: Optional[str], artist2: Optional[str]) -> float:
         """Compare artist names with fuzzy matching"""
         if not artist1 or not artist2:
@@ -664,12 +741,12 @@ class AuthorityRecommendationMatcher:
     def process_recommendation(self, recommendation: Dict) -> bool:
         """Process a single recommendation and try to match it"""
         self.stats['recommendations_processed'] += 1
-        
+
         rec_id = recommendation['id']
         song_title = recommendation['song_title']
         artist_name = recommendation.get('artist_name', 'Unknown')
         album_title = recommendation.get('album_title', '')
-        
+
         logger.info(f"Song: {song_title}")
         logger.info(f"Recommendation: {artist_name}" +
                     (f" - {album_title}" if album_title else ""))
@@ -680,12 +757,31 @@ class AuthorityRecommendationMatcher:
             matches = self.find_matching_recordings_via_release(recommendation)
         else:
             matches = self.find_matching_recordings(recommendation)
-        
+
+        # Track if we used iTunes enrichment for the match
+        used_itunes_enrichment = False
+
+        # If no matches found, try iTunes enrichment as fallback
+        if not matches and recommendation.get('itunes_album_id'):
+            logger.info("  No matches with parsed data, trying iTunes metadata...")
+            enriched = self.enrich_recommendation_from_itunes(recommendation)
+
+            if enriched:
+                # Retry matching with iTunes-enriched data
+                if self.strategy == 'release':
+                    matches = self.find_matching_recordings_via_release(enriched)
+                else:
+                    matches = self.find_matching_recordings(enriched)
+
+                if matches:
+                    used_itunes_enrichment = True
+                    logger.info(f"  ✓ iTunes enrichment found {len(matches)} potential match(es)")
+
         if not matches:
             logger.info("  No matches found with sufficient confidence")
             self.stats['no_matches'] += 1
             return False
-        
+
         if len(matches) > 1:
             self.stats['multiple_matches'] += 1
             # Count by confidence level
@@ -720,10 +816,15 @@ class AuthorityRecommendationMatcher:
         
         # Log match details
         mode = "[DRY RUN] " if self.dry_run else ""
-        logger.info(f"  ✓ {mode}MATCHED ({confidence.upper()}, {score:.1f}%)")
+        itunes_note = " via iTunes" if used_itunes_enrichment else ""
+        logger.info(f"  ✓ {mode}MATCHED ({confidence.upper()}, {score:.1f}%){itunes_note}")
         logger.info(f"    Recording: {best_recording.get('artist_name', 'Unknown')} - {best_recording.get('album_title', 'No album')} ({best_recording.get('recording_year', 'No year')})")
         logger.debug(f"    Scores: Artist {details['artist_score']:.1f}%, Album {details['album_score']:.1f}%, Year {'✓' if details['year_match'] else '✗'}")
-        
+
+        # Track iTunes-enriched matches
+        if used_itunes_enrichment:
+            self.stats['itunes_enriched_matches'] += 1
+
         # Update recording_id
         if self.update_recommendation_recording_id(rec_id, best_recording['id']):
             self.stats['updated'] += 1
@@ -839,6 +940,9 @@ class AuthorityRecommendationMatcher:
         logger.info(f"No matches found:            {self.stats['no_matches']}")
         logger.info(f"Multiple matches found:      {self.stats['multiple_matches']}")
         logger.info(f"Recommendations updated:     {self.stats['updated']}")
+        if self.stats['itunes_lookups'] > 0:
+            logger.info(f"iTunes API lookups:          {self.stats['itunes_lookups']}")
+            logger.info(f"iTunes-enriched matches:     {self.stats['itunes_enriched_matches']}")
         logger.info(f"Errors:                      {self.stats['errors']}")
         logger.info("="*80)
 
