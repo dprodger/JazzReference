@@ -816,29 +816,73 @@ def recommendations_list():
     """
     List songs with authority recommendations and their completion status.
     Shows which songs have unmatched recommendations that need attention.
+    Supports filtering by repertoire via query parameter.
     """
+    from flask import request
+
+    repertoire_id = request.args.get('repertoire_id', '')
+
     with get_db_connection() as db:
         with db.cursor() as cur:
+            # Fetch all repertoires for the filter dropdown
             cur.execute("""
                 SELECT
-                    s.id,
-                    s.title,
-                    s.composer,
-                    s.musicbrainz_id,
-                    COUNT(*) AS total_recs,
-                    COUNT(sar.recording_id) AS matched_recs,
-                    ROUND(COUNT(sar.recording_id)::decimal / COUNT(*) * 100, 1) AS perc_complete,
-                    COUNT(*) FILTER (WHERE sar.artist_name IS NULL OR sar.artist_name = '') AS missing_artist,
-                    COUNT(*) FILTER (WHERE sar.album_title IS NULL OR sar.album_title = '') AS missing_album,
-                    array_agg(DISTINCT sar.source) AS sources
-                FROM songs s
-                JOIN song_authority_recommendations sar ON s.id = sar.song_id
-                GROUP BY s.id, s.title, s.composer, s.musicbrainz_id
-                ORDER BY perc_complete ASC, total_recs DESC
+                    r.id,
+                    r.name AS repertoire_name,
+                    COALESCE(u.display_name, u.email) AS user_name,
+                    COUNT(rs.song_id) AS song_count
+                FROM repertoires r
+                JOIN users u ON r.user_id = u.id
+                LEFT JOIN repertoire_songs rs ON r.id = rs.repertoire_id
+                GROUP BY r.id, r.name, u.display_name, u.email
+                ORDER BY u.display_name, u.email, r.name
             """)
+            repertoires = [dict(row) for row in cur.fetchall()]
+
+            # Build the main query - filter by repertoire if selected
+            if repertoire_id:
+                cur.execute("""
+                    SELECT
+                        s.id,
+                        s.title,
+                        s.composer,
+                        s.musicbrainz_id,
+                        COUNT(*) AS total_recs,
+                        COUNT(sar.recording_id) AS matched_recs,
+                        ROUND(COUNT(sar.recording_id)::decimal / COUNT(*) * 100, 1) AS perc_complete,
+                        COUNT(*) FILTER (WHERE sar.artist_name IS NULL OR sar.artist_name = '') AS missing_artist,
+                        COUNT(*) FILTER (WHERE sar.album_title IS NULL OR sar.album_title = '') AS missing_album,
+                        array_agg(DISTINCT sar.source) AS sources
+                    FROM songs s
+                    JOIN song_authority_recommendations sar ON s.id = sar.song_id
+                    JOIN repertoire_songs rs ON s.id = rs.song_id AND rs.repertoire_id = %s
+                    GROUP BY s.id, s.title, s.composer, s.musicbrainz_id
+                    ORDER BY perc_complete ASC, total_recs DESC
+                """, (repertoire_id,))
+            else:
+                cur.execute("""
+                    SELECT
+                        s.id,
+                        s.title,
+                        s.composer,
+                        s.musicbrainz_id,
+                        COUNT(*) AS total_recs,
+                        COUNT(sar.recording_id) AS matched_recs,
+                        ROUND(COUNT(sar.recording_id)::decimal / COUNT(*) * 100, 1) AS perc_complete,
+                        COUNT(*) FILTER (WHERE sar.artist_name IS NULL OR sar.artist_name = '') AS missing_artist,
+                        COUNT(*) FILTER (WHERE sar.album_title IS NULL OR sar.album_title = '') AS missing_album,
+                        array_agg(DISTINCT sar.source) AS sources
+                    FROM songs s
+                    JOIN song_authority_recommendations sar ON s.id = sar.song_id
+                    GROUP BY s.id, s.title, s.composer, s.musicbrainz_id
+                    ORDER BY perc_complete ASC, total_recs DESC
+                """)
             songs = [dict(row) for row in cur.fetchall()]
 
-    return render_template('admin/recommendations_list.html', songs=songs)
+    return render_template('admin/recommendations_list.html',
+                          songs=songs,
+                          repertoires=repertoires,
+                          selected_repertoire_id=repertoire_id)
 
 
 @admin_bp.route('/recommendations/<song_id>')
@@ -847,6 +891,9 @@ def recommendations_review(song_id):
     Review unmatched authority recommendations for a specific song.
     Shows detailed diagnostic information for each recommendation.
     """
+    from flask import request
+    repertoire_id = request.args.get('repertoire_id', '')
+
     with get_db_connection() as db:
         with db.cursor() as cur:
             # Get song info
@@ -912,7 +959,8 @@ def recommendations_review(song_id):
     return render_template('admin/recommendations_review.html',
                           song=song,
                           recommendations=recommendations,
-                          stats=stats)
+                          stats=stats,
+                          repertoire_id=repertoire_id)
 
 
 @admin_bp.route('/recommendations/<song_id>/potential-matches/<rec_id>')
@@ -1406,6 +1454,85 @@ def diagnose_mb_recording(song_id):
 
     except Exception as e:
         logger.error(f"Error in diagnosis: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@admin_bp.route('/recommendations/<song_id>/run-matcher', methods=['POST'])
+def run_matcher_for_song(song_id):
+    """
+    Run the authority recommendation matcher for a specific song.
+    This re-attempts to match unmatched recommendations to recordings.
+    """
+    try:
+        # Import the matcher class
+        import sys
+        from pathlib import Path
+        sys.path.insert(0, str(Path(__file__).parent.parent / 'scripts'))
+        from jazzs_match_authorityrecs import AuthorityRecommendationMatcher
+
+        with get_db_connection() as db:
+            with db.cursor() as cur:
+                # Get song name
+                cur.execute("SELECT title FROM songs WHERE id = %s", (song_id,))
+                song = cur.fetchone()
+
+                if not song:
+                    return jsonify({'error': 'Song not found'}), 404
+
+                song_name = song['title']
+
+        # Run the matcher for this song
+        matcher = AuthorityRecommendationMatcher(
+            dry_run=False,
+            min_confidence='medium',
+            song_name=song_name,
+            strategy='performer'
+        )
+        matcher.run()
+
+        return jsonify({
+            'success': True,
+            'song_name': song_name,
+            'stats': matcher.stats
+        })
+
+    except Exception as e:
+        logger.error(f"Error running matcher for song: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@admin_bp.route('/recommendations/run-matcher-all', methods=['POST'])
+def run_matcher_all():
+    """
+    Run the authority recommendation matcher for all songs with unmatched recommendations.
+    """
+    try:
+        # Import the matcher class
+        import sys
+        from pathlib import Path
+        sys.path.insert(0, str(Path(__file__).parent.parent / 'scripts'))
+        from jazzs_match_authorityrecs import AuthorityRecommendationMatcher
+
+        # Run the matcher for all songs
+        matcher = AuthorityRecommendationMatcher(
+            dry_run=False,
+            min_confidence='medium',
+            song_name=None,  # No filter = all songs
+            strategy='performer'
+        )
+        matcher.run()
+
+        return jsonify({
+            'success': True,
+            'stats': matcher.stats
+        })
+
+    except Exception as e:
+        logger.error(f"Error running matcher for all songs: {e}")
         import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500

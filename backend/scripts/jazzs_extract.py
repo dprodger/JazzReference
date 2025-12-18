@@ -7,6 +7,7 @@ storing them in the song_authority_recommendations table with caching support.
 
 import sys
 import argparse
+import html
 import logging
 import json
 import os
@@ -148,10 +149,13 @@ class JazzStandardsRecommendationExtractor:
         """
         soup = BeautifulSoup(html_content, 'html.parser')
         recommendations = []
-        
+
+        # Extract JavaScript music data first (contains full, non-truncated names)
+        js_music_data = self.extract_js_music_data(html_content)
+
         # Look for the recommendations section
         # The exact HTML structure may vary, so we'll look for common patterns
-        
+
         # Pattern 1: Look for text containing "recommendation"
         # Find ALL tags with "recommendations for this tune", then pick the most specific one
         all_rec_tags = soup.find_all(lambda tag: 
@@ -192,7 +196,7 @@ class JazzStandardsRecommendationExtractor:
                 if len(itunes_columns) > 0:
                     # This is an iTunes panel format table
                     logger.debug(f"  Table {table_idx}: iTunes panel format ({len(itunes_columns)} columns)")
-                    itunes_recs = self.parse_itunes_panel(table)
+                    itunes_recs = self.parse_itunes_panel(table, js_music_data)
                     if itunes_recs:
                         recommendations.extend(itunes_recs)
                         logger.debug(f"    ✓ Extracted {len(itunes_recs)} recommendations from iTunes panel")
@@ -622,10 +626,69 @@ class JazzStandardsRecommendationExtractor:
         return [re.sub(r'[^\w]', '', w) for w in words
                 if len(w) >= 3 and re.sub(r'[^\w]', '', w).lower() not in stop_words]
 
-    def parse_itunes_panel(self, table_elem) -> List[Dict]:
+    def extract_js_music_data(self, html_content: str) -> Dict[str, Dict]:
+        """
+        Extract music data from JavaScript arrays embedded in the page.
+
+        The page contains JS data in this format:
+        "mp3_url##" +
+        "ogg_url##" +
+        "Song Title ##" +
+        "Album Title##" +
+        "Artist Name ##" +
+        "image_url##" +
+        "amazon_url##" +
+        ...###
+
+        Returns:
+            Dict mapping artist names (lowercased) to {'artist': str, 'album': str}
+        """
+        js_data = {}
+
+        try:
+            # Find all record blocks (ending with ###)
+            # Pattern: starts after ### or beginning, ends with ###
+            # Each field is "value##" concatenated with +
+
+            # Extract all ## separated values between string quotes
+            # Look for patterns like: "Song##" + "Album##" + "Artist ##"
+            pattern = r'"([^"]*?)##"\s*\+\s*"([^"]*?)##"\s*\+\s*"([^"]*?)\s*##"'
+
+            # Find sequences that look like: Song ## Album ## Artist ##
+            # We need to find: OGG_URL## + Song## + Album## + Artist##
+            ogg_pattern = r'"https://www\.jazzstandards\.com/games/OGGFiles[^"]+\.ogg##"\s*\+\s*"([^"]+?)\s*##"\s*\+\s*"([^"]+?)##"\s*\+\s*"([^"]+?)\s*##"'
+
+            matches = re.findall(ogg_pattern, html_content)
+
+            for match in matches:
+                song_title, album_title, artist_name = match
+                # Unescape HTML entities (e.g., &amp; -> &, &#39; -> ')
+                song_title = html.unescape(song_title.strip())
+                album_title = html.unescape(album_title.strip())
+                artist_name = html.unescape(artist_name.strip())
+
+                if artist_name and album_title:
+                    # Use lowercase artist for matching, but store original
+                    key = artist_name.lower()
+                    js_data[key] = {
+                        'artist': artist_name,
+                        'album': album_title,
+                        'song': song_title
+                    }
+                    logger.debug(f"    JS data: {artist_name} - {album_title}")
+
+            if js_data:
+                logger.debug(f"  Extracted {len(js_data)} records from JavaScript data")
+
+        except Exception as e:
+            logger.debug(f"  Error extracting JS data: {e}")
+
+        return js_data
+
+    def parse_itunes_panel(self, table_elem, js_music_data: Dict = None) -> List[Dict]:
         """
         Parse iTunes panel format recommendations.
-        
+
         Structure:
         <table class="JSRecommendationInset">
           <tr class="JSiTunesPanelRow">
@@ -638,9 +701,14 @@ class JazzStandardsRecommendationExtractor:
             <td class="JSiTunesPanelColumn">...</td>
           </tr>
         </table>
+
+        Args:
+            table_elem: BeautifulSoup table element
+            js_music_data: Optional dict of JavaScript-extracted music data for enrichment
         """
         recommendations = []
-        
+        js_music_data = js_music_data or {}
+
         try:
             # Find all iTunes panel columns
             columns = table_elem.find_all('td', class_='JSiTunesPanelColumn')
@@ -679,10 +747,22 @@ class JazzStandardsRecommendationExtractor:
                         next_text = br_tag.next_sibling
                         if next_text and isinstance(next_text, str):
                             artist_name = next_text.strip()
-                
+
                 if not artist_name or not album_id:
                     logger.debug(f"      Column {i}: Missing artist or album ID")
                     continue
+
+                # Check if artist name is truncated (ends with "...")
+                # If so, try to find full name from JS data
+                original_artist = artist_name
+                if artist_name.endswith('...') and js_music_data:
+                    # Try to find a matching artist in JS data
+                    truncated_prefix = artist_name[:-3].lower()  # Remove "..."
+                    for js_key, js_info in js_music_data.items():
+                        if js_key.startswith(truncated_prefix):
+                            artist_name = js_info['artist']
+                            logger.debug(f"      Fixed truncated artist: '{original_artist}' -> '{artist_name}'")
+                            break
                 
                 logger.debug(f"      Column {i}: {artist_name} (iTunes: {album_id})")
                 
@@ -711,9 +791,16 @@ class JazzStandardsRecommendationExtractor:
                             recording_year = int(year_match.group(1))
 
                     self.stats['itunes_enriched'] += 1
-                    logger.debug(f"        ✓ Album: {album_title}")
+                    logger.debug(f"        ✓ Album (iTunes): {album_title}")
                     logger.debug(f"        ✓ Year: {recording_year}")
-                
+
+                # If no album title yet, try to get it from JS data
+                if not album_title and js_music_data:
+                    artist_lower = artist_name.lower()
+                    if artist_lower in js_music_data:
+                        album_title = js_music_data[artist_lower]['album']
+                        logger.debug(f"        ✓ Album (JS data): {album_title}")
+
                 # Build recommendation text
                 rec_text = artist_name
                 if album_title:

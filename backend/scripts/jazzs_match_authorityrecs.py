@@ -107,6 +107,10 @@ class AuthorityRecommendationMatcher:
         # Remove "the" prefix
         if s.startswith("the "):
             s = s[4:]
+        # Remove punctuation (helps token_set_ratio: "Band," vs "Band")
+        s = re.sub(r'[^\w\s]', ' ', s)
+        # Collapse multiple spaces
+        s = re.sub(r'\s+', ' ', s).strip()
         return s
 
     def fetch_itunes_metadata(self, itunes_album_id: int) -> Optional[Dict]:

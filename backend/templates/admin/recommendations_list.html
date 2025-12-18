@@ -246,7 +246,16 @@
     <div class="container">
         <div class="header">
             <h1>Authority Recommendations</h1>
-            <p class="header-subtitle">Review and diagnose unmatched authority recommendations</p>
+            <p class="header-subtitle">
+                Review and diagnose unmatched authority recommendations
+                {% if selected_repertoire_id %}
+                {% for rep in repertoires %}
+                {% if rep.id|string == selected_repertoire_id %}
+                <br><strong>Filtered by:</strong> {{ rep.user_name }} - {{ rep.repertoire_name }}
+                {% endif %}
+                {% endfor %}
+                {% endif %}
+            </p>
             <div class="nav-links">
                 <a href="/admin/orphans">Orphan Recordings</a>
                 <a href="/admin/recommendations">Recommendations</a>
@@ -287,9 +296,18 @@
         </div>
 
         <div class="filter-bar">
-            <label>Filter:</label>
+            <label>Repertoire:</label>
+            <select id="filterRepertoire" onchange="filterByRepertoire()">
+                <option value="">All Songs</option>
+                {% for rep in repertoires %}
+                <option value="{{ rep.id }}" {% if selected_repertoire_id == rep.id|string %}selected{% endif %}>
+                    {{ rep.user_name }} - {{ rep.repertoire_name }} ({{ rep.song_count }})
+                </option>
+                {% endfor %}
+            </select>
+            <label>Status:</label>
             <select id="filterStatus" onchange="filterTable()">
-                <option value="all">All Songs</option>
+                <option value="all">All</option>
                 <option value="incomplete" selected>Incomplete Only</option>
                 <option value="complete">Complete Only</option>
             </select>
@@ -316,7 +334,7 @@
                     data-title="{{ song.title | lower }}">
                     <td>
                         <div class="song-title">
-                            <a href="/admin/recommendations/{{ song.id }}">{{ song.title }}</a>
+                            <a href="/admin/recommendations/{{ song.id }}{% if selected_repertoire_id %}?repertoire_id={{ selected_repertoire_id }}{% endif %}">{{ song.title }}</a>
                         </div>
                         {% if song.composer %}
                         <div class="song-composer">{{ song.composer }}</div>
@@ -363,7 +381,7 @@
                         </div>
                     </td>
                     <td>
-                        <a href="/admin/recommendations/{{ song.id }}" class="btn-review">Review</a>
+                        <a href="/admin/recommendations/{{ song.id }}{% if selected_repertoire_id %}?repertoire_id={{ selected_repertoire_id }}{% endif %}" class="btn-review">Review</a>
                     </td>
                 </tr>
                 {% endfor %}
@@ -378,6 +396,19 @@
     </div>
 
     <script>
+        function filterByRepertoire() {
+            const repertoireId = document.getElementById('filterRepertoire').value;
+            const url = new URL(window.location.href);
+
+            if (repertoireId) {
+                url.searchParams.set('repertoire_id', repertoireId);
+            } else {
+                url.searchParams.delete('repertoire_id');
+            }
+
+            window.location.href = url.toString();
+        }
+
         function filterTable() {
             const statusFilter = document.getElementById('filterStatus').value;
             const searchFilter = document.getElementById('searchInput').value.toLowerCase();

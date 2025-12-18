@@ -324,6 +324,20 @@
             background: #27ae60;
         }
 
+        /* Matcher Buttons */
+        .matcher-buttons {
+            display: flex;
+            gap: 10px;
+            margin-left: auto;
+        }
+        .matcher-buttons .btn {
+            white-space: nowrap;
+        }
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
         /* Collapsible matched section */
         .matched-section details {
             margin: 0;
@@ -474,7 +488,7 @@
 <body>
     <div class="container">
         <div class="header">
-            <a href="/admin/recommendations" class="back-link">&larr; Back to Songs</a>
+            <a href="/admin/recommendations{% if repertoire_id %}?repertoire_id={{ repertoire_id }}{% endif %}" class="back-link">&larr; Back to Songs</a>
             <h1>{{ song.title }}</h1>
             <p class="song-meta">
                 {% if song.composer %}{{ song.composer }} &bull; {% endif %}
@@ -511,6 +525,14 @@
                     <div class="progress-fill" style="width: {{ stats.perc_complete }}%"></div>
                 </div>
                 <div class="progress-label">{{ stats.perc_complete }}% complete</div>
+            </div>
+            <div class="matcher-buttons">
+                <button class="btn btn-success" id="runMatcherSong" onclick="runMatcherForSong()">
+                    Run Matcher (This Song)
+                </button>
+                <button class="btn btn-warning" id="runMatcherAll" onclick="runMatcherAll()">
+                    Run Matcher (All Songs)
+                </button>
             </div>
         </div>
 
@@ -572,13 +594,16 @@
                             </span>
                         </div>
                         <div class="rec-field">
-                            <span class="rec-field-label">iTunes IDs</span>
+                            <span class="rec-field-label">iTunes</span>
                             <span class="rec-field-value">
                                 {% if rec.itunes_album_id %}
-                                Album: {{ rec.itunes_album_id }}
+                                <a href="https://music.apple.com/us/album/{{ rec.itunes_album_id }}" target="_blank" title="View on Apple Music">Album</a>
+                                (<a href="https://itunes.apple.com/lookup?id={{ rec.itunes_album_id }}" target="_blank" title="iTunes API">API</a>)
                                 {% endif %}
                                 {% if rec.itunes_track_id %}
-                                / Track: {{ rec.itunes_track_id }}
+                                {% if rec.itunes_album_id %} / {% endif %}
+                                <a href="https://music.apple.com/us/song/{{ rec.itunes_track_id }}" target="_blank" title="View on Apple Music">Track</a>
+                                (<a href="https://itunes.apple.com/lookup?id={{ rec.itunes_track_id }}" target="_blank" title="iTunes API">API</a>)
                                 {% endif %}
                                 {% if not rec.itunes_album_id and not rec.itunes_track_id %}
                                 —
@@ -616,7 +641,7 @@
                 </div>
 
                 <div class="rec-actions">
-                    <button class="btn btn-copy" onclick="copyRecInfo(this, {{ rec | tojson | safe }})">
+                    <button class="btn btn-copy" data-rec='{{ rec | tojson }}' onclick="copyRecInfo(this)">
                         Copy Info
                     </button>
                     <button class="btn btn-primary" onclick="findMatches('{{ song.id }}', '{{ rec.id }}')">
@@ -1048,7 +1073,8 @@
 
         // ===== COPY FUNCTIONS =====
 
-        function copyRecInfo(btn, rec) {
+        function copyRecInfo(btn) {
+            const rec = JSON.parse(btn.dataset.rec);
             const songTitle = {{ song.title | tojson | safe }};
             const songId = '{{ song.id }}';
             const mbId = '{{ song.musicbrainz_id or "" }}';
@@ -1156,6 +1182,86 @@ Total Releases: ${data.mb_data?.total_releases || 0}`;
                 console.error('Failed to copy:', err);
                 alert('Failed to copy to clipboard');
             });
+        }
+
+        // ===== MATCHER FUNCTIONS =====
+
+        async function runMatcherForSong() {
+            const btn = document.getElementById('runMatcherSong');
+            const originalText = btn.textContent;
+
+            if (!confirm('Run the matcher for this song? This will attempt to match unmatched recommendations to recordings.')) {
+                return;
+            }
+
+            btn.disabled = true;
+            btn.textContent = 'Running...';
+
+            try {
+                const response = await fetch(`/admin/recommendations/{{ song.id }}/run-matcher`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to run matcher');
+                }
+
+                const stats = data.stats;
+                const matched = stats.high_confidence_matches + stats.medium_confidence_matches + stats.low_confidence_matches;
+
+                alert(`Matcher completed!\n\nProcessed: ${stats.recommendations_processed}\nMatched: ${matched}\n  - High confidence: ${stats.high_confidence_matches}\n  - Medium confidence: ${stats.medium_confidence_matches}\n  - Low confidence: ${stats.low_confidence_matches}\nNo match: ${stats.no_matches}\nUpdated: ${stats.updated}`);
+
+                if (stats.updated > 0) {
+                    location.reload();
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = originalText;
+            }
+        }
+
+        async function runMatcherAll() {
+            const btn = document.getElementById('runMatcherAll');
+            const originalText = btn.textContent;
+
+            if (!confirm('Run the matcher for ALL songs with unmatched recommendations?\n\nThis may take a while depending on how many unmatched recommendations exist.')) {
+                return;
+            }
+
+            btn.disabled = true;
+            btn.textContent = 'Running (this may take a while)...';
+
+            try {
+                const response = await fetch('/admin/recommendations/run-matcher-all', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to run matcher');
+                }
+
+                const stats = data.stats;
+                const matched = stats.high_confidence_matches + stats.medium_confidence_matches + stats.low_confidence_matches;
+
+                alert(`Matcher completed for all songs!\n\nProcessed: ${stats.recommendations_processed}\nMatched: ${matched}\n  - High confidence: ${stats.high_confidence_matches}\n  - Medium confidence: ${stats.medium_confidence_matches}\n  - Low confidence: ${stats.low_confidence_matches}\nNo match: ${stats.no_matches}\nUpdated: ${stats.updated}`);
+
+                if (stats.updated > 0) {
+                    location.reload();
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = originalText;
+            }
         }
     </script>
 
