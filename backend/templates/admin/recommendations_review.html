@@ -1,0 +1,1059 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Review: {{ song.title }} - Admin</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f7;
+            color: #333;
+            line-height: 1.6;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        .header {
+            margin-bottom: 30px;
+        }
+        .back-link {
+            color: #0066cc;
+            text-decoration: none;
+            font-size: 14px;
+        }
+        .back-link:hover {
+            text-decoration: underline;
+        }
+        h1 {
+            color: #1d1d1f;
+            margin: 10px 0 5px;
+        }
+        .song-meta {
+            color: #666;
+            font-size: 14px;
+        }
+        .song-meta a {
+            color: #0066cc;
+        }
+
+        /* Stats Bar */
+        .stats-bar {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 25px;
+            padding: 15px 20px;
+            background: #fff;
+            border-radius: 8px;
+            border: 1px solid #e0e0e0;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .stat {
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 24px;
+            font-weight: 700;
+        }
+        .stat-label {
+            font-size: 11px;
+            color: #666;
+            text-transform: uppercase;
+        }
+        .stat-value.green { color: #27ae60; }
+        .stat-value.orange { color: #f39c12; }
+        .stat-value.red { color: #e74c3c; }
+
+        /* Progress Bar */
+        .progress-container {
+            flex: 1;
+            min-width: 200px;
+        }
+        .progress-bar {
+            height: 12px;
+            background: #e0e0e0;
+            border-radius: 6px;
+            overflow: hidden;
+            margin-bottom: 4px;
+        }
+        .progress-fill {
+            height: 100%;
+            background: #27ae60;
+            border-radius: 6px;
+        }
+        .progress-label {
+            font-size: 12px;
+            color: #666;
+        }
+
+        /* Section Headers */
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 30px 0 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+        .section-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #1d1d1f;
+        }
+        .section-count {
+            font-size: 14px;
+            color: #666;
+        }
+
+        /* Recommendation Cards */
+        .rec-grid {
+            display: grid;
+            gap: 15px;
+        }
+        .rec-card {
+            background: #fff;
+            border-radius: 10px;
+            border: 2px solid #e0e0e0;
+            overflow: hidden;
+        }
+        .rec-card.matched {
+            border-color: #27ae60;
+            opacity: 0.7;
+        }
+        .rec-card.issue-extraction {
+            border-color: #e74c3c;
+        }
+        .rec-card.issue-matching {
+            border-color: #f39c12;
+        }
+
+        .rec-header {
+            padding: 12px 16px;
+            background: #fafafa;
+            border-bottom: 1px solid #e0e0e0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .rec-source {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .source-badge {
+            font-size: 11px;
+            font-weight: 600;
+            padding: 3px 8px;
+            border-radius: 4px;
+            text-transform: uppercase;
+        }
+        .source-badge.jazzstandards { background: #3498db; color: #fff; }
+        .source-badge.ted_gioia { background: #9b59b6; color: #fff; }
+        .source-badge.allmusic { background: #e67e22; color: #fff; }
+        .source-badge.default { background: #95a5a6; color: #fff; }
+
+        .issue-indicator {
+            font-size: 11px;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+        .issue-indicator.extraction {
+            background: #ffebee;
+            color: #c62828;
+        }
+        .issue-indicator.matching {
+            background: #fff3e0;
+            color: #ef6c00;
+        }
+        .issue-indicator.matched {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+
+        .rec-body {
+            padding: 16px;
+        }
+        .rec-info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+        .rec-field {
+            display: flex;
+            flex-direction: column;
+        }
+        .rec-field-label {
+            font-size: 11px;
+            text-transform: uppercase;
+            color: #888;
+            margin-bottom: 2px;
+        }
+        .rec-field-value {
+            font-size: 14px;
+            color: #333;
+        }
+        .rec-field-value.empty {
+            color: #e74c3c;
+            font-style: italic;
+        }
+        .rec-field-value a {
+            color: #0066cc;
+            text-decoration: none;
+        }
+        .rec-field-value a:hover {
+            text-decoration: underline;
+        }
+
+        /* Recommendation Text */
+        .rec-text {
+            background: #f8f9fa;
+            padding: 12px;
+            border-radius: 6px;
+            font-size: 13px;
+            color: #555;
+            max-height: 100px;
+            overflow-y: auto;
+            margin-top: 10px;
+        }
+
+        /* Matched Info */
+        .matched-info {
+            background: #e8f5e9;
+            padding: 12px;
+            border-radius: 6px;
+            margin-top: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .matched-info-icon {
+            color: #27ae60;
+            font-size: 20px;
+        }
+        .matched-info-text {
+            flex: 1;
+        }
+        .matched-info-performer {
+            font-weight: 600;
+            color: #1d1d1f;
+        }
+        .matched-info-album {
+            font-size: 13px;
+            color: #666;
+        }
+
+        /* External Links */
+        .external-links {
+            display: flex;
+            gap: 10px;
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid #eee;
+        }
+        .ext-link {
+            font-size: 12px;
+            color: #0066cc;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .ext-link:hover {
+            text-decoration: underline;
+        }
+
+        /* Action Buttons */
+        .rec-actions {
+            padding: 12px 16px;
+            background: #fafafa;
+            border-top: 1px solid #e0e0e0;
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+        .btn {
+            padding: 8px 14px;
+            border: none;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .btn:hover {
+            opacity: 0.85;
+        }
+        .btn-primary {
+            background: #0066cc;
+            color: #fff;
+        }
+        .btn-secondary {
+            background: #e0e0e0;
+            color: #333;
+        }
+        .btn-success {
+            background: #27ae60;
+            color: #fff;
+        }
+        .btn-warning {
+            background: #f39c12;
+            color: #fff;
+        }
+        .btn-danger {
+            background: #e74c3c;
+            color: #fff;
+        }
+
+        /* Collapsible matched section */
+        .matched-section details {
+            margin: 0;
+        }
+        .matched-section summary {
+            cursor: pointer;
+            list-style: none;
+        }
+        .matched-section summary::-webkit-details-marker {
+            display: none;
+        }
+        .matched-section .rec-header {
+            cursor: pointer;
+        }
+        .matched-section .collapse-indicator {
+            color: #27ae60;
+            transition: transform 0.2s;
+        }
+        .matched-section details[open] .collapse-indicator {
+            transform: rotate(90deg);
+        }
+
+        /* Potential Matches Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-overlay.active {
+            display: flex;
+        }
+        .modal-content {
+            background: #fff;
+            border-radius: 12px;
+            max-width: 800px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        }
+        .modal-header {
+            padding: 20px;
+            border-bottom: 1px solid #e0e0e0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .modal-header h2 {
+            margin: 0;
+            font-size: 18px;
+        }
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #666;
+        }
+        .modal-body {
+            padding: 20px;
+        }
+        .modal-loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+        .match-option {
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+        .match-option:hover {
+            border-color: #0066cc;
+            background: #f8f9fa;
+        }
+        .match-option.selected {
+            border-color: #0066cc;
+            background: #e3f2fd;
+        }
+        .match-cover {
+            width: 60px;
+            height: 60px;
+            border-radius: 4px;
+            object-fit: cover;
+            background: #eee;
+        }
+        .match-info {
+            flex: 1;
+        }
+        .match-title {
+            font-weight: 600;
+            color: #1d1d1f;
+        }
+        .match-artist {
+            font-size: 13px;
+            color: #666;
+        }
+        .match-year {
+            font-size: 12px;
+            color: #888;
+        }
+        .match-badges {
+            display: flex;
+            gap: 6px;
+            margin-top: 4px;
+        }
+        .match-badge {
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 3px;
+        }
+        .match-badge.spotify {
+            background: #1db954;
+            color: #fff;
+        }
+        .match-badge.has-recording {
+            background: #27ae60;
+            color: #fff;
+        }
+        .modal-footer {
+            padding: 15px 20px;
+            border-top: 1px solid #e0e0e0;
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+
+        /* Empty state */
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <a href="/admin/recommendations" class="back-link">&larr; Back to Songs</a>
+            <h1>{{ song.title }}</h1>
+            <p class="song-meta">
+                {% if song.composer %}{{ song.composer }} &bull; {% endif %}
+                {% if song.musicbrainz_id %}
+                <a href="https://musicbrainz.org/work/{{ song.musicbrainz_id }}" target="_blank">MusicBrainz</a> &bull;
+                <a href="https://musicbrainz.org/ws/2/recording?work={{ song.musicbrainz_id }}&limit=100&fmt=json" target="_blank">MB Recordings API</a>
+                {% endif %}
+            </p>
+        </div>
+
+        <div class="stats-bar">
+            <div class="stat">
+                <div class="stat-value">{{ stats.total }}</div>
+                <div class="stat-label">Total</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value green">{{ stats.matched }}</div>
+                <div class="stat-label">Matched</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value red">{{ stats.unmatched }}</div>
+                <div class="stat-label">Unmatched</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value orange">{{ stats.missing_artist }}</div>
+                <div class="stat-label">No Artist</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value orange">{{ stats.missing_album }}</div>
+                <div class="stat-label">No Album</div>
+            </div>
+            <div class="progress-container">
+                <div class="progress-bar">
+                    <div class="progress-fill" style="width: {{ stats.perc_complete }}%"></div>
+                </div>
+                <div class="progress-label">{{ stats.perc_complete }}% complete</div>
+            </div>
+        </div>
+
+        {% set unmatched_recs = recommendations | selectattr('recording_id', 'none') | list %}
+        {% set matched_recs = recommendations | rejectattr('recording_id', 'none') | list %}
+
+        <!-- Unmatched Recommendations -->
+        {% if unmatched_recs %}
+        <div class="section-header">
+            <span class="section-title">Unmatched Recommendations</span>
+            <span class="section-count">{{ unmatched_recs | length }} items</span>
+        </div>
+
+        <div class="rec-grid">
+            {% for rec in unmatched_recs %}
+            {% set has_artist = rec.artist_name and rec.artist_name.strip() %}
+            {% set has_album = rec.album_title and rec.album_title.strip() %}
+            {% set issue_type = 'extraction' if (not has_artist or not has_album) else 'matching' %}
+
+            <div class="rec-card issue-{{ issue_type }}" data-id="{{ rec.id }}">
+                <div class="rec-header">
+                    <div class="rec-source">
+                        {% set source_class = rec.source if rec.source in ['jazzstandards', 'ted_gioia', 'allmusic'] else 'default' %}
+                        <span class="source-badge {{ source_class }}">{{ rec.source }}</span>
+                        {% if not has_artist or not has_album %}
+                        <span class="issue-indicator extraction">Extraction Issue</span>
+                        {% else %}
+                        <span class="issue-indicator matching">Matching Issue</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="rec-body">
+                    <div class="rec-info-grid">
+                        <div class="rec-field">
+                            <span class="rec-field-label">Artist</span>
+                            <span class="rec-field-value {% if not has_artist %}empty{% endif %}">
+                                {% if has_artist %}
+                                {{ rec.artist_name }}
+                                {% else %}
+                                (missing)
+                                {% endif %}
+                            </span>
+                        </div>
+                        <div class="rec-field">
+                            <span class="rec-field-label">Album</span>
+                            <span class="rec-field-value {% if not has_album %}empty{% endif %}">
+                                {% if has_album %}
+                                {{ rec.album_title }}
+                                {% else %}
+                                (missing)
+                                {% endif %}
+                            </span>
+                        </div>
+                        <div class="rec-field">
+                            <span class="rec-field-label">Year</span>
+                            <span class="rec-field-value">
+                                {{ rec.recording_year or '—' }}
+                            </span>
+                        </div>
+                        <div class="rec-field">
+                            <span class="rec-field-label">iTunes IDs</span>
+                            <span class="rec-field-value">
+                                {% if rec.itunes_album_id %}
+                                Album: {{ rec.itunes_album_id }}
+                                {% endif %}
+                                {% if rec.itunes_track_id %}
+                                / Track: {{ rec.itunes_track_id }}
+                                {% endif %}
+                                {% if not rec.itunes_album_id and not rec.itunes_track_id %}
+                                —
+                                {% endif %}
+                            </span>
+                        </div>
+                    </div>
+
+                    {% if rec.recommendation_text %}
+                    <div class="rec-text">{{ rec.recommendation_text }}</div>
+                    {% endif %}
+
+                    <div class="external-links">
+                        {% if rec.source_url %}
+                        <a href="{{ rec.source_url }}" target="_blank" class="ext-link">
+                            Source Page &rarr;
+                        </a>
+                        {% endif %}
+                        {% if has_artist %}
+                        <a href="https://musicbrainz.org/search?query={{ rec.artist_name | urlencode }}&type=artist" target="_blank" class="ext-link">
+                            Search MB Artist &rarr;
+                        </a>
+                        {% endif %}
+                        {% if has_album %}
+                        <a href="https://musicbrainz.org/search?query={{ rec.album_title | urlencode }}&type=release" target="_blank" class="ext-link">
+                            Search MB Release &rarr;
+                        </a>
+                        {% endif %}
+                        {% if has_artist and has_album %}
+                        <a href="https://musicbrainz.org/search?query=artist%3A%22{{ rec.artist_name | urlencode }}%22+release%3A%22{{ rec.album_title | urlencode }}%22&type=release" target="_blank" class="ext-link">
+                            Search MB Combined &rarr;
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="rec-actions">
+                    <button class="btn btn-primary" onclick="findMatches('{{ song.id }}', '{{ rec.id }}')">
+                        Find Matches
+                    </button>
+                    <button class="btn btn-warning" onclick="showDiagnoseModal('{{ rec.id }}')">
+                        Diagnose MB URL
+                    </button>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- Matched Recommendations -->
+        {% if matched_recs %}
+        <div class="section-header">
+            <span class="section-title">Matched Recommendations</span>
+            <span class="section-count">{{ matched_recs | length }} items</span>
+        </div>
+
+        <div class="rec-grid matched-section">
+            {% for rec in matched_recs %}
+            <div class="rec-card matched" data-id="{{ rec.id }}">
+                <details>
+                    <summary>
+                        <div class="rec-header">
+                            <div class="rec-source">
+                                {% set source_class = rec.source if rec.source in ['jazzstandards', 'ted_gioia', 'allmusic'] else 'default' %}
+                                <span class="source-badge {{ source_class }}">{{ rec.source }}</span>
+                                <span class="issue-indicator matched">Matched</span>
+                            </div>
+                            <span class="collapse-indicator">&#9654;</span>
+                        </div>
+                    </summary>
+
+                    <div class="rec-body">
+                        <div class="matched-info">
+                            <span class="matched-info-icon">&#10003;</span>
+                            <div class="matched-info-text">
+                                <div class="matched-info-performer">{{ rec.matched_performer or 'Unknown Artist' }}</div>
+                                <div class="matched-info-album">{{ rec.matched_album or 'Unknown Album' }}</div>
+                            </div>
+                        </div>
+
+                        <div class="rec-info-grid" style="margin-top: 15px;">
+                            <div class="rec-field">
+                                <span class="rec-field-label">Rec Artist</span>
+                                <span class="rec-field-value">{{ rec.artist_name or '—' }}</span>
+                            </div>
+                            <div class="rec-field">
+                                <span class="rec-field-label">Rec Album</span>
+                                <span class="rec-field-value">{{ rec.album_title or '—' }}</span>
+                            </div>
+                            <div class="rec-field">
+                                <span class="rec-field-label">Year</span>
+                                <span class="rec-field-value">{{ rec.recording_year or '—' }}</span>
+                            </div>
+                        </div>
+
+                        {% if rec.recommendation_text %}
+                        <div class="rec-text">{{ rec.recommendation_text }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="rec-actions">
+                        <button class="btn btn-danger" onclick="unlinkRec('{{ rec.id }}')">
+                            Unlink
+                        </button>
+                    </div>
+                </details>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if not recommendations %}
+        <div class="empty-state">
+            <h2>No recommendations found</h2>
+            <p>Import recommendations for this song first.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Potential Matches Modal -->
+    <div id="matchModal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Potential Matches</h2>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body" id="matchModalBody">
+                <!-- Loaded dynamically -->
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                <button class="btn btn-success" id="linkBtn" onclick="linkSelected()" disabled>
+                    Link Selected
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentRecId = null;
+        let selectedRecordingId = null;
+
+        async function findMatches(songId, recId) {
+            currentRecId = recId;
+            selectedRecordingId = null;
+
+            const modal = document.getElementById('matchModal');
+            const modalBody = document.getElementById('matchModalBody');
+
+            modal.classList.add('active');
+            modalBody.innerHTML = '<div class="modal-loading">Searching for potential matches...</div>';
+
+            try {
+                const response = await fetch(`/admin/recommendations/${songId}/potential-matches/${recId}`);
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to load matches');
+                }
+
+                renderMatches(data);
+            } catch (error) {
+                modalBody.innerHTML = `<div class="modal-loading">Error: ${error.message}</div>`;
+            }
+        }
+
+        function renderMatches(data) {
+            const modalBody = document.getElementById('matchModalBody');
+            const rec = data.recommendation;
+            const matches = data.matches;
+
+            let html = `
+                <div style="margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+                    <strong>Looking for:</strong><br>
+                    ${rec.artist_name || '(no artist)'} - ${rec.album_title || '(no album)'} ${rec.recording_year ? '(' + rec.recording_year + ')' : ''}
+                </div>
+            `;
+
+            if (matches.length === 0) {
+                html += '<div class="empty-state">No potential matches found in the releases database.</div>';
+            } else {
+                html += '<p style="margin-bottom: 15px; color: #666;">Select a release to link:</p>';
+
+                for (const match of matches) {
+                    const isSelected = selectedRecordingId === match.recording_id;
+                    html += `
+                        <div class="match-option ${isSelected ? 'selected' : ''}"
+                             onclick="selectMatch('${match.recording_id || ''}', '${match.release_id}')"
+                             ${!match.recording_id ? 'style="opacity: 0.6;"' : ''}>
+                            ${match.cover_art ? `<img src="${match.cover_art}" class="match-cover">` : '<div class="match-cover"></div>'}
+                            <div class="match-info">
+                                <div class="match-title">${match.release_title || 'Unknown Release'}</div>
+                                <div class="match-artist">${match.artist_credit || 'Unknown Artist'}</div>
+                                <div class="match-year">${match.release_year || '?'}</div>
+                                <div class="match-badges">
+                                    ${match.spotify_album_id ? '<span class="match-badge spotify">Spotify</span>' : ''}
+                                    ${match.recording_id ? '<span class="match-badge has-recording">Has Recording</span>' : '<span style="font-size:11px;color:#888;">No recording for this song</span>'}
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+            }
+
+            modalBody.innerHTML = html;
+            updateLinkButton();
+        }
+
+        function selectMatch(recordingId, releaseId) {
+            if (!recordingId) {
+                alert('This release is not linked to a recording for this song. You may need to import it from MusicBrainz first.');
+                return;
+            }
+            selectedRecordingId = recordingId;
+            renderMatchesWithSelection();
+        }
+
+        function renderMatchesWithSelection() {
+            // Re-render to show selection
+            const options = document.querySelectorAll('.match-option');
+            options.forEach(opt => {
+                const hasRecording = opt.getAttribute('onclick').includes(selectedRecordingId);
+                opt.classList.toggle('selected', hasRecording);
+            });
+            updateLinkButton();
+        }
+
+        function updateLinkButton() {
+            const btn = document.getElementById('linkBtn');
+            btn.disabled = !selectedRecordingId;
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('matchModal');
+            modal.classList.remove('active');
+            currentRecId = null;
+            selectedRecordingId = null;
+        }
+
+        async function linkSelected() {
+            if (!currentRecId || !selectedRecordingId) return;
+
+            const btn = document.getElementById('linkBtn');
+            btn.disabled = true;
+            btn.textContent = 'Linking...';
+
+            try {
+                const response = await fetch(`/admin/recommendations/${currentRecId}/link`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ recording_id: selectedRecordingId })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to link');
+                }
+
+                closeModal();
+                location.reload();
+            } catch (error) {
+                alert('Error: ' + error.message);
+                btn.disabled = false;
+                btn.textContent = 'Link Selected';
+            }
+        }
+
+        async function unlinkRec(recId) {
+            if (!confirm('Remove the link between this recommendation and its recording?')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/admin/recommendations/${recId}/unlink`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to unlink');
+                }
+
+                location.reload();
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+
+        // Close modal on click outside
+        document.getElementById('matchModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeModal();
+            }
+        });
+
+        // ===== DIAGNOSIS MODAL =====
+        let diagnoseRecId = null;
+
+        function showDiagnoseModal(recId) {
+            diagnoseRecId = recId;
+            const modal = document.getElementById('diagnoseModal');
+            const resultDiv = document.getElementById('diagnoseResult');
+            const urlInput = document.getElementById('mbUrlInput');
+
+            modal.classList.add('active');
+            resultDiv.innerHTML = '';
+            urlInput.value = '';
+            urlInput.focus();
+        }
+
+        function closeDiagnoseModal() {
+            const modal = document.getElementById('diagnoseModal');
+            modal.classList.remove('active');
+            diagnoseRecId = null;
+        }
+
+        async function runDiagnosis() {
+            const urlInput = document.getElementById('mbUrlInput');
+            const resultDiv = document.getElementById('diagnoseResult');
+            const btn = document.getElementById('diagnoseBtn');
+            const url = urlInput.value.trim();
+
+            if (!url) {
+                alert('Please enter a MusicBrainz recording URL');
+                return;
+            }
+
+            btn.disabled = true;
+            btn.textContent = 'Analyzing...';
+            resultDiv.innerHTML = '<div class="modal-loading">Fetching data from MusicBrainz and analyzing...</div>';
+
+            try {
+                const response = await fetch(`/admin/recommendations/{{ song.id }}/diagnose`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        url: url,
+                        recommendation_id: diagnoseRecId
+                    })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Diagnosis failed');
+                }
+
+                renderDiagnosis(data);
+            } catch (error) {
+                resultDiv.innerHTML = `<div style="color: #e74c3c; padding: 20px;">Error: ${error.message}</div>`;
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Diagnose';
+            }
+        }
+
+        function renderDiagnosis(data) {
+            const resultDiv = document.getElementById('diagnoseResult');
+
+            let html = `
+                <div style="margin-top: 20px;">
+                    <h4 style="margin-bottom: 15px;">Diagnosis Results</h4>
+
+                    <div style="margin-bottom: 15px; padding: 10px; background: #f8f9fa; border-radius: 6px;">
+                        <a href="${data.mb_url}" target="_blank" style="color: #9b4dca;">${data.mb_url}</a>
+                    </div>
+
+                    <!-- Checks -->
+                    <div style="margin-bottom: 20px;">
+                        <h5 style="margin-bottom: 10px; color: #666;">Checks</h5>
+                        ${data.checks.map(check => `
+                            <div style="display: flex; align-items: center; gap: 10px; padding: 8px; border-bottom: 1px solid #eee;">
+                                <span style="font-size: 18px;">${check.passed ? '&#10003;' : '&#10007;'}</span>
+                                <span style="font-weight: 600; min-width: 140px; color: ${check.passed ? '#27ae60' : '#e74c3c'};">${check.name}</span>
+                                <span style="color: #666; font-size: 13px;">${check.detail}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+
+                    <!-- MB Data -->
+                    ${data.mb_data ? `
+                    <div style="margin-bottom: 20px;">
+                        <h5 style="margin-bottom: 10px; color: #666;">MusicBrainz Data</h5>
+                        <div style="background: #f0e6f6; padding: 12px; border-radius: 6px; font-size: 13px;">
+                            <div><strong>Title:</strong> ${data.mb_data.title || '—'}</div>
+                            <div><strong>Artist:</strong> ${data.mb_data.artist_credit || '—'}</div>
+                            <div><strong>Releases:</strong> ${data.mb_data.total_releases} total</div>
+                            ${data.mb_data.linked_works && data.mb_data.linked_works.length > 0 ? `
+                            <div style="margin-top: 8px;"><strong>Linked Works:</strong></div>
+                            <ul style="margin: 4px 0 0 20px;">
+                                ${data.mb_data.linked_works.map(w => `
+                                    <li style="${w.is_ours ? 'color: #27ae60; font-weight: 600;' : ''}">
+                                        ${w.title} ${w.is_ours ? '(THIS SONG)' : ''}
+                                        <a href="https://musicbrainz.org/work/${w.id}" target="_blank" style="font-size: 11px;">[view]</a>
+                                    </li>
+                                `).join('')}
+                            </ul>
+                            ` : '<div style="margin-top: 8px; color: #e74c3c;"><strong>No Work links!</strong></div>'}
+                        </div>
+                    </div>
+                    ` : ''}
+
+                    <!-- Issues -->
+                    ${data.issues && data.issues.length > 0 ? `
+                    <div style="margin-bottom: 20px;">
+                        <h5 style="margin-bottom: 10px; color: #e74c3c;">Issues Found</h5>
+                        <ul style="margin: 0; padding-left: 20px;">
+                            ${data.issues.map(issue => `<li style="color: #c0392b; margin-bottom: 4px;">${issue}</li>`).join('')}
+                        </ul>
+                    </div>
+                    ` : ''}
+
+                    <!-- Suggestions -->
+                    ${data.suggestions && data.suggestions.length > 0 ? `
+                    <div style="margin-bottom: 20px;">
+                        <h5 style="margin-bottom: 10px; color: #2980b9;">Suggestions</h5>
+                        <ul style="margin: 0; padding-left: 20px;">
+                            ${data.suggestions.map(sug => `<li style="color: #2c3e50; margin-bottom: 4px;">${sug}</li>`).join('')}
+                        </ul>
+                    </div>
+                    ` : ''}
+
+                    <!-- Summary -->
+                    <div style="padding: 15px; background: ${data.issues && data.issues.length > 0 ? '#fff3e0' : '#e8f5e9'}; border-radius: 6px; font-weight: 500;">
+                        ${data.summary || 'Diagnosis complete.'}
+                    </div>
+                </div>
+            `;
+
+            resultDiv.innerHTML = html;
+        }
+
+        // Handle Enter key in URL input
+        document.addEventListener('DOMContentLoaded', function() {
+            const urlInput = document.getElementById('mbUrlInput');
+            if (urlInput) {
+                urlInput.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        runDiagnosis();
+                    }
+                });
+            }
+        });
+
+        // Close diagnosis modal on click outside
+        document.getElementById('diagnoseModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeDiagnoseModal();
+            }
+        });
+    </script>
+
+    <!-- Diagnosis Modal -->
+    <div id="diagnoseModal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 700px;">
+            <div class="modal-header">
+                <h2>Diagnose MusicBrainz Recording</h2>
+                <button class="modal-close" onclick="closeDiagnoseModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p style="margin-bottom: 15px; color: #666;">
+                    Paste a MusicBrainz recording URL to diagnose why it's not matching.
+                    This will check if the recording is linked to the correct Work and compare
+                    artist/album names.
+                </p>
+                <div style="display: flex; gap: 10px;">
+                    <input type="text" id="mbUrlInput"
+                           placeholder="https://musicbrainz.org/recording/..."
+                           style="flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px;">
+                    <button class="btn btn-warning" id="diagnoseBtn" onclick="runDiagnosis()">
+                        Diagnose
+                    </button>
+                </div>
+                <div id="diagnoseResult"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeDiagnoseModal()">Close</button>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

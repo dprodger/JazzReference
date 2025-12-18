@@ -274,42 +274,64 @@ class JazzStandardsRecommendationExtractor:
         logger.debug(f"  Total extracted: {len(recommendations)} recommendations")
         return recommendations
     
+    def _normalize_for_dedup(self, text: str) -> str:
+        """Normalize text for deduplication comparison."""
+        if not text:
+            return ''
+        # Lowercase
+        text = text.lower().strip()
+        # Normalize & to and
+        text = text.replace('&', 'and')
+        # Remove punctuation except spaces
+        text = re.sub(r'[^\w\s]', '', text)
+        # Collapse multiple spaces
+        text = re.sub(r'\s+', ' ', text)
+        return text
+
     def deduplicate_recommendations(self, recommendations: List[Dict]) -> List[Dict]:
         """
         Deduplicate recommendations using multiple matching strategies.
-        
+
         A recommendation is considered a duplicate if it matches on ANY of:
         1. iTunes track ID (most specific)
         2. iTunes album ID + artist name (same album by same artist)
         3. Artist name + album title + year (for non-iTunes entries)
-        
+        4. Normalized album title (handles '&' vs 'and', punctuation differences)
+
         When duplicates are found, prefer the one with more complete metadata.
         """
         seen_keys = {}  # Maps keys to list index in deduplicated
         deduplicated = []
-        
+
         for rec in recommendations:
             # Generate all possible matching keys for this recommendation
             matching_keys = []
-            
+
             # Key 1: iTunes track ID (most specific)
             if rec.get('itunes_track_id'):
                 matching_keys.append(f"track_{rec['itunes_track_id']}")
-            
+
             # Key 2: iTunes album ID + artist (same album by same artist)
             if rec.get('itunes_album_id') and rec.get('artist_name'):
                 key = f"album_{rec['itunes_album_id']}_{rec['artist_name'].lower().strip()}"
                 matching_keys.append(key)
-            
+
             # Key 3: Artist + album + year (for matching non-iTunes entries)
             if rec.get('artist_name') and rec.get('album_title') and rec.get('recording_year'):
                 key = f"artist_album_year_{rec['artist_name'].lower().strip()}_{rec['album_title'].lower().strip()}_{rec['recording_year']}"
                 matching_keys.append(key)
-            
+
             # Key 4: Artist + album (weaker match, no year)
             if rec.get('artist_name') and rec.get('album_title'):
                 key = f"artist_album_{rec['artist_name'].lower().strip()}_{rec['album_title'].lower().strip()}"
                 matching_keys.append(key)
+
+            # Key 5: Normalized album title only (catches "The Great Kai & J.J." vs "The Great Kai and J.J")
+            # This is aggressive but helps with same-album different-formatting duplicates
+            if rec.get('album_title'):
+                norm_album = self._normalize_for_dedup(rec['album_title'])
+                if len(norm_album) >= 10:  # Only for reasonably specific album titles
+                    matching_keys.append(f"norm_album_{norm_album}")
             
             logger.debug(f"    Checking: {rec.get('artist_name')} - {rec.get('album_title')}")
             logger.debug(f"      Keys: {matching_keys}")

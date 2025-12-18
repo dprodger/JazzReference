@@ -805,3 +805,572 @@ def link_orphan_to_existing_recording(orphan_id):
     except Exception as e:
         logger.error(f"Error linking orphan to recording: {e}")
         return jsonify({'error': str(e)}), 500
+
+
+# =============================================================================
+# AUTHORITY RECOMMENDATIONS REVIEWER
+# =============================================================================
+
+@admin_bp.route('/recommendations')
+def recommendations_list():
+    """
+    List songs with authority recommendations and their completion status.
+    Shows which songs have unmatched recommendations that need attention.
+    """
+    with get_db_connection() as db:
+        with db.cursor() as cur:
+            cur.execute("""
+                SELECT
+                    s.id,
+                    s.title,
+                    s.composer,
+                    s.musicbrainz_id,
+                    COUNT(*) AS total_recs,
+                    COUNT(sar.recording_id) AS matched_recs,
+                    ROUND(COUNT(sar.recording_id)::decimal / COUNT(*) * 100, 1) AS perc_complete,
+                    COUNT(*) FILTER (WHERE sar.artist_name IS NULL OR sar.artist_name = '') AS missing_artist,
+                    COUNT(*) FILTER (WHERE sar.album_title IS NULL OR sar.album_title = '') AS missing_album,
+                    array_agg(DISTINCT sar.source) AS sources
+                FROM songs s
+                JOIN song_authority_recommendations sar ON s.id = sar.song_id
+                GROUP BY s.id, s.title, s.composer, s.musicbrainz_id
+                ORDER BY perc_complete ASC, total_recs DESC
+            """)
+            songs = [dict(row) for row in cur.fetchall()]
+
+    return render_template('admin/recommendations_list.html', songs=songs)
+
+
+@admin_bp.route('/recommendations/<song_id>')
+def recommendations_review(song_id):
+    """
+    Review unmatched authority recommendations for a specific song.
+    Shows detailed diagnostic information for each recommendation.
+    """
+    with get_db_connection() as db:
+        with db.cursor() as cur:
+            # Get song info
+            cur.execute("""
+                SELECT id, title, composer, musicbrainz_id
+                FROM songs WHERE id = %s
+            """, (song_id,))
+            song = cur.fetchone()
+
+            if not song:
+                return "Song not found", 404
+
+            song = dict(song)
+
+            # Get all recommendations for this song
+            cur.execute("""
+                SELECT
+                    sar.id,
+                    sar.song_id,
+                    sar.recording_id,
+                    sar.source,
+                    sar.recommendation_text,
+                    sar.source_url,
+                    sar.artist_name,
+                    sar.album_title,
+                    sar.recording_year,
+                    sar.itunes_album_id,
+                    sar.itunes_track_id,
+                    sar.created_at,
+                    -- If matched, get recording info
+                    r.album_title AS matched_album,
+                    p.name AS matched_performer
+                FROM song_authority_recommendations sar
+                LEFT JOIN recordings r ON sar.recording_id = r.id
+                LEFT JOIN recording_performers rp ON r.id = rp.recording_id AND rp.role = 'leader'
+                LEFT JOIN performers p ON rp.performer_id = p.id
+                WHERE sar.song_id = %s
+                ORDER BY
+                    CASE WHEN sar.recording_id IS NULL THEN 0 ELSE 1 END,
+                    sar.source,
+                    sar.artist_name
+            """, (song_id,))
+            recommendations = [dict(row) for row in cur.fetchall()]
+
+            # Calculate stats
+            total = len(recommendations)
+            matched = sum(1 for r in recommendations if r['recording_id'])
+            unmatched = total - matched
+            missing_artist = sum(1 for r in recommendations
+                               if not r['recording_id'] and (not r['artist_name'] or r['artist_name'].strip() == ''))
+            missing_album = sum(1 for r in recommendations
+                              if not r['recording_id'] and (not r['album_title'] or r['album_title'].strip() == ''))
+
+            stats = {
+                'total': total,
+                'matched': matched,
+                'unmatched': unmatched,
+                'missing_artist': missing_artist,
+                'missing_album': missing_album,
+                'perc_complete': round(matched / total * 100, 1) if total > 0 else 0
+            }
+
+    return render_template('admin/recommendations_review.html',
+                          song=song,
+                          recommendations=recommendations,
+                          stats=stats)
+
+
+@admin_bp.route('/recommendations/<song_id>/potential-matches/<rec_id>')
+def get_potential_matches(song_id, rec_id):
+    """
+    Find potential release matches for an unmatched recommendation.
+    Searches releases by artist name and album title similarity.
+    """
+    with get_db_connection() as db:
+        with db.cursor() as cur:
+            # Get the recommendation
+            cur.execute("""
+                SELECT id, artist_name, album_title, recording_year
+                FROM song_authority_recommendations
+                WHERE id = %s AND song_id = %s
+            """, (rec_id, song_id))
+            rec = cur.fetchone()
+
+            if not rec:
+                return jsonify({'error': 'Recommendation not found'}), 404
+
+            rec = dict(rec)
+            artist_name = rec.get('artist_name') or ''
+            album_title = rec.get('album_title') or ''
+
+            # Search for potential matches in releases
+            # Using ILIKE for case-insensitive partial matching
+            cur.execute("""
+                SELECT DISTINCT
+                    rel.id AS release_id,
+                    rel.title AS release_title,
+                    rel.artist_credit,
+                    rel.release_year,
+                    rel.musicbrainz_release_id,
+                    rel.spotify_album_id,
+                    COALESCE(
+                        (SELECT ri.image_url_small FROM release_imagery ri
+                         WHERE ri.release_id = rel.id AND ri.type = 'Front' LIMIT 1),
+                        rel.cover_art_small
+                    ) AS cover_art,
+                    r.id AS recording_id,
+                    r.album_title AS recording_album
+                FROM releases rel
+                LEFT JOIN recording_releases rr ON rel.id = rr.release_id
+                LEFT JOIN recordings r ON rr.recording_id = r.id AND r.song_id = %s
+                WHERE (
+                    rel.artist_credit ILIKE %s
+                    OR rel.title ILIKE %s
+                )
+                ORDER BY
+                    CASE WHEN r.id IS NOT NULL THEN 0 ELSE 1 END,
+                    rel.release_year DESC
+                LIMIT 20
+            """, (
+                song_id,
+                f'%{artist_name}%' if artist_name else '%',
+                f'%{album_title}%' if album_title else '%'
+            ))
+
+            matches = [dict(row) for row in cur.fetchall()]
+
+            # Convert UUIDs to strings
+            for m in matches:
+                if m.get('release_id'):
+                    m['release_id'] = str(m['release_id'])
+                if m.get('recording_id'):
+                    m['recording_id'] = str(m['recording_id'])
+
+    return jsonify({
+        'recommendation': {
+            'id': str(rec['id']),
+            'artist_name': rec['artist_name'],
+            'album_title': rec['album_title'],
+            'recording_year': rec['recording_year']
+        },
+        'matches': matches
+    })
+
+
+@admin_bp.route('/recommendations/<rec_id>/link', methods=['POST'])
+def link_recommendation_to_recording(rec_id):
+    """
+    Manually link an authority recommendation to a recording.
+    """
+    data = request.get_json() or {}
+    recording_id = data.get('recording_id')
+
+    if not recording_id:
+        return jsonify({'error': 'recording_id is required'}), 400
+
+    try:
+        with get_db_connection() as db:
+            with db.cursor() as cur:
+                cur.execute("""
+                    UPDATE song_authority_recommendations
+                    SET recording_id = %s,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE id = %s
+                    RETURNING id, recording_id
+                """, (recording_id, rec_id))
+                result = cur.fetchone()
+                db.commit()
+
+                if not result:
+                    return jsonify({'error': 'Recommendation not found'}), 404
+
+                return jsonify({
+                    'success': True,
+                    'recommendation_id': str(result['id']),
+                    'recording_id': str(result['recording_id'])
+                })
+
+    except Exception as e:
+        logger.error(f"Error linking recommendation: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@admin_bp.route('/recommendations/<rec_id>/unlink', methods=['POST'])
+def unlink_recommendation(rec_id):
+    """
+    Remove the recording link from an authority recommendation.
+    """
+    try:
+        with get_db_connection() as db:
+            with db.cursor() as cur:
+                cur.execute("""
+                    UPDATE song_authority_recommendations
+                    SET recording_id = NULL,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE id = %s
+                    RETURNING id
+                """, (rec_id,))
+                result = cur.fetchone()
+                db.commit()
+
+                if not result:
+                    return jsonify({'error': 'Recommendation not found'}), 404
+
+                return jsonify({
+                    'success': True,
+                    'recommendation_id': str(result['id'])
+                })
+
+    except Exception as e:
+        logger.error(f"Error unlinking recommendation: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@admin_bp.route('/recommendations/<song_id>/diagnose', methods=['POST'])
+def diagnose_mb_recording(song_id):
+    """
+    Diagnose why a MusicBrainz recording isn't matching.
+
+    Takes a MusicBrainz recording URL and returns:
+    - Is the recording linked to this song's Work in MusicBrainz?
+    - Do we have this recording in our database?
+    - Do we have its releases?
+    - Where does the matching logic fail?
+    """
+    import re
+    import requests
+    from rapidfuzz import fuzz
+
+    data = request.get_json() or {}
+    mb_url = data.get('url', '').strip()
+    rec_id = data.get('recommendation_id')  # Optional: to compare against specific rec
+
+    # Parse recording ID from URL
+    # Supports: https://musicbrainz.org/recording/UUID or just UUID
+    mb_recording_id = None
+    uuid_pattern = r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
+
+    match = re.search(uuid_pattern, mb_url, re.IGNORECASE)
+    if match:
+        mb_recording_id = match.group(0).lower()
+    else:
+        return jsonify({'error': 'Could not parse MusicBrainz recording ID from URL'}), 400
+
+    diagnosis = {
+        'mb_recording_id': mb_recording_id,
+        'mb_url': f'https://musicbrainz.org/recording/{mb_recording_id}',
+        'checks': [],
+        'recommendation': None,
+        'mb_data': None,
+        'our_data': None,
+        'issues': [],
+        'suggestions': []
+    }
+
+    try:
+        with get_db_connection() as db:
+            with db.cursor() as cur:
+                # Get song info including Work ID
+                cur.execute("""
+                    SELECT id, title, musicbrainz_id
+                    FROM songs WHERE id = %s
+                """, (song_id,))
+                song = cur.fetchone()
+
+                if not song:
+                    return jsonify({'error': 'Song not found'}), 404
+
+                song = dict(song)
+                diagnosis['song'] = {
+                    'id': str(song['id']),
+                    'title': song['title'],
+                    'work_id': song['musicbrainz_id']
+                }
+
+                # Get the recommendation if provided
+                if rec_id:
+                    cur.execute("""
+                        SELECT id, artist_name, album_title, recording_year, source
+                        FROM song_authority_recommendations
+                        WHERE id = %s
+                    """, (rec_id,))
+                    rec = cur.fetchone()
+                    if rec:
+                        diagnosis['recommendation'] = dict(rec)
+                        diagnosis['recommendation']['id'] = str(rec['id'])
+
+                # ===== CHECK 1: Fetch from MusicBrainz =====
+                mb_session = requests.Session()
+                mb_session.headers.update({
+                    'User-Agent': 'JazzReferenceAdmin/1.0 (diagnostic tool)'
+                })
+
+                # Fetch recording with work-rels and releases
+                mb_response = mb_session.get(
+                    f'https://musicbrainz.org/ws/2/recording/{mb_recording_id}',
+                    params={
+                        'inc': 'releases+artist-credits+work-rels',
+                        'fmt': 'json'
+                    },
+                    timeout=15
+                )
+
+                if mb_response.status_code == 404:
+                    diagnosis['checks'].append({
+                        'name': 'MB Recording Exists',
+                        'passed': False,
+                        'detail': 'Recording not found in MusicBrainz'
+                    })
+                    diagnosis['issues'].append('Recording does not exist in MusicBrainz')
+                    return jsonify(diagnosis)
+
+                if mb_response.status_code != 200:
+                    diagnosis['checks'].append({
+                        'name': 'MB API Call',
+                        'passed': False,
+                        'detail': f'MusicBrainz API error: {mb_response.status_code}'
+                    })
+                    return jsonify(diagnosis)
+
+                mb_data = mb_response.json()
+                diagnosis['checks'].append({
+                    'name': 'MB Recording Exists',
+                    'passed': True,
+                    'detail': f"Found: {mb_data.get('title')}"
+                })
+
+                # Extract MB data
+                mb_artist_credit = ' / '.join([
+                    ac.get('name', ac.get('artist', {}).get('name', ''))
+                    for ac in mb_data.get('artist-credit', [])
+                ])
+                mb_releases = mb_data.get('releases', [])
+
+                diagnosis['mb_data'] = {
+                    'title': mb_data.get('title'),
+                    'artist_credit': mb_artist_credit,
+                    'releases': [
+                        {
+                            'id': r.get('id'),
+                            'title': r.get('title'),
+                            'date': r.get('date'),
+                            'country': r.get('country')
+                        }
+                        for r in mb_releases[:10]  # Limit to first 10
+                    ],
+                    'total_releases': len(mb_releases)
+                }
+
+                # ===== CHECK 2: Is it linked to the Work? =====
+                work_relations = mb_data.get('relations', [])
+                work_links = [
+                    rel for rel in work_relations
+                    if rel.get('type') == 'performance' and rel.get('work')
+                ]
+
+                linked_to_our_work = False
+                linked_works = []
+                for rel in work_links:
+                    work = rel.get('work', {})
+                    work_id = work.get('id')
+                    work_title = work.get('title')
+                    linked_works.append({
+                        'id': work_id,
+                        'title': work_title,
+                        'is_ours': work_id == song['musicbrainz_id']
+                    })
+                    if work_id == song['musicbrainz_id']:
+                        linked_to_our_work = True
+
+                diagnosis['mb_data']['linked_works'] = linked_works
+
+                if linked_to_our_work:
+                    diagnosis['checks'].append({
+                        'name': 'Linked to Work',
+                        'passed': True,
+                        'detail': f"Recording IS linked to '{song['title']}' in MusicBrainz"
+                    })
+                elif linked_works:
+                    diagnosis['checks'].append({
+                        'name': 'Linked to Work',
+                        'passed': False,
+                        'detail': f"Recording is linked to OTHER works: {', '.join([w['title'] for w in linked_works])}"
+                    })
+                    diagnosis['issues'].append(f"Recording is linked to wrong Work(s) in MusicBrainz: {', '.join([w['title'] for w in linked_works])}")
+                    diagnosis['suggestions'].append("Edit MusicBrainz to add a 'performance of' relationship to the correct Work")
+                else:
+                    diagnosis['checks'].append({
+                        'name': 'Linked to Work',
+                        'passed': False,
+                        'detail': "Recording has NO work relationships in MusicBrainz"
+                    })
+                    diagnosis['issues'].append("Recording is not linked to any Work in MusicBrainz")
+                    diagnosis['suggestions'].append("Edit MusicBrainz to add a 'performance of' relationship to this Work")
+
+                # ===== CHECK 3: Do we have this recording? =====
+                cur.execute("""
+                    SELECT r.id, r.album_title, r.recording_year, r.musicbrainz_id,
+                           p.name as leader_name
+                    FROM recordings r
+                    LEFT JOIN recording_performers rp ON r.id = rp.recording_id AND rp.role = 'leader'
+                    LEFT JOIN performers p ON rp.performer_id = p.id
+                    WHERE r.musicbrainz_id = %s
+                """, (mb_recording_id,))
+                our_recording = cur.fetchone()
+
+                if our_recording:
+                    our_recording = dict(our_recording)
+                    diagnosis['checks'].append({
+                        'name': 'In Our Database',
+                        'passed': True,
+                        'detail': f"We have this recording: {our_recording['leader_name'] or 'Unknown'} - {our_recording['album_title']}"
+                    })
+                    diagnosis['our_data'] = {
+                        'recording_id': str(our_recording['id']),
+                        'album_title': our_recording['album_title'],
+                        'recording_year': our_recording['recording_year'],
+                        'leader_name': our_recording['leader_name']
+                    }
+                else:
+                    diagnosis['checks'].append({
+                        'name': 'In Our Database',
+                        'passed': False,
+                        'detail': "We do NOT have this recording in our database"
+                    })
+                    if linked_to_our_work:
+                        diagnosis['issues'].append("Recording is linked to Work but we haven't imported it")
+                        diagnosis['suggestions'].append("Re-run the MusicBrainz import for this song to pick up this recording")
+                    else:
+                        diagnosis['issues'].append("Recording not imported (not linked to Work in MB)")
+
+                # ===== CHECK 4: Do we have the releases? =====
+                if mb_releases:
+                    mb_release_ids = [r.get('id') for r in mb_releases]
+                    placeholders = ','.join(['%s'] * len(mb_release_ids))
+                    cur.execute(f"""
+                        SELECT musicbrainz_release_id, title, artist_credit
+                        FROM releases
+                        WHERE musicbrainz_release_id IN ({placeholders})
+                    """, mb_release_ids)
+                    our_releases = {r['musicbrainz_release_id']: dict(r) for r in cur.fetchall()}
+
+                    matched_releases = []
+                    missing_releases = []
+                    for mb_rel in mb_releases[:5]:  # Check first 5
+                        if mb_rel.get('id') in our_releases:
+                            matched_releases.append(mb_rel.get('title'))
+                        else:
+                            missing_releases.append({
+                                'id': mb_rel.get('id'),
+                                'title': mb_rel.get('title')
+                            })
+
+                    if matched_releases:
+                        diagnosis['checks'].append({
+                            'name': 'Have Releases',
+                            'passed': True,
+                            'detail': f"We have {len(matched_releases)} of the releases: {', '.join(matched_releases[:3])}"
+                        })
+                    else:
+                        diagnosis['checks'].append({
+                            'name': 'Have Releases',
+                            'passed': False,
+                            'detail': "We don't have any of this recording's releases"
+                        })
+                        diagnosis['issues'].append("None of the recording's releases are in our database")
+
+                    diagnosis['our_data'] = diagnosis.get('our_data') or {}
+                    diagnosis['our_data']['matched_releases'] = matched_releases
+                    diagnosis['our_data']['missing_releases'] = missing_releases[:5]
+
+                # ===== CHECK 5: Compare with recommendation =====
+                if diagnosis.get('recommendation'):
+                    rec = diagnosis['recommendation']
+                    rec_artist = rec.get('artist_name') or ''
+                    rec_album = rec.get('album_title') or ''
+
+                    # Artist comparison
+                    artist_score = fuzz.ratio(rec_artist.lower(), mb_artist_credit.lower())
+                    artist_partial = fuzz.partial_ratio(rec_artist.lower(), mb_artist_credit.lower())
+
+                    diagnosis['checks'].append({
+                        'name': 'Artist Match',
+                        'passed': artist_score >= 80 or artist_partial >= 90,
+                        'detail': f"Rec artist: '{rec_artist}' vs MB: '{mb_artist_credit}' (score: {artist_score}%, partial: {artist_partial}%)"
+                    })
+
+                    if artist_score < 80 and artist_partial < 90:
+                        diagnosis['issues'].append(f"Artist name mismatch: '{rec_artist}' vs '{mb_artist_credit}'")
+                        diagnosis['suggestions'].append("Check if the matcher needs to handle this artist name variation")
+
+                    # Album comparison (against all MB releases)
+                    best_album_score = 0
+                    best_album_match = None
+                    for mb_rel in mb_releases:
+                        rel_title = mb_rel.get('title', '')
+                        score = fuzz.ratio(rec_album.lower(), rel_title.lower())
+                        if score > best_album_score:
+                            best_album_score = score
+                            best_album_match = rel_title
+
+                    diagnosis['checks'].append({
+                        'name': 'Album Match',
+                        'passed': best_album_score >= 80,
+                        'detail': f"Rec album: '{rec_album}' vs best MB match: '{best_album_match}' (score: {best_album_score}%)"
+                    })
+
+                    if best_album_score < 80:
+                        diagnosis['issues'].append(f"Album title mismatch: '{rec_album}' doesn't match any MB release (best: {best_album_score}%)")
+                        diagnosis['suggestions'].append("The recommendation's album title may be different from MB release titles")
+
+                # ===== Summary =====
+                if not diagnosis['issues']:
+                    if our_recording:
+                        diagnosis['summary'] = "This recording exists in our database. The matcher may need to be re-run or there's a logic issue."
+                    else:
+                        diagnosis['summary'] = "All checks passed but recording not imported. Try re-importing from MusicBrainz."
+                else:
+                    diagnosis['summary'] = f"Found {len(diagnosis['issues'])} issue(s) preventing the match."
+
+                return jsonify(diagnosis)
+
+    except Exception as e:
+        logger.error(f"Error in diagnosis: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500

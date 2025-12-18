@@ -179,16 +179,18 @@ class AuthorityRecommendationMatcher:
         """Compare artist names with fuzzy matching"""
         if not artist1 or not artist2:
             return 0.0
-        
+
         norm1 = self.normalize_string(artist1)
         norm2 = self.normalize_string(artist2)
-        
+
         # Try multiple fuzzy matching approaches
         ratio = fuzz.ratio(norm1, norm2)
         token_sort = fuzz.token_sort_ratio(norm1, norm2)
-        
+        partial = fuzz.partial_ratio(norm1, norm2)
+
         # Return the best score
-        return max(ratio, token_sort)
+        # partial_ratio helps match "J.J. Johnson" against "Kai Winding / J.J. Johnson"
+        return max(ratio, token_sort, partial)
     
     def compare_albums(self, album1: Optional[str], album2: Optional[str]) -> float:
         """Compare album titles with fuzzy matching"""
