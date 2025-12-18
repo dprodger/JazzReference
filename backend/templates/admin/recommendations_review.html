@@ -316,6 +316,13 @@
             background: #e74c3c;
             color: #fff;
         }
+        .btn-copy {
+            background: #6c757d;
+            color: #fff;
+        }
+        .btn-copy.copied {
+            background: #27ae60;
+        }
 
         /* Collapsible matched section */
         .matched-section details {
@@ -609,6 +616,9 @@
                 </div>
 
                 <div class="rec-actions">
+                    <button class="btn btn-copy" onclick="copyRecInfo(this, {{ rec | tojson | safe }})">
+                        Copy Info
+                    </button>
                     <button class="btn btn-primary" onclick="findMatches('{{ song.id }}', '{{ rec.id }}')">
                         Find Matches
                     </button>
@@ -1001,10 +1011,20 @@
                     <div style="padding: 15px; background: ${data.issues && data.issues.length > 0 ? '#fff3e0' : '#e8f5e9'}; border-radius: 6px; font-weight: 500;">
                         ${data.summary || 'Diagnosis complete.'}
                     </div>
+
+                    <!-- Copy Button -->
+                    <div style="margin-top: 15px; text-align: right;">
+                        <button class="btn btn-copy" onclick="copyDiagnosis(this)">
+                            Copy Results
+                        </button>
+                    </div>
                 </div>
             `;
 
             resultDiv.innerHTML = html;
+
+            // Store diagnosis data for copying
+            resultDiv.diagnosisData = data;
         }
 
         // Handle Enter key in URL input
@@ -1025,6 +1045,118 @@
                 closeDiagnoseModal();
             }
         });
+
+        // ===== COPY FUNCTIONS =====
+
+        function copyRecInfo(btn, rec) {
+            const songTitle = {{ song.title | tojson | safe }};
+            const songId = '{{ song.id }}';
+            const mbId = '{{ song.musicbrainz_id or "" }}';
+            const secondMbId = '{{ song.second_mb_id or "" }}';
+
+            const artist = rec.artist_name || '';
+            const album = rec.album_title || '';
+            const year = rec.recording_year || '';
+
+            let text = `=== Unmatched Recommendation ===
+Song: ${songTitle}
+Song ID: ${songId}
+MusicBrainz Work ID: ${mbId || '(none)'}${secondMbId ? '\nSecond MB Work ID: ' + secondMbId : ''}
+MusicBrainz Work URL: ${mbId ? 'https://musicbrainz.org/work/' + mbId : '(none)'}
+
+Recommendation ID: ${rec.id}
+Source: ${rec.source}
+Artist: ${artist || '(missing)'}
+Album: ${album || '(missing)'}
+Year: ${year || '(unknown)'}`;
+
+            if (rec.itunes_album_id || rec.itunes_track_id) {
+                text += `\niTunes Album ID: ${rec.itunes_album_id || '(none)'}`;
+                text += `\niTunes Track ID: ${rec.itunes_track_id || '(none)'}`;
+            }
+
+            text += `
+
+Search URLs:
+- MB Artist: https://musicbrainz.org/search?query=${encodeURIComponent(artist)}&type=artist
+- MB Release: https://musicbrainz.org/search?query=${encodeURIComponent(album)}&type=release
+- MB Combined: https://musicbrainz.org/search?query=artist%3A%22${encodeURIComponent(artist)}%22+release%3A%22${encodeURIComponent(album)}%22&type=release`;
+
+            copyToClipboard(btn, text);
+        }
+
+        function copyDiagnosis(btn) {
+            const resultDiv = document.getElementById('diagnoseResult');
+            const data = resultDiv.diagnosisData;
+
+            if (!data) {
+                alert('No diagnosis data to copy');
+                return;
+            }
+
+            const songTitle = {{ song.title | tojson | safe }};
+            const songId = '{{ song.id }}';
+            const mbWorkId = '{{ song.musicbrainz_id or "" }}';
+            const secondMbId = '{{ song.second_mb_id or "" }}';
+
+            let text = `=== MusicBrainz Recording Diagnosis ===
+Song: ${songTitle}
+Song ID: ${songId}
+MusicBrainz Work ID: ${mbWorkId || '(none)'}${secondMbId ? '\nSecond MB Work ID: ' + secondMbId : ''}
+
+Recording URL: ${data.mb_url}
+Recording ID: ${data.recording_id || '(unknown)'}
+
+--- MusicBrainz Data ---
+Title: ${data.mb_data?.title || '(unknown)'}
+Artist: ${data.mb_data?.artist_credit || '(unknown)'}
+Total Releases: ${data.mb_data?.total_releases || 0}`;
+
+            if (data.mb_data?.linked_works?.length > 0) {
+                text += `\n\nLinked Works:`;
+                for (const w of data.mb_data.linked_works) {
+                    text += `\n- ${w.title} (${w.id})${w.is_ours ? ' <-- THIS SONG' : ''}`;
+                }
+            }
+
+            text += `\n\n--- Checks ---`;
+            for (const check of data.checks) {
+                text += `\n${check.passed ? '✓' : '✗'} ${check.name}: ${check.detail}`;
+            }
+
+            if (data.issues?.length > 0) {
+                text += `\n\n--- Issues ---`;
+                for (const issue of data.issues) {
+                    text += `\n• ${issue}`;
+                }
+            }
+
+            if (data.suggestions?.length > 0) {
+                text += `\n\n--- Suggestions ---`;
+                for (const sug of data.suggestions) {
+                    text += `\n• ${sug}`;
+                }
+            }
+
+            text += `\n\n--- Summary ---\n${data.summary || 'Diagnosis complete.'}`;
+
+            copyToClipboard(btn, text);
+        }
+
+        function copyToClipboard(btn, text) {
+            navigator.clipboard.writeText(text).then(() => {
+                const originalText = btn.textContent;
+                btn.textContent = 'Copied!';
+                btn.classList.add('copied');
+                setTimeout(() => {
+                    btn.textContent = originalText;
+                    btn.classList.remove('copied');
+                }, 2000);
+            }).catch(err => {
+                console.error('Failed to copy:', err);
+                alert('Failed to copy to clipboard');
+            });
+        }
     </script>
 
     <!-- Diagnosis Modal -->

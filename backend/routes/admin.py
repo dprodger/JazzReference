@@ -851,7 +851,7 @@ def recommendations_review(song_id):
         with db.cursor() as cur:
             # Get song info
             cur.execute("""
-                SELECT id, title, composer, musicbrainz_id
+                SELECT id, title, composer, musicbrainz_id, second_mb_id
                 FROM songs WHERE id = %s
             """, (song_id,))
             song = cur.fetchone()
