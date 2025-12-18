@@ -20,7 +20,7 @@ struct LoadingView: View {
                 .foregroundColor(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(.systemBackground))
+        .background(Color.white)
     }
 }
 
@@ -61,7 +61,7 @@ struct ErrorView: View {
         }
         .padding(.top, 60)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(.systemBackground))
+        .background(Color.white)
     }
 }
 
@@ -81,7 +81,7 @@ struct SuccessView: View {
                 .foregroundColor(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(.systemBackground))
+        .background(Color.white)
     }
 }
 
@@ -121,7 +121,7 @@ struct NotImplementedView: View {
         }
         .padding(.top, 60)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(.systemBackground))
+        .background(Color.white)
     }
 }
 

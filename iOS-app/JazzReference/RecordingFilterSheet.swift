@@ -45,7 +45,7 @@ struct RecordingFilterSheet: View {
                                 selectedFilter = .withSpotify
                             }
                         }
-                        .background(Color(.systemBackground))
+                        .background(Color.white)
                         .cornerRadius(10)
                     }
 
@@ -151,16 +151,18 @@ struct RecordingFilterSheet: View {
                     .font(JazzTheme.caption())
                 Text(family.rawValue)
                     .font(JazzTheme.subheadline())
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 10)
             .padding(.horizontal, 8)
-            .background(isSelected ? JazzTheme.brass : Color(.systemBackground))
+            .background(isSelected ? JazzTheme.brass : Color.white)
             .foregroundColor(isSelected ? .white : JazzTheme.charcoal)
             .cornerRadius(8)
             .overlay(
                 RoundedRectangle(cornerRadius: 8)
-                    .stroke(isSelected ? Color.clear : JazzTheme.smokeGray.opacity(0.3), lineWidth: 1)
+                    .stroke(isSelected ? Color.clear : JazzTheme.smokeGray.opacity(0.5), lineWidth: 1)
             )
         }
         .buttonStyle(.plain)

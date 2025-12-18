@@ -80,7 +80,7 @@ struct SongImportConfirmationView: View {
             .padding(.horizontal)
             .padding(.bottom, 20)
         }
-        .background(Color(.systemBackground))
+        .background(Color.white)
     }
 }
 
@@ -155,7 +155,7 @@ struct SongExactMatchView: View {
             .padding(.horizontal)
             .padding(.bottom, 20)
         }
-        .background(Color(.systemBackground))
+        .background(Color.white)
     }
 }
 
@@ -258,7 +258,7 @@ struct SongTitleMatchNoMbidView: View {
             .padding(.horizontal)
             .padding(.bottom, 20)
         }
-        .background(Color(.systemBackground))
+        .background(Color.white)
     }
 }
 
@@ -372,6 +372,6 @@ struct SongTitleMatchDifferentMbidView: View {
             .padding(.horizontal)
             .padding(.bottom, 20)
         }
-        .background(Color(.systemBackground))
+        .background(Color.white)
     }
 }

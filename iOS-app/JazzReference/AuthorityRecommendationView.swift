@@ -190,7 +190,7 @@ struct AuthorityRecommendationsView: View {
                 if linkingInProgress {
                     ProgressView("Linking...")
                         .padding()
-                        .background(Color(.systemBackground))
+                        .background(Color.white)
                         .cornerRadius(10)
                         .shadow(radius: 10)
                 }

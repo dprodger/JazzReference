@@ -67,7 +67,7 @@ struct ArtistImportConfirmationView: View {
             .padding(.horizontal)
             .padding(.bottom, 20)
         }
-        .background(Color(.systemBackground))
+        .background(Color.white)
     }
 }
 
@@ -154,7 +154,7 @@ struct ArtistExactMatchView: View {
             .padding(.horizontal)
             .padding(.bottom, 20)
         }
-        .background(Color(.systemBackground))
+        .background(Color.white)
     }
 }
 
@@ -254,7 +254,7 @@ struct ArtistNameMatchNoMbidView: View {
             .padding(.horizontal)
             .padding(.bottom, 20)
         }
-        .background(Color(.systemBackground))
+        .background(Color.white)
     }
 }
 
@@ -370,6 +370,6 @@ struct ArtistNameMatchDifferentMbidView: View {
             .padding(.horizontal)
             .padding(.bottom, 20)
         }
-        .background(Color(.systemBackground))
+        .background(Color.white)
     }
 }

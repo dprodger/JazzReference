@@ -287,7 +287,7 @@ struct SongDetailView: View {
                         }
                         .padding()
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(Color(.systemBackground))
+                        .background(Color.white)
                         .cornerRadius(8)
                     }
 
@@ -305,7 +305,7 @@ struct SongDetailView: View {
                         }
                         .padding()
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(Color(.systemBackground))
+                        .background(Color.white)
                         .cornerRadius(8)
                     }
 
