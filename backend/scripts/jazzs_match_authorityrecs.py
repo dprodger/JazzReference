@@ -196,17 +196,20 @@ class AuthorityRecommendationMatcher:
         """Compare album titles with fuzzy matching"""
         if not album1 or not album2:
             return 0.0
-        
+
         norm1 = self.normalize_string(album1)
         norm2 = self.normalize_string(album2)
-        
+
         # Try multiple fuzzy matching approaches
         ratio = fuzz.ratio(norm1, norm2)
         token_sort = fuzz.token_sort_ratio(norm1, norm2)
         partial = fuzz.partial_ratio(norm1, norm2)
-        
+        # token_set_ratio handles word reordering well, e.g.:
+        # "The (Be)Witching Hour: Midnight Blue" vs "Midnight Blue, the (Be)witching Hour"
+        token_set = fuzz.token_set_ratio(norm1, norm2)
+
         # Return the best score
-        return max(ratio, token_sort, partial)
+        return max(ratio, token_sort, partial, token_set)
     
     def compare_years(self, year1: Optional[int], year2: Optional[int]) -> bool:
         """Check if years match within tolerance"""

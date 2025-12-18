@@ -1354,23 +1354,43 @@ def diagnose_mb_recording(song_id):
                         diagnosis['suggestions'].append("Check if the matcher needs to handle this artist name variation")
 
                     # Album comparison (against all MB releases)
+                    # Use same matching logic as the actual matcher
                     best_album_score = 0
                     best_album_match = None
+                    best_album_method = None
                     for mb_rel in mb_releases:
                         rel_title = mb_rel.get('title', '')
-                        score = fuzz.ratio(rec_album.lower(), rel_title.lower())
-                        if score > best_album_score:
-                            best_album_score = score
+                        rec_lower = rec_album.lower()
+                        rel_lower = rel_title.lower()
+
+                        # Try multiple fuzzy matching approaches (same as matcher)
+                        ratio = fuzz.ratio(rec_lower, rel_lower)
+                        token_sort = fuzz.token_sort_ratio(rec_lower, rel_lower)
+                        partial = fuzz.partial_ratio(rec_lower, rel_lower)
+                        token_set = fuzz.token_set_ratio(rec_lower, rel_lower)
+
+                        # Find best method and score
+                        scores = [
+                            (ratio, 'ratio'),
+                            (token_sort, 'token_sort'),
+                            (partial, 'partial'),
+                            (token_set, 'token_set')
+                        ]
+                        best_for_this = max(scores, key=lambda x: x[0])
+
+                        if best_for_this[0] > best_album_score:
+                            best_album_score = best_for_this[0]
                             best_album_match = rel_title
+                            best_album_method = best_for_this[1]
 
                     diagnosis['checks'].append({
                         'name': 'Album Match',
                         'passed': best_album_score >= 80,
-                        'detail': f"Rec album: '{rec_album}' vs best MB match: '{best_album_match}' (score: {best_album_score}%)"
+                        'detail': f"Rec album: '{rec_album}' vs best MB match: '{best_album_match}' (score: {best_album_score:.1f}% via {best_album_method})"
                     })
 
                     if best_album_score < 80:
-                        diagnosis['issues'].append(f"Album title mismatch: '{rec_album}' doesn't match any MB release (best: {best_album_score}%)")
+                        diagnosis['issues'].append(f"Album title mismatch: '{rec_album}' doesn't match any MB release (best: {best_album_score:.1f}%)")
                         diagnosis['suggestions'].append("The recommendation's album title may be different from MB release titles")
 
                 # ===== Summary =====
