@@ -782,6 +782,14 @@ class JazzStandardsRecommendationExtractor:
                     itunes_data = self.search_itunes(artist_name, self.current_song_title)
 
                 if itunes_data:
+                    # Prefer iTunes artist name over HTML-parsed name
+                    # HTML names can be truncated or incorrectly formatted (e.g., "Hendricks & Ross Lambert"
+                    # instead of "Lambert, Hendricks & Ross")
+                    itunes_artist = itunes_data.get('artistName')
+                    if itunes_artist and itunes_artist != artist_name:
+                        logger.debug(f"        Using iTunes artist: '{itunes_artist}' (HTML had: '{artist_name}')")
+                        artist_name = itunes_artist
+
                     album_title = itunes_data.get('collectionName')
 
                     # Extract year from releaseDate
@@ -791,6 +799,7 @@ class JazzStandardsRecommendationExtractor:
                             recording_year = int(year_match.group(1))
 
                     self.stats['itunes_enriched'] += 1
+                    logger.debug(f"        ✓ Artist (iTunes): {artist_name}")
                     logger.debug(f"        ✓ Album (iTunes): {album_title}")
                     logger.debug(f"        ✓ Year: {recording_year}")
 
@@ -898,18 +907,23 @@ class JazzStandardsRecommendationExtractor:
                 )
                 
                 if itunes_data:
-                    # Use iTunes metadata
-                    if not artist_name or len(artist_name) < 3:
-                        artist_name = itunes_data.get('artistName')
+                    # Prefer iTunes artist name over HTML-parsed name
+                    # HTML names can be truncated or incorrectly formatted
+                    itunes_artist = itunes_data.get('artistName')
+                    if itunes_artist:
+                        if artist_name and itunes_artist != artist_name:
+                            logger.debug(f"    Using iTunes artist: '{itunes_artist}' (HTML had: '{artist_name}')")
+                        artist_name = itunes_artist
+
                     album_title = itunes_data.get('collectionName')
-                    
+
                     # Extract year from releaseDate if not already found
                     if not recording_year and itunes_data.get('releaseDate'):
                         release_date = itunes_data['releaseDate']
                         year_match = re.search(r'(\d{4})', release_date)
                         if year_match:
                             recording_year = int(year_match.group(1))
-                    
+
                     # Track successful enrichment
                     self.stats['itunes_enriched'] += 1
             
