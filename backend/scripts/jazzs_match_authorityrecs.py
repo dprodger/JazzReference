@@ -196,6 +196,34 @@ class AuthorityRecommendationMatcher:
         # partial_ratio helps match "J.J. Johnson" against "Kai Winding / J.J. Johnson"
         return max(ratio, token_sort, partial)
     
+    def extract_year_patterns(self, text: str) -> set:
+        """
+        Extract year patterns from album titles.
+        Handles formats like: '47, '48, 47-48, 1947, 1947-48, etc.
+        Returns a set of normalized 2-digit year strings.
+        """
+        if not text:
+            return set()
+
+        years = set()
+
+        # Match 4-digit years (1947, 1948, etc.)
+        for match in re.finditer(r'\b(19\d{2}|20\d{2})\b', text):
+            years.add(match.group(1)[-2:])  # Keep last 2 digits
+
+        # Match 2-digit years with apostrophe ('47, '48, etc.)
+        for match in re.finditer(r"'(\d{2})\b", text):
+            years.add(match.group(1))
+
+        # Match year ranges (47-48, 1947-48, etc.)
+        for match in re.finditer(r"(\d{2,4})[-–](\d{2})\b", text):
+            first = match.group(1)
+            second = match.group(2)
+            years.add(first[-2:])  # Last 2 digits of first year
+            years.add(second)       # Second year is already 2 digits
+
+        return years
+
     def compare_albums(self, album1: Optional[str], album2: Optional[str]) -> float:
         """Compare album titles with fuzzy matching"""
         if not album1 or not album2:
@@ -212,8 +240,27 @@ class AuthorityRecommendationMatcher:
         # "The (Be)Witching Hour: Midnight Blue" vs "Midnight Blue, the (Be)witching Hour"
         token_set = fuzz.token_set_ratio(norm1, norm2)
 
-        # Return the best score
-        return max(ratio, token_sort, partial, token_set)
+        base_score = max(ratio, token_sort, partial, token_set)
+
+        # Boost score if both albums contain matching year patterns
+        # e.g., "Buddy Rich '47 '48" vs "The Legendary '47-'48 Orchestra"
+        years1 = self.extract_year_patterns(album1)
+        years2 = self.extract_year_patterns(album2)
+
+        if years1 and years2:
+            # Check if years match (at least 2 matching years, or all years from smaller set match)
+            matching_years = years1 & years2
+            min_years = min(len(years1), len(years2))
+
+            if len(matching_years) >= 2 or (min_years > 0 and len(matching_years) == min_years):
+                # Significant year overlap - boost score to meet medium confidence threshold (85%)
+                # e.g., "Buddy Rich '47 '48" vs "The Legendary '47-'48 Orchestra"
+                if base_score < 85:
+                    boosted = 86.0  # Just above the 85% threshold for album_high
+                    logger.debug(f"    Year pattern boost: {base_score:.1f}% -> {boosted:.1f}% (matching years: {matching_years})")
+                    return boosted
+
+        return base_score
     
     def compare_years(self, year1: Optional[int], year2: Optional[int]) -> bool:
         """Check if years match within tolerance"""
