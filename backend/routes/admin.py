@@ -909,6 +909,7 @@ def recommendations_review(song_id):
             song = dict(song)
 
             # Get all recommendations for this song
+            # Use subquery for performer to avoid duplicates when recording has multiple leaders
             cur.execute("""
                 SELECT
                     sar.id,
@@ -925,11 +926,15 @@ def recommendations_review(song_id):
                     sar.created_at,
                     -- If matched, get recording info
                     r.album_title AS matched_album,
-                    p.name AS matched_performer
+                    (
+                        SELECT p.name
+                        FROM recording_performers rp
+                        JOIN performers p ON rp.performer_id = p.id
+                        WHERE rp.recording_id = r.id AND rp.role = 'leader'
+                        LIMIT 1
+                    ) AS matched_performer
                 FROM song_authority_recommendations sar
                 LEFT JOIN recordings r ON sar.recording_id = r.id
-                LEFT JOIN recording_performers rp ON r.id = rp.recording_id AND rp.role = 'leader'
-                LEFT JOIN performers p ON rp.performer_id = p.id
                 WHERE sar.song_id = %s
                 ORDER BY
                     CASE WHEN sar.recording_id IS NULL THEN 0 ELSE 1 END,
