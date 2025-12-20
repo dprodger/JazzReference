@@ -150,22 +150,25 @@ HAS_BACK_COVER_SQL = """
 # For release-level queries (get_recording_releases), we check imagery for specific release
 RELEASE_ART_SMALL_SQL = """
     COALESCE(
-        (SELECT ri.image_url_small FROM release_imagery ri 
-         WHERE ri.release_id = rel.id AND ri.type = 'Front'),
+        (SELECT ri.image_url_small FROM release_imagery ri
+         WHERE ri.release_id = rel.id AND ri.type = 'Front'
+         LIMIT 1),
         rel.cover_art_small
     ) as cover_art_small"""
 
 RELEASE_ART_MEDIUM_SQL = """
     COALESCE(
-        (SELECT ri.image_url_medium FROM release_imagery ri 
-         WHERE ri.release_id = rel.id AND ri.type = 'Front'),
+        (SELECT ri.image_url_medium FROM release_imagery ri
+         WHERE ri.release_id = rel.id AND ri.type = 'Front'
+         LIMIT 1),
         rel.cover_art_medium
     ) as cover_art_medium"""
 
 RELEASE_ART_LARGE_SQL = """
     COALESCE(
-        (SELECT ri.image_url_large FROM release_imagery ri 
-         WHERE ri.release_id = rel.id AND ri.type = 'Front'),
+        (SELECT ri.image_url_large FROM release_imagery ri
+         WHERE ri.release_id = rel.id AND ri.type = 'Front'
+         LIMIT 1),
         rel.cover_art_large
     ) as cover_art_large"""
 
@@ -366,6 +369,7 @@ def get_recording_detail(recording_id):
                          LEFT JOIN recording_releases rr_sub ON rr_sub.release_id = rel_sub.id AND rr_sub.recording_id = r.id
                          WHERE rel_sub.id = r.default_release_id
                            AND (rel_sub.spotify_album_id IS NOT NULL OR rr_sub.spotify_track_id IS NOT NULL)
+                         LIMIT 1
                         ),
                         (SELECT CASE
                              WHEN rr_sub.spotify_track_id IS NOT NULL THEN 'https://open.spotify.com/track/' || rr_sub.spotify_track_id
