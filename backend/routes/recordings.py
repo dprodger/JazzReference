@@ -474,31 +474,76 @@ def get_recording_detail(recording_id):
                 JOIN songs s ON st.song_id = s.id
                 WHERE st.recording_id = %s
                 ORDER BY st.created_at DESC
+            ),
+            -- Streaming links from normalized tables (best link per service)
+            streaming_links_data AS (
+                SELECT DISTINCT ON (service)
+                    service,
+                    service_url as track_url,
+                    preview_url,
+                    -- Get album URL from release_streaming_links for same release
+                    (SELECT rsl.service_url
+                     FROM release_streaming_links rsl
+                     WHERE rsl.release_id = rr.release_id AND rsl.service = rrsl.service
+                    ) as album_url
+                FROM recording_releases rr
+                JOIN recording_release_streaming_links rrsl ON rrsl.recording_release_id = rr.id
+                WHERE rr.recording_id = %s
+                ORDER BY service, rrsl.match_confidence DESC NULLS LAST
             )
             SELECT
                 (SELECT row_to_json(recording_data.*) FROM recording_data) as recording,
                 (SELECT COALESCE(json_agg(performers_data.*), '[]'::json) FROM performers_data) as performers,
                 (SELECT COALESCE(json_agg(releases_data.*), '[]'::json) FROM releases_data) as releases,
                 (SELECT COALESCE(json_agg(authority_data.*), '[]'::json) FROM authority_data) as authority_recommendations,
-                (SELECT COALESCE(json_agg(transcriptions_data.*), '[]'::json) FROM transcriptions_data) as transcriptions
+                (SELECT COALESCE(json_agg(transcriptions_data.*), '[]'::json) FROM transcriptions_data) as transcriptions,
+                (SELECT COALESCE(json_agg(streaming_links_data.*), '[]'::json) FROM streaming_links_data) as streaming_links
         """
 
-        # Execute the single query with recording_id passed 5 times (for each CTE)
+        # Execute the single query with recording_id passed 6 times (for each CTE)
         result = db_tools.execute_query(
             combined_query,
-            (recording_id, recording_id, recording_id, recording_id, recording_id),
+            (recording_id, recording_id, recording_id, recording_id, recording_id, recording_id),
             fetch_one=True
         )
-        
+
         if not result or not result['recording']:
             return jsonify({'error': 'Recording not found'}), 404
-        
+
         # Build response from the single query result
         recording_dict = result['recording']
         recording_dict['performers'] = result['performers'] if result['performers'] else []
         recording_dict['releases'] = result['releases'] if result['releases'] else []
         recording_dict['authority_recommendations'] = result['authority_recommendations'] if result['authority_recommendations'] else []
         recording_dict['transcriptions'] = result['transcriptions'] if result['transcriptions'] else []
+
+        # Transform streaming_links from array to dict keyed by service
+        streaming_links_array = result['streaming_links'] if result['streaming_links'] else []
+        streaming_links_dict = {}
+        for link in streaming_links_array:
+            streaming_links_dict[link['service']] = {
+                'track_url': link.get('track_url'),
+                'album_url': link.get('album_url'),
+                'preview_url': link.get('preview_url')
+            }
+
+        # Add YouTube from legacy recordings.youtube_url field
+        if recording_dict.get('youtube_url'):
+            streaming_links_dict['youtube'] = {
+                'track_url': recording_dict.get('youtube_url'),
+                'album_url': None,
+                'preview_url': None
+            }
+
+        # Add legacy Spotify URL if not already in streaming_links
+        if 'spotify' not in streaming_links_dict and recording_dict.get('spotify_url'):
+            streaming_links_dict['spotify'] = {
+                'track_url': recording_dict.get('spotify_url'),
+                'album_url': None,
+                'preview_url': None
+            }
+
+        recording_dict['streaming_links'] = streaming_links_dict
 
         return jsonify(recording_dict)
         

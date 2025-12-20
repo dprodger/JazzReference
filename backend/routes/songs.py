@@ -220,7 +220,22 @@ def get_song_summary(song_id):
                     (SELECT COUNT(*)
                      FROM song_authority_recommendations
                      WHERE song_id = s.id) as authority_recommendation_count,
-                    (SELECT COUNT(*) FROM recordings WHERE song_id = s.id) as recording_count
+                    (SELECT COUNT(*) FROM recordings WHERE song_id = s.id) as recording_count,
+                    -- Check if any recording has streaming links (for play button)
+                    EXISTS(
+                        SELECT 1 FROM recordings r2
+                        JOIN recording_releases rr2 ON rr2.recording_id = r2.id
+                        JOIN recording_release_streaming_links rrsl ON rrsl.recording_release_id = rr2.id
+                        WHERE r2.song_id = s.id
+                    ) OR EXISTS(
+                        SELECT 1 FROM recordings r2
+                        WHERE r2.song_id = s.id AND r2.youtube_url IS NOT NULL
+                    ) OR EXISTS(
+                        SELECT 1 FROM recordings r2
+                        JOIN recording_releases rr2 ON rr2.recording_id = r2.id
+                        JOIN releases rel2 ON rr2.release_id = rel2.id
+                        WHERE r2.song_id = s.id AND rel2.spotify_album_id IS NOT NULL
+                    ) as has_any_streaming
                 FROM songs s
                 WHERE s.id = %s
             ),
@@ -286,7 +301,25 @@ def get_song_summary(song_id):
                     COALESCE(
                         array_agg(DISTINCT sar.source) FILTER (WHERE sar.source IS NOT NULL),
                         ARRAY[]::text[]
-                    ) as authority_sources
+                    ) as authority_sources,
+                    -- Check if any streaming link exists (for play button visibility)
+                    (
+                        EXISTS(SELECT 1 FROM recording_releases rr2
+                               JOIN recording_release_streaming_links rrsl ON rrsl.recording_release_id = rr2.id
+                               WHERE rr2.recording_id = r.id)
+                        OR r.youtube_url IS NOT NULL
+                        OR EXISTS(SELECT 1 FROM recording_releases rr2
+                                  JOIN releases rel2 ON rr2.release_id = rel2.id
+                                  WHERE rr2.recording_id = r.id AND rel2.spotify_album_id IS NOT NULL)
+                    ) as has_streaming,
+                    -- Get available streaming services as array
+                    COALESCE(
+                        (SELECT array_agg(DISTINCT rrsl.service)
+                         FROM recording_releases rr2
+                         JOIN recording_release_streaming_links rrsl ON rrsl.recording_release_id = rr2.id
+                         WHERE rr2.recording_id = r.id),
+                        ARRAY[]::varchar[]
+                    ) as streaming_services
                 FROM recordings r
                 INNER JOIN song_authority_recommendations sar ON r.id = sar.recording_id
                 LEFT JOIN releases def_rel ON r.default_release_id = def_rel.id
