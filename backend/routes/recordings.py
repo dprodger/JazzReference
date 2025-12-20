@@ -494,6 +494,7 @@ def get_recording_detail(recording_id):
                     (SELECT rsl.service_url
                      FROM release_streaming_links rsl
                      WHERE rsl.release_id = rr.release_id AND rsl.service = rrsl.service
+                     LIMIT 1
                     ) as album_url
                 FROM recording_releases rr
                 JOIN recording_release_streaming_links rrsl ON rrsl.recording_release_id = rr.id
