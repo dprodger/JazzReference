@@ -58,6 +58,15 @@ from typing import Callable, Optional
 # Add parent directory to path for imports (do this immediately)
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+# Load environment variables from .env file in backend directory
+try:
+    from dotenv import load_dotenv
+    env_path = Path(__file__).parent.parent / '.env'
+    if env_path.exists():
+        load_dotenv(env_path)
+except ImportError:
+    pass  # python-dotenv not installed, skip
+
 
 class ScriptBase:
     """Base class providing common CLI script infrastructure."""
