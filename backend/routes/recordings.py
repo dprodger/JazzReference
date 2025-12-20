@@ -34,20 +34,22 @@ recordings_bp = Blueprint('recordings', __name__)
 ALBUM_ART_SMALL_SQL = """
     COALESCE(
         -- 1. release_imagery (Front) for default release
-        (SELECT ri.image_url_small FROM release_imagery ri 
-         WHERE ri.release_id = r.default_release_id AND ri.type = 'Front'),
+        (SELECT ri.image_url_small FROM release_imagery ri
+         WHERE ri.release_id = r.default_release_id AND ri.type = 'Front'
+         LIMIT 1),
         -- 2. releases table for default release
-        (SELECT rel.cover_art_small FROM releases rel 
-         WHERE rel.id = r.default_release_id AND rel.cover_art_small IS NOT NULL),
+        (SELECT rel.cover_art_small FROM releases rel
+         WHERE rel.id = r.default_release_id AND rel.cover_art_small IS NOT NULL
+         LIMIT 1),
         -- 3. release_imagery (Front) for any linked release
-        (SELECT ri.image_url_small 
-         FROM recording_releases rr 
+        (SELECT ri.image_url_small
+         FROM recording_releases rr
          JOIN release_imagery ri ON rr.release_id = ri.release_id
          WHERE rr.recording_id = r.id AND ri.type = 'Front'
          LIMIT 1),
         -- 4. releases table for any linked release
-        (SELECT rel.cover_art_small 
-         FROM recording_releases rr 
+        (SELECT rel.cover_art_small
+         FROM recording_releases rr
          JOIN releases rel ON rr.release_id = rel.id
          WHERE rr.recording_id = r.id AND rel.cover_art_small IS NOT NULL
          ORDER BY rel.release_year DESC NULLS LAST LIMIT 1)
@@ -55,17 +57,19 @@ ALBUM_ART_SMALL_SQL = """
 
 ALBUM_ART_MEDIUM_SQL = """
     COALESCE(
-        (SELECT ri.image_url_medium FROM release_imagery ri 
-         WHERE ri.release_id = r.default_release_id AND ri.type = 'Front'),
-        (SELECT rel.cover_art_medium FROM releases rel 
-         WHERE rel.id = r.default_release_id AND rel.cover_art_medium IS NOT NULL),
-        (SELECT ri.image_url_medium 
-         FROM recording_releases rr 
+        (SELECT ri.image_url_medium FROM release_imagery ri
+         WHERE ri.release_id = r.default_release_id AND ri.type = 'Front'
+         LIMIT 1),
+        (SELECT rel.cover_art_medium FROM releases rel
+         WHERE rel.id = r.default_release_id AND rel.cover_art_medium IS NOT NULL
+         LIMIT 1),
+        (SELECT ri.image_url_medium
+         FROM recording_releases rr
          JOIN release_imagery ri ON rr.release_id = ri.release_id
          WHERE rr.recording_id = r.id AND ri.type = 'Front'
          LIMIT 1),
-        (SELECT rel.cover_art_medium 
-         FROM recording_releases rr 
+        (SELECT rel.cover_art_medium
+         FROM recording_releases rr
          JOIN releases rel ON rr.release_id = rel.id
          WHERE rr.recording_id = r.id AND rel.cover_art_medium IS NOT NULL
          ORDER BY rel.release_year DESC NULLS LAST LIMIT 1)
@@ -74,9 +78,11 @@ ALBUM_ART_MEDIUM_SQL = """
 ALBUM_ART_LARGE_SQL = """
     COALESCE(
         (SELECT ri.image_url_large FROM release_imagery ri
-         WHERE ri.release_id = r.default_release_id AND ri.type = 'Front'),
+         WHERE ri.release_id = r.default_release_id AND ri.type = 'Front'
+         LIMIT 1),
         (SELECT rel.cover_art_large FROM releases rel
-         WHERE rel.id = r.default_release_id AND rel.cover_art_large IS NOT NULL),
+         WHERE rel.id = r.default_release_id AND rel.cover_art_large IS NOT NULL
+         LIMIT 1),
         (SELECT ri.image_url_large
          FROM recording_releases rr
          JOIN release_imagery ri ON rr.release_id = ri.release_id
@@ -98,7 +104,8 @@ ALBUM_ART_LARGE_SQL = """
 BACK_COVER_SMALL_SQL = """
     COALESCE(
         (SELECT ri.image_url_small FROM release_imagery ri
-         WHERE ri.release_id = r.default_release_id AND ri.type = 'Back'),
+         WHERE ri.release_id = r.default_release_id AND ri.type = 'Back'
+         LIMIT 1),
         (SELECT ri.image_url_small
          FROM recording_releases rr
          JOIN release_imagery ri ON rr.release_id = ri.release_id
@@ -109,7 +116,8 @@ BACK_COVER_SMALL_SQL = """
 BACK_COVER_MEDIUM_SQL = """
     COALESCE(
         (SELECT ri.image_url_medium FROM release_imagery ri
-         WHERE ri.release_id = r.default_release_id AND ri.type = 'Back'),
+         WHERE ri.release_id = r.default_release_id AND ri.type = 'Back'
+         LIMIT 1),
         (SELECT ri.image_url_medium
          FROM recording_releases rr
          JOIN release_imagery ri ON rr.release_id = ri.release_id
@@ -120,7 +128,8 @@ BACK_COVER_MEDIUM_SQL = """
 BACK_COVER_LARGE_SQL = """
     COALESCE(
         (SELECT ri.image_url_large FROM release_imagery ri
-         WHERE ri.release_id = r.default_release_id AND ri.type = 'Back'),
+         WHERE ri.release_id = r.default_release_id AND ri.type = 'Back'
+         LIMIT 1),
         (SELECT ri.image_url_large
          FROM recording_releases rr
          JOIN release_imagery ri ON rr.release_id = ri.release_id
