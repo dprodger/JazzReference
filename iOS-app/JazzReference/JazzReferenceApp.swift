@@ -78,7 +78,8 @@ struct ContentView: View {
 
 struct SettingsView: View {
     @EnvironmentObject var authManager: AuthenticationManager
-    
+    @AppStorage("preferredStreamingService") private var preferredStreamingService: String = StreamingService.spotify.rawValue
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -94,7 +95,7 @@ struct SettingsView: View {
                                     .font(.system(size: 40))
                                     .foregroundColor(.white)
                             }
-                        
+
                         // Name
                         if let displayName = authManager.currentUser?.displayName {
                             Text(displayName)
@@ -102,7 +103,7 @@ struct SettingsView: View {
                                 .fontWeight(.semibold)
                                 .foregroundColor(JazzTheme.charcoal)
                         }
-                        
+
                         // Email
                         if let email = authManager.currentUser?.email {
                             Text(email)
@@ -111,10 +112,48 @@ struct SettingsView: View {
                         }
                     }
                     .padding(.top, 32)
-                    
+
                     Divider()
                         .padding(.horizontal)
-                    
+
+                    // Playback Settings Section
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Playback")
+                            .font(JazzTheme.headline())
+                            .foregroundColor(JazzTheme.charcoal)
+                            .padding(.horizontal)
+
+                        VStack(spacing: 0) {
+                            HStack {
+                                Image(systemName: "play.circle.fill")
+                                    .foregroundColor(JazzTheme.burgundy)
+                                Text("Preferred Service")
+                                    .font(JazzTheme.body())
+                                    .foregroundColor(JazzTheme.charcoal)
+                                Spacer()
+                                Picker("", selection: $preferredStreamingService) {
+                                    ForEach(StreamingService.allCases) { service in
+                                        Text(service.displayName).tag(service.rawValue)
+                                    }
+                                }
+                                .pickerStyle(.menu)
+                                .tint(JazzTheme.burgundy)
+                            }
+                            .padding()
+                            .background(JazzTheme.cardBackground)
+                            .cornerRadius(8)
+                        }
+                        .padding(.horizontal)
+
+                        Text("Play buttons will open this service when available")
+                            .font(JazzTheme.caption())
+                            .foregroundColor(JazzTheme.smokeGray)
+                            .padding(.horizontal)
+                    }
+
+                    Divider()
+                        .padding(.horizontal)
+
                     // Account Actions
                     VStack(spacing: 0) {
                         // Log Out Button
@@ -134,7 +173,7 @@ struct SettingsView: View {
                         }
                         .padding(.horizontal)
                     }
-                    
+
                     Spacer()
                 }
             }

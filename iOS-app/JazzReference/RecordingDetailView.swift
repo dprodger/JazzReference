@@ -85,19 +85,36 @@ struct RecordingDetailView: View {
     }
     
     /// Available streaming sources as (name, url) tuples
-    private var availableStreamingSources: [(name: String, icon: String, url: String, color: Color)] {
-        var sources: [(name: String, icon: String, url: String, color: Color)] = []
-        
-        if let spotifyUrl = displaySpotifyUrl {
-            sources.append((name: "Spotify", icon: "music.note", url: spotifyUrl, color: JazzTheme.teal))
+    /// Prefers new streamingLinks API, falls back to legacy fields
+    private var availableStreamingSources: [(name: String, icon: String, url: String, color: Color, service: StreamingService)] {
+        var sources: [(name: String, icon: String, url: String, color: Color, service: StreamingService)] = []
+
+        // Use new streamingLinks API if available
+        if let links = recording?.streamingLinks {
+            if let spotifyLink = links["spotify"], let url = spotifyLink.bestPlaybackUrl {
+                sources.append((name: "Spotify", icon: "music.note.list", url: url, color: StreamingService.spotify.brandColor, service: .spotify))
+            }
+            if let appleLink = links["apple_music"], let url = appleLink.bestPlaybackUrl {
+                sources.append((name: "Apple Music", icon: "music.note", url: url, color: StreamingService.appleMusic.brandColor, service: .appleMusic))
+            }
+            if let youtubeLink = links["youtube"], let url = youtubeLink.bestPlaybackUrl {
+                sources.append((name: "YouTube", icon: "play.rectangle.fill", url: url, color: StreamingService.youtube.brandColor, service: .youtube))
+            }
         }
-        if let youtubeUrl = recording?.youtubeUrl {
-            sources.append((name: "YouTube", icon: "play.rectangle.fill", url: youtubeUrl, color: JazzTheme.burgundy))
+
+        // Fall back to legacy fields if no streamingLinks
+        if sources.isEmpty {
+            if let spotifyUrl = displaySpotifyUrl {
+                sources.append((name: "Spotify", icon: "music.note.list", url: spotifyUrl, color: StreamingService.spotify.brandColor, service: .spotify))
+            }
+            if let appleMusicUrl = recording?.appleMusicUrl {
+                sources.append((name: "Apple Music", icon: "music.note", url: appleMusicUrl, color: StreamingService.appleMusic.brandColor, service: .appleMusic))
+            }
+            if let youtubeUrl = recording?.youtubeUrl {
+                sources.append((name: "YouTube", icon: "play.rectangle.fill", url: youtubeUrl, color: StreamingService.youtube.brandColor, service: .youtube))
+            }
         }
-        if let appleMusicUrl = recording?.appleMusicUrl {
-            sources.append((name: "Apple Music", icon: "applelogo", url: appleMusicUrl, color: JazzTheme.amber))
-        }
-        
+
         return sources
     }
     
@@ -256,6 +273,11 @@ struct RecordingDetailView: View {
                                 Text("Composed by \(composer)")
                                     .font(JazzTheme.subheadline())
                                     .foregroundColor(JazzTheme.smokeGray)
+                            }
+
+                            // Streaming services indicator
+                            if hasStreamingSource {
+                                streamingServicesIndicator
                             }
                         }
                         .padding()
@@ -608,6 +630,40 @@ struct RecordingDetailView: View {
         .cornerRadius(8)
     }
     
+    // MARK: - Streaming Services Indicator
+
+    private var streamingServicesIndicator: some View {
+        HStack(spacing: 12) {
+            Text("Listen on")
+                .font(JazzTheme.caption())
+                .foregroundColor(JazzTheme.smokeGray)
+
+            ForEach(availableStreamingSources, id: \.url) { source in
+                Button {
+                    if let url = URL(string: source.url) {
+                        openURL(url)
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: source.icon)
+                            .font(.system(size: 14))
+                        Text(source.name)
+                            .font(JazzTheme.caption())
+                    }
+                    .foregroundColor(source.color)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(source.color.opacity(0.15))
+                    .cornerRadius(16)
+                }
+                .buttonStyle(.plain)
+            }
+
+            Spacer()
+        }
+        .padding(.top, 8)
+    }
+
     // MARK: - Album Art Placeholder
 
     private var albumArtPlaceholder: some View {

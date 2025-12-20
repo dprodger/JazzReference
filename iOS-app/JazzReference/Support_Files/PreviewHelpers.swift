@@ -32,7 +32,8 @@ extension Song {
         recordingCount: 2,
         featuredRecordings: [Recording.preview1],
         transcriptions: [SoloTranscription.preview1, SoloTranscription.preview2],
-        transcriptionCount: 2
+        transcriptionCount: 2,
+        hasAnyStreaming: true
     )
 
     static let previewNoRecordings = Song(
@@ -52,7 +53,8 @@ extension Song {
         recordingCount: 0,
         featuredRecordings: nil,
         transcriptions: [],
-        transcriptionCount: 0
+        transcriptionCount: 0,
+        hasAnyStreaming: false
     )
 }
 
@@ -83,7 +85,26 @@ extension Recording {
         performers: [Performer.preview1, Performer.preview2, Performer.preview3],
         composer: "Paul Desmond",
         releases: [Release.preview, Release.previewNoSpotify],
-        transcriptions: [SoloTranscription.preview1]
+        transcriptions: [SoloTranscription.preview1],
+        streamingLinks: [
+            "spotify": StreamingLink(
+                trackUrl: "https://open.spotify.com/track/example",
+                albumUrl: "https://open.spotify.com/album/example",
+                previewUrl: nil
+            ),
+            "apple_music": StreamingLink(
+                trackUrl: "https://music.apple.com/album/example",
+                albumUrl: nil,
+                previewUrl: nil
+            ),
+            "youtube": StreamingLink(
+                trackUrl: "https://youtube.com/watch?v=example",
+                albumUrl: nil,
+                previewUrl: nil
+            )
+        ],
+        hasStreaming: true,
+        streamingServices: ["spotify", "apple_music", "youtube"]
     )
     
     static let preview2 = Recording(
@@ -112,7 +133,21 @@ extension Recording {
         performers: [Performer.preview1, Performer.preview4],
         composer: "Paul Desmond",
         releases: nil,
-        transcriptions: nil
+        transcriptions: nil,
+        streamingLinks: [
+            "spotify": StreamingLink(
+                trackUrl: "https://open.spotify.com/track/example",
+                albumUrl: nil,
+                previewUrl: nil
+            ),
+            "youtube": StreamingLink(
+                trackUrl: "https://youtube.com/watch?v=example2",
+                albumUrl: nil,
+                previewUrl: nil
+            )
+        ],
+        hasStreaming: true,
+        streamingServices: ["spotify", "youtube"]
     )
 
     static let previewMinimal = Recording(
@@ -141,7 +176,10 @@ extension Recording {
         performers: nil,
         composer: nil,
         releases: nil,
-        transcriptions: nil
+        transcriptions: nil,
+        streamingLinks: nil,
+        hasStreaming: false,
+        streamingServices: nil
     )
 }
 

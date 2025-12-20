@@ -38,6 +38,9 @@ struct Song: Identifiable, Codable {
 
     var authorityRecommendationCount: Int?
 
+    // NEW: Whether any recording has streaming links (for play button visibility)
+    let hasAnyStreaming: Bool?
+
     enum CodingKeys: String, CodingKey {
         case id, title, composer, structure
         case composedYear = "composed_year"
@@ -54,6 +57,7 @@ struct Song: Identifiable, Codable {
         case transcriptions
         case transcriptionCount = "transcription_count"
         case authorityRecommendationCount = "authority_recommendation_count"
+        case hasAnyStreaming = "has_any_streaming"
     }
 
     var hasAuthorityRecommendations: Bool {
@@ -133,6 +137,15 @@ struct Recording: Codable, Identifiable {
     // Transcriptions for this recording (only populated on recording detail)
     let transcriptions: [SoloTranscription]?
 
+    // NEW: Streaming links by service (spotify, apple_music, youtube)
+    let streamingLinks: [String: StreamingLink]?
+
+    // NEW: Whether this recording has any streaming links available
+    let hasStreaming: Bool?
+
+    // NEW: List of streaming services available for this recording
+    let streamingServices: [String]?
+
     enum CodingKeys: String, CodingKey {
         case id, label, notes, composer, performers, releases, transcriptions
         case songId = "song_id"
@@ -157,6 +170,9 @@ struct Recording: Codable, Identifiable {
         case authorityCount = "authority_count"
         case authoritySources = "authority_sources"
         case authorityRecommendations = "authority_recommendations"
+        case streamingLinks = "streaming_links"
+        case hasStreaming = "has_streaming"
+        case streamingServices = "streaming_services"
     }
     
     // Helper computed properties
@@ -278,6 +294,138 @@ struct Recording: Codable, Identifiable {
     var hasReleases: Bool {
         guard let releases = releases else { return false }
         return !releases.isEmpty
+    }
+
+    // MARK: - Streaming Link Helpers
+
+    /// Whether any streaming service is available
+    var hasAnyStreamingLink: Bool {
+        if let hasStreaming = hasStreaming {
+            return hasStreaming
+        }
+        guard let links = streamingLinks else { return false }
+        return !links.isEmpty
+    }
+
+    /// Get streaming link for a specific service
+    func streamingLink(for service: String) -> StreamingLink? {
+        streamingLinks?[service]
+    }
+
+    /// Get the best playback URL for the preferred service, with fallback
+    func playbackUrl(preferring preferredService: String) -> (service: String, url: String)? {
+        // Try preferred service first
+        if let link = streamingLinks?[preferredService], let url = link.bestPlaybackUrl {
+            return (preferredService, url)
+        }
+        // Fall back to any available service
+        if let links = streamingLinks {
+            for (service, link) in links {
+                if let url = link.bestPlaybackUrl {
+                    return (service, url)
+                }
+            }
+        }
+        // Legacy fallback to old URL fields
+        if let url = bestSpotifyUrl {
+            return ("spotify", url)
+        }
+        if let url = appleMusicUrl {
+            return ("apple_music", url)
+        }
+        if let url = youtubeUrl {
+            return ("youtube", url)
+        }
+        return nil
+    }
+
+    /// Ordered list of available streaming services for UI display
+    var availableStreamingServices: [String] {
+        if let services = streamingServices {
+            return services
+        }
+        var services: [String] = []
+        if let links = streamingLinks {
+            services = Array(links.keys).sorted()
+        }
+        // Add legacy services if not already present
+        if bestSpotifyUrl != nil && !services.contains("spotify") {
+            services.append("spotify")
+        }
+        if appleMusicUrl != nil && !services.contains("apple_music") {
+            services.append("apple_music")
+        }
+        if youtubeUrl != nil && !services.contains("youtube") {
+            services.append("youtube")
+        }
+        return services
+    }
+}
+
+// MARK: - Streaming Link Model
+
+struct StreamingLink: Codable {
+    let trackUrl: String?
+    let albumUrl: String?
+    let previewUrl: String?
+
+    enum CodingKeys: String, CodingKey {
+        case trackUrl = "track_url"
+        case albumUrl = "album_url"
+        case previewUrl = "preview_url"
+    }
+
+    /// Best available URL for playback (prefer track, fall back to album)
+    var bestPlaybackUrl: String? {
+        trackUrl ?? albumUrl
+    }
+}
+
+// MARK: - Streaming Service Enum
+
+enum StreamingService: String, CaseIterable, Identifiable {
+    case spotify = "spotify"
+    case appleMusic = "apple_music"
+    case youtube = "youtube"
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .spotify: return "Spotify"
+        case .appleMusic: return "Apple Music"
+        case .youtube: return "YouTube"
+        }
+    }
+
+    var iconName: String {
+        switch self {
+        case .spotify: return "music.note.list"
+        case .appleMusic: return "music.note"
+        case .youtube: return "play.rectangle.fill"
+        }
+    }
+
+    var brandColor: Color {
+        switch self {
+        case .spotify: return Color(red: 30/255, green: 215/255, blue: 96/255)  // Spotify green
+        case .appleMusic: return Color(red: 252/255, green: 60/255, blue: 68/255)  // Apple Music red
+        case .youtube: return Color(red: 255/255, green: 0/255, blue: 0/255)  // YouTube red
+        }
+    }
+
+    /// URL scheme for opening the app directly
+    var urlScheme: String? {
+        switch self {
+        case .spotify: return "spotify"
+        case .appleMusic: return "music"
+        case .youtube: return "youtube"
+        }
+    }
+
+    /// Initialize from a service key string (e.g., "spotify", "apple_music")
+    init?(key: String) {
+        self.init(rawValue: key)
     }
 }
 

@@ -52,7 +52,10 @@ struct SongDetailView: View {
     // NEW: Summary Information section expansion state (starts collapsed)
     @State private var isSummaryInfoExpanded = false
 
-    
+    // Playback preference
+    @AppStorage("preferredStreamingService") private var preferredStreamingService: String = StreamingService.spotify.rawValue
+    @Environment(\.openURL) private var openURL
+
     // MARK: - Initializer
     init(songId: String, allSongs: [Song] = [], repertoireId: String = "all") {
         self.songId = songId
@@ -161,6 +164,46 @@ struct SongDetailView: View {
     private func hasAuthoritativeRecordings(for song: Song) -> Bool {
         guard let featured = song.featuredRecordings else { return false }
         return !featured.isEmpty
+    }
+
+    // MARK: - Playback Helpers
+
+    /// Whether any recording has streaming links available
+    private var canPlay: Bool {
+        guard let song = song else { return false }
+        return song.hasAnyStreaming == true
+    }
+
+    /// Get the best playback URL for the song (from first featured or first available recording)
+    private var bestPlaybackInfo: (service: String, url: String)? {
+        guard let song = song else { return nil }
+
+        // First try featured recordings
+        if let featured = song.featuredRecordings {
+            for recording in featured {
+                if let playback = recording.playbackUrl(preferring: preferredStreamingService) {
+                    return playback
+                }
+            }
+        }
+
+        // Then try all recordings
+        if let recordings = song.recordings {
+            for recording in recordings {
+                if let playback = recording.playbackUrl(preferring: preferredStreamingService) {
+                    return playback
+                }
+            }
+        }
+
+        return nil
+    }
+
+    /// Open the best available playback URL
+    private func openPlayback() {
+        guard let playback = bestPlaybackInfo,
+              let url = URL(string: playback.url) else { return }
+        openURL(url)
     }
     
     // MARK: - Song Content View
@@ -480,14 +523,35 @@ struct SongDetailView: View {
     }
     
     // MARK: - Toolbar Content
-    
+
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
         ToolbarItem(placement: .navigationBarTrailing) {
-            Button(action: { showAddToRepertoireSheet = true }) {
-                Image(systemName: "plus.circle")
+            HStack(spacing: 16) {
+                // Play button - only show if streaming is available
+                if canPlay {
+                    Button(action: openPlayback) {
+                        Image(systemName: "play.circle.fill")
+                            .font(.system(size: 22))
+                            .foregroundColor(playButtonColor)
+                    }
+                }
+
+                // Add to repertoire button
+                Button(action: { showAddToRepertoireSheet = true }) {
+                    Image(systemName: "plus.circle")
+                }
             }
         }
+    }
+
+    /// Color for play button based on which service will be used
+    private var playButtonColor: Color {
+        guard let playback = bestPlaybackInfo,
+              let service = StreamingService(key: playback.service) else {
+            return JazzTheme.burgundy
+        }
+        return service.brandColor
     }
     
     // MARK: - Navigation Arrow
