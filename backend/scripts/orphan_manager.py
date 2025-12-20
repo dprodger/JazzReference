@@ -22,8 +22,8 @@ from dotenv import load_dotenv
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-# Load .env from scripts directory
-load_dotenv(Path(__file__).parent / '.env')
+# Load .env from backend directory
+load_dotenv(Path(__file__).parent.parent / '.env')
 
 from db_utils import get_db_connection
 from mb_utils import MusicBrainzSearcher
