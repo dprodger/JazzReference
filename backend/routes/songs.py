@@ -480,7 +480,44 @@ def get_song_recordings(song_id):
                 COALESCE(
                     array_agg(DISTINCT sar.source) FILTER (WHERE sar.source IS NOT NULL),
                     ARRAY[]::text[]
-                ) as authority_sources
+                ) as authority_sources,
+                -- Streaming availability flags from normalized tables
+                (
+                    EXISTS(SELECT 1 FROM recording_releases rr2
+                           JOIN recording_release_streaming_links rrsl ON rrsl.recording_release_id = rr2.id
+                           WHERE rr2.recording_id = r.id)
+                    OR r.youtube_url IS NOT NULL
+                    OR EXISTS(SELECT 1 FROM recording_releases rr2
+                              JOIN releases rel2 ON rr2.release_id = rel2.id
+                              WHERE rr2.recording_id = r.id AND rel2.spotify_album_id IS NOT NULL)
+                ) as has_streaming,
+                -- Per-service availability
+                (
+                    EXISTS(SELECT 1 FROM recording_releases rr2
+                           JOIN recording_release_streaming_links rrsl ON rrsl.recording_release_id = rr2.id
+                           WHERE rr2.recording_id = r.id AND rrsl.service = 'spotify')
+                    OR EXISTS(SELECT 1 FROM recording_releases rr2
+                              JOIN releases rel2 ON rr2.release_id = rel2.id
+                              WHERE rr2.recording_id = r.id AND rel2.spotify_album_id IS NOT NULL)
+                ) as has_spotify,
+                EXISTS(SELECT 1 FROM recording_releases rr2
+                       JOIN recording_release_streaming_links rrsl ON rrsl.recording_release_id = rr2.id
+                       WHERE rr2.recording_id = r.id AND rrsl.service = 'apple_music'
+                ) as has_apple_music,
+                (
+                    EXISTS(SELECT 1 FROM recording_releases rr2
+                           JOIN recording_release_streaming_links rrsl ON rrsl.recording_release_id = rr2.id
+                           WHERE rr2.recording_id = r.id AND rrsl.service = 'youtube')
+                    OR r.youtube_url IS NOT NULL
+                ) as has_youtube,
+                -- Available streaming services as array
+                COALESCE(
+                    (SELECT array_agg(DISTINCT rrsl.service)
+                     FROM recording_releases rr2
+                     JOIN recording_release_streaming_links rrsl ON rrsl.recording_release_id = rr2.id
+                     WHERE rr2.recording_id = r.id),
+                    ARRAY[]::varchar[]
+                ) as streaming_services
             FROM recordings r
             LEFT JOIN releases def_rel ON r.default_release_id = def_rel.id
             LEFT JOIN recording_performers rp ON r.id = rp.recording_id
