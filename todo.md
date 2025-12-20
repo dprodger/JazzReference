@@ -116,6 +116,37 @@ Data problems:
 * what to do with song that has two or more musicbrainz IDs? (A Child Is Born is a good example of this)
 
 
+## Apple Music Catalog Hosting Analysis (2025-12-20)
+
+**Current situation:**
+- Apple Music catalog: ~20GB albums + ~40GB songs as parquet files
+- Built indexed DuckDB database: 12GB (albums-only mode)
+- Currently on laptop, not accessible to Render-hosted backend
+- Need access for song_research thread to match recordings
+
+**Recommended: MotherDuck (DuckDB Cloud)**
+
+Why it fits for this project:
+- **Simplicity**: Upload existing DuckDB file, change one connection string, done
+- **Cost**: Free tier includes 10GB storage and 10M query units/month
+  - 12GB DB is slightly over free tier - either pay small overage or trim fields
+- **Performance**: Cloud infrastructure, faster than laptop, queries run server-side
+- **Batch-friendly**: No paying for idle time, just when actually querying
+
+Migration steps:
+1. Sign up at motherduck.com
+2. Upload `apple_music_catalog.duckdb` file
+3. Update `AppleMusicCatalog` class to connect via `md:` connection string
+4. Done
+
+**Alternative options considered:**
+- S3 + DuckDB httpfs: Very cheap storage (~$0.30/month), but slower queries
+- Small VM (DigitalOcean): $5-10/month, full control, another server to manage
+- Render Persistent Disk: Everything in one place, but max 100GB and extra cost
+- Load into PostgreSQL: Single database, but adds 12GB+ and different query patterns
+
+---
+
 Overall approach:
 
 for each entity, provide a script to "research them"
