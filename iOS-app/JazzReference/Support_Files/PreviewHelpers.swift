@@ -104,9 +104,12 @@ extension Recording {
             )
         ],
         hasStreaming: true,
+        hasSpotify: true,
+        hasAppleMusic: true,
+        hasYoutube: true,
         streamingServices: ["spotify", "apple_music", "youtube"]
     )
-    
+
     static let preview2 = Recording(
         id: "preview-recording-2",
         songId: "preview-song-1",
@@ -147,6 +150,9 @@ extension Recording {
             )
         ],
         hasStreaming: true,
+        hasSpotify: true,
+        hasAppleMusic: false,
+        hasYoutube: true,
         streamingServices: ["spotify", "youtube"]
     )
 
@@ -179,6 +185,9 @@ extension Recording {
         transcriptions: nil,
         streamingLinks: nil,
         hasStreaming: false,
+        hasSpotify: false,
+        hasAppleMusic: false,
+        hasYoutube: false,
         streamingServices: nil
     )
 }

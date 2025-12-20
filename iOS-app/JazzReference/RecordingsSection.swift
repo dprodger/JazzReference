@@ -12,8 +12,41 @@ import SwiftUI
 
 // MARK: - Song Recording Filter Enum
 enum SongRecordingFilter: String, CaseIterable {
-    case withSpotify = "With Spotify"
     case all = "All"
+    case playable = "Playable"
+    case withSpotify = "With Spotify"
+    case withAppleMusic = "With Apple Music"
+
+    var displayName: String {
+        rawValue
+    }
+
+    var subtitle: String {
+        switch self {
+        case .all: return "Show all recordings"
+        case .playable: return "Any streaming service available"
+        case .withSpotify: return "Recordings available on Spotify"
+        case .withAppleMusic: return "Recordings available on Apple Music"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .all: return "music.note.list"
+        case .playable: return "play.circle"
+        case .withSpotify: return "music.note.list"
+        case .withAppleMusic: return "music.note"
+        }
+    }
+
+    var iconColor: Color {
+        switch self {
+        case .all: return JazzTheme.smokeGray
+        case .playable: return JazzTheme.burgundy
+        case .withSpotify: return StreamingService.spotify.brandColor
+        case .withAppleMusic: return StreamingService.appleMusic.brandColor
+        }
+    }
 }
 
 // MARK: - Instrument Family Enum
@@ -65,7 +98,7 @@ struct RecordingsSection: View {
     // Callback when sort order changes (for parent to reload data)
     var onSortOrderChanged: ((RecordingSortOrder) -> Void)?
 
-    @State private var selectedFilter: SongRecordingFilter = .withSpotify
+    @State private var selectedFilter: SongRecordingFilter = .all
     @State private var selectedInstrument: InstrumentFamily? = nil
     @State private var showFilterSheet: Bool = false
     @State private var isSectionExpanded: Bool = true
@@ -235,11 +268,12 @@ struct RecordingsSection: View {
     @ViewBuilder
     private var filterChipsBar: some View {
         HStack(spacing: 8) {
-            // Active filter chips
-            if selectedFilter == .withSpotify {
+            // Active filter chips for streaming service
+            if selectedFilter != .all {
                 FilterChip(
-                    label: "Spotify",
-                    icon: "music.note",
+                    label: selectedFilter.displayName,
+                    icon: selectedFilter.icon,
+                    iconColor: selectedFilter.iconColor,
                     onRemove: { selectedFilter = .all }
                 )
             }
@@ -273,7 +307,7 @@ struct RecordingsSection: View {
     }
 
     private var hasActiveFilters: Bool {
-        selectedFilter == .withSpotify || selectedInstrument != nil
+        selectedFilter != .all || selectedInstrument != nil
     }
 
     // MARK: - Computed Properties
@@ -310,13 +344,25 @@ struct RecordingsSection: View {
             }
         }
         
-        // Then, apply Spotify filter
+        // Then, apply streaming service filter
         switch selectedFilter {
-        case .withSpotify:
-            // Use bestSpotifyUrl which checks releases first, then falls back to recording URL
-            result = result.filter { $0.bestSpotifyUrl != nil }
         case .all:
             break
+        case .playable:
+            // Any streaming service available
+            result = result.filter {
+                $0.hasStreaming == true || $0.hasAnyStreamingLink
+            }
+        case .withSpotify:
+            // Use API's has_spotify flag, fall back to legacy checks
+            result = result.filter {
+                $0.hasSpotify == true || $0.bestSpotifyUrl != nil
+            }
+        case .withAppleMusic:
+            // Use API's has_apple_music flag
+            result = result.filter {
+                $0.hasAppleMusic == true
+            }
         }
         
         return result
@@ -422,6 +468,8 @@ struct RecordingsSection: View {
 struct FilterChip: View {
     let label: String
     let icon: String?
+    var iconColor: Color? = nil
+    var backgroundColor: Color? = nil
     let onRemove: () -> Void
 
     var body: some View {
@@ -429,6 +477,7 @@ struct FilterChip: View {
             if let icon = icon {
                 Image(systemName: icon)
                     .font(JazzTheme.caption())
+                    .foregroundColor(iconColor ?? .white)
             }
 
             Text(label)
@@ -443,7 +492,7 @@ struct FilterChip: View {
         .foregroundColor(.white)
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
-        .background(JazzTheme.brass)
+        .background(backgroundColor ?? JazzTheme.brass)
         .cornerRadius(16)
     }
 }

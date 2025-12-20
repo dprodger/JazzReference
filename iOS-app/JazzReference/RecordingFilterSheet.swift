@@ -26,23 +26,20 @@ struct RecordingFilterSheet: View {
                             .foregroundColor(JazzTheme.charcoal)
 
                         VStack(spacing: 0) {
-                            availabilityRow(
-                                title: "All recordings",
-                                subtitle: "Show all recordings",
-                                isSelected: selectedFilter == .all
-                            ) {
-                                selectedFilter = .all
-                            }
-
-                            Divider()
-                                .padding(.leading, 44)
-
-                            availabilityRow(
-                                title: "With Spotify",
-                                subtitle: "Only recordings you can play",
-                                isSelected: selectedFilter == .withSpotify
-                            ) {
-                                selectedFilter = .withSpotify
+                            ForEach(Array(SongRecordingFilter.allCases.enumerated()), id: \.element) { index, filter in
+                                if index > 0 {
+                                    Divider()
+                                        .padding(.leading, 44)
+                                }
+                                availabilityRow(
+                                    title: filter.displayName,
+                                    subtitle: filter.subtitle,
+                                    icon: filter.icon,
+                                    iconColor: filter.iconColor,
+                                    isSelected: selectedFilter == filter
+                                ) {
+                                    selectedFilter = filter
+                                }
                             }
                         }
                         .background(Color.white)
@@ -108,6 +105,8 @@ struct RecordingFilterSheet: View {
     private func availabilityRow(
         title: String,
         subtitle: String,
+        icon: String,
+        iconColor: Color,
         isSelected: Bool,
         action: @escaping () -> Void
     ) -> some View {
@@ -118,9 +117,14 @@ struct RecordingFilterSheet: View {
                     .foregroundColor(isSelected ? JazzTheme.burgundy : JazzTheme.smokeGray.opacity(0.5))
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(title)
-                        .font(JazzTheme.body())
-                        .foregroundColor(JazzTheme.charcoal)
+                    HStack(spacing: 6) {
+                        Image(systemName: icon)
+                            .font(JazzTheme.caption())
+                            .foregroundColor(iconColor)
+                        Text(title)
+                            .font(JazzTheme.body())
+                            .foregroundColor(JazzTheme.charcoal)
+                    }
                     Text(subtitle)
                         .font(JazzTheme.caption())
                         .foregroundColor(JazzTheme.smokeGray)
@@ -171,7 +175,7 @@ struct RecordingFilterSheet: View {
     // MARK: - Helpers
 
     private var hasActiveFilters: Bool {
-        selectedFilter == .withSpotify || selectedInstrument != nil
+        selectedFilter != .all || selectedInstrument != nil
     }
 
     private func clearAllFilters() {

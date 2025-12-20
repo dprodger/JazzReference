@@ -143,6 +143,11 @@ struct Recording: Codable, Identifiable {
     // NEW: Whether this recording has any streaming links available
     let hasStreaming: Bool?
 
+    // NEW: Per-service availability flags (for filtering)
+    let hasSpotify: Bool?
+    let hasAppleMusic: Bool?
+    let hasYoutube: Bool?
+
     // NEW: List of streaming services available for this recording
     let streamingServices: [String]?
 
@@ -172,6 +177,9 @@ struct Recording: Codable, Identifiable {
         case authorityRecommendations = "authority_recommendations"
         case streamingLinks = "streaming_links"
         case hasStreaming = "has_streaming"
+        case hasSpotify = "has_spotify"
+        case hasAppleMusic = "has_apple_music"
+        case hasYoutube = "has_youtube"
         case streamingServices = "streaming_services"
     }
     
