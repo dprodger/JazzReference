@@ -1,0 +1,748 @@
+"""
+Apple Music Matching Utilities
+
+Core business logic for matching releases to Apple Music albums.
+
+This module provides the AppleMusicMatcher class which handles:
+- Apple Music API search and lookup
+- Fuzzy matching and validation of albums and tracks
+- Database updates for streaming links and artwork
+- Caching of API responses to minimize rate limiting
+
+Supports two data sources:
+1. Local catalog (via Apple Music Feed) - preferred, no rate limits
+2. iTunes Search API - fallback, has aggressive rate limiting
+
+Uses the normalized streaming_links tables for storage.
+
+Used by:
+- scripts/match_apple_tracks.py (CLI interface)
+- song_research.py (background worker)
+"""
+
+import logging
+from typing import Dict, Any, Optional, List
+
+from db_utils import get_db_connection
+
+from apple_music_client import (
+    AppleMusicClient,
+    AppleMusicRateLimitError,
+    _CACHE_MISS,
+    build_apple_music_album_url,
+    build_apple_music_track_url,
+    SERVICE_NAME,
+)
+from apple_music_db import (
+    find_song_by_name,
+    find_song_by_id,
+    get_releases_for_song,
+    get_recordings_for_release,
+    upsert_release_streaming_link,
+    upsert_track_streaming_link,
+    upsert_release_imagery,
+)
+
+# Optional: Apple Music Feed catalog (much faster, no rate limits)
+try:
+    from apple_music_feed import AppleMusicCatalog, PYARROW_AVAILABLE
+    FEED_AVAILABLE = PYARROW_AVAILABLE
+except ImportError:
+    FEED_AVAILABLE = False
+    AppleMusicCatalog = None
+
+# Reuse matching utilities from Spotify - they're service-agnostic
+from spotify_matching import (
+    strip_ensemble_suffix,
+    strip_live_suffix,
+    normalize_for_comparison,
+    calculate_similarity,
+    is_substring_title_match,
+    extract_primary_artist,
+    validate_track_match,
+    validate_album_match,
+    is_compilation_artist,
+)
+
+logger = logging.getLogger(__name__)
+
+
+class AppleMusicMatcher:
+    """
+    Handles matching releases to Apple Music albums with fuzzy validation and caching.
+    """
+
+    def __init__(
+        self,
+        dry_run: bool = False,
+        strict_mode: bool = True,
+        force_refresh: bool = False,
+        artist_filter: str = None,
+        cache_days: int = 30,
+        rate_limit_delay: float = 0.2,
+        max_retries: int = 3,
+        rematch: bool = False,
+        logger: logging.Logger = None,
+        progress_callback=None,
+        use_local_catalog: bool = True,
+        local_catalog_only: bool = False,
+    ):
+        """
+        Initialize Apple Music Matcher
+
+        Args:
+            dry_run: If True, show what would be matched without making changes
+            strict_mode: If True, use stricter validation thresholds
+            force_refresh: If True, ignore cache and fetch fresh data
+            artist_filter: Filter releases by specific artist
+            cache_days: Days before cache expires
+            rate_limit_delay: Delay between API calls
+            max_retries: Max retries for rate-limited requests
+            rematch: If True, re-evaluate releases that already have Apple Music
+            logger: Optional logger instance
+            progress_callback: Optional callback(phase, current, total)
+            use_local_catalog: If True, use downloaded Apple Music catalog first
+            local_catalog_only: If True, don't fall back to API (avoids rate limits)
+        """
+        self.dry_run = dry_run
+        self.strict_mode = strict_mode
+        self.artist_filter = artist_filter
+        self.rematch = rematch
+        self.logger = logger or logging.getLogger(__name__)
+        self.progress_callback = progress_callback
+        self.use_local_catalog = use_local_catalog
+        self.local_catalog_only = local_catalog_only
+
+        # Initialize local catalog if available and requested
+        self.catalog = None
+        if use_local_catalog and FEED_AVAILABLE:
+            try:
+                self.catalog = AppleMusicCatalog(logger=self.logger)
+                # Try to verify catalog has data
+                stats = self.catalog.get_catalog_stats()
+                if stats.get('albums'):
+                    self.logger.info("Using local Apple Music catalog for matching")
+                else:
+                    self.logger.debug("Local catalog exists but has no album data")
+                    self.catalog = None
+            except FileNotFoundError:
+                self.logger.debug("Local Apple Music catalog not found, will use API")
+                self.catalog = None
+            except Exception as e:
+                self.logger.warning(f"Failed to load local catalog: {e}")
+                self.catalog = None
+
+        # Initialize API client (used as fallback or primary if no catalog)
+        self.client = AppleMusicClient(
+            cache_days=cache_days,
+            force_refresh=force_refresh,
+            rate_limit_delay=rate_limit_delay,
+            max_retries=max_retries,
+            logger=self.logger,
+        )
+
+        # Stats tracking
+        self.stats = {
+            'releases_processed': 0,
+            'releases_with_apple_music': 0,
+            'releases_matched': 0,
+            'releases_no_match': 0,
+            'releases_skipped': 0,
+            'tracks_matched': 0,
+            'tracks_no_match': 0,
+            'artwork_added': 0,
+            'errors': 0,
+            'cache_hits': 0,
+            'api_calls': 0,
+            'local_catalog_hits': 0,
+        }
+
+        # Validation thresholds
+        if strict_mode:
+            self.min_artist_similarity = 75
+            self.min_album_similarity = 65
+            self.min_track_similarity = 85
+        else:
+            self.min_artist_similarity = 65
+            self.min_album_similarity = 55
+            self.min_track_similarity = 75
+
+    def match_releases(self, song_identifier: str) -> Dict[str, Any]:
+        """
+        Match all releases for a song to Apple Music.
+
+        This is the main entry point for matching.
+
+        Args:
+            song_identifier: Song title or ID (with optional 'song-' prefix)
+
+        Returns:
+            Dict with 'success', 'song', 'stats', and 'message' keys
+        """
+        # Look up the song
+        if song_identifier.startswith('song-') or self._is_uuid(song_identifier):
+            song = find_song_by_id(song_identifier)
+        else:
+            song = find_song_by_name(song_identifier)
+
+        if not song:
+            return {
+                'success': False,
+                'song': None,
+                'stats': self.stats,
+                'message': f"Song not found: {song_identifier}"
+            }
+
+        song_id = str(song['id'])
+        song_title = song['title']
+
+        self.logger.info(f"Matching Apple Music for: {song_title}")
+
+        # Get all releases for this song
+        releases = get_releases_for_song(song_id, self.artist_filter)
+
+        if not releases:
+            return {
+                'success': True,
+                'song': song,
+                'stats': self.stats,
+                'message': f"No releases found for song: {song_title}"
+            }
+
+        self.logger.info(f"Found {len(releases)} releases to process")
+
+        # Process each release
+        with get_db_connection() as conn:
+            for i, release in enumerate(releases):
+                if self.progress_callback:
+                    self.progress_callback('matching', i + 1, len(releases))
+
+                self._process_release(conn, song_id, song_title, release)
+
+        # Aggregate client stats
+        self.stats['cache_hits'] = self.client.stats.get('cache_hits', 0)
+        self.stats['api_calls'] = self.client.stats.get('api_calls', 0)
+
+        return {
+            'success': True,
+            'song': song,
+            'stats': self.stats,
+            'message': f"Processed {len(releases)} releases"
+        }
+
+    def _process_release(
+        self,
+        conn,
+        song_id: str,
+        song_title: str,
+        release: Dict
+    ) -> None:
+        """
+        Process a single release, matching it to Apple Music.
+
+        Args:
+            conn: Database connection
+            song_id: Our song ID
+            song_title: Song title for track matching
+            release: Release dict from database
+        """
+        release_id = str(release['id'])
+        release_title = release['title']
+        artist_credit = release['artist_credit'] or ''
+        release_year = release.get('release_year')
+
+        self.stats['releases_processed'] += 1
+
+        # Check if already matched
+        if release.get('has_apple_music') and not self.rematch:
+            self.logger.debug(f"  Skipping (already has Apple Music): {release_title}")
+            self.stats['releases_skipped'] += 1
+            self.stats['releases_with_apple_music'] += 1
+            return
+
+        self.logger.info(f"  Processing: {artist_credit} - {release_title}")
+
+        # Search Apple Music for this album
+        apple_album = self._search_and_validate_album(
+            artist_credit, release_title, release_year
+        )
+
+        if not apple_album:
+            self.logger.info(f"    No match found")
+            self.stats['releases_no_match'] += 1
+            return
+
+        # Found a match - update the database
+        album_id = apple_album['id']
+        album_url = build_apple_music_album_url(album_id)
+        match_confidence = apple_album.get('_match_confidence', 0.8)
+
+        self.logger.info(f"    Matched: {apple_album['artist']} - {apple_album['name']}")
+
+        # Save album link
+        upsert_release_streaming_link(
+            conn,
+            release_id=release_id,
+            service_id=album_id,
+            service_url=album_url,
+            match_confidence=match_confidence,
+            match_method='fuzzy_search',
+            dry_run=self.dry_run,
+            log=self.logger,
+        )
+
+        # Save artwork
+        if apple_album.get('artwork'):
+            if upsert_release_imagery(
+                conn,
+                release_id=release_id,
+                artwork=apple_album['artwork'],
+                source_id=album_id,
+                dry_run=self.dry_run,
+                log=self.logger,
+            ):
+                self.stats['artwork_added'] += 1
+
+        self.stats['releases_matched'] += 1
+
+        # Now try to match the specific track
+        from_local = apple_album.get('_source') == 'local_catalog'
+        self._match_track_on_release(
+            conn, song_id, song_title, release_id, album_id, from_local
+        )
+
+    def _search_and_validate_album(
+        self,
+        artist_name: str,
+        album_title: str,
+        release_year: int = None
+    ) -> Optional[Dict]:
+        """
+        Search Apple Music for an album and validate the match.
+
+        Uses multiple search strategies with progressively relaxed criteria.
+        If local catalog is available, searches there first (no rate limits).
+        Falls back to iTunes API if needed.
+
+        Args:
+            artist_name: Artist/performer name
+            album_title: Album title to search for
+            release_year: Optional year for validation
+
+        Returns:
+            Matched album dict with _match_confidence, or None
+        """
+        # Try local catalog first if available
+        if self.catalog:
+            result = self._search_local_catalog(artist_name, album_title, release_year)
+            if result:
+                self.stats['local_catalog_hits'] += 1
+                return result
+
+        # Skip API fallback if local_catalog_only mode
+        if self.local_catalog_only:
+            self.logger.debug("    Skipping API fallback (local catalog only mode)")
+            return None
+
+        # Fall back to iTunes API
+        return self._search_api(artist_name, album_title, release_year)
+
+    def _search_local_catalog(
+        self,
+        artist_name: str,
+        album_title: str,
+        release_year: int = None
+    ) -> Optional[Dict]:
+        """
+        Search the local Apple Music catalog for an album.
+
+        Args:
+            artist_name: Artist/performer name
+            album_title: Album title to search for
+            release_year: Optional year for validation
+
+        Returns:
+            Matched album dict with _match_confidence, or None
+        """
+        if not self.catalog:
+            return None
+
+        search_strategies = []
+
+        # Strategy 1: Full artist + album
+        search_strategies.append((artist_name, album_title))
+
+        # Strategy 2: Strip ensemble suffix
+        stripped_artist = strip_ensemble_suffix(artist_name)
+        if stripped_artist != artist_name:
+            search_strategies.append((stripped_artist, album_title))
+
+        # Strategy 3: Strip live suffix from album
+        stripped_album = strip_live_suffix(album_title)
+        if stripped_album != album_title:
+            search_strategies.append((artist_name, stripped_album))
+
+        for search_artist, search_album in search_strategies:
+            try:
+                albums = self.catalog.search_albums(
+                    artist_name=search_artist,
+                    album_title=search_album,
+                    limit=25
+                )
+
+                if not albums:
+                    continue
+
+                # Convert to our expected format and validate
+                for album_data in albums:
+                    album = self._convert_catalog_album(album_data)
+                    if album:
+                        is_valid, confidence = self._validate_album_match(
+                            album, artist_name, album_title, release_year
+                        )
+                        if is_valid:
+                            album['_match_confidence'] = confidence
+                            album['_source'] = 'local_catalog'
+                            return album
+
+            except Exception as e:
+                self.logger.debug(f"Local catalog search error: {e}")
+                continue
+
+        return None
+
+    def _convert_catalog_album(self, catalog_data: Dict) -> Optional[Dict]:
+        """
+        Convert local catalog album data to the format used by the matcher.
+
+        The catalog uses different field names than the iTunes API.
+        """
+        try:
+            # Map catalog fields to our expected format
+            album = {
+                'id': str(catalog_data.get('id', '')),
+                'name': catalog_data.get('name', ''),
+                'artist': catalog_data.get('artistName', ''),
+                'release_date': catalog_data.get('releaseDate', ''),
+                'track_count': catalog_data.get('trackCount', 0),
+            }
+
+            # Handle artwork if present
+            artwork_url = catalog_data.get('artworkUrl')
+            if artwork_url:
+                # Generate different sizes from template URL
+                album['artwork'] = {
+                    'small': artwork_url.replace('{w}x{h}', '100x100'),
+                    'medium': artwork_url.replace('{w}x{h}', '300x300'),
+                    'large': artwork_url.replace('{w}x{h}', '600x600'),
+                }
+
+            return album if album['id'] and album['name'] else None
+
+        except Exception as e:
+            self.logger.debug(f"Failed to convert catalog album: {e}")
+            return None
+
+    def _search_api(
+        self,
+        artist_name: str,
+        album_title: str,
+        release_year: int = None
+    ) -> Optional[Dict]:
+        """
+        Search iTunes API for an album (original API-based search).
+
+        Args:
+            artist_name: Artist/performer name
+            album_title: Album title to search for
+            release_year: Optional year for validation
+
+        Returns:
+            Matched album dict with _match_confidence, or None
+        """
+        search_strategies = []
+
+        # Strategy 1: Full artist + album
+        search_strategies.append((artist_name, album_title))
+
+        # Strategy 2: Strip ensemble suffix (e.g., "Bill Evans Trio" -> "Bill Evans")
+        stripped_artist = strip_ensemble_suffix(artist_name)
+        if stripped_artist != artist_name:
+            search_strategies.append((stripped_artist, album_title))
+
+        # Strategy 3: Strip live suffix from album
+        stripped_album = strip_live_suffix(album_title)
+        if stripped_album != album_title:
+            search_strategies.append((artist_name, stripped_album))
+
+        # Strategy 4: Album only (fallback for Various Artists, etc.)
+        search_strategies.append((None, album_title))
+
+        for search_artist, search_album in search_strategies:
+            albums = self.client.search_albums(
+                artist_name=search_artist or '',
+                album_title=search_album,
+                limit=10
+            )
+
+            if not albums:
+                continue
+
+            # Validate each result
+            for album in albums:
+                is_valid, confidence = self._validate_album_match(
+                    album, artist_name, album_title, release_year
+                )
+
+                if is_valid:
+                    album['_match_confidence'] = confidence
+                    album['_source'] = 'itunes_api'
+                    return album
+
+        return None
+
+    def _validate_album_match(
+        self,
+        apple_album: Dict,
+        expected_artist: str,
+        expected_album: str,
+        expected_year: int = None
+    ) -> tuple[bool, float]:
+        """
+        Validate that an Apple Music album matches our expected album.
+
+        Args:
+            apple_album: Album dict from Apple Music API
+            expected_artist: Our artist name
+            expected_album: Our album title
+            expected_year: Our release year (optional)
+
+        Returns:
+            Tuple of (is_valid, confidence_score)
+        """
+        am_artist = apple_album.get('artist', '')
+        am_album = apple_album.get('name', '')
+
+        # Normalize for comparison
+        norm_expected_artist = normalize_for_comparison(expected_artist)
+        norm_expected_album = normalize_for_comparison(expected_album)
+        norm_am_artist = normalize_for_comparison(am_artist)
+        norm_am_album = normalize_for_comparison(am_album)
+
+        # Calculate similarities
+        artist_similarity = calculate_similarity(norm_expected_artist, norm_am_artist)
+        album_similarity = calculate_similarity(norm_expected_album, norm_am_album)
+
+        # Check for compilation artist (relax artist matching)
+        if is_compilation_artist(expected_artist) or is_compilation_artist(am_artist):
+            # For compilations, only require album match
+            if album_similarity >= self.min_album_similarity:
+                return True, album_similarity / 100.0
+            return False, 0.0
+
+        # Standard matching
+        if artist_similarity < self.min_artist_similarity:
+            # Try substring matching for artist
+            if not is_substring_title_match(norm_expected_artist, norm_am_artist):
+                self.logger.debug(f"    Artist mismatch: {expected_artist} vs {am_artist} ({artist_similarity}%)")
+                return False, 0.0
+
+        if album_similarity < self.min_album_similarity:
+            # Try substring matching for album
+            if not is_substring_title_match(norm_expected_album, norm_am_album):
+                self.logger.debug(f"    Album mismatch: {expected_album} vs {am_album} ({album_similarity}%)")
+                return False, 0.0
+
+        # Year validation (optional, just for confidence scoring)
+        year_bonus = 0
+        if expected_year and apple_album.get('release_date'):
+            try:
+                am_year = int(apple_album['release_date'][:4])
+                if abs(am_year - expected_year) <= 1:
+                    year_bonus = 0.1
+            except (ValueError, TypeError):
+                pass
+
+        # Calculate overall confidence
+        confidence = (artist_similarity / 100.0 * 0.4 +
+                     album_similarity / 100.0 * 0.5 +
+                     year_bonus)
+
+        return True, min(confidence, 1.0)
+
+    def _match_track_on_release(
+        self,
+        conn,
+        song_id: str,
+        song_title: str,
+        release_id: str,
+        apple_album_id: str,
+        from_local_catalog: bool = False
+    ) -> None:
+        """
+        Match a specific track on a release to an Apple Music track.
+
+        Args:
+            conn: Database connection
+            song_id: Our song ID
+            song_title: Song title to match
+            release_id: Our release ID
+            apple_album_id: Apple Music album ID we matched
+            from_local_catalog: If True, album was matched from local catalog
+        """
+        # Get our recordings on this release
+        recordings = get_recordings_for_release(song_id, release_id)
+
+        if not recordings:
+            self.logger.debug(f"    No recordings found for this release")
+            return
+
+        # Get tracks from Apple Music - prefer local catalog if available
+        am_tracks = None
+
+        if from_local_catalog and self.catalog:
+            try:
+                catalog_songs = self.catalog.get_songs_for_album(apple_album_id)
+                if catalog_songs:
+                    # Convert to our expected format
+                    am_tracks = []
+                    for song in catalog_songs:
+                        am_tracks.append({
+                            'id': str(song.get('id', '')),
+                            'name': song.get('name', ''),
+                            'disc_number': song.get('discNumber', 1),
+                            'track_number': song.get('trackNumber', 0),
+                            'duration_ms': song.get('durationInMillis'),
+                            'preview_url': song.get('previewUrl'),
+                            'isrc': song.get('isrc'),
+                        })
+            except Exception as e:
+                self.logger.debug(f"Local catalog track lookup failed: {e}")
+
+        # Fall back to API if needed
+        if not am_tracks:
+            am_tracks = self.client.lookup_album_tracks(apple_album_id)
+
+        if not am_tracks:
+            self.logger.debug(f"    Could not fetch tracks from Apple Music")
+            return
+
+        # Try to match each of our recordings
+        for rec in recordings:
+            recording_release_id = str(rec['recording_release_id'])
+            our_title = rec['song_title']
+            our_disc = rec.get('disc_number', 1)
+            our_track = rec.get('track_number')
+
+            # Skip if already matched
+            if rec.get('apple_music_track_id') and not self.rematch:
+                continue
+
+            # Find matching track
+            matched_track = self._find_matching_track(
+                our_title, am_tracks, our_disc, our_track
+            )
+
+            if matched_track:
+                track_id = matched_track['id']
+                track_url = build_apple_music_track_url(track_id)
+
+                upsert_track_streaming_link(
+                    conn,
+                    recording_release_id=recording_release_id,
+                    service_id=track_id,
+                    service_url=track_url,
+                    duration_ms=matched_track.get('duration_ms'),
+                    preview_url=matched_track.get('preview_url'),
+                    isrc=matched_track.get('isrc'),
+                    match_confidence=matched_track.get('_match_confidence', 0.8),
+                    match_method='fuzzy_search',
+                    dry_run=self.dry_run,
+                    log=self.logger,
+                )
+
+                self.stats['tracks_matched'] += 1
+                self.logger.debug(f"      Matched track: {matched_track['name']}")
+            else:
+                self.stats['tracks_no_match'] += 1
+
+    def _find_matching_track(
+        self,
+        song_title: str,
+        apple_tracks: List[Dict],
+        expected_disc: int = None,
+        expected_track: int = None
+    ) -> Optional[Dict]:
+        """
+        Find a matching track from Apple Music album tracks.
+
+        Args:
+            song_title: Our song title
+            apple_tracks: List of track dicts from Apple Music
+            expected_disc: Expected disc number (optional)
+            expected_track: Expected track number (optional)
+
+        Returns:
+            Matched track dict with _match_confidence, or None
+        """
+        norm_title = normalize_for_comparison(song_title)
+        best_match = None
+        best_score = 0
+
+        for track in apple_tracks:
+            am_title = track.get('name', '')
+            norm_am_title = normalize_for_comparison(am_title)
+
+            similarity = calculate_similarity(norm_title, norm_am_title)
+
+            # Position bonus if disc/track match
+            position_bonus = 0
+            if expected_disc and expected_track:
+                if (track.get('disc_number') == expected_disc and
+                    track.get('track_number') == expected_track):
+                    position_bonus = 10  # Boost for exact position match
+
+            total_score = similarity + position_bonus
+
+            if total_score > best_score:
+                best_score = total_score
+                best_match = track
+
+        # Check if best match meets threshold
+        if best_match and best_score >= self.min_track_similarity:
+            best_match['_match_confidence'] = min(best_score / 100.0, 1.0)
+            return best_match
+
+        # Try substring matching as fallback
+        for track in apple_tracks:
+            am_title = track.get('name', '')
+            if is_substring_title_match(norm_title, normalize_for_comparison(am_title)):
+                track['_match_confidence'] = 0.7
+                return track
+
+        return None
+
+    def _is_uuid(self, s: str) -> bool:
+        """Check if string looks like a UUID"""
+        import re
+        uuid_pattern = r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+        return bool(re.match(uuid_pattern, s.lower()))
+
+    def print_stats(self) -> None:
+        """Print matching statistics"""
+        self.logger.info("=" * 60)
+        self.logger.info("Apple Music Matching Statistics")
+        self.logger.info("=" * 60)
+        self.logger.info(f"Releases processed:     {self.stats['releases_processed']}")
+        self.logger.info(f"  Already had Apple:    {self.stats['releases_with_apple_music']}")
+        self.logger.info(f"  Matched:              {self.stats['releases_matched']}")
+        self.logger.info(f"  No match:             {self.stats['releases_no_match']}")
+        self.logger.info(f"  Skipped:              {self.stats['releases_skipped']}")
+        self.logger.info(f"Tracks matched:         {self.stats['tracks_matched']}")
+        self.logger.info(f"Tracks no match:        {self.stats['tracks_no_match']}")
+        self.logger.info(f"Artwork added:          {self.stats['artwork_added']}")
+        self.logger.info(f"Local catalog hits:     {self.stats['local_catalog_hits']}")
+        self.logger.info(f"Cache hits:             {self.stats['cache_hits']}")
+        self.logger.info(f"API calls:              {self.stats['api_calls']}")
+        self.logger.info(f"Errors:                 {self.stats['errors']}")
+        self.logger.info("=" * 60)
