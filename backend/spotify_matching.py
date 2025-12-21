@@ -138,7 +138,18 @@ def normalize_for_comparison(text: str) -> str:
     # Remove remastered annotations
     text = re.sub(r'\s*-\s*remastered(\s+\d{4})?.*$', '', text, flags=re.IGNORECASE)
     text = re.sub(r'\s*\(remastered(\s+\d{4})?\).*$', '', text, flags=re.IGNORECASE)
-    
+
+    # Remove featured artist annotations (common in streaming services)
+    # Handles: (feat. Artist), (featuring Artist), (ft. Artist), (with Artist)
+    text = re.sub(r'\s*\(feat\.?\s+[^)]+\)', '', text, flags=re.IGNORECASE)
+    text = re.sub(r'\s*\(featuring\s+[^)]+\)', '', text, flags=re.IGNORECASE)
+    text = re.sub(r'\s*\(ft\.?\s+[^)]+\)', '', text, flags=re.IGNORECASE)
+    text = re.sub(r'\s*\(with\s+[^)]+\)', '', text, flags=re.IGNORECASE)
+    # Also handle dash variants: - feat. Artist, - featuring Artist
+    text = re.sub(r'\s*-\s*feat\.?\s+.*$', '', text, flags=re.IGNORECASE)
+    text = re.sub(r'\s*-\s*featuring\s+.*$', '', text, flags=re.IGNORECASE)
+    text = re.sub(r'\s*-\s*ft\.?\s+.*$', '', text, flags=re.IGNORECASE)
+
     # Remove date/venue at end
     text = re.sub(r'\s*/\s+[a-z]+\s+\d+.*$', '', text, flags=re.IGNORECASE)
     

@@ -1889,41 +1889,47 @@ def diagnose_apple_match(song_id):
 
         # Compare if we have both
         if diagnosis['apple_music_data'] and diagnosis['our_release']:
+            from spotify_matching import normalize_for_comparison, is_substring_title_match
+
             am = diagnosis['apple_music_data']
             our = diagnosis['our_release']
 
-            # Calculate similarities
-            artist_sim = fuzz.ratio(
-                (am.get('artist') or '').lower(),
-                (our.get('artist') or '').lower()
-            )
-            album_sim = fuzz.ratio(
-                (am.get('name') or '').lower(),
-                (our.get('title') or '').lower()
-            )
+            # Normalize names (strips feat., remastered, live annotations, etc.)
+            am_artist_norm = normalize_for_comparison(am.get('artist') or '')
+            our_artist_norm = normalize_for_comparison(our.get('artist') or '')
+            am_album_norm = normalize_for_comparison(am.get('name') or '')
+            our_album_norm = normalize_for_comparison(our.get('title') or '')
+
+            # Calculate similarities on normalized names
+            artist_sim = fuzz.ratio(am_artist_norm, our_artist_norm)
+            album_sim = fuzz.ratio(am_album_norm, our_album_norm)
 
             # Partial ratio (handles substrings better)
-            artist_partial = fuzz.partial_ratio(
-                (am.get('artist') or '').lower(),
-                (our.get('artist') or '').lower()
-            )
-            album_partial = fuzz.partial_ratio(
-                (am.get('name') or '').lower(),
-                (our.get('title') or '').lower()
-            )
+            artist_partial = fuzz.partial_ratio(am_artist_norm, our_artist_norm)
+            album_partial = fuzz.partial_ratio(am_album_norm, our_album_norm)
+
+            # Check substring matching (fallback used by actual matcher)
+            artist_substring = is_substring_title_match(am.get('artist') or '', our.get('artist') or '')
+            album_substring = is_substring_title_match(am.get('name') or '', our.get('title') or '')
 
             diagnosis['comparison'] = {
                 'artist': {
                     'apple_music': am.get('artist'),
                     'our_release': our.get('artist'),
+                    'normalized_apple': am_artist_norm,
+                    'normalized_ours': our_artist_norm,
                     'similarity': artist_sim,
                     'partial_similarity': artist_partial,
+                    'substring_match': artist_substring,
                 },
                 'album': {
                     'apple_music': am.get('name'),
                     'our_release': our.get('title'),
+                    'normalized_apple': am_album_norm,
+                    'normalized_ours': our_album_norm,
                     'similarity': album_sim,
                     'partial_similarity': album_partial,
+                    'substring_match': album_substring,
                 },
                 'year': {
                     'apple_music': am.get('release_date', '')[:4] if am.get('release_date') else None,
@@ -1932,46 +1938,61 @@ def diagnose_apple_match(song_id):
             }
 
             # Add diagnosis based on similarities
-            # Default thresholds: artist >= 65%, album >= 65%
-            if artist_sim < 65:
+            # Default thresholds: artist >= 65%, album >= 65% (with substring fallback)
+            artist_passes = artist_sim >= 65 or artist_substring
+            album_passes = album_sim >= 65 or album_substring
+
+            if artist_sim >= 65:
+                diagnosis['checks'].append({
+                    'name': 'Artist name match',
+                    'passed': True,
+                    'message': f'Artist similarity {artist_sim}% (normalized)'
+                })
+            elif artist_substring:
+                diagnosis['checks'].append({
+                    'name': 'Artist name match',
+                    'passed': True,
+                    'message': f'Artist similarity {artist_sim}% but substring match passes'
+                })
+            else:
                 diagnosis['checks'].append({
                     'name': 'Artist name match',
                     'passed': False,
-                    'message': f'Artist similarity {artist_sim}% is below threshold (65%)'
+                    'message': f'Artist similarity {artist_sim}% is below threshold (65%) and no substring match'
                 })
                 diagnosis['suggestions'].append(
                     f'Artist names differ significantly: "{am.get("artist")}" vs "{our.get("artist")}"'
                 )
-            else:
-                diagnosis['checks'].append({
-                    'name': 'Artist name match',
-                    'passed': True,
-                    'message': f'Artist similarity {artist_sim}%'
-                })
 
-            if album_sim < 65:
+            if album_sim >= 65:
+                diagnosis['checks'].append({
+                    'name': 'Album name match',
+                    'passed': True,
+                    'message': f'Album similarity {album_sim}% (normalized)'
+                })
+            elif album_substring:
+                diagnosis['checks'].append({
+                    'name': 'Album name match',
+                    'passed': True,
+                    'message': f'Album similarity {album_sim}% but substring match passes'
+                })
+            else:
                 diagnosis['checks'].append({
                     'name': 'Album name match',
                     'passed': False,
-                    'message': f'Album similarity {album_sim}% is below threshold (65%)'
+                    'message': f'Album similarity {album_sim}% is below threshold (65%) and no substring match'
                 })
                 diagnosis['suggestions'].append(
                     f'Album names differ: "{am.get("name")}" vs "{our.get("title")}"'
                 )
-            else:
-                diagnosis['checks'].append({
-                    'name': 'Album name match',
-                    'passed': True,
-                    'message': f'Album similarity {album_sim}%'
-                })
 
-            # Check if it would match with current thresholds
-            would_match = artist_sim >= 65 and album_sim >= 65
+            # Check if it would match with current thresholds (including substring fallback)
+            would_match = artist_passes and album_passes
             diagnosis['would_match'] = would_match
 
             if not would_match:
                 diagnosis['suggestions'].append(
-                    'This album would not match with current thresholds. Consider manual linking or adjusting the matcher thresholds.'
+                    'This album would not match with current thresholds. Consider manual linking.'
                 )
 
         return jsonify(diagnosis)
