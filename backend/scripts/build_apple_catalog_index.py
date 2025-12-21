@@ -6,6 +6,11 @@ Loads the downloaded Apple Music parquet files into an indexed DuckDB database
 for fast searching. This is a one-time operation that makes subsequent searches
 nearly instant.
 
+IMPORTANT: The Apple Music Feed has a known issue where primaryArtists[].name
+contains localized names (e.g., Japanese) instead of English. To get English
+artist names, you must also download the 'artists' catalog, which contains
+the nameDefault field with English names.
+
 Usage:
   python build_apple_catalog_index.py
 
@@ -93,6 +98,12 @@ Examples:
     )
 
     script.parser.add_argument(
+        '--skip-song-indexes',
+        action='store_true',
+        help='Load songs but skip creating indexes (faster, less memory)'
+    )
+
+    script.parser.add_argument(
         '--catalog-dir',
         type=Path,
         default=DEFAULT_CATALOG_DIR,
@@ -169,6 +180,7 @@ Examples:
     # Find parquet files
     albums_dir = get_latest_export_dir(catalog_dir, 'albums')
     songs_dir = get_latest_export_dir(catalog_dir, 'songs')
+    artists_dir = get_latest_export_dir(catalog_dir, 'artists')
 
     if not albums_dir:
         script.logger.error(f"No albums data found in {catalog_dir}/albums/")
@@ -177,11 +189,18 @@ Examples:
 
     albums_glob = str(albums_dir / '*.parquet')
     songs_glob = str(songs_dir / '*.parquet') if songs_dir else None
+    artists_glob = str(artists_dir / '*.parquet') if artists_dir else None
 
     script.logger.info("Building indexed Apple Music catalog database...")
     script.logger.info(f"  Albums source: {albums_dir}")
     if songs_dir:
         script.logger.info(f"  Songs source: {songs_dir}")
+    if artists_dir:
+        script.logger.info(f"  Artists source: {artists_dir}")
+    else:
+        script.logger.warning("  Artists catalog not found - will use localized artist names!")
+        script.logger.warning("  Run: python download_apple_catalog.py --feed artists")
+        script.logger.warning("  Then rebuild with --rebuild to get English artist names.")
     script.logger.info(f"  Output: {db_path}")
     script.logger.info("")
 
@@ -189,30 +208,86 @@ Examples:
     db_path.parent.mkdir(parents=True, exist_ok=True)
     conn = duckdb.connect(str(db_path))
 
-    # Load albums
+    # Load artists lookup table first (if available) for English names
+    has_artists = False
+    if artists_glob:
+        script.logger.info("Loading artists (for English name lookup)...")
+        start = time.time()
+
+        conn.execute(f"""
+            CREATE TABLE artists AS
+            SELECT
+                id,
+                nameDefault as name_english,
+                name['default'] as name_default,
+                CAST(name AS VARCHAR) as name_localized_json
+            FROM read_parquet('{artists_glob}')
+            WHERE nameDefault IS NOT NULL
+        """)
+
+        artist_count = conn.execute("SELECT COUNT(*) FROM artists").fetchone()[0]
+        elapsed = time.time() - start
+        script.logger.info(f"  Loaded {artist_count:,} artists in {elapsed:.1f}s")
+
+        # Create artist index for fast lookups
+        conn.execute("CREATE INDEX idx_artist_id ON artists(id)")
+        has_artists = True
+
+    # Load albums - join with artists if available to get English names
     script.logger.info("Loading albums...")
     start = time.time()
 
-    conn.execute(f"""
-        CREATE TABLE albums AS
-        SELECT
-            id,
-            nameDefault as name,
-            primaryArtists[1].name as artist_name,
-            primaryArtists[1].id as artist_id,
-            CAST(releaseDate AS VARCHAR) as release_date,
-            len(songs) as track_count,
-            upc,
-            urlTemplate as url_template,
-            -- Store full primaryArtists for multi-artist albums
-            CAST(primaryArtists AS VARCHAR) as primary_artists_json
-        FROM read_parquet('{albums_glob}')
-        WHERE nameDefault IS NOT NULL
-    """)
+    if has_artists:
+        # Join with artists table to get English artist names
+        conn.execute(f"""
+            CREATE TABLE albums AS
+            SELECT
+                a.id,
+                a.nameDefault as name,
+                COALESCE(art.name_english, a.primaryArtists[1].name) as artist_name,
+                a.primaryArtists[1].id as artist_id,
+                CAST(a.releaseDate AS VARCHAR) as release_date,
+                len(a.songs) as track_count,
+                a.upc,
+                a.urlTemplate as url_template,
+                -- Store full primaryArtists for multi-artist albums
+                CAST(a.primaryArtists AS VARCHAR) as primary_artists_json
+            FROM read_parquet('{albums_glob}') a
+            LEFT JOIN artists art ON a.primaryArtists[1].id = art.id
+            WHERE a.nameDefault IS NOT NULL
+        """)
+    else:
+        # No artists table - use localized names (fallback)
+        conn.execute(f"""
+            CREATE TABLE albums AS
+            SELECT
+                id,
+                nameDefault as name,
+                primaryArtists[1].name as artist_name,
+                primaryArtists[1].id as artist_id,
+                CAST(releaseDate AS VARCHAR) as release_date,
+                len(songs) as track_count,
+                upc,
+                urlTemplate as url_template,
+                -- Store full primaryArtists for multi-artist albums
+                CAST(primaryArtists AS VARCHAR) as primary_artists_json
+            FROM read_parquet('{albums_glob}')
+            WHERE nameDefault IS NOT NULL
+        """)
 
     album_count = conn.execute("SELECT COUNT(*) FROM albums").fetchone()[0]
     elapsed = time.time() - start
     script.logger.info(f"  Loaded {album_count:,} albums in {elapsed:.1f}s")
+
+    # Verify we got English names
+    if has_artists:
+        sample = conn.execute("""
+            SELECT artist_name FROM albums
+            WHERE artist_id = '120922'
+            LIMIT 1
+        """).fetchone()
+        if sample:
+            script.logger.info(f"  Sample artist name (ID 120922): {sample[0]}")
 
     # Create album indexes
     script.logger.info("Creating album indexes...")
@@ -230,41 +305,71 @@ Examples:
         script.logger.info("Loading songs...")
         start = time.time()
 
-        conn.execute(f"""
-            CREATE TABLE songs AS
-            SELECT
-                id,
-                nameDefault as name,
-                primaryArtists[1].name as artist_name,
-                primaryArtists[1].id as artist_id,
-                album.id as album_id,
-                album.name as album_name,
-                volumeNumber as disc_number,
-                trackNumber as track_number,
-                durationInMillis as duration_ms,
-                isrc,
-                shortPreview as preview_url
-            FROM read_parquet('{songs_glob}')
-            WHERE nameDefault IS NOT NULL
-        """)
+        if has_artists:
+            # Join with artists table to get English artist names
+            conn.execute(f"""
+                CREATE TABLE songs AS
+                SELECT
+                    s.id,
+                    s.nameDefault as name,
+                    COALESCE(art.name_english, s.primaryArtists[1].name) as artist_name,
+                    s.primaryArtists[1].id as artist_id,
+                    s.album.id as album_id,
+                    s.album.name as album_name,
+                    s.volumeNumber as disc_number,
+                    s.trackNumber as track_number,
+                    s.durationInMillis as duration_ms,
+                    s.isrc,
+                    s.shortPreview as preview_url
+                FROM read_parquet('{songs_glob}') s
+                LEFT JOIN artists art ON s.primaryArtists[1].id = art.id
+                WHERE s.nameDefault IS NOT NULL
+            """)
+        else:
+            # No artists table - use localized names (fallback)
+            conn.execute(f"""
+                CREATE TABLE songs AS
+                SELECT
+                    id,
+                    nameDefault as name,
+                    primaryArtists[1].name as artist_name,
+                    primaryArtists[1].id as artist_id,
+                    album.id as album_id,
+                    album.name as album_name,
+                    volumeNumber as disc_number,
+                    trackNumber as track_number,
+                    durationInMillis as duration_ms,
+                    isrc,
+                    shortPreview as preview_url
+                FROM read_parquet('{songs_glob}')
+                WHERE nameDefault IS NOT NULL
+            """)
 
         song_count = conn.execute("SELECT COUNT(*) FROM songs").fetchone()[0]
         elapsed = time.time() - start
         script.logger.info(f"  Loaded {song_count:,} songs in {elapsed:.1f}s")
 
-        # Create song indexes
-        script.logger.info("Creating song indexes...")
-        start = time.time()
+        # Create song indexes (unless --skip-song-indexes)
+        if args.skip_song_indexes:
+            script.logger.info("Skipping song indexes (--skip-song-indexes)")
+        else:
+            script.logger.info("Creating song indexes...")
+            start = time.time()
 
-        conn.execute("CREATE INDEX idx_song_name ON songs(LOWER(name))")
-        conn.execute("CREATE INDEX idx_song_artist ON songs(LOWER(artist_name))")
-        conn.execute("CREATE INDEX idx_song_album ON songs(album_id)")
-        conn.execute("CREATE INDEX idx_song_id ON songs(id)")
+            conn.execute("CREATE INDEX idx_song_name ON songs(LOWER(name))")
+            conn.execute("CREATE INDEX idx_song_artist ON songs(LOWER(artist_name))")
+            conn.execute("CREATE INDEX idx_song_album ON songs(album_id)")
+            conn.execute("CREATE INDEX idx_song_id ON songs(id)")
 
-        elapsed = time.time() - start
-        script.logger.info(f"  Created indexes in {elapsed:.1f}s")
+            elapsed = time.time() - start
+            script.logger.info(f"  Created indexes in {elapsed:.1f}s")
     elif args.albums_only:
         script.logger.info("Skipping songs (--albums-only mode)")
+
+    # Drop the artists lookup table to save space (data is now in albums/songs)
+    if has_artists:
+        script.logger.info("Dropping artists lookup table (no longer needed)...")
+        conn.execute("DROP TABLE artists")
 
     conn.close()
 
@@ -273,8 +378,17 @@ Examples:
     script.logger.info("")
     script.logger.info(f"✓ Database created: {db_path}")
     script.logger.info(f"  Size: {db_size:.2f} GB")
+    if has_artists:
+        script.logger.info(f"  Artist names: English (from artists catalog)")
+    else:
+        script.logger.info(f"  Artist names: Localized (artists catalog not available)")
     script.logger.info("")
     script.logger.info("Run with --stats to test search performance.")
+    script.logger.info("")
+    script.logger.info("To upload to MotherDuck:")
+    script.logger.info(f"  duckdb")
+    script.logger.info(f"  ATTACH 'md:'")
+    script.logger.info(f"  CREATE OR REPLACE DATABASE apple_music_feed FROM '{db_path}'")
 
     return True
 

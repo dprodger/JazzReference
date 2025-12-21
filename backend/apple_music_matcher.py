@@ -38,6 +38,7 @@ from apple_music_db import (
     find_song_by_id,
     get_releases_for_song,
     get_recordings_for_release,
+    mark_release_searched,
     upsert_release_streaming_link,
     upsert_track_streaming_link,
     upsert_release_imagery,
@@ -155,6 +156,7 @@ class AppleMusicMatcher:
             'cache_hits': 0,
             'api_calls': 0,
             'local_catalog_hits': 0,
+            'catalog_queries': 0,
         }
 
         # Validation thresholds
@@ -217,11 +219,13 @@ class AppleMusicMatcher:
                 if self.progress_callback:
                     self.progress_callback('matching', i + 1, len(releases))
 
-                self._process_release(conn, song_id, song_title, release)
+                self._process_release(conn, song_id, song_title, release, i + 1, len(releases))
 
         # Aggregate client stats
         self.stats['cache_hits'] = self.client.stats.get('cache_hits', 0)
         self.stats['api_calls'] = self.client.stats.get('api_calls', 0)
+        if self.catalog:
+            self.stats['catalog_queries'] = self.catalog.get_query_count()
 
         return {
             'success': True,
@@ -235,7 +239,9 @@ class AppleMusicMatcher:
         conn,
         song_id: str,
         song_title: str,
-        release: Dict
+        release: Dict,
+        current: int = 0,
+        total: int = 0
     ) -> None:
         """
         Process a single release, matching it to Apple Music.
@@ -245,6 +251,8 @@ class AppleMusicMatcher:
             song_id: Our song ID
             song_title: Song title for track matching
             release: Release dict from database
+            current: Current release number (1-indexed)
+            total: Total number of releases
         """
         release_id = str(release['id'])
         release_title = release['title']
@@ -253,14 +261,22 @@ class AppleMusicMatcher:
 
         self.stats['releases_processed'] += 1
 
+        progress = f"[{current}/{total}] " if current and total else ""
+
         # Check if already matched
         if release.get('has_apple_music') and not self.rematch:
-            self.logger.debug(f"  Skipping (already has Apple Music): {release_title}")
+            self.logger.debug(f"  {progress}Skipping (already has Apple Music): {release_title}")
             self.stats['releases_skipped'] += 1
             self.stats['releases_with_apple_music'] += 1
             return
 
-        self.logger.info(f"  Processing: {artist_credit} - {release_title}")
+        # Check if already searched with no match (cached negative result)
+        if release.get('apple_music_searched_at') and not self.rematch:
+            self.logger.debug(f"  {progress}Skipping (previously searched, no match): {release_title}")
+            self.stats['releases_skipped'] += 1
+            return
+
+        self.logger.info(f"  {progress}Processing: {artist_credit} - {release_title}")
 
         # Search Apple Music for this album
         apple_album = self._search_and_validate_album(
@@ -270,6 +286,8 @@ class AppleMusicMatcher:
         if not apple_album:
             self.logger.info(f"    No match found")
             self.stats['releases_no_match'] += 1
+            # Cache negative result so we don't re-search
+            mark_release_searched(conn, release_id, self.dry_run, self.logger)
             return
 
         # Found a match - update the database
@@ -304,6 +322,9 @@ class AppleMusicMatcher:
                 self.stats['artwork_added'] += 1
 
         self.stats['releases_matched'] += 1
+
+        # Mark as searched (for consistency and rematch tracking)
+        mark_release_searched(conn, release_id, self.dry_run, self.logger)
 
         # Now try to match the specific track
         from_local = apple_album.get('_source') == 'local_catalog'
@@ -742,6 +763,7 @@ class AppleMusicMatcher:
         self.logger.info(f"Tracks no match:        {self.stats['tracks_no_match']}")
         self.logger.info(f"Artwork added:          {self.stats['artwork_added']}")
         self.logger.info(f"Local catalog hits:     {self.stats['local_catalog_hits']}")
+        self.logger.info(f"Catalog queries:        {self.stats['catalog_queries']}")
         self.logger.info(f"Cache hits:             {self.stats['cache_hits']}")
         self.logger.info(f"API calls:              {self.stats['api_calls']}")
         self.logger.info(f"Errors:                 {self.stats['errors']}")

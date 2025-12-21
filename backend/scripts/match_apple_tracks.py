@@ -167,6 +167,7 @@ Examples:
             "Artwork added": stats['artwork_added'],
             "Errors": stats['errors'],
             "Local catalog hits": stats['local_catalog_hits'],
+            "Catalog queries": stats['catalog_queries'],
             "Cache hits": stats['cache_hits'],
             "API calls": stats['api_calls'],
         }, title="APPLE MUSIC MATCHING SUMMARY")

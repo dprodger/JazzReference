@@ -77,6 +77,7 @@ def get_releases_for_song(song_id: str, artist_filter: str = None) -> List[dict]
                     rel.title,
                     rel.artist_credit,
                     rel.release_year,
+                    rel.apple_music_searched_at,
                     -- Check for existing Apple Music link
                     rsl.service_id as apple_music_album_id,
                     rsl.service_url as apple_music_url,
@@ -124,7 +125,7 @@ def get_releases_for_song(song_id: str, artist_filter: str = None) -> List[dict]
 
             query += """
                 GROUP BY rel.id, rel.title, rel.artist_credit, rel.release_year,
-                         rsl.service_id, rsl.service_url, rsl.id, rr.recording_id
+                         rel.apple_music_searched_at, rsl.service_id, rsl.service_url, rsl.id, rr.recording_id
                 ORDER BY rel.release_year
             """
 
@@ -212,6 +213,38 @@ def get_releases_without_apple_music() -> List[dict]:
 # ============================================================================
 # UPDATE FUNCTIONS
 # ============================================================================
+
+def mark_release_searched(
+    conn,
+    release_id: str,
+    dry_run: bool = False,
+    log: logging.Logger = None
+) -> None:
+    """
+    Mark a release as having been searched for Apple Music.
+
+    Sets apple_music_searched_at to current timestamp.
+    Used to cache "no match found" results so we don't re-search.
+
+    Args:
+        conn: Database connection
+        release_id: Release ID to update
+        dry_run: If True, don't actually update
+        log: Logger for debug output
+    """
+    if dry_run:
+        if log:
+            log.debug(f"    [DRY RUN] Would mark release {release_id} as searched")
+        return
+
+    with conn.cursor() as cur:
+        cur.execute("""
+            UPDATE releases
+            SET apple_music_searched_at = NOW()
+            WHERE id = %s
+        """, (release_id,))
+        conn.commit()
+
 
 def upsert_release_streaming_link(
     conn,
