@@ -38,9 +38,10 @@ struct ArtistsListView: View {
         }
     }
 
-    // Computed property to group loaded artists by first letter
+    // Computed property to group artists by first letter
+    // Uses the lightweight index (id, name, sort_name) for all 30k performers
     private var groupedArtists: [(String, [Performer])] {
-        let filtered = networkManager.performers
+        let filtered = networkManager.performersIndex
 
         let grouped = Dictionary(grouping: filtered) { performer in
             firstLetter(for: performer.name)
@@ -60,29 +61,14 @@ struct ArtistsListView: View {
         }
     }
 
-    // Get all section letters from the full index (for alphabet sidebar)
-    // This uses the lightweight index so all letters are available immediately
+    // Get all section letters for the alphabet sidebar
     private var allSectionLetters: [String] {
-        let source = networkManager.performersIndex.isEmpty
-            ? networkManager.performers
-            : networkManager.performersIndex
-
-        let letters = Set(source.map { firstLetter(for: $0.name) })
-
-        return letters.sorted { lhs, rhs in
-            if lhs == "#" { return false }
-            if rhs == "#" { return true }
-            if lhs == "•" { return false }
-            if rhs == "•" { return true }
-            return lhs < rhs
-        }
+        groupedArtists.map { $0.0 }
     }
 
-    // Total count for display (from index if available)
+    // Total count for display
     private var totalArtistsCount: Int {
-        networkManager.performersIndex.isEmpty
-            ? networkManager.performers.count
-            : networkManager.performersIndex.count
+        networkManager.performersIndex.count
     }
 
     var body: some View {
@@ -96,20 +82,14 @@ struct ArtistsListView: View {
                     searchTask = Task {
                         try? await Task.sleep(nanoseconds: 300_000_000)
                         if !Task.isCancelled {
-                            // Fetch both index and first page for new search
-                            async let indexFetch: () = networkManager.fetchPerformersIndex(searchQuery: newValue)
-                            async let performersFetch: () = networkManager.fetchPerformers(searchQuery: newValue)
-                            _ = await (indexFetch, performersFetch)
+                            await networkManager.fetchPerformersIndex(searchQuery: newValue)
                         }
                     }
                 }
                 .task {
                     // Only load on initial appear, not when returning from detail view
                     if !hasPerformedInitialLoad {
-                        // Load index and first page concurrently
-                        async let indexFetch: () = networkManager.fetchPerformersIndex(searchQuery: searchText)
-                        async let performersFetch: () = networkManager.fetchPerformers(searchQuery: searchText)
-                        _ = await (indexFetch, performersFetch)
+                        await networkManager.fetchPerformersIndex(searchQuery: searchText)
                         hasPerformedInitialLoad = true
                     }
                 }
@@ -180,41 +160,12 @@ struct ArtistsListView: View {
                     }
                     .id(letter) // Anchor for scrolling
                 }
-
-                // Loading indicator and infinite scroll trigger
-                if networkManager.hasMorePerformers {
-                    HStack {
-                        Spacer()
-                        if networkManager.isLoadingMorePerformers {
-                            ProgressView()
-                                .tint(JazzTheme.amber)
-                            Text("Loading more...")
-                                .font(JazzTheme.subheadline())
-                                .foregroundColor(JazzTheme.smokeGray)
-                                .padding(.leading, 8)
-                        } else {
-                            Text("Scroll for more")
-                                .font(JazzTheme.subheadline())
-                                .foregroundColor(JazzTheme.smokeGray)
-                        }
-                        Spacer()
-                    }
-                    .padding(.vertical, 16)
-                    .listRowBackground(Color.clear)
-                    .listRowSeparator(.hidden)
-                    .onAppear {
-                        // Trigger loading more when this row appears
-                        Task {
-                            await networkManager.loadMorePerformers(searchQuery: searchText)
-                        }
-                    }
-                }
             }
             .listStyle(.plain)
             .scrollContentBackground(.hidden)
             .background(JazzTheme.backgroundLight)
             .overlay(alignment: .trailing) {
-                // Custom alphabet index overlay - uses full index for all letters
+                // Custom alphabet index overlay
                 AlphabetIndexView(
                     letters: allSectionLetters,
                     accentColor: JazzTheme.amber,

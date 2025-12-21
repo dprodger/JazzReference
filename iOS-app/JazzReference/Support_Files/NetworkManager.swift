@@ -152,17 +152,27 @@ class NetworkManager: ObservableObject {
         }
     }
 
-    /// Fetch lightweight performer index for alphabet navigation
+    /// Fetch lightweight performer index for display and alphabet navigation
     /// Returns only id, name, sort_name - fast to load all 30k performers
     func fetchPerformersIndex(searchQuery: String = "") async {
         let startTime = Date()
+        await MainActor.run {
+            isLoading = true
+            errorMessage = nil
+        }
 
         var urlString = "\(NetworkManager.baseURL)/performers/index"
         if !searchQuery.isEmpty {
             urlString += "?search=\(searchQuery.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")"
         }
 
-        guard let url = URL(string: urlString) else { return }
+        guard let url = URL(string: urlString) else {
+            await MainActor.run {
+                errorMessage = "Invalid URL"
+                isLoading = false
+            }
+            return
+        }
 
         do {
             let (data, _) = try await URLSession.shared.data(from: url)
@@ -172,6 +182,7 @@ class NetworkManager: ObservableObject {
 
             await MainActor.run {
                 self.performersIndex = decodedPerformers
+                self.isLoading = false
             }
             NetworkManager.logRequest("GET /performers/index\(searchQuery.isEmpty ? "" : "?search=...")", startTime: startTime)
         } catch is CancellationError {
@@ -179,7 +190,11 @@ class NetworkManager: ObservableObject {
         } catch let error as NSError where error.code == NSURLErrorCancelled {
             return
         } catch {
-            print("Error fetching performers index: \(error)")
+            guard !Task.isCancelled else { return }
+            await MainActor.run {
+                self.errorMessage = "Failed to fetch performers: \(error.localizedDescription)"
+                self.isLoading = false
+            }
         }
     }
 
