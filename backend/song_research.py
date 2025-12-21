@@ -5,6 +5,7 @@ Coordinates background research tasks for songs
 It uses:
 - MBReleaseImporter for MusicBrainz releases and performer data
 - SpotifyMatcher for Spotify release and track matching (with caching)
+- AppleMusicMatcher for Apple Music release and track matching (with caching)
 """
 
 import logging
@@ -13,11 +14,16 @@ from typing import Dict, Any
 
 from mb_release_importer import MBReleaseImporter
 from spotify_utils import SpotifyMatcher
+from apple_music_matcher import AppleMusicMatcher
 from db_utils import get_db_connection
 from mb_utils import MusicBrainzSearcher, update_song_composer, update_song_wikipedia_url, update_song_composed_year
 import research_queue
 
 logger = logging.getLogger(__name__)
+
+# Temporarily disable Apple Music matching until catalog hosting is resolved
+# See doc/alternate_apple_approaches.md for context
+APPLE_MUSIC_MATCHING_ENABLED = False
 
 
 def research_song(song_id: str, song_name: str) -> Dict[str, Any]:
@@ -126,46 +132,68 @@ def research_song(song_id: str, song_name: str) -> Dict[str, Any]:
         
         if not spotify_result['success']:
             # Spotify matching failed, but MusicBrainz succeeded
-            # This is a partial success - log warning but don't fail completely
+            # Continue to Apple Music matching
             error = spotify_result.get('error', 'Unknown error')
             logger.warning(f"⚠ Spotify matching failed: {error}")
-            logger.info(f"✓ Research partially complete (MusicBrainz only)")
-            
-            # Return success with combined stats
-            combined_stats = {
-                'musicbrainz': mb_stats,
-                'spotify': {'error': error},
-                'partial_success': True
-            }
-            
-            return {
-                'success': True,
-                'song_id': song_id,
-                'song_name': song_name,
-                'stats': combined_stats
-            }
+            spotify_stats = {'error': error}
+        else:
+            spotify_stats = spotify_result['stats']
+            logger.info(f"✓ Spotify matching complete")
+            logger.info(f"  Releases processed: {spotify_stats['releases_processed']}")
+            logger.info(f"  Spotify matches found: {spotify_stats['releases_with_spotify']}")
+            logger.info(f"  Releases updated: {spotify_stats['releases_updated']}")
+            logger.info(f"  No match found: {spotify_stats['releases_no_match']}")
+            logger.info(f"  Already had URL: {spotify_stats['releases_skipped']}")
+            logger.info(f"  Tracks matched: {spotify_stats['tracks_matched']}")
+            logger.info(f"  Tracks skipped: {spotify_stats['tracks_skipped']}")
+            logger.info(f"  Tracks no match: {spotify_stats['tracks_no_match']}")
+            logger.info(f"  Cache hits: {spotify_stats['cache_hits']}")
+            logger.info(f"  API calls: {spotify_stats['api_calls']}")
         
-        spotify_stats = spotify_result['stats']
-        logger.info(f"✓ Spotify matching complete")
-        logger.info(f"  Releases processed: {spotify_stats['releases_processed']}")
-        logger.info(f"  Spotify matches found: {spotify_stats['releases_with_spotify']}")
-        logger.info(f"  Releases updated: {spotify_stats['releases_updated']}")
-        logger.info(f"  No match found: {spotify_stats['releases_no_match']}")
-        logger.info(f"  Already had URL: {spotify_stats['releases_skipped']}")
-        logger.info(f"  Tracks matched: {spotify_stats['tracks_matched']}")
-        logger.info(f"  Tracks skipped: {spotify_stats['tracks_skipped']}")
-        logger.info(f"  Tracks no match: {spotify_stats['tracks_no_match']}")
-        logger.info(f"  Cache hits: {spotify_stats['cache_hits']}")
-        logger.info(f"  API calls: {spotify_stats['api_calls']}")
-        
-        # Combine stats from both operations
+        # Step 3: Match Apple Music releases and tracks
+        # AppleMusicMatcher uses the normalized streaming_links tables
+        if APPLE_MUSIC_MATCHING_ENABLED:
+            apple_matcher = AppleMusicMatcher(
+                dry_run=False,
+                strict_mode=True,
+                logger=logger,
+                progress_callback=progress_callback
+            )
+
+            logger.info("Matching Apple Music releases...")
+            apple_result = apple_matcher.match_releases(str(song_id))
+
+            if not apple_result['success']:
+                # Apple Music matching failed, but others succeeded
+                # This is a partial success - log warning but don't fail
+                error = apple_result.get('message', 'Unknown error')
+                logger.warning(f"⚠ Apple Music matching failed: {error}")
+                apple_stats = {'error': error}
+            else:
+                apple_stats = apple_result['stats']
+                logger.info(f"✓ Apple Music matching complete")
+                logger.info(f"  Releases processed: {apple_stats['releases_processed']}")
+                logger.info(f"  Apple Music matches found: {apple_stats['releases_matched']}")
+                logger.info(f"  No match found: {apple_stats['releases_no_match']}")
+                logger.info(f"  Already had Apple: {apple_stats['releases_with_apple_music']}")
+                logger.info(f"  Tracks matched: {apple_stats['tracks_matched']}")
+                logger.info(f"  Tracks no match: {apple_stats['tracks_no_match']}")
+                logger.info(f"  Artwork added: {apple_stats['artwork_added']}")
+                logger.info(f"  Cache hits: {apple_stats['cache_hits']}")
+                logger.info(f"  API calls: {apple_stats['api_calls']}")
+        else:
+            logger.info("⏭ Skipping Apple Music matching (temporarily disabled)")
+            apple_stats = {'skipped': True}
+
+        # Combine stats from all operations
         combined_stats = {
             'musicbrainz': mb_stats,
-            'spotify': spotify_stats
+            'spotify': spotify_stats,
+            'apple_music': apple_stats
         }
-        
+
         logger.info(f"✓ Successfully researched {song_name}")
-        
+
         return {
             'success': True,
             'song_id': song_id,
