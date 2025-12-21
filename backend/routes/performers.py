@@ -8,38 +8,81 @@ logger = logging.getLogger(__name__)
 performers_bp = Blueprint('performers', __name__)
 
 # Performer endpoints:
-# - GET /performers
-# - POST /performers
-# - GET /performers/<performer_id>
-# - GET /performers/search
+# - GET /performers              - List performers (supports pagination via limit/offset)
+# - GET /performers/index        - Lightweight list (id, name, sort_name only) for alphabet index
+# - POST /performers             - Create a new performer
+# - GET /performers/<performer_id> - Get performer details
+# - GET /performers/search       - Search performers by name
 
 @performers_bp.route('/performers', methods=['GET'])
 def get_performers():
-    """Get all performers or search performers by name"""
+    """
+    Get performers with optional search and pagination.
+
+    Query Parameters:
+        search: Filter performers by name (case-insensitive partial match)
+        limit: Maximum number of results to return (default: no limit for backward compat)
+        offset: Number of results to skip (default: 0)
+
+    Response Headers:
+        X-Total-Count: Total number of matching performers
+        X-Has-More: "true" if more results available, "false" otherwise
+
+    Returns:
+        Array of performer objects (maintains backward compatibility)
+    """
     search_query = request.args.get('search', '')
-    
+
+    # Pagination params - default to no limit for backward compatibility
+    limit_param = request.args.get('limit')
+    offset = int(request.args.get('offset', 0))
+
+    # If limit specified, cap it at 1000
+    limit = min(int(limit_param), 1000) if limit_param else None
+
     try:
-        if search_query:
-            query = """
-                SELECT id, name, sort_name, biography, birth_date, death_date,
-                    external_links, wikipedia_url, musicbrainz_id
-                FROM performers
-                WHERE name ILIKE %s
-                ORDER BY COALESCE(sort_name, name)
-            """
-            params = (f'%{search_query}%',)
+        # Build WHERE clause
+        where_clause = "WHERE name ILIKE %s" if search_query else ""
+        base_params = (f'%{search_query}%',) if search_query else ()
+
+        # Get total count first
+        count_query = f"SELECT COUNT(*) as count FROM performers {where_clause}"
+        count_result = db_tools.execute_query(count_query, base_params if base_params else None, fetch_one=True)
+        total_count = count_result['count'] if count_result else 0
+
+        # Build main query with pagination
+        query = f"""
+            SELECT id, name, sort_name, biography, birth_date, death_date,
+                external_links, wikipedia_url, musicbrainz_id
+            FROM performers
+            {where_clause}
+            ORDER BY COALESCE(sort_name, name)
+        """
+
+        # Add pagination if limit specified
+        if limit is not None:
+            query += f" LIMIT {limit} OFFSET {offset}"
+            params = base_params if base_params else None
         else:
-            query = """
-                SELECT id, name, sort_name, biography, birth_date, death_date,
-                    external_links, wikipedia_url, musicbrainz_id
-                FROM performers
-                ORDER BY COALESCE(sort_name, name)
-            """
-            params = None
-        
+            params = base_params if base_params else None
+
         performers = db_tools.execute_query(query, params)
-        return jsonify(performers)
-        
+
+        # Build response with pagination headers
+        response = jsonify(performers)
+        response.headers['X-Total-Count'] = str(total_count)
+
+        if limit is not None:
+            has_more = (offset + len(performers)) < total_count
+            response.headers['X-Has-More'] = 'true' if has_more else 'false'
+        else:
+            response.headers['X-Has-More'] = 'false'
+
+        # Allow these headers to be read by JavaScript/iOS clients
+        response.headers['Access-Control-Expose-Headers'] = 'X-Total-Count, X-Has-More'
+
+        return response
+
     except Exception as e:
         logger.error(f"Error fetching performers: {e}")
         return jsonify({'error': 'Failed to fetch performers', 'detail': str(e)}), 500
@@ -332,10 +375,53 @@ def search_performers():
                     })
                 
                 return jsonify(results)
-        
+
     except Exception as e:
         logger.error(f"Error searching performers: {e}", exc_info=True)
         return jsonify({'error': 'Internal server error'}), 500
 
 
+@performers_bp.route('/performers/index', methods=['GET'])
+def get_performers_index():
+    """
+    Get lightweight list of all performers for building an alphabet index.
 
+    Returns only id, name, and sort_name - minimal data for fast loading.
+    This enables the iOS app to build the full alphabet navigation index
+    while loading detailed data progressively.
+
+    Query Parameters:
+        search: Filter performers by name (case-insensitive partial match)
+
+    Returns:
+        Array of {id, name, sort_name} objects
+    """
+    search_query = request.args.get('search', '')
+
+    try:
+        if search_query:
+            query = """
+                SELECT id, name, sort_name
+                FROM performers
+                WHERE name ILIKE %s
+                ORDER BY COALESCE(sort_name, name)
+            """
+            params = (f'%{search_query}%',)
+        else:
+            query = """
+                SELECT id, name, sort_name
+                FROM performers
+                ORDER BY COALESCE(sort_name, name)
+            """
+            params = None
+
+        performers = db_tools.execute_query(query, params)
+
+        response = jsonify(performers)
+        response.headers['X-Total-Count'] = str(len(performers))
+
+        return response
+
+    except Exception as e:
+        logger.error(f"Error fetching performers index: {e}")
+        return jsonify({'error': 'Failed to fetch performers index', 'detail': str(e)}), 500
