@@ -1,3 +1,7 @@
+AuthKey_KMVRF8X88R.p8
+backend/apple_music_catalog.duckdb
+backend/data/
+
 backend/client-google-client
 backend/scripts/.env.spotify2_jazzlinernotes
 backend/scripts/.env.spotify_jazzlinernotes
