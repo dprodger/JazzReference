@@ -16,6 +16,7 @@ rapidfuzz==3.14.3
 # Authentication (Phase 2)
 PyJWT==2.8.0
 bcrypt==4.1.2
+cryptography==42.0.0  # For JWT ES256 signing (Apple Music Feed)
 
 # Email Service (Phase 3 - optional for Phase 2)
 sendgrid==6.11.0
@@ -25,3 +26,7 @@ sendgrid==6.11.0
 
 # Google OAuth (Phase 6 - optional for Phase 2)
 google-auth==2.27.0
+
+# Apple Music Feed (bulk catalog data)
+pyarrow>=15.0.0  # For reading parquet files
+duckdb>=1.4.3  # For memory-efficient parquet queries (MotherDuck requires 1.4+)
