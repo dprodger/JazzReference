@@ -70,6 +70,14 @@ class NetworkManager: ObservableObject {
     @Published var isLoading = false
     @Published var errorMessage: String?
     @Published var recordings: [Recording] = []
+
+    // MARK: - Performers Pagination State
+    @Published var performersIndex: [Performer] = []  // Lightweight index for alphabet nav
+    @Published var hasMorePerformers = true
+    @Published var isLoadingMorePerformers = false
+    private var performersTotalCount = 0
+    private var currentPerformersOffset = 0
+    private let performersPageSize = 500
     
     // MARK: - Diagnostics
     private static var requestCounter = 0
@@ -144,18 +152,54 @@ class NetworkManager: ObservableObject {
         }
     }
 
+    /// Fetch lightweight performer index for alphabet navigation
+    /// Returns only id, name, sort_name - fast to load all 30k performers
+    func fetchPerformersIndex(searchQuery: String = "") async {
+        let startTime = Date()
+
+        var urlString = "\(NetworkManager.baseURL)/performers/index"
+        if !searchQuery.isEmpty {
+            urlString += "?search=\(searchQuery.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")"
+        }
+
+        guard let url = URL(string: urlString) else { return }
+
+        do {
+            let (data, _) = try await URLSession.shared.data(from: url)
+            let decodedPerformers = try JSONDecoder().decode([Performer].self, from: data)
+
+            guard !Task.isCancelled else { return }
+
+            await MainActor.run {
+                self.performersIndex = decodedPerformers
+            }
+            NetworkManager.logRequest("GET /performers/index\(searchQuery.isEmpty ? "" : "?search=...")", startTime: startTime)
+        } catch is CancellationError {
+            return
+        } catch let error as NSError where error.code == NSURLErrorCancelled {
+            return
+        } catch {
+            print("Error fetching performers index: \(error)")
+        }
+    }
+
+    /// Fetch performers with pagination - initial load or after search change
     func fetchPerformers(searchQuery: String = "") async {
         let startTime = Date()
         await MainActor.run {
             isLoading = true
             errorMessage = nil
+            // Reset pagination state for fresh load
+            currentPerformersOffset = 0
+            hasMorePerformers = true
+            performers = []
         }
-        
-        var urlString = "\(NetworkManager.baseURL)/performers"
+
+        var urlString = "\(NetworkManager.baseURL)/performers?limit=\(performersPageSize)&offset=0"
         if !searchQuery.isEmpty {
-            urlString += "?search=\(searchQuery.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")"
+            urlString += "&search=\(searchQuery.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")"
         }
-        
+
         guard let url = URL(string: urlString) else {
             await MainActor.run {
                 errorMessage = "Invalid URL"
@@ -163,32 +207,100 @@ class NetworkManager: ObservableObject {
             }
             return
         }
-        
+
         do {
-            let (data, _) = try await URLSession.shared.data(from: url)
+            let (data, response) = try await URLSession.shared.data(from: url)
             let decodedPerformers = try JSONDecoder().decode([Performer].self, from: data)
 
-            // Check if cancelled before updating UI (avoids race with newer request)
+            // Parse pagination headers
+            var totalCount = decodedPerformers.count
+            var hasMore = false
+            if let httpResponse = response as? HTTPURLResponse {
+                if let totalCountHeader = httpResponse.value(forHTTPHeaderField: "X-Total-Count"),
+                   let count = Int(totalCountHeader) {
+                    totalCount = count
+                }
+                if let hasMoreHeader = httpResponse.value(forHTTPHeaderField: "X-Has-More") {
+                    hasMore = hasMoreHeader == "true"
+                }
+            }
+
             guard !Task.isCancelled else { return }
 
             await MainActor.run {
                 self.performers = decodedPerformers
+                self.performersTotalCount = totalCount
+                self.hasMorePerformers = hasMore
+                self.currentPerformersOffset = decodedPerformers.count
                 self.isLoading = false
             }
-            NetworkManager.logRequest("GET /performers\(searchQuery.isEmpty ? "" : "?search=...")", startTime: startTime)
+            NetworkManager.logRequest("GET /performers?limit=\(performersPageSize)&offset=0\(searchQuery.isEmpty ? "" : "&search=...")", startTime: startTime)
         } catch is CancellationError {
-            // Task was cancelled (user typed again) - silently ignore
             return
         } catch let error as NSError where error.code == NSURLErrorCancelled {
-            // URLSession request was cancelled - silently ignore
             return
         } catch {
-            // Only show error if this task wasn't cancelled
             guard !Task.isCancelled else { return }
             await MainActor.run {
                 self.errorMessage = "Failed to fetch performers: \(error.localizedDescription)"
                 self.isLoading = false
             }
+        }
+    }
+
+    /// Load next page of performers for infinite scroll
+    func loadMorePerformers(searchQuery: String = "") async {
+        // Don't load if already loading or no more data
+        guard !isLoadingMorePerformers && hasMorePerformers else { return }
+
+        let startTime = Date()
+        await MainActor.run {
+            isLoadingMorePerformers = true
+        }
+
+        var urlString = "\(NetworkManager.baseURL)/performers?limit=\(performersPageSize)&offset=\(currentPerformersOffset)"
+        if !searchQuery.isEmpty {
+            urlString += "&search=\(searchQuery.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")"
+        }
+
+        guard let url = URL(string: urlString) else {
+            await MainActor.run {
+                isLoadingMorePerformers = false
+            }
+            return
+        }
+
+        do {
+            let (data, response) = try await URLSession.shared.data(from: url)
+            let decodedPerformers = try JSONDecoder().decode([Performer].self, from: data)
+
+            // Parse pagination headers
+            var hasMore = false
+            if let httpResponse = response as? HTTPURLResponse {
+                if let hasMoreHeader = httpResponse.value(forHTTPHeaderField: "X-Has-More") {
+                    hasMore = hasMoreHeader == "true"
+                }
+            }
+
+            guard !Task.isCancelled else { return }
+
+            await MainActor.run {
+                self.performers.append(contentsOf: decodedPerformers)
+                self.hasMorePerformers = hasMore
+                self.currentPerformersOffset += decodedPerformers.count
+                self.isLoadingMorePerformers = false
+            }
+            NetworkManager.logRequest("GET /performers?limit=\(performersPageSize)&offset=\(currentPerformersOffset - decodedPerformers.count)\(searchQuery.isEmpty ? "" : "&search=...")", startTime: startTime)
+        } catch is CancellationError {
+            return
+        } catch let error as NSError where error.code == NSURLErrorCancelled {
+            return
+        } catch {
+            guard !Task.isCancelled else { return }
+            await MainActor.run {
+                self.isLoadingMorePerformers = false
+            }
+            print("Error loading more performers: \(error)")
         }
     }
     

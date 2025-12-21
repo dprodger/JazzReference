@@ -4,6 +4,7 @@
 //
 //  Enhanced with custom scrollable alphabet index (iOS Contacts-style)
 //  Updated to handle non-Latin characters better
+//  Now uses pagination for faster initial load with infinite scroll
 //
 
 import SwiftUI
@@ -13,34 +14,38 @@ struct ArtistsListView: View {
     @State private var searchText = ""
     @State private var searchTask: Task<Void, Never>?
     @State private var hasPerformedInitialLoad = false
-    
-    // Computed property to group artists by first letter
+
+    // Helper to extract first letter for grouping
+    private func firstLetter(for name: String) -> String {
+        let firstChar: String
+
+        if let commaIndex = name.firstIndex(of: ",") {
+            // "Last, First" format - use first letter of last name
+            let lastName = name[..<commaIndex]
+            firstChar = String(lastName.prefix(1)).uppercased()
+        } else {
+            // Single name - use first letter
+            firstChar = String(name.prefix(1)).uppercased()
+        }
+
+        // Check if it's a Latin letter (A-Z)
+        if firstChar.rangeOfCharacter(from: CharacterSet(charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZ")) != nil {
+            return firstChar
+        } else if firstChar.rangeOfCharacter(from: .letters) != nil {
+            return "•" // Non-Latin letters (Cyrillic, Asian scripts, etc.)
+        } else {
+            return "#" // Numbers and symbols
+        }
+    }
+
+    // Computed property to group loaded artists by first letter
     private var groupedArtists: [(String, [Performer])] {
         let filtered = networkManager.performers
-        
+
         let grouped = Dictionary(grouping: filtered) { performer in
-            let name = performer.name
-            let firstChar: String
-            
-            if let commaIndex = name.firstIndex(of: ",") {
-                // "Last, First" format - use first letter of last name
-                let lastName = name[..<commaIndex]
-                firstChar = String(lastName.prefix(1)).uppercased()
-            } else {
-                // Single name - use first letter
-                firstChar = String(name.prefix(1)).uppercased()
-            }
-            
-            // Check if it's a Latin letter (A-Z)
-            if firstChar.rangeOfCharacter(from: CharacterSet(charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZ")) != nil {
-                return firstChar
-            } else if firstChar.rangeOfCharacter(from: .letters) != nil {
-                return "•" // Non-Latin letters (Cyrillic, Asian scripts, etc.)
-            } else {
-                return "#" // Numbers and symbols
-            }
+            firstLetter(for: performer.name)
         }
-        
+
         return grouped.sorted { lhs, rhs in
             // "#" always last
             if lhs.key == "#" { return false }
@@ -54,31 +59,57 @@ struct ArtistsListView: View {
             (key, value.sorted { $0.name < $1.name })
         }
     }
-    
-    // Get all section letters for the index
-    private var sectionLetters: [String] {
-        groupedArtists.map { $0.0 }
+
+    // Get all section letters from the full index (for alphabet sidebar)
+    // This uses the lightweight index so all letters are available immediately
+    private var allSectionLetters: [String] {
+        let source = networkManager.performersIndex.isEmpty
+            ? networkManager.performers
+            : networkManager.performersIndex
+
+        let letters = Set(source.map { firstLetter(for: $0.name) })
+
+        return letters.sorted { lhs, rhs in
+            if lhs == "#" { return false }
+            if rhs == "#" { return true }
+            if lhs == "•" { return false }
+            if rhs == "•" { return true }
+            return lhs < rhs
+        }
     }
-    
+
+    // Total count for display (from index if available)
+    private var totalArtistsCount: Int {
+        networkManager.performersIndex.isEmpty
+            ? networkManager.performers.count
+            : networkManager.performersIndex.count
+    }
+
     var body: some View {
         NavigationStack {
             contentView
                 .background(JazzTheme.backgroundLight)
-                .jazzNavigationBar(title: "Artists (\(networkManager.performers.count.formatted()))", color: JazzTheme.amber)
+                .jazzNavigationBar(title: "Artists (\(totalArtistsCount.formatted()))", color: JazzTheme.amber)
                 .searchable(text: $searchText, prompt: "Search artists")
                 .onChange(of: searchText) { oldValue, newValue in
                     searchTask?.cancel()
                     searchTask = Task {
                         try? await Task.sleep(nanoseconds: 300_000_000)
                         if !Task.isCancelled {
-                            await networkManager.fetchPerformers(searchQuery: newValue)
+                            // Fetch both index and first page for new search
+                            async let indexFetch: () = networkManager.fetchPerformersIndex(searchQuery: newValue)
+                            async let performersFetch: () = networkManager.fetchPerformers(searchQuery: newValue)
+                            _ = await (indexFetch, performersFetch)
                         }
                     }
                 }
                 .task {
                     // Only load on initial appear, not when returning from detail view
                     if !hasPerformedInitialLoad {
-                        await networkManager.fetchPerformers(searchQuery: searchText)
+                        // Load index and first page concurrently
+                        async let indexFetch: () = networkManager.fetchPerformersIndex(searchQuery: searchText)
+                        async let performersFetch: () = networkManager.fetchPerformers(searchQuery: searchText)
+                        _ = await (indexFetch, performersFetch)
                         hasPerformedInitialLoad = true
                     }
                 }
@@ -149,14 +180,43 @@ struct ArtistsListView: View {
                     }
                     .id(letter) // Anchor for scrolling
                 }
+
+                // Loading indicator and infinite scroll trigger
+                if networkManager.hasMorePerformers {
+                    HStack {
+                        Spacer()
+                        if networkManager.isLoadingMorePerformers {
+                            ProgressView()
+                                .tint(JazzTheme.amber)
+                            Text("Loading more...")
+                                .font(JazzTheme.subheadline())
+                                .foregroundColor(JazzTheme.smokeGray)
+                                .padding(.leading, 8)
+                        } else {
+                            Text("Scroll for more")
+                                .font(JazzTheme.subheadline())
+                                .foregroundColor(JazzTheme.smokeGray)
+                        }
+                        Spacer()
+                    }
+                    .padding(.vertical, 16)
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+                    .onAppear {
+                        // Trigger loading more when this row appears
+                        Task {
+                            await networkManager.loadMorePerformers(searchQuery: searchText)
+                        }
+                    }
+                }
             }
             .listStyle(.plain)
             .scrollContentBackground(.hidden)
             .background(JazzTheme.backgroundLight)
             .overlay(alignment: .trailing) {
-                // Custom alphabet index overlay
+                // Custom alphabet index overlay - uses full index for all letters
                 AlphabetIndexView(
-                    letters: sectionLetters,
+                    letters: allSectionLetters,
                     accentColor: JazzTheme.amber,
                     onTap: { letter in
                         // Use short animation to prevent conflicts during rapid scrubbing
