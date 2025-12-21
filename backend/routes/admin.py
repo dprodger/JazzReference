@@ -1541,3 +1541,443 @@ def run_matcher_all():
         import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
+
+
+# ============================================================================
+# Apple Music Match Admin
+# ============================================================================
+
+@admin_bp.route('/apple-matches')
+def apple_matches_list():
+    """List songs with Apple Music match statistics."""
+    with get_db_connection() as db:
+        with db.cursor() as cur:
+            # Get songs with releases and their Apple Music match status
+            cur.execute("""
+                SELECT
+                    s.id,
+                    s.title,
+                    s.composer,
+                    COUNT(DISTINCT rel.id) as total_releases,
+                    COUNT(DISTINCT CASE WHEN rsl.id IS NOT NULL THEN rel.id END) as matched_releases,
+                    COUNT(DISTINCT CASE
+                        WHEN rsl.id IS NULL AND rel.apple_music_searched_at IS NOT NULL
+                        THEN rel.id
+                    END) as searched_no_match,
+                    COUNT(DISTINCT CASE
+                        WHEN rsl.id IS NULL AND rel.apple_music_searched_at IS NULL
+                        THEN rel.id
+                    END) as not_searched,
+                    COUNT(DISTINCT rr.recording_id) as total_recordings,
+                    COUNT(DISTINCT CASE WHEN rrsl.id IS NOT NULL THEN rr.id END) as matched_tracks
+                FROM songs s
+                JOIN recordings rec ON rec.song_id = s.id
+                JOIN recording_releases rr ON rr.recording_id = rec.id
+                JOIN releases rel ON rr.release_id = rel.id
+                LEFT JOIN release_streaming_links rsl
+                    ON rel.id = rsl.release_id AND rsl.service = 'apple_music'
+                LEFT JOIN recording_release_streaming_links rrsl
+                    ON rr.id = rrsl.recording_release_id AND rrsl.service = 'apple_music'
+                GROUP BY s.id, s.title, s.composer
+                HAVING COUNT(DISTINCT rel.id) > 0
+                ORDER BY s.title
+            """)
+            songs = cur.fetchall()
+
+            # Calculate summary stats
+            total_songs = len(songs)
+            songs_complete = sum(1 for s in songs if s['matched_releases'] == s['total_releases'])
+            songs_partial = sum(1 for s in songs if 0 < s['matched_releases'] < s['total_releases'])
+            songs_none = sum(1 for s in songs if s['matched_releases'] == 0)
+
+            summary = {
+                'total_songs': total_songs,
+                'songs_complete': songs_complete,
+                'songs_partial': songs_partial,
+                'songs_none': songs_none,
+                'total_releases': sum(s['total_releases'] for s in songs),
+                'matched_releases': sum(s['matched_releases'] for s in songs),
+                'searched_no_match': sum(s['searched_no_match'] for s in songs),
+                'not_searched': sum(s['not_searched'] for s in songs),
+            }
+
+    return render_template('admin/apple_matches_list.html',
+                          songs=songs,
+                          summary=summary)
+
+
+@admin_bp.route('/apple-matches/<song_id>')
+def apple_matches_review(song_id):
+    """Review Apple Music matches for a specific song."""
+    with get_db_connection() as db:
+        with db.cursor() as cur:
+            # Get song info
+            cur.execute("""
+                SELECT id, title, composer, musicbrainz_id
+                FROM songs WHERE id = %s
+            """, (song_id,))
+            song = cur.fetchone()
+
+            if not song:
+                return "Song not found", 404
+
+            # Get releases with Apple Music status and track details
+            cur.execute("""
+                SELECT
+                    rel.id,
+                    rel.title,
+                    rel.artist_credit,
+                    rel.release_year,
+                    rel.musicbrainz_release_id,
+                    rel.apple_music_searched_at,
+                    rsl.service_id as apple_music_album_id,
+                    rsl.service_url as apple_music_url,
+                    rsl.id IS NOT NULL as has_apple_music,
+                    -- Get cover art
+                    COALESCE(
+                        (SELECT ri.image_url_small FROM release_imagery ri
+                         WHERE ri.release_id = rel.id AND ri.type = 'Front' LIMIT 1),
+                        rel.cover_art_small
+                    ) as cover_art,
+                    -- Get recordings for this release
+                    (SELECT json_agg(
+                        json_build_object(
+                            'recording_release_id', rr_sub.id,
+                            'track_number', rr_sub.track_number,
+                            'disc_number', rr_sub.disc_number,
+                            'title', COALESCE(rr_sub.track_title, s_sub.title),
+                            'has_apple_music', rrsl_sub.id IS NOT NULL,
+                            'apple_music_track_id', rrsl_sub.service_id,
+                            'apple_music_url', rrsl_sub.service_url
+                        ) ORDER BY rr_sub.disc_number, rr_sub.track_number
+                    )
+                    FROM recording_releases rr_sub
+                    JOIN recordings rec_sub ON rr_sub.recording_id = rec_sub.id
+                    JOIN songs s_sub ON rec_sub.song_id = s_sub.id
+                    LEFT JOIN recording_release_streaming_links rrsl_sub
+                        ON rr_sub.id = rrsl_sub.recording_release_id
+                        AND rrsl_sub.service = 'apple_music'
+                    WHERE rr_sub.release_id = rel.id
+                      AND rec_sub.song_id = %s
+                    ) as tracks
+                FROM releases rel
+                JOIN recording_releases rr ON rel.id = rr.release_id
+                JOIN recordings rec ON rr.recording_id = rec.id
+                LEFT JOIN release_streaming_links rsl
+                    ON rel.id = rsl.release_id AND rsl.service = 'apple_music'
+                WHERE rec.song_id = %s
+                GROUP BY rel.id, rel.title, rel.artist_credit, rel.release_year,
+                         rel.musicbrainz_release_id, rel.apple_music_searched_at,
+                         rsl.service_id, rsl.service_url, rsl.id,
+                         rel.cover_art_small
+                ORDER BY rel.release_year, rel.title
+            """, (song_id, song_id))
+            releases = cur.fetchall()
+
+            # Calculate stats
+            stats = {
+                'total_releases': len(releases),
+                'matched_releases': sum(1 for r in releases if r['has_apple_music']),
+                'searched_no_match': sum(1 for r in releases
+                    if not r['has_apple_music'] and r['apple_music_searched_at']),
+                'not_searched': sum(1 for r in releases
+                    if not r['has_apple_music'] and not r['apple_music_searched_at']),
+                'total_tracks': sum(len(r['tracks'] or []) for r in releases),
+                'matched_tracks': sum(
+                    sum(1 for t in (r['tracks'] or []) if t['has_apple_music'])
+                    for r in releases
+                ),
+            }
+
+    return render_template('admin/apple_matches_review.html',
+                          song=song,
+                          releases=releases,
+                          stats=stats)
+
+
+@admin_bp.route('/apple-matches/<song_id>/run-matcher', methods=['POST'])
+def run_apple_matcher_for_song(song_id):
+    """Run the Apple Music matcher for a specific song."""
+    try:
+        from apple_music_matcher import AppleMusicMatcher
+
+        with get_db_connection() as db:
+            with db.cursor() as cur:
+                cur.execute("SELECT title FROM songs WHERE id = %s", (song_id,))
+                song = cur.fetchone()
+                if not song:
+                    return jsonify({'error': 'Song not found'}), 404
+                song_name = song['title']
+
+        # Check for local-only mode from request
+        local_only = request.json.get('local_only', False) if request.is_json else False
+
+        matcher = AppleMusicMatcher(
+            dry_run=False,
+            strict_mode=True,
+            rematch=False,
+            local_catalog_only=local_only,
+            logger=logger
+        )
+
+        result = matcher.match_song(song_name)
+
+        return jsonify({
+            'success': result.get('success', False),
+            'song_name': song_name,
+            'stats': result.get('stats', {})
+        })
+
+    except Exception as e:
+        logger.error(f"Error running Apple matcher for song: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@admin_bp.route('/apple-matches/<song_id>/diagnose', methods=['POST'])
+def diagnose_apple_match(song_id):
+    """
+    Diagnose why an Apple Music album didn't match a release.
+
+    Takes an Apple Music URL and compares it against our releases.
+    """
+    import re
+    from rapidfuzz import fuzz
+
+    try:
+        data = request.get_json()
+        apple_url = data.get('url', '').strip()
+        release_id = data.get('release_id')
+
+        if not apple_url:
+            return jsonify({'error': 'Apple Music URL is required'}), 400
+
+        # Parse Apple Music URL to extract album ID
+        # Formats:
+        # https://music.apple.com/us/album/kind-of-blue/268443092
+        # https://music.apple.com/us/album/1440851918
+        album_id_match = re.search(r'/album/[^/]*/(\d+)|/album/(\d+)', apple_url)
+        if not album_id_match:
+            return jsonify({'error': 'Could not parse Apple Music album ID from URL'}), 400
+
+        album_id = album_id_match.group(1) or album_id_match.group(2)
+
+        diagnosis = {
+            'url': apple_url,
+            'album_id': album_id,
+            'checks': [],
+            'apple_music_data': None,
+            'our_release': None,
+            'comparison': None,
+            'suggestions': []
+        }
+
+        # Try iTunes API first (returns English names, more reliable for comparison)
+        try:
+            from apple_music_client import AppleMusicClient
+            client = AppleMusicClient()
+
+            album_data = client.lookup_album(album_id)
+            if album_data:
+                diagnosis['checks'].append({
+                    'name': 'Album via iTunes API',
+                    'passed': True,
+                    'message': 'Found via iTunes API lookup'
+                })
+                diagnosis['apple_music_data'] = {
+                    'id': album_data.get('id'),
+                    'name': album_data.get('name'),
+                    'artist': album_data.get('artist'),
+                    'release_date': album_data.get('release_date'),
+                    'track_count': album_data.get('track_count'),
+                }
+
+                # Get album tracks via iTunes API
+                tracks = client.lookup_album_tracks(album_id)
+                if tracks:
+                    diagnosis['apple_music_data']['tracks'] = [
+                        {'name': t.get('name'), 'track_number': t.get('track_number')}
+                        for t in tracks[:10]
+                    ]
+                    if len(tracks) > 10:
+                        diagnosis['apple_music_data']['tracks_truncated'] = True
+            else:
+                diagnosis['checks'].append({
+                    'name': 'Album via iTunes API',
+                    'passed': False,
+                    'message': 'Not found via iTunes API'
+                })
+        except Exception as e:
+            diagnosis['checks'].append({
+                'name': 'Album via iTunes API',
+                'passed': False,
+                'message': f'API lookup failed: {str(e)}'
+            })
+
+        # If iTunes API failed, try local catalog as fallback
+        if not diagnosis['apple_music_data']:
+            try:
+                from apple_music_feed import AppleMusicCatalog
+                catalog = AppleMusicCatalog()
+
+                album_data = catalog.get_album_by_id(album_id)
+
+                if album_data:
+                    diagnosis['checks'].append({
+                        'name': 'Album in local catalog',
+                        'passed': True,
+                        'message': 'Found in local catalog (note: may have localized names)'
+                    })
+                    diagnosis['apple_music_data'] = {
+                        'id': album_data.get('id'),
+                        'name': album_data.get('name'),
+                        'artist': album_data.get('artistName'),
+                        'release_date': album_data.get('releaseDate'),
+                        'track_count': album_data.get('trackCount'),
+                    }
+                    # Warn about potential localization
+                    diagnosis['suggestions'].append(
+                        'Data from local catalog may have localized artist names. '
+                        'iTunes API lookup was not available.'
+                    )
+
+                    # Get tracks
+                    tracks = catalog.get_songs_for_album(album_id)
+                    if tracks:
+                        diagnosis['apple_music_data']['tracks'] = [
+                            {'name': t.get('name'), 'track_number': t.get('trackNumber')}
+                            for t in tracks[:10]
+                        ]
+                        if len(tracks) > 10:
+                            diagnosis['apple_music_data']['tracks_truncated'] = True
+                else:
+                    diagnosis['checks'].append({
+                        'name': 'Album in local catalog',
+                        'passed': False,
+                        'message': 'Not found in local catalog either'
+                    })
+                    diagnosis['suggestions'].append('Album not found in iTunes API or local catalog.')
+            except Exception as e:
+                diagnosis['checks'].append({
+                    'name': 'Album in local catalog',
+                    'passed': False,
+                    'message': f'Error accessing catalog: {str(e)}'
+                })
+
+        # Get our release data for comparison
+        if release_id:
+            with get_db_connection() as db:
+                with db.cursor() as cur:
+                    cur.execute("""
+                        SELECT
+                            rel.id, rel.title, rel.artist_credit, rel.release_year,
+                            rel.apple_music_searched_at
+                        FROM releases rel
+                        WHERE rel.id = %s
+                    """, (release_id,))
+                    release = cur.fetchone()
+
+                    if release:
+                        diagnosis['our_release'] = {
+                            'id': str(release['id']),
+                            'title': release['title'],
+                            'artist': release['artist_credit'],
+                            'year': release['release_year'],
+                            'searched_at': str(release['apple_music_searched_at']) if release['apple_music_searched_at'] else None
+                        }
+
+        # Compare if we have both
+        if diagnosis['apple_music_data'] and diagnosis['our_release']:
+            am = diagnosis['apple_music_data']
+            our = diagnosis['our_release']
+
+            # Calculate similarities
+            artist_sim = fuzz.ratio(
+                (am.get('artist') or '').lower(),
+                (our.get('artist') or '').lower()
+            )
+            album_sim = fuzz.ratio(
+                (am.get('name') or '').lower(),
+                (our.get('title') or '').lower()
+            )
+
+            # Partial ratio (handles substrings better)
+            artist_partial = fuzz.partial_ratio(
+                (am.get('artist') or '').lower(),
+                (our.get('artist') or '').lower()
+            )
+            album_partial = fuzz.partial_ratio(
+                (am.get('name') or '').lower(),
+                (our.get('title') or '').lower()
+            )
+
+            diagnosis['comparison'] = {
+                'artist': {
+                    'apple_music': am.get('artist'),
+                    'our_release': our.get('artist'),
+                    'similarity': artist_sim,
+                    'partial_similarity': artist_partial,
+                },
+                'album': {
+                    'apple_music': am.get('name'),
+                    'our_release': our.get('title'),
+                    'similarity': album_sim,
+                    'partial_similarity': album_partial,
+                },
+                'year': {
+                    'apple_music': am.get('release_date', '')[:4] if am.get('release_date') else None,
+                    'our_release': our.get('year'),
+                }
+            }
+
+            # Add diagnosis based on similarities
+            # Default thresholds: artist >= 65%, album >= 65%
+            if artist_sim < 65:
+                diagnosis['checks'].append({
+                    'name': 'Artist name match',
+                    'passed': False,
+                    'message': f'Artist similarity {artist_sim}% is below threshold (65%)'
+                })
+                diagnosis['suggestions'].append(
+                    f'Artist names differ significantly: "{am.get("artist")}" vs "{our.get("artist")}"'
+                )
+            else:
+                diagnosis['checks'].append({
+                    'name': 'Artist name match',
+                    'passed': True,
+                    'message': f'Artist similarity {artist_sim}%'
+                })
+
+            if album_sim < 65:
+                diagnosis['checks'].append({
+                    'name': 'Album name match',
+                    'passed': False,
+                    'message': f'Album similarity {album_sim}% is below threshold (65%)'
+                })
+                diagnosis['suggestions'].append(
+                    f'Album names differ: "{am.get("name")}" vs "{our.get("title")}"'
+                )
+            else:
+                diagnosis['checks'].append({
+                    'name': 'Album name match',
+                    'passed': True,
+                    'message': f'Album similarity {album_sim}%'
+                })
+
+            # Check if it would match with current thresholds
+            would_match = artist_sim >= 65 and album_sim >= 65
+            diagnosis['would_match'] = would_match
+
+            if not would_match:
+                diagnosis['suggestions'].append(
+                    'This album would not match with current thresholds. Consider manual linking or adjusting the matcher thresholds.'
+                )
+
+        return jsonify(diagnosis)
+
+    except Exception as e:
+        logger.error(f"Error diagnosing Apple match: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
