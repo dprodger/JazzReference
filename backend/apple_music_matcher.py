@@ -24,6 +24,7 @@ import logging
 from typing import Dict, Any, Optional, List
 
 from db_utils import get_db_connection
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 
 from apple_music_client import (
     AppleMusicClient,
@@ -223,8 +224,20 @@ class AppleMusicMatcher:
             if self.progress_callback:
                 self.progress_callback('matching', i + 1, len(releases))
 
-            with get_db_connection() as conn:
-                self._process_release(conn, song_id, song_title, release, i + 1, len(releases))
+            try:
+                with get_db_connection() as conn:
+                    self._process_release(conn, song_id, song_title, release, i + 1, len(releases))
+            except Exception as e:
+                # Log error but continue with next release
+                release_title = release.get('title', 'Unknown')
+                self.logger.error(f"  Error processing release {i + 1}/{len(releases)} ({release_title}): {e}")
+                self.stats['errors'] += 1
+                # Refresh the catalog connection if available
+                if self.catalog:
+                    try:
+                        self.catalog._refresh_conn()
+                    except Exception:
+                        pass
 
         # Aggregate client stats
         self.stats['cache_hits'] = self.client.stats.get('cache_hits', 0)
@@ -437,11 +450,8 @@ class AppleMusicMatcher:
 
         for search_artist, search_album in search_strategies:
             try:
-                albums = self.catalog.search_albums(
-                    artist_name=search_artist,
-                    album_title=search_album,
-                    limit=50
-                )
+                # Use timeout to prevent catalog searches from hanging
+                albums = self._search_with_timeout(search_artist, search_album, timeout=30)
 
                 if not albums:
                     continue
@@ -458,11 +468,46 @@ class AppleMusicMatcher:
                             album['_source'] = 'local_catalog'
                             return album
 
+            except FuturesTimeoutError:
+                self.logger.warning(f"    Catalog search timed out for: {search_artist} - {search_album}")
+                # Refresh connection after timeout
+                if self.catalog:
+                    self.catalog._refresh_conn()
+                continue
             except Exception as e:
                 self.logger.debug(f"Local catalog search error: {e}")
                 continue
 
         return None
+
+    def _search_with_timeout(
+        self,
+        artist_name: Optional[str],
+        album_title: str,
+        timeout: int = 30
+    ) -> List[Dict]:
+        """
+        Search the catalog with a timeout to prevent hangs.
+
+        Args:
+            artist_name: Artist name to search for (optional)
+            album_title: Album title to search for
+            timeout: Maximum seconds to wait for search
+
+        Returns:
+            List of matching albums, or empty list on timeout/error
+
+        Raises:
+            FuturesTimeoutError: If search exceeds timeout
+        """
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(
+                self.catalog.search_albums,
+                artist_name=artist_name,
+                album_title=album_title,
+                limit=50
+            )
+            return future.result(timeout=timeout)
 
     def _convert_catalog_album(self, catalog_data: Dict) -> Optional[Dict]:
         """

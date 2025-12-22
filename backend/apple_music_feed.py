@@ -627,14 +627,28 @@ class AppleMusicCatalog:
     def _get_conn(self):
         """Get DuckDB connection."""
         if self._conn is None:
-            if self._use_motherduck:
-                # MotherDuck connection - db_path is like "md:apple_music_feed"
-                self._conn = duckdb.connect(str(self.db_path))
-            elif self._use_indexed_db:
-                self._conn = duckdb.connect(str(self.db_path), read_only=True)
-            else:
-                self._conn = duckdb.connect(':memory:')
+            self._create_conn()
         return self._conn
+
+    def _create_conn(self):
+        """Create a new DuckDB connection."""
+        if self._use_motherduck:
+            # MotherDuck connection - db_path is like "md:apple_music_feed"
+            self._conn = duckdb.connect(str(self.db_path))
+        elif self._use_indexed_db:
+            self._conn = duckdb.connect(str(self.db_path), read_only=True)
+        else:
+            self._conn = duckdb.connect(':memory:')
+
+    def _refresh_conn(self):
+        """Close and recreate the DuckDB connection."""
+        if self._conn is not None:
+            try:
+                self._conn.close()
+            except Exception:
+                pass
+            self._conn = None
+        self._create_conn()
 
     def get_query_count(self) -> int:
         """Get the total number of queries executed."""
@@ -718,13 +732,30 @@ class AppleMusicCatalog:
         try:
             self._query_count += 1
             self.log.debug(f"Album search query: artist={artist_name}, album={album_title}")
+
+            # Refresh connection periodically to avoid stale connection issues
+            if self._query_count % 500 == 0:
+                self.log.debug("Refreshing DuckDB connection (periodic)")
+                self._refresh_conn()
+                conn = self._get_conn()
+
             result = conn.execute(query, params).fetchall()
             self.log.debug(f"Album search returned {len(result)} results")
             columns = ['id', 'name', 'artistName', 'releaseDate', 'trackCount', 'upc', 'urlTemplate']
             return [dict(zip(columns, row)) for row in result]
         except Exception as e:
             self.log.error(f"Album search error: {e}")
-            return []
+            # Refresh connection on error and retry once
+            try:
+                self.log.debug("Refreshing DuckDB connection after error")
+                self._refresh_conn()
+                conn = self._get_conn()
+                result = conn.execute(query, params).fetchall()
+                columns = ['id', 'name', 'artistName', 'releaseDate', 'trackCount', 'upc', 'urlTemplate']
+                return [dict(zip(columns, row)) for row in result]
+            except Exception as retry_error:
+                self.log.error(f"Album search retry failed: {retry_error}")
+                return []
 
     def _search_albums_parquet(
         self,
