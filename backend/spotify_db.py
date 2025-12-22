@@ -399,3 +399,103 @@ def update_recording_default_release(conn, song_id: str, release_id: str,
             log.debug(f"    Set default_release_id on {updated_count} recording(s)")
         else:
             log.debug(f"    No recordings needed default_release_id update (already set)")
+
+
+# ============================================================================
+# BAD MATCH BLOCKLIST FUNCTIONS
+# ============================================================================
+
+def is_track_blocked(song_id: str, track_id: str, service: str = 'spotify') -> bool:
+    """
+    Check if a streaming track ID is blocked from matching a song.
+
+    Args:
+        song_id: Our database song ID
+        track_id: Streaming service track ID (e.g., Spotify track ID)
+        service: Streaming service name (default: 'spotify')
+
+    Returns:
+        True if this track is blocked from matching this song, False otherwise
+    """
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT 1 FROM bad_streaming_matches
+                WHERE service = %s
+                  AND block_level = 'track'
+                  AND service_id = %s
+                  AND song_id = %s
+                LIMIT 1
+            """, (service, track_id, song_id))
+            return cur.fetchone() is not None
+
+
+def is_album_blocked(song_id: str, album_id: str, service: str = 'spotify') -> bool:
+    """
+    Check if a streaming album ID is blocked from matching a song's releases.
+
+    Args:
+        song_id: Our database song ID
+        album_id: Streaming service album ID (e.g., Spotify album ID)
+        service: Streaming service name (default: 'spotify')
+
+    Returns:
+        True if this album is blocked from matching this song, False otherwise
+    """
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT 1 FROM bad_streaming_matches
+                WHERE service = %s
+                  AND block_level = 'album'
+                  AND service_id = %s
+                  AND song_id = %s
+                LIMIT 1
+            """, (service, album_id, song_id))
+            return cur.fetchone() is not None
+
+
+def get_blocked_tracks_for_song(song_id: str, service: str = 'spotify') -> List[str]:
+    """
+    Get all blocked track IDs for a song.
+
+    Args:
+        song_id: Our database song ID
+        service: Streaming service name (default: 'spotify')
+
+    Returns:
+        List of blocked track IDs
+    """
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT service_id FROM bad_streaming_matches
+                WHERE service = %s
+                  AND block_level = 'track'
+                  AND song_id = %s
+            """, (service, song_id))
+            rows = cur.fetchall()
+            return [row['service_id'] for row in rows]
+
+
+def get_blocked_albums_for_song(song_id: str, service: str = 'spotify') -> List[str]:
+    """
+    Get all blocked album IDs for a song.
+
+    Args:
+        song_id: Our database song ID
+        service: Streaming service name (default: 'spotify')
+
+    Returns:
+        List of blocked album IDs
+    """
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT service_id FROM bad_streaming_matches
+                WHERE service = %s
+                  AND block_level = 'album'
+                  AND song_id = %s
+            """, (service, song_id))
+            rows = cur.fetchall()
+            return [row['service_id'] for row in rows]

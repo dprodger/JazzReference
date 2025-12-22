@@ -50,6 +50,8 @@ from spotify_db import (
     update_release_artwork,
     update_recording_release_track_id,
     update_recording_default_release,
+    is_track_blocked,
+    is_album_blocked,
 )
 
 logger = logging.getLogger(__name__)
@@ -108,9 +110,11 @@ class SpotifyMatcher:
             'releases_updated': 0,
             'releases_no_match': 0,
             'releases_skipped': 0,
+            'releases_blocked': 0,  # Albums blocked via bad_streaming_matches
             'tracks_matched': 0,
             'tracks_skipped': 0,
             'tracks_no_match': 0,
+            'tracks_blocked': 0,  # Tracks blocked via bad_streaming_matches
             'errors': 0,
             'cache_hits': 0,
             'api_calls': 0,
@@ -1073,8 +1077,13 @@ class SpotifyMatcher:
                 
                 # Search Spotify for album (with song title for track verification fallback)
                 spotify_match = self.search_spotify_album(title, artist_name, song['title'])
-                
+
                 if spotify_match:
+                    # Check if this album is blocked for this song
+                    if is_album_blocked(song['id'], spotify_match['id']):
+                        self.logger.info(f"[{i}/{len(releases)}] {title} ({artist_name or 'Unknown'}, {year or 'Unknown'}) - ⊘ Album blocked (in blocklist)")
+                        self.stats['releases_blocked'] += 1
+                        continue
                     # Check if we already know track matching fails for this combination
                     # This avoids opening a DB connection just to reach the same "no match" conclusion
                     if self._is_track_match_cached_failure(song['id'], release['id'], spotify_match['id']):
@@ -1143,54 +1152,78 @@ class SpotifyMatcher:
     
     def match_track_to_recording(self, song_title: str, spotify_tracks: List[dict],
                                    expected_disc: int = None, expected_track: int = None,
-                                   alt_titles: List[str] = None) -> Optional[dict]:
+                                   alt_titles: List[str] = None,
+                                   song_id: str = None) -> Optional[dict]:
         """
         Find the best matching Spotify track for a song title
-        
+
         Args:
             song_title: The song title to match
             spotify_tracks: List of track dicts from get_album_tracks()
             expected_disc: Expected disc number (optional, for position-based fallback)
             expected_track: Expected track number (optional, for position-based fallback)
             alt_titles: Alternative titles to try if primary title doesn't match
-            
+            song_id: Our database song ID (for blocklist checking)
+
         Returns:
             Best matching track dict or None if no good match
         """
         best_match = None
         best_score = 0
-        
+
+        # Build set of blocked track IDs for this song (more efficient than per-track DB calls)
+        blocked_track_ids = set()
+        if song_id:
+            from spotify_db import get_blocked_tracks_for_song
+            blocked_track_ids = set(get_blocked_tracks_for_song(song_id))
+            if blocked_track_ids:
+                self.logger.debug(f"      Found {len(blocked_track_ids)} blocked track(s) for this song")
+
         # First pass: standard fuzzy matching with primary title
         for track in spotify_tracks:
+            # Check if this track is blocked for this song
+            if track['id'] in blocked_track_ids:
+                self.logger.debug(f"      Skipping blocked track: {track['id']} ('{track['name']}')")
+                self.stats['tracks_blocked'] += 1
+                continue
+
             score = self.calculate_similarity(song_title, track['name'])
-            
+
             if score > best_score and score >= self.min_track_similarity:
                 best_score = score
                 best_match = track
-        
+
         if best_match:
             self.logger.debug(f"      Track match: '{song_title}' → '{best_match['name']}' ({best_score}%)")
             return best_match
-        
+
         # Second pass: try alternative titles
         if alt_titles:
             for alt_title in alt_titles:
                 for track in spotify_tracks:
+                    # Check if this track is blocked for this song
+                    if track['id'] in blocked_track_ids:
+                        continue
+
                     score = self.calculate_similarity(alt_title, track['name'])
-                    
+
                     if score > best_score and score >= self.min_track_similarity:
                         best_score = score
                         best_match = track
-                
+
                 if best_match:
                     self.logger.debug(f"      Track match via alt title: '{alt_title}' → '{best_match['name']}' ({best_score}%)")
                     return best_match
-        
+
         # Fallback: if positions provided and no fuzzy match, try position-based substring match
-        # This handles cases like "An Affair to Remember" vs 
+        # This handles cases like "An Affair to Remember" vs
         # "An Affair to Remember - From the 20th Century-Fox Film, An Affair To Remember"
         if expected_disc is not None and expected_track is not None:
             for track in spotify_tracks:
+                # Check if this track is blocked for this song
+                if track['id'] in blocked_track_ids:
+                    continue
+
                 # Check if track position matches exactly
                 if track.get('disc_number') == expected_disc and track.get('track_number') == expected_track:
                     # Position matches - try substring matching with primary title
@@ -1198,7 +1231,7 @@ class SpotifyMatcher:
                         self.logger.debug(f"      Position+substring match: '{song_title}' → '{track['name']}' "
                                         f"(disc {expected_disc}, track {expected_track})")
                         return track
-                    
+
                     # Also try substring matching with alt titles
                     if alt_titles:
                         for alt_title in alt_titles:
@@ -1206,7 +1239,7 @@ class SpotifyMatcher:
                                 self.logger.debug(f"      Position+substring match via alt title: '{alt_title}' → '{track['name']}' "
                                                 f"(disc {expected_disc}, track {expected_track})")
                                 return track
-        
+
         return best_match
     
     def match_tracks_for_release(self, conn, song_id: str, release_id: str, 
@@ -1254,11 +1287,12 @@ class SpotifyMatcher:
             
             # Match song title to a track, passing position info for fallback matching
             matched_track = self.match_track_to_recording(
-                song_title, 
+                song_title,
                 spotify_tracks,
                 expected_disc=recording.get('disc_number'),
                 expected_track=recording.get('track_number'),
-                alt_titles=alt_titles
+                alt_titles=alt_titles,
+                song_id=song_id
             )
             
             if matched_track:
@@ -1376,7 +1410,7 @@ class SpotifyMatcher:
         """Print summary of matching statistics"""
         # Aggregate client stats before printing
         self._aggregate_client_stats()
-        
+
         self.logger.info("\n" + "=" * 70)
         self.logger.info("SPOTIFY MATCHING SUMMARY")
         self.logger.info("=" * 70)
@@ -1388,6 +1422,11 @@ class SpotifyMatcher:
         self.logger.info("-" * 70)
         self.logger.info(f"Total with Spotify:        {self.stats['recordings_with_spotify']}")
         self.logger.info("-" * 70)
+        # Show blocklist stats if any were encountered
+        if self.stats['tracks_blocked'] > 0 or self.stats['releases_blocked'] > 0:
+            self.logger.info(f"Tracks blocked:            {self.stats['tracks_blocked']}")
+            self.logger.info(f"Albums blocked:            {self.stats['releases_blocked']}")
+            self.logger.info("-" * 70)
         self.logger.info(f"API calls made:            {self.stats['api_calls']}")
         self.logger.info(f"Cache hits:                {self.stats['cache_hits']}")
         self.logger.info(f"Rate limit hits:           {self.stats['rate_limit_hits']}")

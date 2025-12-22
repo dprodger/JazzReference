@@ -26,6 +26,12 @@ logger = logging.getLogger(__name__)
 admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
 
 
+@admin_bp.route('/')
+def admin_index():
+    """Admin dashboard with links to all admin services"""
+    return render_template('admin/index.html')
+
+
 @admin_bp.route('/orphans')
 def orphans_list():
     """List songs with orphan recordings for review"""

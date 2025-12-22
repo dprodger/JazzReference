@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - Approach Note</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f7;
+            color: #333;
+            line-height: 1.6;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        header {
+            margin-bottom: 40px;
+        }
+        h1 {
+            color: #1d1d1f;
+            margin-bottom: 8px;
+        }
+        .subtitle {
+            color: #666;
+            font-size: 1.1em;
+        }
+        .section {
+            margin-bottom: 40px;
+        }
+        .section h2 {
+            color: #1d1d1f;
+            font-size: 1.3em;
+            margin-bottom: 16px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+        .card-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 20px;
+        }
+        .card {
+            background: #fff;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            transition: transform 0.2s, box-shadow 0.2s;
+            text-decoration: none;
+            color: inherit;
+            display: block;
+        }
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+        }
+        .card-icon {
+            font-size: 2em;
+            margin-bottom: 12px;
+        }
+        .card h3 {
+            color: #1d1d1f;
+            margin-bottom: 8px;
+            font-size: 1.1em;
+        }
+        .card p {
+            color: #666;
+            font-size: 0.9em;
+            line-height: 1.5;
+        }
+        .card .endpoint {
+            margin-top: 12px;
+            font-family: 'SF Mono', Monaco, monospace;
+            font-size: 0.75em;
+            color: #888;
+            background: #f5f5f7;
+            padding: 4px 8px;
+            border-radius: 4px;
+            display: inline-block;
+        }
+        .back-link {
+            display: inline-block;
+            margin-bottom: 20px;
+            color: #0066cc;
+            text-decoration: none;
+        }
+        .back-link:hover {
+            text-decoration: underline;
+        }
+        .status-section {
+            background: #fff;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+        .status-section h3 {
+            margin-bottom: 16px;
+            color: #1d1d1f;
+        }
+        #queue-status {
+            font-family: 'SF Mono', Monaco, monospace;
+            font-size: 0.9em;
+            color: #666;
+        }
+        .status-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .status-item:last-child {
+            border-bottom: none;
+        }
+        .status-label {
+            color: #888;
+        }
+        .status-value {
+            font-weight: 600;
+            color: #1d1d1f;
+        }
+        .status-value.active {
+            color: #34c759;
+        }
+        .status-value.inactive {
+            color: #ff9500;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="/" class="back-link">&larr; Back to Home</a>
+
+        <header>
+            <h1>Admin Dashboard</h1>
+            <p class="subtitle">Manage data, review matches, and monitor system health</p>
+        </header>
+
+        <div class="section">
+            <h2>Data Review</h2>
+            <div class="card-grid">
+                <a href="/admin/orphans" class="card">
+                    <div class="card-icon">📦</div>
+                    <h3>Orphan Recordings</h3>
+                    <p>Review MusicBrainz recordings that couldn't be automatically linked to existing database recordings. Import or reject them.</p>
+                    <span class="endpoint">/admin/orphans</span>
+                </a>
+
+                <a href="/admin/recommendations" class="card">
+                    <div class="card-icon">⭐</div>
+                    <h3>Authority Recommendations</h3>
+                    <p>Match authority recommendations (from jazzstandards.com, etc.) to recordings in the database.</p>
+                    <span class="endpoint">/admin/recommendations</span>
+                </a>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Streaming Services</h2>
+            <div class="card-grid">
+                <a href="/admin/apple-matches" class="card">
+                    <div class="card-icon">🍎</div>
+                    <h3>Apple Music Matching</h3>
+                    <p>Review and run Apple Music track matching for songs. Diagnose matching issues and manually trigger re-matches.</p>
+                    <span class="endpoint">/admin/apple-matches</span>
+                </a>
+
+                <a href="/admin/streaming-availability" class="card">
+                    <div class="card-icon">🎧</div>
+                    <h3>Streaming Availability</h3>
+                    <p>Check streaming availability across services. See which recordings have Spotify, Apple Music, or other streaming links.</p>
+                    <span class="endpoint">/admin/streaming-availability</span>
+                </a>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>System Status</h2>
+            <div class="status-section">
+                <h3>Research Queue</h3>
+                <div id="queue-status">
+                    <p>Loading...</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>API Documentation</h2>
+            <div class="card-grid">
+                <a href="/docs" class="card">
+                    <div class="card-icon">📚</div>
+                    <h3>API Reference</h3>
+                    <p>Complete API documentation for the Approach Note REST API. Includes endpoints, parameters, and examples.</p>
+                    <span class="endpoint">/docs</span>
+                </a>
+
+                <a href="/api/health" class="card">
+                    <div class="card-icon">💚</div>
+                    <h3>Health Check</h3>
+                    <p>Simple health check endpoint to verify the API is running and responding.</p>
+                    <span class="endpoint">/api/health</span>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function loadQueueStatus() {
+            try {
+                const response = await fetch('/api/research/queue');
+                const data = await response.json();
+
+                const statusHtml = `
+                    <div class="status-item">
+                        <span class="status-label">Worker Status</span>
+                        <span class="status-value ${data.worker_running ? 'active' : 'inactive'}">
+                            ${data.worker_running ? 'Running' : 'Stopped'}
+                        </span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">Queue Size</span>
+                        <span class="status-value">${data.queue_size} items</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">Currently Processing</span>
+                        <span class="status-value">${data.current_item || 'None'}</span>
+                    </div>
+                `;
+
+                document.getElementById('queue-status').innerHTML = statusHtml;
+            } catch (error) {
+                document.getElementById('queue-status').innerHTML =
+                    '<p style="color: #ff3b30;">Failed to load queue status</p>';
+            }
+        }
+
+        loadQueueStatus();
+        // Refresh every 30 seconds
+        setInterval(loadQueueStatus, 30000);
+    </script>
+</body>
+</html>
