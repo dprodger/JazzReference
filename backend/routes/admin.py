@@ -2035,6 +2035,13 @@ def streaming_availability():
         with db.cursor() as cur:
             # Build the base query
             # We need to count recordings that have track-level streaming links
+            #
+            # DATA MODELS:
+            # - Spotify (legacy): spotify_track_id column on recording_releases table
+            # - Apple Music (new): recording_release_streaming_links with service='apple_music'
+            #
+            # TODO: Once Spotify is migrated to recording_release_streaming_links,
+            #       update this query to use the new model for both services.
             query = """
                 WITH song_recording_counts AS (
                     SELECT
@@ -2042,34 +2049,34 @@ def streaming_availability():
                         s.title,
                         s.composer,
                         COUNT(DISTINCT r.id) as total_recordings,
+                        -- Spotify: uses legacy spotify_track_id on recording_releases
                         COUNT(DISTINCT CASE
-                            WHEN rrsl_spotify.id IS NOT NULL THEN r.id
+                            WHEN rr.spotify_track_id IS NOT NULL THEN r.id
                         END) as spotify_recordings,
+                        -- Apple Music: uses recording_release_streaming_links
                         COUNT(DISTINCT CASE
                             WHEN rrsl_apple.id IS NOT NULL THEN r.id
                         END) as apple_recordings,
                         COUNT(DISTINCT CASE
-                            WHEN rrsl_spotify.id IS NOT NULL AND rrsl_apple.id IS NOT NULL THEN r.id
+                            WHEN rr.spotify_track_id IS NOT NULL AND rrsl_apple.id IS NOT NULL THEN r.id
                         END) as both_recordings,
                         COUNT(DISTINCT CASE
-                            WHEN rrsl_spotify.id IS NOT NULL OR rrsl_apple.id IS NOT NULL THEN r.id
+                            WHEN rr.spotify_track_id IS NOT NULL OR rrsl_apple.id IS NOT NULL THEN r.id
                         END) as any_playable_recordings,
                         COUNT(DISTINCT CASE
-                            WHEN rrsl_spotify.id IS NULL AND rrsl_apple.id IS NULL THEN r.id
+                            WHEN rr.spotify_track_id IS NULL AND rrsl_apple.id IS NULL THEN r.id
                         END) as no_streaming_recordings,
                         -- Catalog differences
                         COUNT(DISTINCT CASE
-                            WHEN rrsl_spotify.id IS NOT NULL AND rrsl_apple.id IS NULL THEN r.id
+                            WHEN rr.spotify_track_id IS NOT NULL AND rrsl_apple.id IS NULL THEN r.id
                         END) as spotify_only_recordings,
                         COUNT(DISTINCT CASE
-                            WHEN rrsl_spotify.id IS NULL AND rrsl_apple.id IS NOT NULL THEN r.id
+                            WHEN rr.spotify_track_id IS NULL AND rrsl_apple.id IS NOT NULL THEN r.id
                         END) as apple_only_recordings
                     FROM songs s
                     LEFT JOIN recordings r ON r.song_id = s.id
                     LEFT JOIN recording_releases rr ON rr.recording_id = r.id
-                    LEFT JOIN recording_release_streaming_links rrsl_spotify
-                        ON rrsl_spotify.recording_release_id = rr.id
-                        AND rrsl_spotify.service = 'spotify'
+                    -- Apple Music uses the new streaming links table
                     LEFT JOIN recording_release_streaming_links rrsl_apple
                         ON rrsl_apple.recording_release_id = rr.id
                         AND rrsl_apple.service = 'apple_music'
