@@ -2002,3 +2002,165 @@ def diagnose_apple_match(song_id):
         import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
+
+
+# =============================================================================
+# STREAMING AVAILABILITY
+# =============================================================================
+
+@admin_bp.route('/streaming-availability')
+def streaming_availability():
+    """
+    Get streaming availability statistics for songs.
+
+    Shows for each song:
+    - Total recordings
+    - Recordings with Spotify track links
+    - Recordings with Apple Music track links
+    - Recordings with both
+    - Recordings with neither
+
+    Query params:
+    - repertoire_id: Filter to songs in a specific repertoire
+    - filter: 'no_playable' | 'spotify_only' | 'apple_only' | 'catalog_diff' | 'all' (default: all)
+    - sort: 'title' | 'total' | 'playable' | 'spotify' | 'apple' | 'missing' (default: title)
+    - order: 'asc' | 'desc' (default: asc)
+    """
+    repertoire_id = request.args.get('repertoire_id')
+    filter_type = request.args.get('filter', 'all')
+    sort_by = request.args.get('sort', 'title')
+    order = request.args.get('order', 'asc')
+
+    with get_db_connection() as db:
+        with db.cursor() as cur:
+            # Build the base query
+            # We need to count recordings that have track-level streaming links
+            query = """
+                WITH song_recording_counts AS (
+                    SELECT
+                        s.id as song_id,
+                        s.title,
+                        s.composer,
+                        COUNT(DISTINCT r.id) as total_recordings,
+                        COUNT(DISTINCT CASE
+                            WHEN rrsl_spotify.id IS NOT NULL THEN r.id
+                        END) as spotify_recordings,
+                        COUNT(DISTINCT CASE
+                            WHEN rrsl_apple.id IS NOT NULL THEN r.id
+                        END) as apple_recordings,
+                        COUNT(DISTINCT CASE
+                            WHEN rrsl_spotify.id IS NOT NULL AND rrsl_apple.id IS NOT NULL THEN r.id
+                        END) as both_recordings,
+                        COUNT(DISTINCT CASE
+                            WHEN rrsl_spotify.id IS NOT NULL OR rrsl_apple.id IS NOT NULL THEN r.id
+                        END) as any_playable_recordings,
+                        COUNT(DISTINCT CASE
+                            WHEN rrsl_spotify.id IS NULL AND rrsl_apple.id IS NULL THEN r.id
+                        END) as no_streaming_recordings,
+                        -- Catalog differences
+                        COUNT(DISTINCT CASE
+                            WHEN rrsl_spotify.id IS NOT NULL AND rrsl_apple.id IS NULL THEN r.id
+                        END) as spotify_only_recordings,
+                        COUNT(DISTINCT CASE
+                            WHEN rrsl_spotify.id IS NULL AND rrsl_apple.id IS NOT NULL THEN r.id
+                        END) as apple_only_recordings
+                    FROM songs s
+                    LEFT JOIN recordings r ON r.song_id = s.id
+                    LEFT JOIN recording_releases rr ON rr.recording_id = r.id
+                    LEFT JOIN recording_release_streaming_links rrsl_spotify
+                        ON rrsl_spotify.recording_release_id = rr.id
+                        AND rrsl_spotify.service = 'spotify'
+                    LEFT JOIN recording_release_streaming_links rrsl_apple
+                        ON rrsl_apple.recording_release_id = rr.id
+                        AND rrsl_apple.service = 'apple_music'
+            """
+
+            # Add repertoire join if filtering
+            params = []
+            if repertoire_id:
+                query += """
+                    INNER JOIN repertoire_songs rs ON rs.song_id = s.id
+                    WHERE rs.repertoire_id = %s
+                """
+                params.append(repertoire_id)
+
+            query += """
+                    GROUP BY s.id, s.title, s.composer
+                )
+                SELECT * FROM song_recording_counts
+            """
+
+            # Add filter conditions
+            if filter_type == 'no_playable':
+                query += " WHERE any_playable_recordings = 0 AND total_recordings > 0"
+            elif filter_type == 'spotify_only':
+                query += " WHERE spotify_only_recordings > 0"
+            elif filter_type == 'apple_only':
+                query += " WHERE apple_only_recordings > 0"
+            elif filter_type == 'catalog_diff':
+                query += " WHERE spotify_only_recordings > 0 OR apple_only_recordings > 0"
+            # 'all' has no filter
+
+            # Add sorting
+            sort_column = {
+                'title': 'title',
+                'total': 'total_recordings',
+                'playable': 'any_playable_recordings',
+                'spotify': 'spotify_recordings',
+                'apple': 'apple_recordings',
+                'missing': 'no_streaming_recordings',
+            }.get(sort_by, 'title')
+
+            order_dir = 'DESC' if order == 'desc' else 'ASC'
+            query += f" ORDER BY {sort_column} {order_dir}"
+
+            cur.execute(query, params)
+            songs = [dict(row) for row in cur.fetchall()]
+
+            # Calculate summary stats
+            summary = {
+                'total_songs': len(songs),
+                'songs_with_no_playable': sum(1 for s in songs if s['any_playable_recordings'] == 0 and s['total_recordings'] > 0),
+                'songs_with_catalog_diff': sum(1 for s in songs if s['spotify_only_recordings'] > 0 or s['apple_only_recordings'] > 0),
+                'total_recordings': sum(s['total_recordings'] for s in songs),
+                'total_spotify': sum(s['spotify_recordings'] for s in songs),
+                'total_apple': sum(s['apple_recordings'] for s in songs),
+                'total_both': sum(s['both_recordings'] for s in songs),
+                'total_neither': sum(s['no_streaming_recordings'] for s in songs),
+            }
+
+            # Get available repertoires for the filter dropdown
+            cur.execute("""
+                SELECT r.id, r.name, COUNT(rs.song_id) as song_count
+                FROM repertoires r
+                LEFT JOIN repertoire_songs rs ON r.id = rs.repertoire_id
+                GROUP BY r.id, r.name
+                ORDER BY r.name
+            """)
+            repertoires = [dict(row) for row in cur.fetchall()]
+
+    # Check if JSON requested
+    if request.headers.get('Accept') == 'application/json' or request.args.get('format') == 'json':
+        return jsonify({
+            'songs': songs,
+            'summary': summary,
+            'repertoires': repertoires,
+            'filters': {
+                'repertoire_id': repertoire_id,
+                'filter': filter_type,
+                'sort': sort_by,
+                'order': order
+            }
+        })
+
+    # Otherwise return HTML template
+    return render_template(
+        'admin/streaming_availability.html',
+        songs=songs,
+        summary=summary,
+        repertoires=repertoires,
+        current_repertoire=repertoire_id,
+        current_filter=filter_type,
+        current_sort=sort_by,
+        current_order=order
+    )
