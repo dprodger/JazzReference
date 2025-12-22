@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Streaming Availability - Admin</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f7;
+            color: #333;
+            line-height: 1.6;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: #1d1d1f;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 20px;
+        }
+
+        /* Summary Cards */
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+        .summary-card {
+            background: #fff;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .summary-card.highlight {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #fff;
+        }
+        .summary-card.warning {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: #fff;
+        }
+        .summary-card.spotify {
+            background: linear-gradient(135deg, #1db954 0%, #169c46 100%);
+            color: #fff;
+        }
+        .summary-card.apple {
+            background: linear-gradient(135deg, #fc3c44 0%, #d12f35 100%);
+            color: #fff;
+        }
+        .summary-value {
+            font-size: 36px;
+            font-weight: 700;
+            line-height: 1;
+        }
+        .summary-label {
+            font-size: 13px;
+            opacity: 0.9;
+            margin-top: 5px;
+        }
+
+        /* Filters */
+        .filters {
+            background: #fff;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            align-items: end;
+        }
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        .filter-group label {
+            font-size: 12px;
+            color: #666;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        .filter-group select {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+            background: #fff;
+            min-width: 180px;
+        }
+        .filter-group select:focus {
+            outline: none;
+            border-color: #0066cc;
+        }
+        .apply-btn {
+            background: #0066cc;
+            color: #fff;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            margin-top: auto;
+        }
+        .apply-btn:hover {
+            background: #0055aa;
+        }
+
+        /* Table */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: #fff;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        th {
+            background: #fafafa;
+            color: #1d1d1f;
+            font-weight: 600;
+            cursor: pointer;
+            user-select: none;
+        }
+        th:hover {
+            background: #f0f0f0;
+        }
+        th a {
+            color: inherit;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        th .sort-icon {
+            font-size: 10px;
+            opacity: 0.5;
+        }
+        th .sort-icon.active {
+            opacity: 1;
+        }
+        tr:hover {
+            background: #f9f9fb;
+        }
+        .song-title {
+            font-weight: 500;
+            color: #1d1d1f;
+        }
+        .composer {
+            color: #666;
+            font-size: 13px;
+        }
+
+        /* Badges */
+        .badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .badge-spotify { background: #1db954; color: #fff; }
+        .badge-apple { background: #fc3c44; color: #fff; }
+        .badge-both { background: #667eea; color: #fff; }
+        .badge-none { background: #e74c3c; color: #fff; }
+        .badge-diff { background: #f39c12; color: #000; }
+        .count {
+            color: #999;
+            font-size: 14px;
+        }
+        .count-zero {
+            color: #ccc;
+        }
+
+        /* Progress Bar */
+        .progress-bar {
+            height: 8px;
+            background: #eee;
+            border-radius: 4px;
+            overflow: hidden;
+            min-width: 100px;
+        }
+        .progress-bar-inner {
+            height: 100%;
+            display: flex;
+        }
+        .progress-spotify {
+            background: #1db954;
+        }
+        .progress-apple {
+            background: #fc3c44;
+        }
+        .progress-both {
+            background: #667eea;
+        }
+        .progress-none {
+            background: #ddd;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #666;
+            background: #fff;
+            border-radius: 12px;
+        }
+        .empty-state h2 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .summary-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            .filters {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Streaming Availability</h1>
+        <p class="subtitle">Track which recordings have playable links on Spotify and Apple Music</p>
+
+        <!-- Summary Cards -->
+        <div class="summary-grid">
+            <div class="summary-card highlight">
+                <div class="summary-value">{{ summary.total_songs }}</div>
+                <div class="summary-label">Total Songs</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-value">{{ summary.total_recordings }}</div>
+                <div class="summary-label">Total Recordings</div>
+            </div>
+            <div class="summary-card spotify">
+                <div class="summary-value">{{ summary.total_spotify }}</div>
+                <div class="summary-label">Spotify Tracks</div>
+            </div>
+            <div class="summary-card apple">
+                <div class="summary-value">{{ summary.total_apple }}</div>
+                <div class="summary-label">Apple Music Tracks</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-value">{{ summary.total_both }}</div>
+                <div class="summary-label">On Both Services</div>
+            </div>
+            <div class="summary-card warning">
+                <div class="summary-value">{{ summary.total_neither }}</div>
+                <div class="summary-label">No Streaming Link</div>
+            </div>
+        </div>
+
+        <!-- Filters -->
+        <form class="filters" method="get">
+            <div class="filter-group">
+                <label>Repertoire</label>
+                <select name="repertoire_id">
+                    <option value="">All Songs</option>
+                    {% for r in repertoires %}
+                    <option value="{{ r.id }}" {% if current_repertoire == r.id|string %}selected{% endif %}>
+                        {{ r.name }} ({{ r.song_count }} songs)
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>Filter</label>
+                <select name="filter">
+                    <option value="all" {% if current_filter == 'all' %}selected{% endif %}>All Songs</option>
+                    <option value="no_playable" {% if current_filter == 'no_playable' %}selected{% endif %}>No Playable Tracks</option>
+                    <option value="catalog_diff" {% if current_filter == 'catalog_diff' %}selected{% endif %}>Catalog Differences</option>
+                    <option value="spotify_only" {% if current_filter == 'spotify_only' %}selected{% endif %}>Spotify Only</option>
+                    <option value="apple_only" {% if current_filter == 'apple_only' %}selected{% endif %}>Apple Only</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>Sort By</label>
+                <select name="sort">
+                    <option value="title" {% if current_sort == 'title' %}selected{% endif %}>Title</option>
+                    <option value="total" {% if current_sort == 'total' %}selected{% endif %}>Total Recordings</option>
+                    <option value="playable" {% if current_sort == 'playable' %}selected{% endif %}>Playable Tracks</option>
+                    <option value="spotify" {% if current_sort == 'spotify' %}selected{% endif %}>Spotify Tracks</option>
+                    <option value="apple" {% if current_sort == 'apple' %}selected{% endif %}>Apple Music Tracks</option>
+                    <option value="missing" {% if current_sort == 'missing' %}selected{% endif %}>Missing Tracks</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>Order</label>
+                <select name="order">
+                    <option value="asc" {% if current_order == 'asc' %}selected{% endif %}>Ascending</option>
+                    <option value="desc" {% if current_order == 'desc' %}selected{% endif %}>Descending</option>
+                </select>
+            </div>
+            <button type="submit" class="apply-btn">Apply Filters</button>
+        </form>
+
+        <!-- Results Table -->
+        {% if songs %}
+        <table>
+            <thead>
+                <tr>
+                    <th style="width: 30%">Song</th>
+                    <th>Total</th>
+                    <th>Spotify</th>
+                    <th>Apple</th>
+                    <th>Both</th>
+                    <th>Neither</th>
+                    <th>Catalog Diff</th>
+                    <th style="width: 15%">Coverage</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for song in songs %}
+                <tr>
+                    <td>
+                        <div class="song-title">{{ song.title }}</div>
+                        {% if song.composer %}
+                        <div class="composer">{{ song.composer }}</div>
+                        {% endif %}
+                    </td>
+                    <td>{{ song.total_recordings }}</td>
+                    <td>
+                        {% if song.spotify_recordings > 0 %}
+                        <span class="badge badge-spotify">{{ song.spotify_recordings }}</span>
+                        {% else %}
+                        <span class="count count-zero">0</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if song.apple_recordings > 0 %}
+                        <span class="badge badge-apple">{{ song.apple_recordings }}</span>
+                        {% else %}
+                        <span class="count count-zero">0</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if song.both_recordings > 0 %}
+                        <span class="badge badge-both">{{ song.both_recordings }}</span>
+                        {% else %}
+                        <span class="count count-zero">0</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if song.no_streaming_recordings > 0 %}
+                        <span class="badge badge-none">{{ song.no_streaming_recordings }}</span>
+                        {% else %}
+                        <span class="count count-zero">0</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if song.spotify_only_recordings > 0 or song.apple_only_recordings > 0 %}
+                        {% if song.spotify_only_recordings > 0 %}
+                        <span class="badge badge-spotify" title="Spotify only">S: {{ song.spotify_only_recordings }}</span>
+                        {% endif %}
+                        {% if song.apple_only_recordings > 0 %}
+                        <span class="badge badge-apple" title="Apple only">A: {{ song.apple_only_recordings }}</span>
+                        {% endif %}
+                        {% else %}
+                        <span class="count count-zero">-</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if song.total_recordings > 0 %}
+                        <div class="progress-bar" title="{{ song.any_playable_recordings }}/{{ song.total_recordings }} playable">
+                            <div class="progress-bar-inner">
+                                {% set both_pct = (song.both_recordings / song.total_recordings * 100)|round %}
+                                {% set spotify_only_pct = (song.spotify_only_recordings / song.total_recordings * 100)|round %}
+                                {% set apple_only_pct = (song.apple_only_recordings / song.total_recordings * 100)|round %}
+                                {% set none_pct = (song.no_streaming_recordings / song.total_recordings * 100)|round %}
+                                <div class="progress-both" style="width: {{ both_pct }}%"></div>
+                                <div class="progress-spotify" style="width: {{ spotify_only_pct }}%"></div>
+                                <div class="progress-apple" style="width: {{ apple_only_pct }}%"></div>
+                                <div class="progress-none" style="width: {{ none_pct }}%"></div>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="empty-state">
+            <h2>No songs found</h2>
+            <p>{% if current_filter != 'all' %}Try adjusting your filters{% else %}No songs in the database{% endif %}</p>
+        </div>
+        {% endif %}
+    </div>
+</body>
+</html>
