@@ -692,6 +692,14 @@ class AppleMusicCatalog:
 
         where_clause = " AND ".join(conditions) if conditions else "1=1"
 
+        # Order by relevance - shorter album names that match are likely more relevant
+        # Also prioritize exact-ish matches by checking length similarity
+        order_clause = ""
+        if album_title:
+            # Order by how close the album name length is to the search term
+            # This helps rank "Midnight in Paris (Soundtrack)" above "Jazz Midnight Paris: The Best..."
+            order_clause = f"ORDER BY ABS(LENGTH(name) - {len(album_title)})"
+
         query = f"""
             SELECT
                 id,
@@ -703,6 +711,7 @@ class AppleMusicCatalog:
                 url_template as urlTemplate
             FROM albums
             WHERE {where_clause}
+            {order_clause}
             LIMIT {limit}
         """
 

@@ -57,6 +57,7 @@ from spotify_matching import (
     strip_ensemble_suffix,
     strip_live_suffix,
     normalize_for_comparison,
+    normalize_name_variants,
     calculate_similarity,
     is_substring_title_match,
     extract_primary_artist,
@@ -83,6 +84,7 @@ class AppleMusicMatcher:
         rate_limit_delay: float = 0.2,
         max_retries: int = 3,
         rematch: bool = False,
+        rematch_failures: bool = False,
         logger: logging.Logger = None,
         progress_callback=None,
         use_local_catalog: bool = True,
@@ -100,6 +102,7 @@ class AppleMusicMatcher:
             rate_limit_delay: Delay between API calls
             max_retries: Max retries for rate-limited requests
             rematch: If True, re-evaluate releases that already have Apple Music
+            rematch_failures: If True, re-evaluate releases that had no match (keeps existing matches)
             logger: Optional logger instance
             progress_callback: Optional callback(phase, current, total)
             use_local_catalog: If True, use downloaded Apple Music catalog first
@@ -109,6 +112,7 @@ class AppleMusicMatcher:
         self.strict_mode = strict_mode
         self.artist_filter = artist_filter
         self.rematch = rematch
+        self.rematch_failures = rematch_failures
         self.logger = logger or logging.getLogger(__name__)
         self.progress_callback = progress_callback
         self.use_local_catalog = use_local_catalog
@@ -213,12 +217,13 @@ class AppleMusicMatcher:
 
         self.logger.info(f"Found {len(releases)} releases to process")
 
-        # Process each release
-        with get_db_connection() as conn:
-            for i, release in enumerate(releases):
-                if self.progress_callback:
-                    self.progress_callback('matching', i + 1, len(releases))
+        # Process each release with a fresh connection to avoid timeouts
+        # (catalog searches can take a long time for some releases)
+        for i, release in enumerate(releases):
+            if self.progress_callback:
+                self.progress_callback('matching', i + 1, len(releases))
 
+            with get_db_connection() as conn:
                 self._process_release(conn, song_id, song_title, release, i + 1, len(releases))
 
         # Aggregate client stats
@@ -271,7 +276,8 @@ class AppleMusicMatcher:
             return
 
         # Check if already searched with no match (cached negative result)
-        if release.get('apple_music_searched_at') and not self.rematch:
+        # rematch_failures allows re-processing these while keeping existing matches
+        if release.get('apple_music_searched_at') and not self.rematch and not self.rematch_failures:
             self.logger.debug(f"  {progress}Skipping (previously searched, no match): {release_title}")
             self.stats['releases_skipped'] += 1
             return
@@ -403,12 +409,38 @@ class AppleMusicMatcher:
         if stripped_album != album_title:
             search_strategies.append((artist_name, stripped_album))
 
+        # Strategy 4: Extract primary artist from collaborations
+        # Handles "Artist1 & Artist2" -> "Artist1"
+        primary_artist = extract_primary_artist(artist_name)
+        if primary_artist != artist_name:
+            search_strategies.append((primary_artist, album_title))
+
+        # Strategy 5: Album only (fallback for name variants like David/Dave)
+        # The validation will still check artist similarity
+        search_strategies.append((None, album_title))
+
+        # Strategy 6: Album with punctuation stripped
+        # Handles "Album: Subtitle" vs "Album (Subtitle)" differences
+        import re
+        stripped_album = re.sub(r'[:\-\(\)\[\]]', ' ', album_title)
+        stripped_album = ' '.join(stripped_album.split())  # normalize whitespace
+        if stripped_album != album_title:
+            search_strategies.append((None, stripped_album))
+
+        # Strategy 7: Main title only (before colon, dash, or parenthesis)
+        # Handles "Album: Subtitle" by searching just "Album"
+        main_title_match = re.match(r'^([^:\-\(\[]+)', album_title)
+        if main_title_match:
+            main_title = main_title_match.group(1).strip()
+            if main_title and len(main_title) >= 5 and main_title != album_title:
+                search_strategies.append((None, main_title))
+
         for search_artist, search_album in search_strategies:
             try:
                 albums = self.catalog.search_albums(
                     artist_name=search_artist,
                     album_title=search_album,
-                    limit=25
+                    limit=50
                 )
 
                 if not albums:
@@ -554,9 +586,18 @@ class AppleMusicMatcher:
         artist_similarity = calculate_similarity(norm_expected_artist, norm_am_artist)
         album_similarity = calculate_similarity(norm_expected_album, norm_am_album)
 
-        # Check for compilation artist (relax artist matching)
-        if is_compilation_artist(expected_artist) or is_compilation_artist(am_artist):
-            # For compilations, only require album match
+        # Check for compilation artist mismatch - prevent false positives
+        expected_is_compilation = is_compilation_artist(expected_artist)
+        am_is_compilation = is_compilation_artist(am_artist)
+
+        if expected_is_compilation != am_is_compilation:
+            # One is compilation, the other is not - this is likely a false match
+            # e.g., "Various Artists - Midnight in Paris" should NOT match "Johnny Britt - Midnight in Paris"
+            self.logger.debug(f"    Compilation mismatch: expected={expected_artist} (comp={expected_is_compilation}) vs {am_artist} (comp={am_is_compilation})")
+            return False, 0.0
+
+        if expected_is_compilation and am_is_compilation:
+            # Both are compilations - only require album match
             if album_similarity >= self.min_album_similarity:
                 return True, album_similarity / 100.0
             return False, 0.0
@@ -565,8 +606,20 @@ class AppleMusicMatcher:
         if artist_similarity < self.min_artist_similarity:
             # Try substring matching for artist
             if not is_substring_title_match(norm_expected_artist, norm_am_artist):
-                self.logger.debug(f"    Artist mismatch: {expected_artist} vs {am_artist} ({artist_similarity}%)")
-                return False, 0.0
+                # Try name variant normalization (e.g., Dave -> David, Bill -> William)
+                norm_expected_with_variants = normalize_name_variants(norm_expected_artist)
+                norm_am_with_variants = normalize_name_variants(norm_am_artist)
+                variant_similarity = calculate_similarity(norm_expected_with_variants, norm_am_with_variants)
+
+                if variant_similarity >= self.min_artist_similarity:
+                    self.logger.debug(f"    Artist match via name variants: {expected_artist} vs {am_artist} ({variant_similarity:.1f}%)")
+                    artist_similarity = variant_similarity
+                elif is_substring_title_match(norm_expected_with_variants, norm_am_with_variants):
+                    self.logger.debug(f"    Artist match via name variant substring: {expected_artist} vs {am_artist}")
+                    artist_similarity = self.min_artist_similarity  # Treat as threshold match
+                else:
+                    self.logger.debug(f"    Artist mismatch: {expected_artist} vs {am_artist} ({artist_similarity}%)")
+                    return False, 0.0
 
         if album_similarity < self.min_album_similarity:
             # Try substring matching for album
@@ -686,6 +739,21 @@ class AppleMusicMatcher:
                 self.logger.debug(f"      Matched track: {matched_track['name']}")
             else:
                 self.stats['tracks_no_match'] += 1
+                # Log track match failure with details
+                self.logger.debug(f"      Track no match: \"{our_title}\"")
+                # Find best candidate for debugging
+                if am_tracks:
+                    norm_our = normalize_for_comparison(our_title)
+                    best_sim = 0
+                    best_candidate = None
+                    for t in am_tracks:
+                        norm_am = normalize_for_comparison(t.get('name', ''))
+                        sim = calculate_similarity(norm_our, norm_am)
+                        if sim > best_sim:
+                            best_sim = sim
+                            best_candidate = t.get('name', '')
+                    if best_candidate:
+                        self.logger.debug(f"        Best candidate: \"{best_candidate}\" ({best_sim:.1f}% < {self.min_track_similarity}%)")
 
     def _find_matching_track(
         self,

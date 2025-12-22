@@ -22,8 +22,122 @@ ENSEMBLE_SUFFIXES = [
     'Orchestra', 'Big Band', 'Band', 'Ensemble', 'Group'
 ]
 
+# Common first name nicknames/variants - map to canonical form
+# This handles cases like "Dave Liebman" vs "David Liebman"
+NAME_VARIANTS = {
+    # David variants
+    'dave': 'david',
+    'davey': 'david',
+    'davy': 'david',
+    # William variants
+    'bill': 'william',
+    'billy': 'william',
+    'will': 'william',
+    'willy': 'william',
+    'willie': 'william',
+    # Robert variants
+    'bob': 'robert',
+    'bobby': 'robert',
+    'rob': 'robert',
+    'robbie': 'robert',
+    # Richard variants
+    'dick': 'richard',
+    'rick': 'richard',
+    'ricky': 'richard',
+    'richie': 'richard',
+    # James variants
+    'jim': 'james',
+    'jimmy': 'james',
+    'jamie': 'james',
+    # Thomas variants
+    'tom': 'thomas',
+    'tommy': 'thomas',
+    # Charles variants
+    'charlie': 'charles',
+    'chuck': 'charles',
+    'chas': 'charles',
+    # Edward variants
+    'ed': 'edward',
+    'eddie': 'edward',
+    'ted': 'edward',
+    'teddy': 'edward',
+    # Michael variants
+    'mike': 'michael',
+    'mikey': 'michael',
+    'mick': 'michael',
+    # Joseph variants
+    'joe': 'joseph',
+    'joey': 'joseph',
+    # Anthony variants
+    'tony': 'anthony',
+    # Benjamin variants
+    'ben': 'benjamin',
+    'benny': 'benjamin',
+    # Daniel variants
+    'dan': 'daniel',
+    'danny': 'daniel',
+    # Donald variants
+    'don': 'donald',
+    'donnie': 'donald',
+    # Gerald variants
+    'gerry': 'gerald',
+    'jerry': 'gerald',
+    # Kenneth variants
+    'ken': 'kenneth',
+    'kenny': 'kenneth',
+    # Lawrence variants
+    'larry': 'lawrence',
+    # Matthew variants
+    'matt': 'matthew',
+    # Nicholas variants
+    'nick': 'nicholas',
+    'nicky': 'nicholas',
+    # Patrick variants
+    'pat': 'patrick',
+    'paddy': 'patrick',
+    # Peter variants
+    'pete': 'peter',
+    # Philip variants
+    'phil': 'philip',
+    # Raymond variants
+    'ray': 'raymond',
+    # Ronald variants
+    'ron': 'ronald',
+    'ronnie': 'ronald',
+    # Samuel variants
+    'sam': 'samuel',
+    'sammy': 'samuel',
+    # Stephen/Steven variants
+    'steve': 'steven',
+    'stevie': 'steven',
+    # Theodore variants
+    'theo': 'theodore',
+    # Timothy variants
+    'tim': 'timothy',
+    'timmy': 'timothy',
+    # Walter variants
+    'walt': 'walter',
+    'wally': 'walter',
+    # Alexander variants
+    'alex': 'alexander',
+    # Frederick variants
+    'fred': 'frederick',
+    'freddy': 'frederick',
+    'freddie': 'frederick',
+    # Harold variants
+    'hal': 'harold',
+    'harry': 'harold',
+    # Leonard variants
+    'len': 'leonard',
+    'lenny': 'leonard',
+    # Nathaniel variants
+    'nat': 'nathaniel',
+    'nate': 'nathaniel',
+}
+
 # Artist names that indicate a compilation rather than a specific artist
 # For these, we allow lenient track verification since artist matching is meaningless
+# Includes common translations from Apple Music catalogs
 COMPILATION_ARTIST_PATTERNS = [
     'various artists',
     'various',
@@ -32,8 +146,16 @@ COMPILATION_ARTIST_PATTERNS = [
     'compilation',
     'assorted artists',
     'diverse artists',
-    'varios artistas',
-    'artistes divers',
+    # Translations found in Apple Music catalog
+    '群星',                    # Chinese
+    'varios artistas',        # Spanish
+    'vários artistas',        # Portuguese
+    'artistes variés',        # French
+    'artistes divers',        # French alt
+    'verschiedene interpreten',  # German
+    'artisti vari',           # Italian
+    'さまざまなアーティスト',      # Japanese
+    '여러 아티스트',            # Korean
 ]
 
 
@@ -77,6 +199,35 @@ def strip_ensemble_suffix(artist_name: str) -> str:
             return re.sub(pattern, '', artist_name, flags=re.IGNORECASE).strip()
 
     return artist_name
+
+
+def normalize_name_variants(text: str) -> str:
+    """
+    Normalize common first name nicknames/variants to their canonical form.
+
+    This handles cases like "Dave Liebman" -> "David Liebman" to improve
+    artist matching when the same person uses different name forms.
+
+    Args:
+        text: Text that may contain name variants
+
+    Returns:
+        Text with common nickname variants normalized
+    """
+    if not text:
+        return text
+
+    words = text.lower().split()
+    normalized_words = []
+
+    for word in words:
+        # Check if this word is a known nickname
+        if word in NAME_VARIANTS:
+            normalized_words.append(NAME_VARIANTS[word])
+        else:
+            normalized_words.append(word)
+
+    return ' '.join(normalized_words)
 
 
 # Common album title suffixes that may differ between MusicBrainz and Spotify

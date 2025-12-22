@@ -30,6 +30,10 @@ def get_row_count(conn, table_name):
     """Get total row count for a table."""
     return conn.execute(f"SELECT COUNT(*) FROM {table_name}").fetchone()[0]
 
+MAX_RETRIES = 5
+RETRY_DELAY = 15  # seconds
+
+
 def upload_table(table_name, batch_size=1_000_000, resume_offset=0):
     """Upload a single table to MotherDuck in batches."""
 
@@ -106,42 +110,87 @@ def upload_table(table_name, batch_size=1_000_000, resume_offset=0):
         rows_to_copy = min(batch_size, total_rows - offset)
         print(f"\nBatch {batch_num}/{batch_num + total_batches - 1}: rows {offset:,} to {offset + rows_to_copy:,}...")
 
-        try:
-            # Use INSERT with LIMIT/OFFSET
-            insert_sql = f"""
-                INSERT INTO {table_name}
-                SELECT * FROM local_db.{table_name}
-                LIMIT {rows_to_copy} OFFSET {offset}
-            """
-            md_conn.execute(insert_sql)
+        retries = 0
+        batch_success = False
 
-            elapsed = time.time() - batch_start
-            rows_per_sec = rows_to_copy / elapsed if elapsed > 0 else 0
-            remaining = total_rows - offset - rows_to_copy
-            eta_seconds = remaining / rows_per_sec if rows_per_sec > 0 else 0
-            eta_minutes = eta_seconds / 60
+        while retries <= MAX_RETRIES and not batch_success:
+            try:
+                if retries > 0:
+                    print(f"  Retry {retries}/{MAX_RETRIES}...")
+                    # Reconnect after error
+                    try:
+                        md_conn.close()
+                        local_conn.close()
+                    except:
+                        pass
+                    local_conn = duckdb.connect(LOCAL_DB_PATH, read_only=True)
+                    md_conn = duckdb.connect(MOTHERDUCK_DB)
+                    try:
+                        md_conn.execute("DETACH local_db")
+                    except:
+                        pass
+                    md_conn.execute(f"ATTACH '{LOCAL_DB_PATH}' AS local_db (READ_ONLY)")
 
-            print(f"  ✓ Done in {elapsed:.1f}s ({rows_per_sec:,.0f} rows/sec)")
-            print(f"  Remaining: {remaining:,} rows (~{eta_minutes:.1f} min)")
+                # Use INSERT with LIMIT/OFFSET
+                insert_sql = f"""
+                    INSERT INTO {table_name}
+                    SELECT * FROM local_db.{table_name}
+                    LIMIT {rows_to_copy} OFFSET {offset}
+                """
+                md_conn.execute(insert_sql)
 
-            offset += rows_to_copy
-            batch_num += 1
+                elapsed = time.time() - batch_start
+                rows_per_sec = rows_to_copy / elapsed if elapsed > 0 else 0
+                remaining = total_rows - offset - rows_to_copy
+                eta_seconds = remaining / rows_per_sec if rows_per_sec > 0 else 0
+                eta_minutes = eta_seconds / 60
 
-        except Exception as e:
-            print(f"  ✗ Error: {e}")
-            print(f"\n  To resume, run:")
-            print(f"  python scripts/upload_to_motherduck.py --table {table_name} --resume {offset}")
+                print(f"  ✓ Done in {elapsed:.1f}s ({rows_per_sec:,.0f} rows/sec)")
+                print(f"  Remaining: {remaining:,} rows (~{eta_minutes:.1f} min)")
+
+                offset += rows_to_copy
+                batch_num += 1
+                batch_success = True
+
+            except Exception as e:
+                error_str = str(e).lower()
+                # Check for retryable errors (lease expired, connection issues)
+                if 'lease expired' in error_str or 'connection' in error_str:
+                    retries += 1
+                    if retries <= MAX_RETRIES:
+                        print(f"  ⚠ {e}")
+                        print(f"  Sleeping {RETRY_DELAY}s before retry...")
+                        time.sleep(RETRY_DELAY)
+                    else:
+                        print(f"  ✗ Error after {MAX_RETRIES} retries: {e}")
+                        print(f"\n  To resume, run:")
+                        print(f"  python scripts/upload_to_motherduck.py --table {table_name} --resume {offset}")
+                        md_conn.close()
+                        local_conn.close()
+                        return  # Exit the function
+                else:
+                    # Non-retryable error
+                    print(f"  ✗ Error: {e}")
+                    print(f"\n  To resume, run:")
+                    print(f"  python scripts/upload_to_motherduck.py --table {table_name} --resume {offset}")
+                    md_conn.close()
+                    local_conn.close()
+                    return  # Exit the function
+
+        if not batch_success:
             break
-        finally:
-            md_conn.close()
-            local_conn.close()
+
+        # Close connections after each successful batch
+        md_conn.close()
+        local_conn.close()
 
     if offset >= total_rows:
         print(f"\n✓ Upload complete! {total_rows:,} rows uploaded to {table_name}")
 
 def main():
     parser = argparse.ArgumentParser(description='Upload DuckDB to MotherDuck in batches')
-    parser.add_argument('--batch-size', type=int, default=1_000_000, help='Rows per batch (default: 1M)')
+    parser.add_argument('--batch-size', '--batch', type=int, default=1_000_000, dest='batch_size',
+                        help='Rows per batch (default: 1M)')
     parser.add_argument('--table', choices=['albums', 'songs'], help='Upload specific table only')
     parser.add_argument('--resume', type=int, default=0, help='Resume from specific row offset')
     args = parser.parse_args()

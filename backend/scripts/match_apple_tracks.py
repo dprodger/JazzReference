@@ -85,6 +85,12 @@ Examples:
     )
 
     script.parser.add_argument(
+        '--rematch-failures',
+        action='store_true',
+        help='Re-evaluate releases that were previously searched but had no match (keeps existing matches)'
+    )
+
+    script.parser.add_argument(
         '--rate-limit-delay',
         type=float,
         default=0.5,
@@ -126,6 +132,7 @@ Examples:
         cache_days=args.cache_days,
         force_refresh=args.force_refresh,
         rematch=args.rematch,
+        rematch_failures=args.rematch_failures,
         rate_limit_delay=rate_delay,
         use_local_catalog=use_local_catalog,
         local_catalog_only=local_catalog_only,
@@ -136,6 +143,7 @@ Examples:
         "DRY RUN": args.dry_run,
         "FORCE REFRESH": args.force_refresh,
         "REMATCH": args.rematch,
+        "REMATCH FAILURES": args.rematch_failures,
         "SLOW MODE": args.slow,
         "LOCAL CATALOG": use_local_catalog,
         "LOCAL ONLY": local_catalog_only,

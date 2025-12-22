@@ -52,7 +52,7 @@ for entry in "${songs[@]}"; do
     echo "[$count/$total] Processing: $song_title"
     echo "----------------------------------------"
 
-    python scripts/match_apple_tracks.py --id "$song_id" --local-only
+    python scripts/match_apple_tracks.py --id "$song_id" --local-only --rematch
 done
 
 echo ""
