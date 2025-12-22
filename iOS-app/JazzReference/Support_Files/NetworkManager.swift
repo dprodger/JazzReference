@@ -399,6 +399,79 @@ class NetworkManager: ObservableObject {
             return nil
         }
     }
+
+    // MARK: - Two-Phase Performer Loading (for performance)
+
+    /// Fetch performer summary - fast endpoint for initial page load
+    /// Returns performer metadata, instruments, images, and recording count - NO recordings
+    func fetchPerformerSummary(id: String) async -> PerformerDetail? {
+        let startTime = Date()
+        guard let url = URL(string: "\(NetworkManager.baseURL)/performers/\(id)/summary") else {
+            print("Invalid URL for performer summary")
+            return nil
+        }
+
+        do {
+            let (data, response) = try await URLSession.shared.data(from: url)
+
+            if let httpResponse = response as? HTTPURLResponse {
+                guard (200...299).contains(httpResponse.statusCode) else {
+                    print("HTTP error fetching performer summary: \(httpResponse.statusCode)")
+                    return nil
+                }
+            }
+
+            let decoder = JSONDecoder()
+            let performer = try decoder.decode(PerformerDetail.self, from: data)
+            NetworkManager.logRequest("GET /performers/\(id)/summary", startTime: startTime)
+
+            if NetworkManager.diagnosticsEnabled {
+                print("   ↳ Summary: \(performer.recordingCount ?? 0) total recordings")
+            }
+            return performer
+        } catch {
+            print("Error fetching performer summary: \(error)")
+            if let decodingError = error as? DecodingError {
+                print("Decoding error details: \(decodingError)")
+            }
+            return nil
+        }
+    }
+
+    /// Fetch all recordings for a performer - heavier endpoint, call after summary loads
+    func fetchPerformerRecordings(id: String, sortBy: PerformerRecordingSortOrder = .year) async -> [PerformerRecording]? {
+        let startTime = Date()
+        guard let url = URL(string: "\(NetworkManager.baseURL)/performers/\(id)/recordings?sort=\(sortBy.rawValue)") else {
+            print("Invalid URL for performer recordings")
+            return nil
+        }
+
+        do {
+            let (data, response) = try await URLSession.shared.data(from: url)
+
+            if let httpResponse = response as? HTTPURLResponse {
+                guard (200...299).contains(httpResponse.statusCode) else {
+                    print("HTTP error fetching performer recordings: \(httpResponse.statusCode)")
+                    return nil
+                }
+            }
+
+            let decoder = JSONDecoder()
+            let recordingsResponse = try decoder.decode(PerformerRecordingsResponse.self, from: data)
+            NetworkManager.logRequest("GET /performers/\(id)/recordings", startTime: startTime)
+
+            if NetworkManager.diagnosticsEnabled {
+                print("   ↳ Loaded \(recordingsResponse.recordingCount) recordings")
+            }
+            return recordingsResponse.recordings
+        } catch {
+            print("Error fetching performer recordings: \(error)")
+            if let decodingError = error as? DecodingError {
+                print("Decoding error details: \(decodingError)")
+            }
+            return nil
+        }
+    }
     
     // MARK: - Repertoire API Methods
     

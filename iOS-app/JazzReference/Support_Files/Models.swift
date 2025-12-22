@@ -573,8 +573,9 @@ struct PerformerDetail: Codable, Identifiable {
     let wikipediaUrl: String?
     let musicbrainzId: String?
     let instruments: [PerformerInstrument]?
-    let recordings: [PerformerRecording]?
+    var recordings: [PerformerRecording]?  // Mutable for two-phase loading
     let images: [ArtistImage]?
+    let recordingCount: Int?  // Total count from summary endpoint
 
     enum CodingKeys: String, CodingKey {
         case id, name, biography, instruments, recordings, images
@@ -584,6 +585,18 @@ struct PerformerDetail: Codable, Identifiable {
         case externalLinks = "external_links"
         case wikipediaUrl = "wikipedia_url"
         case musicbrainzId = "musicbrainz_id"
+        case recordingCount = "recording_count"
+    }
+}
+
+/// Response from /performers/{id}/recordings endpoint
+struct PerformerRecordingsResponse: Codable {
+    let recordings: [PerformerRecording]
+    let recordingCount: Int
+
+    enum CodingKeys: String, CodingKey {
+        case recordings
+        case recordingCount = "recording_count"
     }
 }
 

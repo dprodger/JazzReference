@@ -349,7 +349,8 @@ extension PerformerDetail {
                 bestCoverArtMedium: nil
             )
         ],
-        images: nil
+        images: nil,
+        recordingCount: 3
     )
 
     static let previewMinimal = PerformerDetail(
@@ -366,7 +367,8 @@ extension PerformerDetail {
             PerformerInstrument(name: "Tenor Saxophone", isPrimary: true)
         ],
         recordings: [],
-        images: nil
+        images: nil,
+        recordingCount: 0
     )
 }
 
