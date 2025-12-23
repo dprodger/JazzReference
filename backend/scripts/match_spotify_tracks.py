@@ -69,6 +69,12 @@ Examples:
         help='Number of days before cache expires (default: 30)'
     )
 
+    script.parser.add_argument(
+        '--rematch-tracks',
+        action='store_true',
+        help='Re-run track matching for releases that have album IDs but are missing track IDs'
+    )
+
     # Parse arguments
     args = script.parse_args()
 
@@ -80,13 +86,15 @@ Examples:
         strict_mode=strict_mode,
         logger=script.logger,
         cache_days=args.cache_days,
-        force_refresh=args.force_refresh
+        force_refresh=args.force_refresh,
+        rematch_tracks=args.rematch_tracks
     )
 
     # Print header with modes
     modes = {
         "DRY RUN": args.dry_run,
         "FORCE REFRESH": args.force_refresh,
+        "REMATCH TRACKS": args.rematch_tracks,
     }
     script.print_header(modes)
 

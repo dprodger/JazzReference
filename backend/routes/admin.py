@@ -2177,3 +2177,105 @@ def streaming_availability():
         current_sort=sort_by,
         current_order=order
     )
+
+
+# =============================================================================
+# SPOTIFY DIAGNOSTICS
+# =============================================================================
+
+@admin_bp.route('/spotify-diagnostics/<song_id>')
+def spotify_diagnostics(song_id):
+    """
+    Diagnostic page showing Spotify matching status for all recordings of a song.
+    Shows recordings with their releases and Spotify match status.
+    """
+    with get_db_connection() as db:
+        with db.cursor() as cur:
+            # Get song info
+            cur.execute("""
+                SELECT id, title, composer, musicbrainz_id
+                FROM songs
+                WHERE id = %s
+            """, (song_id,))
+            song = cur.fetchone()
+
+            if not song:
+                return "Song not found", 404
+
+            # Get all recordings for this song with their default release info
+            cur.execute("""
+                SELECT
+                    r.id as recording_id,
+                    r.album_title,
+                    r.recording_year,
+                    r.musicbrainz_id as recording_mb_id,
+                    r.default_release_id,
+                    def_rel.title as default_release_title,
+                    def_rel.artist_credit as default_release_artist,
+                    def_rel.musicbrainz_release_id as default_release_mb_id,
+                    def_rel.spotify_album_id as default_release_spotify_album_id,
+                    -- Count releases and spotify matches for this recording
+                    (SELECT COUNT(*) FROM recording_releases rr WHERE rr.recording_id = r.id) as release_count,
+                    (SELECT COUNT(*) FROM recording_releases rr
+                     WHERE rr.recording_id = r.id AND rr.spotify_track_id IS NOT NULL) as spotify_track_count,
+                    (SELECT COUNT(*) FROM recording_releases rr
+                     JOIN releases rel ON rr.release_id = rel.id
+                     WHERE rr.recording_id = r.id AND rel.spotify_album_id IS NOT NULL) as spotify_album_count
+                FROM recordings r
+                LEFT JOIN releases def_rel ON r.default_release_id = def_rel.id
+                WHERE r.song_id = %s
+                ORDER BY r.recording_year, r.album_title
+            """, (song_id,))
+            recordings = cur.fetchall()
+
+            # For each recording, get all releases
+            recordings_with_releases = []
+            for rec in recordings:
+                cur.execute("""
+                    SELECT
+                        rel.id as release_id,
+                        rel.title,
+                        rel.artist_credit,
+                        rel.release_year,
+                        rel.musicbrainz_release_id as release_mb_id,
+                        rel.spotify_album_id,
+                        rr.spotify_track_id,
+                        rr.disc_number,
+                        rr.track_number,
+                        CASE WHEN rel.id = %s THEN true ELSE false END as is_default
+                    FROM recording_releases rr
+                    JOIN releases rel ON rr.release_id = rel.id
+                    WHERE rr.recording_id = %s
+                    ORDER BY
+                        CASE WHEN rel.id = %s THEN 0 ELSE 1 END,
+                        rel.release_year,
+                        rel.title
+                """, (rec['default_release_id'], rec['recording_id'], rec['default_release_id']))
+                releases = cur.fetchall()
+
+                recordings_with_releases.append({
+                    'recording': rec,
+                    'releases': releases
+                })
+
+            # Summary stats
+            total_recordings = len(recordings)
+            recordings_with_track = sum(1 for r in recordings if r['spotify_track_count'] > 0)
+            recordings_with_album_only = sum(1 for r in recordings
+                                              if r['spotify_track_count'] == 0 and r['spotify_album_count'] > 0)
+            recordings_no_spotify = sum(1 for r in recordings
+                                         if r['spotify_track_count'] == 0 and r['spotify_album_count'] == 0)
+
+            summary = {
+                'total_recordings': total_recordings,
+                'with_track': recordings_with_track,
+                'with_album_only': recordings_with_album_only,
+                'no_spotify': recordings_no_spotify
+            }
+
+    return render_template(
+        'admin/spotify_diagnostics.html',
+        song=song,
+        recordings=recordings_with_releases,
+        summary=summary
+    )

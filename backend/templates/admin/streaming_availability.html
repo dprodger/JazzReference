@@ -179,10 +179,12 @@
             font-weight: 600;
         }
         .badge-spotify { background: #1db954; color: #fff; }
+        .badge-spotify:hover { background: #169c46; }
         .badge-apple { background: #fc3c44; color: #fff; }
         .badge-both { background: #667eea; color: #fff; }
         .badge-none { background: #e74c3c; color: #fff; }
         .badge-diff { background: #f39c12; color: #000; }
+        a.count-zero:hover { color: #0066cc; }
         .count {
             color: #999;
             font-size: 14px;
@@ -343,9 +345,9 @@
                     <td>{{ song.total_recordings }}</td>
                     <td>
                         {% if song.spotify_recordings > 0 %}
-                        <span class="badge badge-spotify">{{ song.spotify_recordings }}</span>
+                        <a href="/admin/spotify-diagnostics/{{ song.song_id }}" class="badge badge-spotify" style="text-decoration: none;">{{ song.spotify_recordings }}</a>
                         {% else %}
-                        <span class="count count-zero">0</span>
+                        <a href="/admin/spotify-diagnostics/{{ song.song_id }}" class="count count-zero" style="text-decoration: none;">0</a>
                         {% endif %}
                     </td>
                     <td>

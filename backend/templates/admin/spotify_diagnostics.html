@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spotify Diagnostics: {{ song.title }} - Admin</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f7;
+            color: #333;
+            line-height: 1.6;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .back-link {
+            display: inline-block;
+            margin-bottom: 15px;
+            color: #0066cc;
+            text-decoration: none;
+            font-size: 14px;
+        }
+        .back-link:hover {
+            text-decoration: underline;
+        }
+        h1 {
+            color: #1d1d1f;
+            margin-bottom: 5px;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 20px;
+        }
+        .subtitle a {
+            color: #0066cc;
+        }
+
+        /* Summary Cards */
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+        .summary-card {
+            background: #fff;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .summary-card.success {
+            background: linear-gradient(135deg, #1db954 0%, #169c46 100%);
+            color: #fff;
+        }
+        .summary-card.warning {
+            background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);
+            color: #fff;
+        }
+        .summary-card.danger {
+            background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+            color: #fff;
+        }
+        .summary-value {
+            font-size: 32px;
+            font-weight: 700;
+            line-height: 1;
+        }
+        .summary-label {
+            font-size: 12px;
+            opacity: 0.9;
+            margin-top: 5px;
+        }
+
+        /* Recording Card */
+        .recording-card {
+            background: #fff;
+            border-radius: 12px;
+            margin-bottom: 15px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .recording-header {
+            padding: 15px 20px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+        }
+        .recording-header:hover {
+            background: #fafafa;
+        }
+        .recording-info {
+            flex: 1;
+        }
+        .recording-title {
+            font-weight: 600;
+            color: #1d1d1f;
+            margin-bottom: 4px;
+        }
+        .recording-meta {
+            font-size: 13px;
+            color: #666;
+        }
+        .recording-meta a {
+            color: #0066cc;
+        }
+        .recording-status {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        .toggle-icon {
+            color: #999;
+            transition: transform 0.2s;
+        }
+        .recording-card.expanded .toggle-icon {
+            transform: rotate(180deg);
+        }
+
+        /* Badges */
+        .badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        .badge-track { background: #1db954; color: #fff; }
+        .badge-album { background: #f39c12; color: #fff; }
+        .badge-none { background: #e74c3c; color: #fff; }
+        .badge-default { background: #667eea; color: #fff; }
+        .badge-warning { background: #ff9500; color: #fff; }
+
+        /* Release List */
+        .releases-list {
+            display: none;
+            padding: 0;
+        }
+        .recording-card.expanded .releases-list {
+            display: block;
+        }
+        .release-item {
+            padding: 12px 20px;
+            border-bottom: 1px solid #f0f0f0;
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 15px;
+            align-items: center;
+        }
+        .release-item:last-child {
+            border-bottom: none;
+        }
+        .release-item.is-default {
+            background: #f0f7ff;
+        }
+        .release-info {
+            min-width: 0;
+        }
+        .release-title {
+            font-weight: 500;
+            color: #1d1d1f;
+            margin-bottom: 3px;
+        }
+        .release-title .default-marker {
+            color: #667eea;
+            font-size: 11px;
+            margin-left: 8px;
+        }
+        .release-meta {
+            font-size: 12px;
+            color: #666;
+        }
+        .release-meta a {
+            color: #0066cc;
+        }
+        .release-spotify {
+            text-align: right;
+            font-size: 12px;
+        }
+        .release-spotify a {
+            color: #1db954;
+        }
+        .spotify-track-link {
+            display: inline-block;
+            background: #1db954;
+            color: #fff;
+            padding: 4px 10px;
+            border-radius: 4px;
+            text-decoration: none;
+            font-size: 11px;
+            font-weight: 500;
+        }
+        .spotify-track-link:hover {
+            background: #169c46;
+        }
+        .spotify-album-link {
+            display: inline-block;
+            background: #f39c12;
+            color: #fff;
+            padding: 4px 10px;
+            border-radius: 4px;
+            text-decoration: none;
+            font-size: 11px;
+            font-weight: 500;
+        }
+        .spotify-album-link:hover {
+            background: #e67e22;
+        }
+        .no-spotify {
+            color: #999;
+            font-style: italic;
+        }
+
+        /* No default release warning */
+        .no-default-warning {
+            background: #fff3cd;
+            color: #856404;
+            padding: 8px 12px;
+            font-size: 12px;
+            border-left: 3px solid #ffc107;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #666;
+            background: #fff;
+            border-radius: 12px;
+        }
+
+        .id-display {
+            font-family: 'SF Mono', Monaco, monospace;
+            font-size: 11px;
+            color: #888;
+            background: #f5f5f7;
+            padding: 2px 6px;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="/admin/streaming-availability" class="back-link">&larr; Back to Streaming Availability</a>
+
+        <h1>Spotify Diagnostics</h1>
+        <p class="subtitle">
+            <strong>{{ song.title }}</strong>
+            {% if song.composer %} by {{ song.composer }}{% endif %}
+            {% if song.musicbrainz_id %}
+            &nbsp;·&nbsp;
+            <a href="https://musicbrainz.org/work/{{ song.musicbrainz_id }}" target="_blank">MusicBrainz</a>
+            {% endif %}
+        </p>
+
+        <!-- Summary Cards -->
+        <div class="summary-grid">
+            <div class="summary-card">
+                <div class="summary-value">{{ summary.total_recordings }}</div>
+                <div class="summary-label">Total Recordings</div>
+            </div>
+            <div class="summary-card success">
+                <div class="summary-value">{{ summary.with_track }}</div>
+                <div class="summary-label">With Track Link</div>
+            </div>
+            <div class="summary-card warning">
+                <div class="summary-value">{{ summary.with_album_only }}</div>
+                <div class="summary-label">Album Only (Gap)</div>
+            </div>
+            <div class="summary-card danger">
+                <div class="summary-value">{{ summary.no_spotify }}</div>
+                <div class="summary-label">No Spotify</div>
+            </div>
+        </div>
+
+        <!-- Recordings List -->
+        {% if recordings %}
+            {% for item in recordings %}
+            {% set rec = item.recording %}
+            {% set releases = item.releases %}
+            <div class="recording-card" onclick="this.classList.toggle('expanded')">
+                <div class="recording-header">
+                    <div class="recording-info">
+                        <div class="recording-title">
+                            {{ rec.album_title or 'Unknown Album' }}
+                            {% if rec.recording_year %}({{ rec.recording_year }}){% endif %}
+                        </div>
+                        <div class="recording-meta">
+                            {% if rec.recording_mb_id %}
+                            <a href="https://musicbrainz.org/recording/{{ rec.recording_mb_id }}" target="_blank" onclick="event.stopPropagation()">MB Recording</a>
+                            &nbsp;·&nbsp;
+                            {% endif %}
+                            {{ rec.release_count }} release(s)
+                            {% if not rec.default_release_id %}
+                            &nbsp;·&nbsp;
+                            <span style="color: #e74c3c;">No default release</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="recording-status">
+                        {% if rec.spotify_track_count > 0 %}
+                        <span class="badge badge-track">{{ rec.spotify_track_count }} track(s)</span>
+                        {% elif rec.spotify_album_count > 0 %}
+                        <span class="badge badge-album">{{ rec.spotify_album_count }} album(s)</span>
+                        {% else %}
+                        <span class="badge badge-none">No Spotify</span>
+                        {% endif %}
+                        <span class="toggle-icon">▼</span>
+                    </div>
+                </div>
+
+                {% if not rec.default_release_id %}
+                <div class="no-default-warning">
+                    ⚠️ No default release set for this recording
+                </div>
+                {% endif %}
+
+                <div class="releases-list">
+                    {% for rel in releases %}
+                    <div class="release-item {% if rel.is_default %}is-default{% endif %}">
+                        <div class="release-info">
+                            <div class="release-title">
+                                {{ rel.title }}
+                                {% if rel.is_default %}<span class="default-marker">★ DEFAULT</span>{% endif %}
+                            </div>
+                            <div class="release-meta">
+                                {{ rel.artist_credit or 'Unknown Artist' }}
+                                {% if rel.release_year %}&nbsp;·&nbsp;{{ rel.release_year }}{% endif %}
+                                {% if rel.disc_number or rel.track_number %}
+                                &nbsp;·&nbsp;Disc {{ rel.disc_number or '?' }} Track {{ rel.track_number or '?' }}
+                                {% endif %}
+                                {% if rel.release_mb_id %}
+                                <br>
+                                <a href="https://musicbrainz.org/release/{{ rel.release_mb_id }}" target="_blank" onclick="event.stopPropagation()">MB Release</a>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="release-spotify">
+                            <div style="margin-bottom: 6px;">
+                                <strong style="font-size: 10px; color: #888; text-transform: uppercase;">Album:</strong><br>
+                                {% if rel.spotify_album_id %}
+                                <a href="https://open.spotify.com/album/{{ rel.spotify_album_id }}" target="_blank" class="spotify-album-link" onclick="event.stopPropagation()">
+                                    ▶ Album
+                                </a>
+                                <span class="id-display">{{ rel.spotify_album_id }}</span>
+                                {% else %}
+                                <span class="no-spotify">None</span>
+                                {% endif %}
+                            </div>
+                            <div>
+                                <strong style="font-size: 10px; color: #888; text-transform: uppercase;">Track:</strong><br>
+                                {% if rel.spotify_track_id %}
+                                <a href="https://open.spotify.com/track/{{ rel.spotify_track_id }}" target="_blank" class="spotify-track-link" onclick="event.stopPropagation()">
+                                    ▶ Track
+                                </a>
+                                <span class="id-display">{{ rel.spotify_track_id }}</span>
+                                {% else %}
+                                <span class="no-spotify">None</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+        <div class="empty-state">
+            <h2>No recordings found</h2>
+            <p>This song has no recordings in the database.</p>
+        </div>
+        {% endif %}
+    </div>
+</body>
+</html>
