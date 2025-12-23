@@ -6,8 +6,8 @@ This script takes a song name, finds all recordings that have Spotify track IDs,
 fetches popularity data from the Spotify API, and saves results to a JSON file.
 
 Usage:
-    python scripts/fetch_spotify_popularity.py "Take Five"
-    python scripts/fetch_spotify_popularity.py "All The Things You Are" --output results.json
+    python scripts/fetch_spotify_popularity.py --name "Take Five"
+    python scripts/fetch_spotify_popularity.py --name "All The Things You Are" --output results.json
 """
 
 import argparse
@@ -217,7 +217,7 @@ def main():
     parser = argparse.ArgumentParser(
         description='Fetch Spotify popularity data for recordings of a song'
     )
-    parser.add_argument('song_name', help='Name of the song to look up')
+    parser.add_argument('--name', '-n', required=True, help='Name of the song to look up')
     parser.add_argument('--output', '-o', help='Output JSON file path')
     parser.add_argument('--verbose', '-v', action='store_true', help='Enable verbose logging')
 
@@ -226,7 +226,7 @@ def main():
     if args.verbose:
         logging.getLogger().setLevel(logging.DEBUG)
 
-    results = fetch_popularity_data(args.song_name, args.output)
+    results = fetch_popularity_data(args.name, args.output)
 
     if results:
         print(f"\n{'='*80}")

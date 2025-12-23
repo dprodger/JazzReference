@@ -24,6 +24,7 @@ from typing import Optional
 
 import psycopg
 from psycopg.rows import dict_row
+from unidecode import unidecode
 
 # Try to import pooling support - optional for scripts
 try:
@@ -539,16 +540,46 @@ def find_performer_by_id(performer_id):
 
 def find_song_by_name(title):
     """
-    Find a song by title (case-insensitive)
-    
+    Find a song by title (case-insensitive, accent-insensitive)
+
+    First attempts exact match (case-insensitive, with apostrophe normalization),
+    then falls back to accent-normalized match for titles with accented characters.
+
+    Examples:
+        - "Take Five" matches "Take Five"
+        - "Don't Get Around Much Anymore" matches "Don't Get Around Much Anymore"
+        - "si tu vois ma mere" matches "Si tu vois ma mère"
+        - "Naima" matches "Naïma"
+
     Args:
         title: Song title to search for
-    
+
     Returns:
         Song record or None if not found
     """
+    # Normalize apostrophes in input for exact match
+    apostrophe_normalized = normalize_apostrophes(title)
+
+    # First try exact match (case-insensitive, apostrophe-normalized)
     query = "SELECT * FROM songs WHERE LOWER(title) = LOWER(%s) LIMIT 1"
-    return execute_query(query, (title,), fetch_one=True)
+    result = execute_query(query, (apostrophe_normalized,), fetch_one=True)
+    if result:
+        return result
+
+    # Fall back to accent-normalized search
+    # Normalize the input (removes accents) and compare against all songs
+    normalized_input = normalize_for_search(title).lower()
+
+    # Get all songs and compare normalized versions
+    # (This is a simple approach; for large DBs, consider adding a normalized_title column)
+    all_songs_query = "SELECT * FROM songs"
+    all_songs = execute_query(all_songs_query, fetch_all=True)
+
+    for song in all_songs:
+        if normalize_for_search(song['title']).lower() == normalized_input:
+            return song
+
+    return None
 
 
 def find_song_by_id(song_id):
@@ -568,23 +599,22 @@ def find_song_by_id(song_id):
 def find_song_by_name_or_id(name=None, song_id=None):
     """
     Find a song by either name or ID
-    
+
     Args:
-        name: Song title to search for (will be normalized for apostrophes)
+        name: Song title to search for (apostrophe and accent normalization handled internally)
         song_id: UUID of the song
-    
+
     Returns:
         Song record or None if not found
-    
+
     Raises:
         ValueError: If neither name nor song_id is provided
     """
     if name is None and song_id is None:
         raise ValueError("Either name or song_id must be provided")
-    
+
     if name is not None:
-        normalized_name = normalize_apostrophes(name)
-        return find_song_by_name(normalized_name)
+        return find_song_by_name(name)
     else:
         return find_song_by_id(song_id)
 
@@ -643,19 +673,19 @@ def get_performer_images(performer_id):
 def normalize_apostrophes(text):
     """
     Normalize various apostrophe characters to the correct Unicode apostrophe (')
-    
+
     Args:
         text: String that may contain various apostrophe characters
-        
+
     Returns:
         String with all apostrophes normalized to U+2019 (')
     """
     if not text:
         return text
-    
+
     # The correct apostrophe to normalize to (U+2019 RIGHT SINGLE QUOTATION MARK)
     correct_apostrophe = '\u2019'  # This is: '
-    
+
     # Map of apostrophe variants to the correct Unicode apostrophe
     apostrophe_variants = {
         "'": correct_apostrophe,  # U+0027 (straight apostrophe)
@@ -664,12 +694,38 @@ def normalize_apostrophes(text):
         "'": correct_apostrophe,  # U+2018 (left single quotation mark)
         "‛": correct_apostrophe,  # U+201B (single high-reversed-9 quotation mark)
     }
-    
+
     result = text
     for variant, correct in apostrophe_variants.items():
         result = result.replace(variant, correct)
-    
+
     return result
+
+
+def normalize_for_search(text):
+    """
+    Normalize text for fuzzy search by removing accents and normalizing apostrophes.
+
+    This converts accented characters to their ASCII equivalents:
+        - "Si tu vois ma mère" -> "Si tu vois ma mere"
+        - "Señor Blues" -> "Senor Blues"
+        - "Naïma" -> "Naima"
+
+    Args:
+        text: String that may contain accented characters
+
+    Returns:
+        ASCII-normalized string suitable for fuzzy matching
+    """
+    if not text:
+        return text
+
+    # First normalize apostrophes to straight apostrophe for consistency
+    # (unidecode will handle the conversion)
+    normalized = normalize_apostrophes(text)
+
+    # Convert to ASCII (removes accents, converts special chars)
+    return unidecode(normalized)
 
 
 def test_connection():

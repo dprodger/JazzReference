@@ -14,7 +14,7 @@ import logging
 from typing import List, Optional, Dict
 from datetime import datetime
 
-from db_utils import get_db_connection
+from db_utils import get_db_connection, find_song_by_name as db_find_song_by_name
 
 logger = logging.getLogger(__name__)
 
@@ -27,14 +27,18 @@ SERVICE_NAME = 'apple_music'
 # ============================================================================
 
 def find_song_by_name(song_name: str) -> Optional[dict]:
-    """Look up song by name"""
-    with get_db_connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                "SELECT id, title, composer, alt_titles FROM songs WHERE LOWER(title) = LOWER(%s)",
-                (song_name,)
-            )
-            return cur.fetchone()
+    """
+    Look up song by name (case-insensitive, accent-insensitive).
+
+    Delegates to db_utils.find_song_by_name which handles:
+    - Smart apostrophe normalization (', ', etc.)
+    - Accent normalization (è, é, ñ, etc.)
+
+    Examples:
+        - "Si tu vois ma mere" matches "Si tu vois ma mère"
+        - "Naima" matches "Naïma"
+    """
+    return db_find_song_by_name(song_name)
 
 
 def find_song_by_id(song_id: str) -> Optional[dict]:
