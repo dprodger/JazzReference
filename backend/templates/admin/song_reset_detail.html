@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reset Recordings: {{ song.title }} - Admin</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f7;
+            color: #333;
+            line-height: 1.6;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        .header {
+            margin-bottom: 30px;
+        }
+        .header h1 {
+            color: #1d1d1f;
+            margin-bottom: 8px;
+        }
+        .header-subtitle {
+            color: #666;
+            font-size: 14px;
+        }
+        .nav-links {
+            margin-top: 10px;
+        }
+        .nav-links a {
+            color: #0066cc;
+            text-decoration: none;
+            margin-right: 20px;
+        }
+        .nav-links a:hover {
+            text-decoration: underline;
+        }
+
+        /* Warning Box */
+        .warning-box {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+        .warning-box h3 {
+            color: #856404;
+            margin-bottom: 10px;
+        }
+        .warning-box p {
+            color: #856404;
+            font-size: 14px;
+        }
+        .warning-box ul {
+            margin-top: 10px;
+            margin-left: 20px;
+            color: #856404;
+            font-size: 14px;
+        }
+
+        /* Summary Stats */
+        .summary-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+        .stat-card {
+            background: #fff;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            border: 1px solid #e0e0e0;
+        }
+        .stat-card.danger {
+            border-color: #e74c3c;
+            background: #fdf2f2;
+        }
+        .stat-value {
+            font-size: 32px;
+            font-weight: 700;
+            color: #1d1d1f;
+        }
+        .stat-card.danger .stat-value {
+            color: #e74c3c;
+        }
+        .stat-label {
+            font-size: 12px;
+            color: #666;
+            text-transform: uppercase;
+            margin-top: 4px;
+        }
+
+        /* Recordings List */
+        .recordings-section {
+            background: #fff;
+            border-radius: 8px;
+            border: 1px solid #e0e0e0;
+            margin-bottom: 30px;
+        }
+        .recordings-section h3 {
+            padding: 15px 20px;
+            border-bottom: 1px solid #e0e0e0;
+            font-size: 14px;
+            text-transform: uppercase;
+            color: #666;
+        }
+        .recordings-list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .recording-item {
+            display: flex;
+            align-items: center;
+            padding: 12px 20px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .recording-item:last-child {
+            border-bottom: none;
+        }
+        .recording-year {
+            width: 60px;
+            font-weight: 600;
+            color: #666;
+        }
+        .recording-info {
+            flex: 1;
+        }
+        .recording-album {
+            font-weight: 600;
+            color: #1d1d1f;
+        }
+        .recording-artist {
+            font-size: 13px;
+            color: #666;
+        }
+        .recording-meta {
+            font-size: 12px;
+            color: #999;
+        }
+
+        /* Action Buttons */
+        .action-section {
+            background: #fff;
+            border-radius: 8px;
+            border: 1px solid #e0e0e0;
+            padding: 25px;
+            text-align: center;
+        }
+        .action-section h3 {
+            margin-bottom: 15px;
+            color: #1d1d1f;
+        }
+        .action-section p {
+            margin-bottom: 20px;
+            color: #666;
+            font-size: 14px;
+        }
+        .btn-group {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+        }
+        .btn {
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: none;
+            border: none;
+        }
+        .btn-cancel {
+            background: #e0e0e0;
+            color: #333;
+        }
+        .btn-cancel:hover {
+            background: #d0d0d0;
+        }
+        .btn-danger {
+            background: #e74c3c;
+            color: #fff;
+        }
+        .btn-danger:hover {
+            background: #c0392b;
+        }
+        .btn-danger:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        /* Result Message */
+        .result-message {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 6px;
+            display: none;
+        }
+        .result-message.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .result-message.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        /* Spinner */
+        .spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid #fff;
+            border-radius: 50%;
+            border-top-color: transparent;
+            animation: spin 0.8s linear infinite;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Reset Recordings: {{ song.title }}</h1>
+            <p class="header-subtitle">
+                {% if song.composer %}{{ song.composer }}{% endif %}
+            </p>
+            <div class="nav-links">
+                <a href="/admin/song-reset">&larr; Back to Song List</a>
+                <a href="/admin">Admin Dashboard</a>
+            </div>
+        </div>
+
+        <div class="warning-box">
+            <h3>Warning: Destructive Action</h3>
+            <p>This will permanently delete the following data for "{{ song.title }}":</p>
+            <ul>
+                <li><strong>{{ stats.recording_count }}</strong> recordings (and their performer links)</li>
+                <li><strong>{{ stats.orphan_release_count }}</strong> releases that are only linked to this song's recordings</li>
+                <li><strong>{{ stats.authority_rec_count }}</strong> authority recommendation links will be unlinked (recommendations preserved)</li>
+            </ul>
+            <p style="margin-top: 10px;">This action cannot be undone. The song itself will remain, allowing you to re-import recordings from MusicBrainz.</p>
+        </div>
+
+        <div class="summary-stats">
+            <div class="stat-card danger">
+                <div class="stat-value">{{ stats.recording_count }}</div>
+                <div class="stat-label">Recordings to Delete</div>
+            </div>
+            <div class="stat-card danger">
+                <div class="stat-value">{{ stats.orphan_release_count }}</div>
+                <div class="stat-label">Releases to Delete</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">{{ stats.authority_rec_count }}</div>
+                <div class="stat-label">Recs to Unlink</div>
+            </div>
+        </div>
+
+        {% if recordings %}
+        <div class="recordings-section">
+            <h3>Recordings to be deleted ({{ recordings | length }})</h3>
+            <div class="recordings-list">
+                {% for rec in recordings %}
+                <div class="recording-item">
+                    <div class="recording-year">{{ rec.recording_year or '?' }}</div>
+                    <div class="recording-info">
+                        <div class="recording-album">{{ rec.album_title or 'Unknown Album' }}</div>
+                        <div class="recording-artist">{{ rec.artist_credit or 'Unknown Artist' }}</div>
+                        <div class="recording-meta">
+                            {{ rec.release_count }} release{% if rec.release_count != 1 %}s{% endif %},
+                            {{ rec.performer_count }} performer{% if rec.performer_count != 1 %}s{% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="action-section">
+            <h3>Confirm Reset</h3>
+            <p>Are you sure you want to delete all recordings for "{{ song.title }}"?</p>
+            <div class="btn-group">
+                <a href="/admin/song-reset" class="btn btn-cancel">Cancel</a>
+                <button id="resetBtn" class="btn btn-danger" onclick="executeReset()">
+                    Delete All Recordings
+                </button>
+            </div>
+            <div id="resultMessage" class="result-message"></div>
+        </div>
+    </div>
+
+    <script>
+        async function executeReset() {
+            const btn = document.getElementById('resetBtn');
+            const resultDiv = document.getElementById('resultMessage');
+
+            // Confirm again
+            if (!confirm('Are you absolutely sure? This will delete {{ stats.recording_count }} recordings and {{ stats.orphan_release_count }} releases.')) {
+                return;
+            }
+
+            // Disable button and show loading
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span>Deleting...';
+            resultDiv.style.display = 'none';
+
+            try {
+                const response = await fetch('/admin/song-reset/{{ song.id }}/execute', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    resultDiv.className = 'result-message success';
+                    resultDiv.innerHTML = `
+                        <strong>Success!</strong> ${data.message}<br>
+                        Deleted: ${data.deleted.recordings} recordings, ${data.deleted.releases} releases<br>
+                        Unlinked: ${data.deleted.authority_recs_unlinked} authority recommendations
+                    `;
+                    resultDiv.style.display = 'block';
+                    btn.innerHTML = 'Done';
+
+                    // Redirect after a moment
+                    setTimeout(() => {
+                        window.location.href = '/admin/song-reset';
+                    }, 2000);
+                } else {
+                    throw new Error(data.error || 'Unknown error');
+                }
+            } catch (error) {
+                resultDiv.className = 'result-message error';
+                resultDiv.innerHTML = `<strong>Error:</strong> ${error.message}`;
+                resultDiv.style.display = 'block';
+                btn.disabled = false;
+                btn.innerHTML = 'Delete All Recordings';
+            }
+        }
+    </script>
+</body>
+</html>

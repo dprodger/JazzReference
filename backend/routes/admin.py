@@ -2283,3 +2283,252 @@ def spotify_diagnostics(song_id):
         recordings=recordings_with_releases,
         summary=summary
     )
+
+
+# =============================================================================
+# SONG RECORDINGS RESET
+# =============================================================================
+
+@admin_bp.route('/song-reset')
+def song_reset_list():
+    """
+    List all songs with search capability for resetting their recordings.
+    Shows recording count and related data counts for each song.
+    """
+    search_query = request.args.get('q', '').strip()
+
+    with get_db_connection() as db:
+        with db.cursor() as cur:
+            if search_query:
+                # Search by song title (case-insensitive, partial match)
+                cur.execute("""
+                    SELECT
+                        s.id,
+                        s.title,
+                        s.composer,
+                        s.musicbrainz_id,
+                        COUNT(DISTINCT r.id) as recording_count,
+                        COUNT(DISTINCT rr.release_id) as release_count,
+                        COUNT(DISTINCT sar.id) as authority_rec_count
+                    FROM songs s
+                    LEFT JOIN recordings r ON r.song_id = s.id
+                    LEFT JOIN recording_releases rr ON rr.recording_id = r.id
+                    LEFT JOIN song_authority_recommendations sar ON sar.recording_id = r.id
+                    WHERE LOWER(s.title) LIKE LOWER(%s)
+                    GROUP BY s.id, s.title, s.composer, s.musicbrainz_id
+                    ORDER BY s.title
+                    LIMIT 100
+                """, (f'%{search_query}%',))
+            else:
+                # Show songs with recordings, ordered by recording count
+                cur.execute("""
+                    SELECT
+                        s.id,
+                        s.title,
+                        s.composer,
+                        s.musicbrainz_id,
+                        COUNT(DISTINCT r.id) as recording_count,
+                        COUNT(DISTINCT rr.release_id) as release_count,
+                        COUNT(DISTINCT sar.id) as authority_rec_count
+                    FROM songs s
+                    LEFT JOIN recordings r ON r.song_id = s.id
+                    LEFT JOIN recording_releases rr ON rr.recording_id = r.id
+                    LEFT JOIN song_authority_recommendations sar ON sar.recording_id = r.id
+                    GROUP BY s.id, s.title, s.composer, s.musicbrainz_id
+                    HAVING COUNT(DISTINCT r.id) > 0
+                    ORDER BY s.title
+                    LIMIT 200
+                """)
+            songs = [dict(row) for row in cur.fetchall()]
+
+    return render_template('admin/song_reset_list.html',
+                          songs=songs,
+                          search_query=search_query)
+
+
+@admin_bp.route('/song-reset/<song_id>')
+def song_reset_detail(song_id):
+    """
+    Show details of what will be deleted for a song before confirmation.
+    """
+    with get_db_connection() as db:
+        with db.cursor() as cur:
+            # Get song info
+            cur.execute("""
+                SELECT id, title, composer, musicbrainz_id
+                FROM songs WHERE id = %s
+            """, (song_id,))
+            song = cur.fetchone()
+
+            if not song:
+                return "Song not found", 404
+
+            song = dict(song)
+
+            # Get recordings with their release info
+            cur.execute("""
+                SELECT
+                    r.id,
+                    r.musicbrainz_id,
+                    r.recording_year,
+                    def_rel.title as album_title,
+                    def_rel.artist_credit,
+                    (SELECT COUNT(*) FROM recording_releases rr WHERE rr.recording_id = r.id) as release_count,
+                    (SELECT COUNT(*) FROM recording_performers rp WHERE rp.recording_id = r.id) as performer_count
+                FROM recordings r
+                LEFT JOIN releases def_rel ON r.default_release_id = def_rel.id
+                WHERE r.song_id = %s
+                ORDER BY r.recording_year, def_rel.title
+            """, (song_id,))
+            recordings = [dict(row) for row in cur.fetchall()]
+
+            # Count releases that will become orphaned
+            cur.execute("""
+                SELECT COUNT(DISTINCT rel.id) as orphan_release_count
+                FROM releases rel
+                JOIN recording_releases rr ON rr.release_id = rel.id
+                JOIN recordings r ON rr.recording_id = r.id
+                WHERE r.song_id = %s
+                  AND NOT EXISTS (
+                      SELECT 1 FROM recording_releases rr2
+                      JOIN recordings r2 ON rr2.recording_id = r2.id
+                      WHERE rr2.release_id = rel.id
+                        AND r2.song_id != %s
+                  )
+            """, (song_id, song_id))
+            orphan_releases = cur.fetchone()['orphan_release_count']
+
+            # Count authority recommendations that will be unlinked
+            cur.execute("""
+                SELECT COUNT(*) as rec_count
+                FROM song_authority_recommendations sar
+                JOIN recordings r ON sar.recording_id = r.id
+                WHERE r.song_id = %s
+            """, (song_id,))
+            authority_recs = cur.fetchone()['rec_count']
+
+            stats = {
+                'recording_count': len(recordings),
+                'orphan_release_count': orphan_releases,
+                'authority_rec_count': authority_recs
+            }
+
+    return render_template('admin/song_reset_detail.html',
+                          song=song,
+                          recordings=recordings,
+                          stats=stats)
+
+
+@admin_bp.route('/song-reset/<song_id>/execute', methods=['POST'])
+def song_reset_execute(song_id):
+    """
+    Execute the reset: remove all recordings and related data for a song.
+
+    This will:
+    1. Unlink authority recommendations from recordings (set recording_id = NULL)
+    2. Delete recording_releases entries for this song's recordings
+    3. Delete orphaned releases (releases with no remaining recording links)
+    4. Delete recording_performers entries (cascades from recording delete)
+    5. Delete recordings for this song
+    """
+    try:
+        with get_db_connection() as db:
+            with db.cursor() as cur:
+                # Get song info for logging
+                cur.execute("""
+                    SELECT id, title FROM songs WHERE id = %s
+                """, (song_id,))
+                song = cur.fetchone()
+
+                if not song:
+                    return jsonify({'error': 'Song not found'}), 404
+
+                song_title = song['title']
+
+                # Get recording IDs for this song
+                cur.execute("""
+                    SELECT id FROM recordings WHERE song_id = %s
+                """, (song_id,))
+                recording_ids = [row['id'] for row in cur.fetchall()]
+
+                if not recording_ids:
+                    return jsonify({
+                        'success': True,
+                        'message': 'No recordings to delete',
+                        'deleted': {
+                            'recordings': 0,
+                            'releases': 0,
+                            'authority_recs_unlinked': 0
+                        }
+                    })
+
+                # 1. Unlink authority recommendations (don't delete, just unlink)
+                cur.execute("""
+                    UPDATE song_authority_recommendations
+                    SET recording_id = NULL, updated_at = CURRENT_TIMESTAMP
+                    WHERE recording_id = ANY(%s)
+                    RETURNING id
+                """, (recording_ids,))
+                unlinked_recs = len(cur.fetchall())
+                logger.info(f"Unlinked {unlinked_recs} authority recommendations for '{song_title}'")
+
+                # 2. Find releases that will become orphaned after we delete recording_releases
+                cur.execute("""
+                    SELECT DISTINCT rel.id
+                    FROM releases rel
+                    JOIN recording_releases rr ON rr.release_id = rel.id
+                    WHERE rr.recording_id = ANY(%s)
+                      AND NOT EXISTS (
+                          SELECT 1 FROM recording_releases rr2
+                          WHERE rr2.release_id = rel.id
+                            AND rr2.recording_id != ALL(%s)
+                      )
+                """, (recording_ids, recording_ids))
+                orphan_release_ids = [row['id'] for row in cur.fetchall()]
+
+                # 3. Delete recording_releases entries
+                cur.execute("""
+                    DELETE FROM recording_releases
+                    WHERE recording_id = ANY(%s)
+                    RETURNING id
+                """, (recording_ids,))
+                deleted_rr = len(cur.fetchall())
+                logger.info(f"Deleted {deleted_rr} recording_releases entries for '{song_title}'")
+
+                # 4. Delete orphaned releases
+                deleted_releases = 0
+                if orphan_release_ids:
+                    cur.execute("""
+                        DELETE FROM releases
+                        WHERE id = ANY(%s)
+                        RETURNING id
+                    """, (orphan_release_ids,))
+                    deleted_releases = len(cur.fetchall())
+                    logger.info(f"Deleted {deleted_releases} orphaned releases for '{song_title}'")
+
+                # 5. Delete recordings (recording_performers cascade deletes automatically)
+                cur.execute("""
+                    DELETE FROM recordings
+                    WHERE song_id = %s
+                    RETURNING id
+                """, (song_id,))
+                deleted_recordings = len(cur.fetchall())
+                logger.info(f"Deleted {deleted_recordings} recordings for '{song_title}'")
+
+                db.commit()
+
+                return jsonify({
+                    'success': True,
+                    'message': f"Successfully reset recordings for '{song_title}'",
+                    'deleted': {
+                        'recordings': deleted_recordings,
+                        'releases': deleted_releases,
+                        'authority_recs_unlinked': unlinked_recs
+                    }
+                })
+
+    except Exception as e:
+        logger.error(f"Error resetting song recordings: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
