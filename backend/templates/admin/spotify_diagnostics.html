@@ -310,6 +310,25 @@
             padding: 2px 6px;
             border-radius: 3px;
         }
+
+        /* Copy button */
+        .copy-btn {
+            background: #e0e0e0;
+            border: none;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 11px;
+            cursor: pointer;
+            color: #333;
+            margin-right: 8px;
+        }
+        .copy-btn:hover {
+            background: #d0d0d0;
+        }
+        .copy-btn.copied {
+            background: #1db954;
+            color: #fff;
+        }
     </style>
 </head>
 <body>
@@ -371,6 +390,7 @@
                         </div>
                     </div>
                     <div class="recording-status">
+                        <button class="copy-btn" onclick="event.stopPropagation(); copyRefs(this, {{ loop.index0 }})" title="Copy references for diagnosis">Copy refs</button>
                         {% if rec.spotify_track_count > 0 %}
                         <span class="badge badge-track">{{ rec.spotify_track_count }} track(s)</span>
                         {% elif rec.spotify_album_count > 0 %}
@@ -449,5 +469,68 @@
         </div>
         {% endif %}
     </div>
+
+    <script>
+        // Recording data for copy function
+        const recordingsData = [
+            {% for item in recordings %}
+            {
+                title: {{ (item.recording.album_title or 'Unknown Album') | tojson }},
+                year: {{ (item.recording.recording_year or '') | tojson }},
+                mb_recording_id: {{ (item.recording.recording_mb_id or '') | tojson }},
+                releases: [
+                    {% for rel in item.releases %}
+                    {
+                        title: {{ rel.title | tojson }},
+                        artist: {{ (rel.artist_credit or '') | tojson }},
+                        year: {{ (rel.release_year or '') | tojson }},
+                        is_default: {{ 'true' if rel.is_default else 'false' }},
+                        mb_release_id: {{ (rel.release_mb_id or '') | tojson }},
+                        spotify_album_id: {{ (rel.spotify_album_id or '') | tojson }},
+                        spotify_track_id: {{ (rel.spotify_track_id or '') | tojson }}
+                    }{% if not loop.last %},{% endif %}
+                    {% endfor %}
+                ]
+            }{% if not loop.last %},{% endif %}
+            {% endfor %}
+        ];
+
+        function copyRefs(btn, index) {
+            const rec = recordingsData[index];
+            let text = `${rec.title}`;
+            if (rec.year) text += ` (${rec.year})`;
+            text += '\n';
+
+            if (rec.mb_recording_id) {
+                text += `MB Recording: https://musicbrainz.org/recording/${rec.mb_recording_id}\n`;
+            }
+
+            // Find the default release, or first release with useful data
+            let releaseToShow = rec.releases.find(r => r.is_default) ||
+                                rec.releases.find(r => r.spotify_album_id || r.mb_release_id) ||
+                                rec.releases[0];
+
+            if (releaseToShow) {
+                if (releaseToShow.mb_release_id) {
+                    text += `MB Release: https://musicbrainz.org/release/${releaseToShow.mb_release_id}\n`;
+                }
+                if (releaseToShow.spotify_album_id) {
+                    text += `Spotify Album: https://open.spotify.com/album/${releaseToShow.spotify_album_id}\n`;
+                }
+                if (releaseToShow.spotify_track_id) {
+                    text += `Spotify Track: https://open.spotify.com/track/${releaseToShow.spotify_track_id}\n`;
+                }
+            }
+
+            navigator.clipboard.writeText(text).then(() => {
+                btn.textContent = 'Copied!';
+                btn.classList.add('copied');
+                setTimeout(() => {
+                    btn.textContent = 'Copy refs';
+                    btn.classList.remove('copied');
+                }, 1500);
+            });
+        }
+    </script>
 </body>
 </html>
