@@ -441,7 +441,7 @@ class AuthorityRecommendationMatcher:
                         )
                         SELECT
                             r.id,
-                            r.album_title,
+                            def_rel.title as album_title,
                             r.recording_year,
                             r.label,
                             -- Get ALL performers on the recording (not just matched ones)
@@ -459,6 +459,7 @@ class AuthorityRecommendationMatcher:
                              LIMIT 1
                             ) as primary_artist
                         FROM recordings r
+                        LEFT JOIN releases def_rel ON r.default_release_id = def_rel.id
                         WHERE r.id IN (
                             SELECT DISTINCT rp.recording_id
                             FROM recording_performers rp
@@ -486,18 +487,18 @@ class AuthorityRecommendationMatcher:
                         cur.execute("""
                             SELECT
                                 r.id,
-                                r.album_title,
+                                def_rel.title as album_title,
                                 r.recording_year,
                                 r.label,
-                                rel.artist_credit as artist_names,
-                                rel.artist_credit as primary_artist
+                                def_rel.artist_credit as artist_names,
+                                def_rel.artist_credit as primary_artist
                             FROM recordings r
-                            JOIN releases rel ON r.default_release_id = rel.id
+                            JOIN releases def_rel ON r.default_release_id = def_rel.id
                             WHERE r.song_id = %s
                               AND (
-                                  unaccent(LOWER(rel.artist_credit)) LIKE %s
-                                  OR unaccent(LOWER(rel.artist_credit)) LIKE %s
-                                  OR LOWER(%s) LIKE '%%' || unaccent(LOWER(rel.artist_credit)) || '%%'
+                                  unaccent(LOWER(def_rel.artist_credit)) LIKE %s
+                                  OR unaccent(LOWER(def_rel.artist_credit)) LIKE %s
+                                  OR LOWER(%s) LIKE '%%' || unaccent(LOWER(def_rel.artist_credit)) || '%%'
                               )
                             LIMIT 50
                         """, (song_id, f'%{normalized_artist}%', f'%{stripped_artist}%', artist_name))
@@ -519,24 +520,23 @@ class AuthorityRecommendationMatcher:
                         cur.execute("""
                             SELECT DISTINCT
                                 r.id,
-                                r.album_title,
+                                def_rel.title as album_title,
                                 r.recording_year,
                                 r.label,
-                                rel.artist_credit as artist_names,
-                                rel.artist_credit as primary_artist
+                                def_rel.artist_credit as artist_names,
+                                def_rel.artist_credit as primary_artist
                             FROM recordings r
                             JOIN songs s ON r.song_id = s.id
-                            LEFT JOIN releases rel ON r.default_release_id = rel.id
+                            LEFT JOIN releases def_rel ON r.default_release_id = def_rel.id
                             LEFT JOIN recording_releases rr ON r.id = rr.recording_id
                             LEFT JOIN releases rel2 ON rr.release_id = rel2.id
                             WHERE s.id = %s
                               AND (
-                                  unaccent(LOWER(r.album_title)) LIKE %s
-                                  OR unaccent(LOWER(rel.title)) LIKE %s
+                                  unaccent(LOWER(def_rel.title)) LIKE %s
                                   OR unaccent(LOWER(rel2.title)) LIKE %s
                               )
                             LIMIT 20
-                        """, (song_id, f'%{album_search}%', f'%{album_search}%', f'%{album_search}%'))
+                        """, (song_id, f'%{album_search}%', f'%{album_search}%'))
 
                         album_matches = cur.fetchall()
                         if album_matches:
@@ -692,7 +692,7 @@ class AuthorityRecommendationMatcher:
                     cur.execute("""
                         SELECT DISTINCT
                             r.id as recording_id,
-                            r.album_title as recording_album,
+                            def_rel.title as recording_album,
                             r.recording_year,
                             rel.id as release_id,
                             rel.title as release_title,
@@ -701,6 +701,7 @@ class AuthorityRecommendationMatcher:
                         FROM releases rel
                         JOIN recording_releases rr ON rel.id = rr.release_id
                         JOIN recordings r ON rr.recording_id = r.id
+                        LEFT JOIN releases def_rel ON r.default_release_id = def_rel.id
                         WHERE r.song_id = %s
                           AND (
                               unaccent(LOWER(rel.title)) LIKE %s
