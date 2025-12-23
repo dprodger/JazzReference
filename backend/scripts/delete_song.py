@@ -133,22 +133,24 @@ class SongDeleter:
             with conn.cursor() as cur:
                 # Get solo transcriptions
                 cur.execute("""
-                    SELECT st.id, st.youtube_url, r.album_title
+                    SELECT st.id, st.youtube_url, def_rel.title as album_title
                     FROM solo_transcriptions st
                     JOIN recordings r ON st.recording_id = r.id
+                    LEFT JOIN releases def_rel ON r.default_release_id = def_rel.id
                     WHERE st.song_id = %s
                     ORDER BY r.recording_year
                 """, (song_id,))
                 info['solo_transcriptions'] = cur.fetchall()
-                
+
                 # Get recordings and their performers
                 cur.execute("""
-                    SELECT r.id, r.album_title, r.recording_year,
+                    SELECT r.id, def_rel.title as album_title, r.recording_year,
                            COUNT(DISTINCT rp.id) as performer_count
                     FROM recordings r
+                    LEFT JOIN releases def_rel ON r.default_release_id = def_rel.id
                     LEFT JOIN recording_performers rp ON r.id = rp.recording_id
                     WHERE r.song_id = %s
-                    GROUP BY r.id, r.album_title, r.recording_year
+                    GROUP BY r.id, def_rel.title, r.recording_year
                     ORDER BY r.recording_year
                 """, (song_id,))
                 recordings = cur.fetchall()

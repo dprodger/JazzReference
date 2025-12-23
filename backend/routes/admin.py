@@ -332,9 +332,6 @@ def _import_single_orphan(db, song, orphan):
         except ValueError:
             pass
 
-    # Use Spotify album name if available, otherwise use artist credit as album title
-    album_title = orphan.get('spotify_album_name') or orphan.get('mb_artist_credit', 'Unknown')
-
     # Check if recording already exists with this MB recording ID
     cur.execute("""
         SELECT id FROM recordings
@@ -350,15 +347,14 @@ def _import_single_orphan(db, song, orphan):
         # Create new recording
         cur.execute("""
             INSERT INTO recordings (
-                song_id, album_title, recording_year,
+                song_id, recording_year,
                 mb_first_release_date, is_canonical,
                 musicbrainz_id, source_mb_work_id
             )
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s)
             RETURNING id
         """, (
             song_id,
-            album_title,
             recording_year,
             release_date,
             False,  # Not canonical by default

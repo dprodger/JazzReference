@@ -625,9 +625,9 @@ class MBReleaseImporter:
             self.logger.info("  No releases found for this recording")
             return
 
-        # Use the first release for album title (for the recording)
+        # Use the first release title for logging
         first_release = mb_releases[0]
-        album_title = first_release.get('title', 'Unknown Album')
+        first_release_title = first_release.get('title', 'Unknown Album')
 
         # Extract recording date from MusicBrainz data (performer relations or first-release-date)
         date_info = extract_recording_date_from_mb(mb_recording, logger=self.logger)
@@ -640,7 +640,7 @@ class MBReleaseImporter:
         else:
             # Recording doesn't exist - need to create it
             recording_id = self._create_recording(
-                conn, song_id, mb_recording_id, album_title, date_info,
+                conn, song_id, mb_recording_id, date_info,
                 source_mb_work_id=source_mb_work_id
             )
             if recording_id:
@@ -669,7 +669,7 @@ class MBReleaseImporter:
         if should_import_performers:
             performers_added = self.performer_importer.add_performers_to_recording(
                 conn, recording_id, mb_recording,
-                source_release_title=album_title
+                source_release_title=first_release_title
             )
             if performers_added > 0:
                 self.stats['performers_added_to_recordings'] += performers_added
@@ -704,7 +704,7 @@ class MBReleaseImporter:
             )
     
     def _create_recording(self, conn, song_id: str, mb_recording_id: str,
-                           album_title: str, date_info: Dict[str, Any],
+                           date_info: Dict[str, Any],
                            source_mb_work_id: Optional[str] = None) -> Optional[str]:
         """
         Create a new recording in the database.
@@ -713,7 +713,6 @@ class MBReleaseImporter:
             conn: Database connection
             song_id: Our database song ID
             mb_recording_id: MusicBrainz recording ID
-            album_title: Album title for this recording
             date_info: Dict from extract_recording_date_from_mb() containing:
                 - recording_date: Formatted date (YYYY-MM-DD)
                 - recording_year: Integer year
@@ -728,22 +727,21 @@ class MBReleaseImporter:
         if self.dry_run:
             source = date_info.get('recording_date_source', 'unknown')
             year = date_info.get('recording_year')
-            self.logger.info(f"  [DRY RUN] Would create recording: {album_title} "
+            self.logger.info(f"  [DRY RUN] Would create recording: MB:{mb_recording_id} "
                            f"(year={year}, source={source})")
             return None
 
         with conn.cursor() as cur:
             cur.execute("""
                 INSERT INTO recordings (
-                    song_id, album_title, recording_year, recording_date,
+                    song_id, recording_year, recording_date,
                     recording_date_source, recording_date_precision, mb_first_release_date,
                     is_canonical, musicbrainz_id, source_mb_work_id
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING id
             """, (
                 song_id,
-                album_title,
                 date_info.get('recording_year'),
                 date_info.get('recording_date'),
                 date_info.get('recording_date_source'),
@@ -759,7 +757,7 @@ class MBReleaseImporter:
             # Log with source info
             source = date_info.get('recording_date_source', 'none')
             year = date_info.get('recording_year', '?')
-            self.logger.info(f"  ✓ Created recording: {album_title[:50]} (year={year}, source={source})")
+            self.logger.info(f"  ✓ Created recording: MB:{mb_recording_id[:8]}... (year={year}, source={source})")
             self.stats['recordings_created'] += 1
 
             return recording_id
@@ -980,7 +978,7 @@ class MBReleaseImporter:
             return result['id'] if result else None
     
     def _get_or_create_recording(self, conn, song_id: str, mb_recording_id: str,
-                                  album_title: str, date_info: Dict[str, Any],
+                                  date_info: Dict[str, Any],
                                   source_mb_work_id: Optional[str] = None) -> Optional[str]:
         """
         Get existing recording or create new one.
@@ -989,15 +987,11 @@ class MBReleaseImporter:
         path now uses _create_recording() with pre-cached existence checks.
 
         IMPORTANT: For MusicBrainz imports, we ONLY match by MusicBrainz recording ID.
-        Album title matching is NOT reliable because different artists can have
-        albums with the same title (e.g., Grant Green's "Born to Be Blue" vs
-        Freddie Hubbard's "Born to Be Blue").
 
         Args:
             conn: Database connection
             song_id: Song ID
             mb_recording_id: MusicBrainz recording ID (unique identifier)
-            album_title: Album title (for display/storage only, NOT for matching)
             date_info: Dict from extract_recording_date_from_mb()
             source_mb_work_id: MusicBrainz work ID this recording was imported from
 
@@ -1006,7 +1000,6 @@ class MBReleaseImporter:
         """
         with conn.cursor() as cur:
             # Match ONLY by MusicBrainz ID - this is the unique identifier
-            # DO NOT fall back to album title matching as it causes cross-artist contamination
             cur.execute("""
                 SELECT id FROM recordings
                 WHERE musicbrainz_id = %s
@@ -1020,20 +1013,19 @@ class MBReleaseImporter:
 
             # Create new recording
             if self.dry_run:
-                self.logger.info(f"  [DRY RUN] Would create recording: {album_title}")
+                self.logger.info(f"  [DRY RUN] Would create recording: MB:{mb_recording_id}")
                 return None
 
             cur.execute("""
                 INSERT INTO recordings (
-                    song_id, album_title, recording_year, recording_date,
+                    song_id, recording_year, recording_date,
                     recording_date_source, recording_date_precision, mb_first_release_date,
                     is_canonical, musicbrainz_id, source_mb_work_id
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING id
             """, (
                 song_id,
-                album_title,
                 date_info.get('recording_year'),
                 date_info.get('recording_date'),
                 date_info.get('recording_date_source'),
@@ -1047,7 +1039,7 @@ class MBReleaseImporter:
             recording_id = cur.fetchone()['id']
             source = date_info.get('recording_date_source', 'none')
             year = date_info.get('recording_year', '?')
-            self.logger.info(f"  ✓ Created recording: {album_title[:50]} (year={year}, source={source})")
+            self.logger.info(f"  ✓ Created recording: MB:{mb_recording_id[:8]}... (year={year}, source={source})")
             self.stats['recordings_created'] += 1
 
             return recording_id

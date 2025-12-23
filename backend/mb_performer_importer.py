@@ -544,13 +544,14 @@ class PerformerImporter:
         # Get recording info for logging
         with conn.cursor() as cur:
             cur.execute("""
-                SELECT r.album_title, r.recording_year, s.title as song_title
+                SELECT def_rel.title as album_title, r.recording_year, s.title as song_title
                 FROM recordings r
                 JOIN songs s ON r.song_id = s.id
+                LEFT JOIN releases def_rel ON r.default_release_id = def_rel.id
                 WHERE r.id = %s
             """, (recording_id,))
             recording_info = cur.fetchone()
-        
+
         if recording_info:
             album = recording_info['album_title'] or 'Unknown Album'
             year = recording_info['recording_year'] or 'N/A'

@@ -81,7 +81,7 @@ def get_existing_spotify_data(song_id: str) -> list:
             cur.execute("""
                 SELECT
                     r.id as recording_id,
-                    r.album_title,
+                    def_rel.title as album_title,
                     r.recording_year,
                     rr.release_id,
                     rr.spotify_track_id,
@@ -99,6 +99,7 @@ def get_existing_spotify_data(song_id: str) -> list:
                         LIMIT 1
                     ) as leader_name
                 FROM recordings r
+                LEFT JOIN releases def_rel ON r.default_release_id = def_rel.id
                 JOIN recording_releases rr ON r.id = rr.recording_id
                 JOIN releases rel ON rr.release_id = rel.id
                 WHERE r.song_id = %s
@@ -540,7 +541,7 @@ def get_tracks_with_albums(song_id: str) -> list:
             cur.execute("""
                 SELECT
                     r.id as recording_id,
-                    r.album_title,
+                    def_rel.title as album_title,
                     r.recording_year,
                     rr.release_id,
                     rr.spotify_track_id,
@@ -558,6 +559,7 @@ def get_tracks_with_albums(song_id: str) -> list:
                         LIMIT 1
                     ) as leader_name
                 FROM recordings r
+                LEFT JOIN releases def_rel ON r.default_release_id = def_rel.id
                 JOIN recording_releases rr ON r.id = rr.recording_id
                 JOIN releases rel ON rr.release_id = rel.id
                 WHERE r.song_id = %s

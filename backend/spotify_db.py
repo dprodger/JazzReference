@@ -61,7 +61,7 @@ def get_recordings_for_song(song_id: str, artist_filter: str = None) -> List[dic
             query = """
                 SELECT
                     r.id,
-                    r.album_title,
+                    def_rel.title as album_title,
                     r.recording_year,
                     -- Get Spotify URL from default release, or best available release (constructed from IDs)
                     COALESCE(
@@ -101,6 +101,7 @@ def get_recordings_for_song(song_id: str, artist_filter: str = None) -> List[dic
                             p.name
                     ) FILTER (WHERE p.id IS NOT NULL) as performers
                 FROM recordings r
+                LEFT JOIN releases def_rel ON r.default_release_id = def_rel.id
                 LEFT JOIN recording_performers rp ON r.id = rp.recording_id
                 LEFT JOIN performers p ON rp.performer_id = p.id
                 LEFT JOIN instruments i ON rp.instrument_id = i.id
@@ -122,7 +123,7 @@ def get_recordings_for_song(song_id: str, artist_filter: str = None) -> List[dic
                 params.append(artist_filter)
             
             query += """
-                GROUP BY r.id, r.album_title, r.recording_year, r.default_release_id
+                GROUP BY r.id, def_rel.title, r.recording_year, r.default_release_id
                 ORDER BY r.recording_year
             """
             

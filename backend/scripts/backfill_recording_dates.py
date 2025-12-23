@@ -115,34 +115,37 @@ Examples:
             if song_filter:
                 # Process all recordings for this specific song
                 cur.execute("""
-                    SELECT id, musicbrainz_id, album_title, recording_year,
-                           recording_date, recording_date_source
-                    FROM recordings
-                    WHERE musicbrainz_id IS NOT NULL
-                      AND song_id = %s
-                    ORDER BY created_at DESC
+                    SELECT r.id, r.musicbrainz_id, def_rel.title as album_title, r.recording_year,
+                           r.recording_date, r.recording_date_source
+                    FROM recordings r
+                    LEFT JOIN releases def_rel ON r.default_release_id = def_rel.id
+                    WHERE r.musicbrainz_id IS NOT NULL
+                      AND r.song_id = %s
+                    ORDER BY r.created_at DESC
                     LIMIT %s
                 """, (song_filter['id'], args.limit))
             elif force_mode:
                 # Process all recordings with MB ID
                 cur.execute("""
-                    SELECT id, musicbrainz_id, album_title, recording_year,
-                           recording_date, recording_date_source
-                    FROM recordings
-                    WHERE musicbrainz_id IS NOT NULL
-                    ORDER BY created_at DESC
+                    SELECT r.id, r.musicbrainz_id, def_rel.title as album_title, r.recording_year,
+                           r.recording_date, r.recording_date_source
+                    FROM recordings r
+                    LEFT JOIN releases def_rel ON r.default_release_id = def_rel.id
+                    WHERE r.musicbrainz_id IS NOT NULL
+                    ORDER BY r.created_at DESC
                     LIMIT %s
                 """, (args.limit,))
             else:
                 # Only process recordings without a source or with legacy source
                 cur.execute("""
-                    SELECT id, musicbrainz_id, album_title, recording_year,
-                           recording_date, recording_date_source
-                    FROM recordings
-                    WHERE musicbrainz_id IS NOT NULL
-                      AND (recording_date_source IS NULL
-                           OR recording_date_source = 'legacy_release_date')
-                    ORDER BY created_at DESC
+                    SELECT r.id, r.musicbrainz_id, def_rel.title as album_title, r.recording_year,
+                           r.recording_date, r.recording_date_source
+                    FROM recordings r
+                    LEFT JOIN releases def_rel ON r.default_release_id = def_rel.id
+                    WHERE r.musicbrainz_id IS NOT NULL
+                      AND (r.recording_date_source IS NULL
+                           OR r.recording_date_source = 'legacy_release_date')
+                    ORDER BY r.created_at DESC
                     LIMIT %s
                 """, (args.limit,))
 
