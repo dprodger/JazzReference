@@ -46,7 +46,7 @@ def get_recordings_with_spotify_tracks(song_id: str) -> list:
                 WITH recording_tracks AS (
                     SELECT DISTINCT ON (rr.spotify_track_id)
                         r.id as recording_id,
-                        r.album_title,
+                        def_rel.title as album_title,
                         r.recording_year,
                         r.musicbrainz_id,
                         rr.spotify_track_id,
@@ -55,6 +55,7 @@ def get_recordings_with_spotify_tracks(song_id: str) -> list:
                         rel.spotify_album_id,
                         rel.spotify_album_url
                     FROM recordings r
+                    LEFT JOIN releases def_rel ON r.default_release_id = def_rel.id
                     JOIN recording_releases rr ON r.id = rr.recording_id
                     JOIN releases rel ON rr.release_id = rel.id
                     WHERE r.song_id = %s
