@@ -21,9 +21,9 @@ import research_queue
 
 logger = logging.getLogger(__name__)
 
-# Temporarily disable Apple Music matching until catalog hosting is resolved
-# See doc/alternate_apple_approaches.md for context
-APPLE_MUSIC_MATCHING_ENABLED = False
+# Apple Music matching uses MotherDuck catalog (no rate limits)
+# Set APPLE_MUSIC_CATALOG_DB=md:apple_music_feed and motherduck_token in env
+APPLE_MUSIC_MATCHING_ENABLED = True
 
 
 def research_song(song_id: str, song_name: str) -> Dict[str, Any]:
@@ -157,7 +157,8 @@ def research_song(song_id: str, song_name: str) -> Dict[str, Any]:
                 dry_run=False,
                 strict_mode=True,
                 logger=logger,
-                progress_callback=progress_callback
+                progress_callback=progress_callback,
+                local_catalog_only=True,  # Use MotherDuck only, no iTunes API fallback
             )
 
             logger.info("Matching Apple Music releases...")
