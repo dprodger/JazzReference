@@ -12,10 +12,10 @@ echo "=========================================="
 
 # Song IDs and titles from Dave's Ensemble repertoire
 songs=(
-#    "1fab7d72-030f-4a28-9952-bbadbff69f08|An Affair to Remember"
-#    "f9c4fa68-498b-4c1e-bb15-04be2c5b4537|Autumn Leaves"
-#    "710b3005-c389-4365-b885-56e3f1dc1762|Black and Blue"
-#    "9e3a5b18-1f38-462e-9e34-dea319b7fcb2|Black Velvet"
+    "1fab7d72-030f-4a28-9952-bbadbff69f08|An Affair to Remember"
+    "f9c4fa68-498b-4c1e-bb15-04be2c5b4537|Autumn Leaves"
+    "710b3005-c389-4365-b885-56e3f1dc1762|Black and Blue"
+    "9e3a5b18-1f38-462e-9e34-dea319b7fcb2|Black Velvet"
     "97bbaec0-395f-40ae-b5cd-25c3d6ca0785|Blue, Turning Grey Over You"
     "2e287025-9996-4fe3-aea6-872cd5f0b70c|Born to be Blue"
     "9b1887a1-7bf5-44e7-b538-574397539b77|By the River Sainte Marie"
@@ -52,7 +52,7 @@ for entry in "${songs[@]}"; do
     echo "[$count/$total] Processing: $song_title"
     echo "----------------------------------------"
 
-    python scripts/match_apple_tracks.py --id "$song_id" --local-only --rematch
+    python scripts/match_apple_tracks.py --id "$song_id" --local-only
 done
 
 echo ""
