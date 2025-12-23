@@ -239,6 +239,34 @@ ALBUM_LIVE_SUFFIXES = [
 ]
 
 
+def normalize_for_search(text: str) -> str:
+    """
+    Normalize text for use in search queries.
+
+    This is lighter than normalize_for_comparison - it only standardizes
+    characters that might cause search mismatches without altering the
+    semantic content.
+
+    Examples:
+        "New Faces – New Sounds" -> "New Faces - New Sounds"
+        "Köln Concert" -> "Koln Concert" (if unidecode available)
+    """
+    if not text:
+        return text
+
+    # Normalize various dash characters to regular hyphen
+    text = text.replace('–', '-')  # en-dash
+    text = text.replace('—', '-')  # em-dash
+    text = text.replace('‐', '-')  # Unicode hyphen
+    text = text.replace('−', '-')  # minus sign
+
+    # Normalize quotes
+    text = text.replace('"', '"').replace('"', '"')
+    text = text.replace(''', "'").replace(''', "'")
+
+    return text
+
+
 def strip_live_suffix(album_title: str) -> str:
     """
     Strip common live recording suffixes from album titles for search queries.
@@ -286,9 +314,15 @@ def normalize_for_comparison(text: str) -> str:
     text = re.sub(r'\s*-\s*recorded\s+(at|in)\s+.*$', '', text, flags=re.IGNORECASE)
     text = re.sub(r'\s*\(recorded\s+(at|in)\s+[^)]*\).*$', '', text, flags=re.IGNORECASE)
     
-    # Remove remastered annotations
-    text = re.sub(r'\s*-\s*remastered(\s+\d{4})?.*$', '', text, flags=re.IGNORECASE)
-    text = re.sub(r'\s*\(remastered(\s+\d{4})?\).*$', '', text, flags=re.IGNORECASE)
+    # Remove remastered annotations (various formats)
+    # "- Remastered", "- Remastered 2025", "- 2025 Remaster", "(Remastered)", etc.
+    text = re.sub(r'\s*-\s*remaster(ed)?(\s+\d{4})?.*$', '', text, flags=re.IGNORECASE)
+    text = re.sub(r'\s*-\s*\d{4}\s+remaster(ed)?.*$', '', text, flags=re.IGNORECASE)
+    text = re.sub(r'\s*\(remaster(ed)?(\s+\d{4})?\).*$', '', text, flags=re.IGNORECASE)
+    text = re.sub(r'\s*\(\d{4}\s+remaster(ed)?\).*$', '', text, flags=re.IGNORECASE)
+    # Handle "- Instrumental/Remastered" and similar compound suffixes
+    text = re.sub(r'\s*-\s*instrumental(/remaster(ed)?)?.*$', '', text, flags=re.IGNORECASE)
+    text = re.sub(r'\s*\(instrumental(/remaster(ed)?)?\).*$', '', text, flags=re.IGNORECASE)
 
     # Remove featured artist annotations (common in streaming services)
     # Handles: (feat. Artist), (featuring Artist), (ft. Artist), (with Artist)
@@ -328,6 +362,13 @@ def normalize_for_comparison(text: str) -> str:
     # This handles title variations where "/" is used as a separator
     text = re.sub(r'\s*/\s*', ' ', text)
     text = text.replace('/', ' ')
+
+    # Normalize various dash characters to regular dash
+    # en-dash (–), em-dash (—), and other Unicode dashes → regular dash (-)
+    text = text.replace('–', '-')  # en-dash
+    text = text.replace('—', '-')  # em-dash
+    text = text.replace('‐', '-')  # Unicode hyphen
+    text = text.replace('−', '-')  # minus sign
 
     # Normalize spacing around dashes (e.g., "St. - Denis" → "St.-Denis")
     text = re.sub(r'\s*-\s*', '-', text)

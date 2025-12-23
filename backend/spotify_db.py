@@ -323,10 +323,10 @@ def update_release_artwork(conn, release_id: str, album_art: dict,
 
 def update_recording_release_track_id(conn, recording_id: str, release_id: str,
                                       track_id: str, track_url: str = None,
+                                      disc_number: int = None, track_number: int = None,
                                       dry_run: bool = False, log: logging.Logger = None):
     """
-    Update the recording_releases junction table with Spotify track ID
-    (URL is constructed on-demand from ID, not stored)
+    Update the recording_releases junction table with Spotify track ID and position
 
     Args:
         conn: Database connection
@@ -334,21 +334,25 @@ def update_recording_release_track_id(conn, recording_id: str, release_id: str,
         release_id: Our release ID
         track_id: Spotify track ID
         track_url: Deprecated - ignored (URL constructed from ID)
+        disc_number: Disc number from Spotify (updates existing value)
+        track_number: Track number from Spotify (updates existing value)
         dry_run: If True, don't actually update
         log: Logger instance
     """
     log = log or logger
 
     if dry_run:
-        log.debug(f"      [DRY RUN] Would update recording_releases with track: {track_id}")
+        log.debug(f"      [DRY RUN] Would update recording_releases with track: {track_id} (disc {disc_number}, track {track_number})")
         return
 
     with conn.cursor() as cur:
         cur.execute("""
             UPDATE recording_releases
-            SET spotify_track_id = %s
+            SET spotify_track_id = %s,
+                disc_number = COALESCE(%s, disc_number),
+                track_number = COALESCE(%s, track_number)
             WHERE recording_id = %s AND release_id = %s
-        """, (track_id, recording_id, release_id))
+        """, (track_id, disc_number, track_number, recording_id, release_id))
 
         conn.commit()
 

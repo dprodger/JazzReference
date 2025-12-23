@@ -33,6 +33,7 @@ from spotify_matching import (
     strip_ensemble_suffix,
     strip_live_suffix,
     normalize_for_comparison,
+    normalize_for_search,
     calculate_similarity,
     is_substring_title_match,
     extract_primary_artist,
@@ -334,9 +335,11 @@ class SpotifyMatcher:
             self.stats['releases_updated'] += 1
     
     def update_recording_release_track_id(self, conn, recording_id: str, release_id: str,
-                                          track_id: str, track_url: str):
+                                          track_id: str, track_url: str,
+                                          disc_number: int = None, track_number: int = None):
         """Update the recording_releases junction table with Spotify track info"""
         update_recording_release_track_id(conn, recording_id, release_id, track_id, track_url,
+                                         disc_number=disc_number, track_number=track_number,
                                          dry_run=self.dry_run, log=self.logger)
     
     def update_recording_default_release(self, conn, song_id: str, release_id: str):
@@ -527,11 +530,11 @@ class SpotifyMatcher:
     
     def get_album_tracks(self, album_id: str) -> Optional[List[dict]]:
         """
-        Fetch tracks from a Spotify album
-        
+        Fetch all tracks from a Spotify album, handling pagination for large albums.
+
         Args:
             album_id: Spotify album ID
-            
+
         Returns:
             List of track dicts with 'id', 'name', 'track_number', 'disc_number', 'url'
             or None if failed
@@ -539,42 +542,51 @@ class SpotifyMatcher:
         # Check cache first
         cache_path = self.client._get_album_cache_path(album_id)
         cached_result = self.client._load_from_cache(cache_path)
-        
+
         if cached_result is not _CACHE_MISS:
             return cached_result
-        
+
         token = self.client.get_spotify_auth_token()
         if not token:
             return None
-        
+
         try:
-            response = self.client._make_api_request(
-                'get',
-                f'https://api.spotify.com/v1/albums/{album_id}/tracks',
-                headers={'Authorization': f'Bearer {token}'},
-                params={'limit': 50},
-                timeout=10
-            )
-            
-            response.raise_for_status()
-            data = response.json()
-            
-            self.stats['api_calls'] += 1
-            self.client.last_made_api_call = True
-            
             tracks = []
-            for item in data.get('items', []):
-                tracks.append({
-                    'id': item['id'],
-                    'name': item['name'],
-                    'track_number': item['track_number'],
-                    'disc_number': item['disc_number'],
-                    'url': item['external_urls']['spotify']
-                })
-            
+            url = f'https://api.spotify.com/v1/albums/{album_id}/tracks'
+            params = {'limit': 50}
+
+            # Paginate through all tracks
+            while url:
+                response = self.client._make_api_request(
+                    'get',
+                    url,
+                    headers={'Authorization': f'Bearer {token}'},
+                    params=params if 'offset' not in url else None,  # params only for first request
+                    timeout=10
+                )
+
+                response.raise_for_status()
+                data = response.json()
+
+                self.stats['api_calls'] += 1
+                self.client.last_made_api_call = True
+
+                for item in data.get('items', []):
+                    tracks.append({
+                        'id': item['id'],
+                        'name': item['name'],
+                        'track_number': item['track_number'],
+                        'disc_number': item['disc_number'],
+                        'url': item['external_urls']['spotify']
+                    })
+
+                # Get next page URL (None if no more pages)
+                url = data.get('next')
+
+            self.logger.debug(f"    Fetched {len(tracks)} total tracks from album")
             self.client._save_to_cache(cache_path, tracks)
             return tracks
-            
+
         except SpotifyRateLimitError as e:
             self.logger.error(f"Rate limit exceeded fetching album tracks: {e}")
             return None
@@ -618,45 +630,50 @@ class SpotifyMatcher:
         # Progressive search strategy
         # Start with specific queries, fall back to broader searches
         search_strategies = []
-        
+
+        # Normalize search terms (convert en-dashes to hyphens, etc.)
+        search_song = normalize_for_search(song_title)
+        search_album = normalize_for_search(album_title)
+        search_artist = normalize_for_search(artist_name) if artist_name else None
+
         # Check if we should try a stripped artist name as fallback
-        stripped_artist = strip_ensemble_suffix(artist_name) if artist_name else None
-        has_stripped_fallback = stripped_artist and stripped_artist != artist_name
-        
-        if artist_name and year:
+        stripped_artist = strip_ensemble_suffix(search_artist) if search_artist else None
+        has_stripped_fallback = stripped_artist and stripped_artist != search_artist
+
+        if search_artist and year:
             search_strategies.append({
-                'query': f'track:"{song_title}" artist:"{artist_name}" album:"{album_title}" year:{year}',
+                'query': f'track:"{search_song}" artist:"{search_artist}" album:"{search_album}" year:{year}',
                 'description': 'exact track, artist, album, and year'
             })
-        
-        if artist_name:
+
+        if search_artist:
             search_strategies.append({
-                'query': f'track:"{song_title}" artist:"{artist_name}" album:"{album_title}"',
+                'query': f'track:"{search_song}" artist:"{search_artist}" album:"{search_album}"',
                 'description': 'exact track, artist, and album'
             })
             search_strategies.append({
-                'query': f'track:"{song_title}" artist:"{artist_name}"',
+                'query': f'track:"{search_song}" artist:"{search_artist}"',
                 'description': 'exact track and artist'
             })
-        
+
         # Fallback: try with ensemble suffix stripped (e.g., "Bill Evans Trio" -> "Bill Evans")
         if has_stripped_fallback:
             search_strategies.append({
-                'query': f'track:"{song_title}" artist:"{stripped_artist}" album:"{album_title}"',
+                'query': f'track:"{search_song}" artist:"{stripped_artist}" album:"{search_album}"',
                 'description': f'exact track, stripped artist ({stripped_artist}), and album'
             })
             search_strategies.append({
-                'query': f'track:"{song_title}" artist:"{stripped_artist}"',
+                'query': f'track:"{search_song}" artist:"{stripped_artist}"',
                 'description': f'exact track and stripped artist ({stripped_artist})'
             })
-        
+
         search_strategies.append({
-            'query': f'track:"{song_title}" album:"{album_title}"',
+            'query': f'track:"{search_song}" album:"{search_album}"',
             'description': 'exact track and album'
         })
-        
+
         search_strategies.append({
-            'query': f'track:"{song_title}"',
+            'query': f'track:"{search_song}"',
             'description': 'exact track only'
         })
         
@@ -796,45 +813,49 @@ class SpotifyMatcher:
         # Progressive search strategy
         search_strategies = []
 
-        # Check if album title has a live suffix we can strip (e.g., "Solo: Live" -> "Solo")
-        stripped_album = strip_live_suffix(album_title)
-        has_stripped_album = stripped_album != album_title
+        # Normalize album title for search (convert en-dashes to hyphens, etc.)
+        search_album = normalize_for_search(album_title)
+        search_artist = normalize_for_search(artist_name) if artist_name else None
 
-        if artist_name:
+        # Check if album title has a live suffix we can strip (e.g., "Solo: Live" -> "Solo")
+        stripped_album = strip_live_suffix(search_album)
+        has_stripped_album = stripped_album != search_album
+
+        if search_artist:
             search_strategies.append({
-                'query': f'album:"{album_title}" artist:"{artist_name}"',
+                'query': f'album:"{search_album}" artist:"{search_artist}"',
                 'description': 'exact album and artist'
             })
             search_strategies.append({
-                'query': f'"{album_title}" "{artist_name}"',
+                'query': f'"{search_album}" "{search_artist}"',
                 'description': 'quoted album and artist'
             })
 
             # Try with ensemble suffix stripped (e.g., "Bill Evans Trio" -> "Bill Evans")
-            stripped_artist = strip_ensemble_suffix(artist_name)
-            if stripped_artist != artist_name:
+            stripped_artist = strip_ensemble_suffix(search_artist)
+            if stripped_artist != search_artist:
                 search_strategies.append({
-                    'query': f'album:"{album_title}" artist:"{stripped_artist}"',
+                    'query': f'album:"{search_album}" artist:"{stripped_artist}"',
                     'description': f'exact album with stripped artist ({stripped_artist})'
                 })
                 search_strategies.append({
-                    'query': f'"{album_title}" "{stripped_artist}"',
+                    'query': f'"{search_album}" "{stripped_artist}"',
                     'description': f'quoted album with stripped artist ({stripped_artist})'
                 })
 
             # Try with live suffix stripped from album (e.g., "Solo: Live" -> "Solo")
             if has_stripped_album:
                 search_strategies.append({
-                    'query': f'album:"{stripped_album}" artist:"{artist_name}"',
+                    'query': f'album:"{stripped_album}" artist:"{search_artist}"',
                     'description': f'stripped album ({stripped_album}) and artist'
                 })
                 search_strategies.append({
-                    'query': f'"{stripped_album}" "{artist_name}"',
+                    'query': f'"{stripped_album}" "{search_artist}"',
                     'description': f'quoted stripped album ({stripped_album}) and artist'
                 })
 
         search_strategies.append({
-            'query': f'album:"{album_title}"',
+            'query': f'album:"{search_album}"',
             'description': 'exact album only'
         })
 
@@ -1305,7 +1326,9 @@ class SpotifyMatcher:
                     recording['recording_id'],
                     release_id,
                     matched_track['id'],
-                    matched_track['url']
+                    matched_track['url'],
+                    disc_number=matched_track.get('disc_number'),
+                    track_number=matched_track.get('track_number')
                 )
                 self.stats['tracks_matched'] += 1
                 any_matched = True
