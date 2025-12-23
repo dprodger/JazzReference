@@ -632,7 +632,7 @@ def get_existing_recordings_for_song(song_id):
                 SELECT
                     rec.id,
                     rec.musicbrainz_id as mb_recording_id,
-                    rec.album_title,
+                    def_rel.title as album_title,
                     rec.recording_year,
                     rec.mb_first_release_date,
                     p.name as leader_name,
@@ -661,6 +661,7 @@ def get_existing_recordings_for_song(song_id):
                         WHERE rr.recording_id = rec.id
                     ) as releases
                 FROM recordings rec
+                LEFT JOIN releases def_rel ON rec.default_release_id = def_rel.id
                 LEFT JOIN recording_performers rp ON rec.id = rp.recording_id AND rp.role = 'leader'
                 LEFT JOIN performers p ON rp.performer_id = p.id
                 WHERE rec.song_id = %s
@@ -930,8 +931,8 @@ def recommendations_review(song_id):
                     sar.itunes_album_id,
                     sar.itunes_track_id,
                     sar.created_at,
-                    -- If matched, get recording info
-                    r.album_title AS matched_album,
+                    -- If matched, get recording info from default release
+                    def_rel.title AS matched_album,
                     (
                         SELECT p.name
                         FROM recording_performers rp
@@ -941,6 +942,7 @@ def recommendations_review(song_id):
                     ) AS matched_performer
                 FROM song_authority_recommendations sar
                 LEFT JOIN recordings r ON sar.recording_id = r.id
+                LEFT JOIN releases def_rel ON r.default_release_id = def_rel.id
                 WHERE sar.song_id = %s
                 ORDER BY
                     CASE WHEN sar.recording_id IS NULL THEN 0 ELSE 1 END,
@@ -1013,10 +1015,11 @@ def get_potential_matches(song_id, rec_id):
                         rel.cover_art_small
                     ) AS cover_art,
                     r.id AS recording_id,
-                    r.album_title AS recording_album
+                    def_rel.title AS recording_album
                 FROM releases rel
                 LEFT JOIN recording_releases rr ON rel.id = rr.release_id
                 LEFT JOIN recordings r ON rr.recording_id = r.id AND r.song_id = %s
+                LEFT JOIN releases def_rel ON r.default_release_id = def_rel.id
                 WHERE (
                     rel.artist_credit ILIKE %s
                     OR rel.title ILIKE %s
@@ -1318,9 +1321,10 @@ def diagnose_mb_recording(song_id):
 
                 # ===== CHECK 3: Do we have this recording? =====
                 cur.execute("""
-                    SELECT r.id, r.album_title, r.recording_year, r.musicbrainz_id,
+                    SELECT r.id, def_rel.title as album_title, r.recording_year, r.musicbrainz_id,
                            p.name as leader_name
                     FROM recordings r
+                    LEFT JOIN releases def_rel ON r.default_release_id = def_rel.id
                     LEFT JOIN recording_performers rp ON r.id = rp.recording_id AND rp.role = 'leader'
                     LEFT JOIN performers p ON rp.performer_id = p.id
                     WHERE r.musicbrainz_id = %s
@@ -1332,7 +1336,7 @@ def diagnose_mb_recording(song_id):
                     diagnosis['checks'].append({
                         'name': 'In Our Database',
                         'passed': True,
-                        'detail': f"We have this recording: {our_recording['leader_name'] or 'Unknown'} - {our_recording['album_title']}"
+                        'detail': f"We have this recording: {our_recording['leader_name'] or 'Unknown'} - {our_recording['album_title'] or 'Unknown Album'}"
                     })
                     diagnosis['our_data'] = {
                         'recording_id': str(our_recording['id']),
@@ -2206,7 +2210,7 @@ def spotify_diagnostics(song_id):
             cur.execute("""
                 SELECT
                     r.id as recording_id,
-                    r.album_title,
+                    def_rel.title as album_title,
                     r.recording_year,
                     r.musicbrainz_id as recording_mb_id,
                     r.default_release_id,
@@ -2224,7 +2228,7 @@ def spotify_diagnostics(song_id):
                 FROM recordings r
                 LEFT JOIN releases def_rel ON r.default_release_id = def_rel.id
                 WHERE r.song_id = %s
-                ORDER BY r.recording_year, r.album_title
+                ORDER BY r.recording_year, def_rel.title
             """, (song_id,))
             recordings = cur.fetchall()
 
