@@ -75,26 +75,42 @@ Examples:
         help='Re-run track matching for releases that have album IDs but are missing track IDs'
     )
 
+    script.parser.add_argument(
+        '--rematch-all',
+        action='store_true',
+        help='Full re-match from scratch: ignore cache, re-match albums and all tracks regardless of existing IDs'
+    )
+
     # Parse arguments
     args = script.parse_args()
 
     # Create matcher
     strict_mode = not args.no_strict
+
+    # --rematch-all implies force_refresh, rematch, and rematch_tracks
+    force_refresh = args.force_refresh or args.rematch_all
+    rematch = args.rematch_all
+    rematch_tracks = args.rematch_tracks or args.rematch_all
+    rematch_all = args.rematch_all
+
     matcher = SpotifyMatcher(
         dry_run=args.dry_run,
         artist_filter=args.artist,
         strict_mode=strict_mode,
         logger=script.logger,
         cache_days=args.cache_days,
-        force_refresh=args.force_refresh,
-        rematch_tracks=args.rematch_tracks
+        force_refresh=force_refresh,
+        rematch=rematch,
+        rematch_tracks=rematch_tracks,
+        rematch_all=rematch_all
     )
 
     # Print header with modes
     modes = {
         "DRY RUN": args.dry_run,
-        "FORCE REFRESH": args.force_refresh,
-        "REMATCH TRACKS": args.rematch_tracks,
+        "FORCE REFRESH": force_refresh,
+        "REMATCH ALL": args.rematch_all,
+        "REMATCH TRACKS": rematch_tracks and not args.rematch_all,
     }
     script.print_header(modes)
 

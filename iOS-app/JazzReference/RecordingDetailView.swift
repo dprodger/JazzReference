@@ -61,11 +61,13 @@ struct RecordingDetailView: View {
     }
     
     /// Spotify URL - uses selected release if user picked one, otherwise uses bestSpotifyUrl
+    /// Only returns track URLs for consistency with has_spotify filter
     private var displaySpotifyUrl: String? {
         if let release = selectedRelease {
-            return release.spotifyTrackUrl ?? release.spotifyAlbumUrl
+            // Only use track URL, not album URL, to match filter behavior
+            return release.spotifyTrackUrl
         }
-        // Use bestSpotifyUrl which is consistent across API endpoints
+        // Use bestSpotifyUrl which only returns track URLs
         return recording?.bestSpotifyUrl
     }
     

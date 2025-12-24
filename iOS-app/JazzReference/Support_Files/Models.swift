@@ -237,20 +237,19 @@ struct Recording: Codable, Identifiable {
         }
     }
     
-    /// Get the best Spotify URL - prefer API-provided best, then check releases array
+    /// Get the best Spotify track URL - only returns URLs for track-level matches
     var bestSpotifyUrl: String? {
         // First try API-provided best URL (from song detail endpoint)
+        // This is already track-based (only set when spotify_track_id exists)
         if let apiUrl = bestSpotifyUrlFromRelease {
             return apiUrl
         }
         // Then try sorted releases array (when viewing recording detail)
+        // Only use track URLs, not album URLs, for consistency with has_spotify
         if let release = sortedReleases?.first(where: { $0.spotifyTrackUrl != nil }) {
             return release.spotifyTrackUrl
         }
-        if let release = sortedReleases?.first(where: { $0.spotifyAlbumUrl != nil }) {
-            return release.spotifyAlbumUrl
-        }
-        // No Spotify URL available
+        // No Spotify track URL available
         return nil
     }
     
@@ -499,10 +498,10 @@ struct Release: Identifiable, Codable {
     }
     
     // MARK: - Computed Properties
-    
-    /// Whether this release has Spotify integration
+
+    /// Whether this release has a Spotify track match for the specific recording
     var hasSpotify: Bool {
-        spotifyAlbumId != nil || spotifyTrackUrl != nil
+        spotifyTrackId != nil || spotifyTrackUrl != nil
     }
     
     /// Display string for track position
