@@ -66,7 +66,8 @@ class SpotifyMatcher:
     def __init__(self, dry_run=False, strict_mode=False, force_refresh=False,
                  artist_filter=False, cache_days=30, logger=None,
                  rate_limit_delay=0.2, max_retries=3,
-                 progress_callback=None, rematch=False, rematch_tracks=False):
+                 progress_callback=None, rematch=False, rematch_tracks=False,
+                 rematch_all=False):
         """
         Initialize Spotify Matcher
 
@@ -81,12 +82,15 @@ class SpotifyMatcher:
             max_retries: Maximum number of retries for rate-limited requests
             progress_callback: Optional callback(phase, current, total) for progress tracking
             rematch: If True, re-evaluate releases that already have Spotify URLs
+            rematch_tracks: If True, re-run track matching for releases with album IDs
+            rematch_all: If True, full re-match from scratch - ignores existing track IDs too
         """
         self.dry_run = dry_run
         self.artist_filter = artist_filter
         self.strict_mode = strict_mode
         self.rematch = rematch
         self.rematch_tracks = rematch_tracks
+        self.rematch_all = rematch_all
         self.logger = logger or logging.getLogger(__name__)
         self.progress_callback = progress_callback
         
@@ -877,23 +881,81 @@ class SpotifyMatcher:
                     params={
                         'q': strategy['query'],
                         'type': 'album',
-                        'limit': 5
+                        'limit': 10
                     },
                     timeout=10
                 )
-                
+
                 response.raise_for_status()
                 data = response.json()
-                
+
                 self.stats['api_calls'] += 1
                 self.client.last_made_api_call = True
-                
+
                 albums = data.get('albums', {}).get('items', [])
-                
+
                 if albums:
                     self.logger.debug(f"    Found {len(albums)} candidates")
-                    
-                    # Evaluate ALL candidates first, collect results
+
+                    # Normalize expected album title for exact matching
+                    expected_normalized = album_title.lower().strip()
+
+                    # FIRST PASS: Look for exact album title matches
+                    # This prioritizes "Julie" over "Julie Is Her Name" when searching for "Julie"
+                    exact_matches = []
+                    for i, album in enumerate(albums):
+                        spotify_album_normalized = album['name'].lower().strip()
+                        if spotify_album_normalized == expected_normalized:
+                            # Validate artist match for this exact title match
+                            is_valid, reason, scores = self.validate_album_match(
+                                album, album_title, artist_name or '', song_title
+                            )
+                            exact_matches.append({
+                                'index': i,
+                                'album': album,
+                                'is_valid': is_valid,
+                                'reason': reason,
+                                'scores': scores
+                            })
+
+                    if exact_matches:
+                        self.logger.debug(f"    Found {len(exact_matches)} exact title match(es)")
+                        # Check if any exact match also passes artist validation
+                        for em in exact_matches:
+                            if em['is_valid']:
+                                self.logger.debug(f"    ✓ Exact match found: '{em['album']['name']}' (#{em['index']+1})")
+                                album = em['album']
+                                scores = em['scores']
+
+                                # Extract album artwork
+                                album_art = {}
+                                images = album.get('images', [])
+                                for image in images:
+                                    height = image.get('height', 0)
+                                    if height >= 600:
+                                        album_art['large'] = image['url']
+                                    elif height >= 300:
+                                        album_art['medium'] = image['url']
+                                    elif height >= 64:
+                                        album_art['small'] = image['url']
+
+                                album_artists = [a['name'] for a in album['artists']]
+                                result = {
+                                    'url': album['external_urls']['spotify'],
+                                    'id': album['id'],
+                                    'artists': album_artists,
+                                    'name': album['name'],
+                                    'album_art': album_art,
+                                    'similarity_scores': scores
+                                }
+                                self.client._save_to_cache(cache_path, result)
+                                return result
+
+                        # Exact title matches exist but failed artist validation
+                        self.logger.debug(f"    Exact matches failed artist validation, trying fuzzy matching...")
+
+                    # SECOND PASS: Fuzzy matching (original logic)
+                    # Evaluate ALL candidates, collect results
                     candidate_results = []
                     for i, album in enumerate(albums):
                         is_valid, reason, scores = self.validate_album_match(
@@ -906,7 +968,7 @@ class SpotifyMatcher:
                             'reason': reason,
                             'scores': scores
                         })
-                    
+
                     # Log summary of ALL candidates
                     self.logger.debug(f"    --- Candidate Summary ---")
                     for cr in candidate_results:
@@ -917,8 +979,8 @@ class SpotifyMatcher:
                         self.logger.debug(f"    {status} #{cr['index']+1}: '{spotify_album}' "
                                         f"(album: {album_sim:.0f}%, artist: {artist_sim:.0f}%)")
                     self.logger.debug(f"    -------------------------")
-                    
-                    # Now select first valid match
+
+                    # Select first valid match from fuzzy results
                     for cr in candidate_results:
                         if cr['is_valid']:
                             album = cr['album']
@@ -1065,8 +1127,8 @@ class SpotifyMatcher:
                     self.logger.info(f"[{i}/{len(releases)}] {title} ({artist_name or 'Unknown'}, {year or 'Unknown'}) - ⊙ Already has Spotify ID, skipping")
                     self.stats['releases_skipped'] += 1
                     continue
-                elif release.get('spotify_album_id') and self.rematch_tracks:
-                    # rematch_tracks mode: Re-run track matching for releases with album IDs
+                elif release.get('spotify_album_id') and self.rematch_tracks and not self.rematch_all:
+                    # rematch_tracks mode (not rematch_all): Re-run track matching for releases with album IDs
                     # but only if there are recordings missing track IDs
                     existing_album_id = release.get('spotify_album_id')
                     recordings = self.get_recordings_for_release(song['id'], release['id'])
@@ -1092,10 +1154,14 @@ class SpotifyMatcher:
                         else:
                             self.stats['releases_no_match'] += 1
                     continue
+                elif release.get('spotify_album_id') and self.rematch_all:
+                    # rematch_all mode: Re-search for album AND re-match all tracks
+                    self.logger.info(f"[{i}/{len(releases)}] {title} ({artist_name or 'Unknown'}, {year or 'Unknown'}) - ↻ Full re-match...")
+                    # Fall through to album search below
                 elif release.get('spotify_album_id') and self.rematch:
                     self.logger.info(f"[{i}/{len(releases)}] {title} ({artist_name or 'Unknown'}, {year or 'Unknown'}) - ↻ Re-matching...")
-                elif self.rematch_tracks and not release.get('spotify_album_id'):
-                    # In rematch_tracks mode, skip releases without album IDs
+                elif self.rematch_tracks and not self.rematch_all and not release.get('spotify_album_id'):
+                    # In rematch_tracks mode (not rematch_all), skip releases without album IDs
                     self.logger.debug(f"[{i}/{len(releases)}] {title} ({artist_name or 'Unknown'}, {year or 'Unknown'}) - ⊙ No album ID, skipping (rematch-tracks mode)")
                     self.stats['releases_skipped'] += 1
                     continue
@@ -1111,7 +1177,8 @@ class SpotifyMatcher:
                         continue
                     # Check if we already know track matching fails for this combination
                     # This avoids opening a DB connection just to reach the same "no match" conclusion
-                    if self._is_track_match_cached_failure(song['id'], release['id'], spotify_match['id']):
+                    # Skip this cache check in rematch_all mode
+                    if not self.rematch_all and self._is_track_match_cached_failure(song['id'], release['id'], spotify_match['id']):
                         self.logger.info(f"[{i}/{len(releases)}] {title} ({artist_name or 'Unknown'}, {year or 'Unknown'}) - ✗ Album matched but track not found (cached)")
                         self.stats['releases_no_match'] += 1
                         continue
@@ -1300,15 +1367,17 @@ class SpotifyMatcher:
         
         # Get our recordings for this release
         recordings = self.get_recordings_for_release(song_id, release_id)
-        
+
         any_matched = False
         for recording in recordings:
-            # Skip if already has a track ID
-            if recording['spotify_track_id']:
+            # Skip if already has a track ID (unless rematch_all mode)
+            if recording['spotify_track_id'] and not self.rematch_all:
                 self.logger.debug(f"      Recording already has track ID, skipping")
                 self.stats['tracks_skipped'] += 1
                 any_matched = True  # Consider already-matched as success
                 continue
+            elif recording['spotify_track_id'] and self.rematch_all:
+                self.logger.debug(f"      Recording has track ID but rematch_all mode, re-matching...")
             
             # Match song title to a track, passing position info for fallback matching
             matched_track = self.match_track_to_recording(

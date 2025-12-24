@@ -306,10 +306,10 @@ def normalize_for_comparison(text: str) -> str:
     # Replace apostrophes with spaces
     # Handles: "Don'cha" vs "Don Cha", "'Way" vs "Way", etc.
     # Using space instead of removal so "don'cha" → "don cha" matches Spotify's "Don Cha"
-    text = text.replace("'", " ")   # Standard apostrophe
-    text = text.replace("'", " ")   # Right single quote (curly apostrophe)
-    text = text.replace("'", " ")   # Left single quote
-    text = text.replace("`", " ")   # Backtick
+    text = text.replace("'", " ")     # U+0027 Standard apostrophe
+    text = text.replace("\u2019", " ") # U+2019 Right single quote (curly apostrophe)
+    text = text.replace("\u2018", " ") # U+2018 Left single quote
+    text = text.replace("`", " ")     # Backtick
 
     # Remove live recording annotations
     text = re.sub(r'\s*-\s*live\s+(at|in|from)\s+.*$', '', text, flags=re.IGNORECASE)
