@@ -669,9 +669,9 @@ def get_existing_recordings_for_song(song_id):
                 rec = dict(row)
                 # Parse releases JSON
                 rec['releases'] = rec['releases'] or []
-                # Add a flag for whether any release has Spotify
+                # Add a flag for whether any release has a Spotify track match
                 rec['has_spotify'] = any(
-                    r.get('spotify_album_id') or r.get('spotify_track_id')
+                    r.get('spotify_track_id')
                     for r in rec['releases']
                 )
                 recordings.append(rec)

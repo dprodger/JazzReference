@@ -473,14 +473,9 @@ def get_song_recordings(song_id):
                               JOIN releases rel2 ON rr2.release_id = rel2.id
                               WHERE rr2.recording_id = r.id AND rel2.spotify_album_id IS NOT NULL)
                 ) as has_streaming,
-                -- Per-service availability
-                (
-                    EXISTS(SELECT 1 FROM recording_releases rr2
-                           JOIN recording_release_streaming_links rrsl ON rrsl.recording_release_id = rr2.id
-                           WHERE rr2.recording_id = r.id AND rrsl.service = 'spotify')
-                    OR EXISTS(SELECT 1 FROM recording_releases rr2
-                              JOIN releases rel2 ON rr2.release_id = rel2.id
-                              WHERE rr2.recording_id = r.id AND rel2.spotify_album_id IS NOT NULL)
+                -- Per-service availability (track-level matches only)
+                EXISTS(SELECT 1 FROM recording_releases rr2
+                       WHERE rr2.recording_id = r.id AND rr2.spotify_track_id IS NOT NULL
                 ) as has_spotify,
                 EXISTS(SELECT 1 FROM recording_releases rr2
                        JOIN recording_release_streaming_links rrsl ON rrsl.recording_release_id = rr2.id

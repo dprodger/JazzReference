@@ -408,7 +408,7 @@ def get_recording_detail(recording_id):
                     CASE WHEN rr.spotify_track_id IS NOT NULL THEN 'https://open.spotify.com/track/' || rr.spotify_track_id END as spotify_track_url,
                     rf.name as format_name,
                     rs.name as status_name,
-                    CASE WHEN rel.spotify_album_id IS NOT NULL THEN 1 ELSE 0 END as has_spotify
+                    CASE WHEN rr.spotify_track_id IS NOT NULL THEN 1 ELSE 0 END as has_spotify
                 FROM recording_releases rr
                 JOIN releases rel ON rr.release_id = rel.id
                 LEFT JOIN release_formats rf ON rel.format_id = rf.id
