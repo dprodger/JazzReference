@@ -915,18 +915,22 @@ class MBReleaseImporter:
         if mb_release_id in existing_releases:
             release_id = existing_releases[mb_release_id]
             self.stats['releases_existing'] += 1
-            self.stats['releases_skipped_api'] += 1
-            
+
             # Check if already linked using pre-fetched data (no DB query!)
             if release_id in existing_links:
                 self.logger.debug(f"    Skipping fully-linked release: {release_title[:40]}")
+                self.stats['releases_skipped_api'] += 1
                 return
-            
+
             # Need to create link (but release exists)
             if recording_id:
                 self.logger.debug(f"    Creating link for existing release: {release_title[:40]}")
-                self._link_recording_to_release_fast(
-                    conn, recording_id, release_id, mb_recording_id, mb_release
+                # Fetch full release details to get track positions
+                # (will use cache if available, so not as slow as it sounds)
+                release_details = self.mb_searcher.get_release_details(mb_release_id)
+                self._link_recording_to_release(
+                    conn, recording_id, release_id, mb_recording_id,
+                    release_details or mb_release
                 )
             return
         
@@ -953,9 +957,9 @@ class MBReleaseImporter:
             self.stats['releases_created'] += 1
             self.logger.info(f"    ✓ Created release: {release_title[:40]}")
 
-            # Link recording to release
+            # Link recording to release (use release_details which has full track info)
             if recording_id:
-                self._link_recording_to_release(conn, recording_id, release_id, mb_release)
+                self._link_recording_to_release(conn, recording_id, release_id, mb_recording_id, release_details)
 
             # Link release-specific credits (producers, engineers, etc.)
             # These go to the RELEASE, not the recording
@@ -1174,32 +1178,47 @@ class MBReleaseImporter:
         """, (release_id, recording_id))
 
     def _link_recording_to_release(self, conn, recording_id: str, release_id: str,
-                                    mb_release: Dict[str, Any]) -> None:
+                                    mb_recording_id: str, mb_release: Dict[str, Any]) -> None:
         """
         Link a recording to a release
-        
+
         Args:
             conn: Database connection
-            recording_id: Recording ID
-            release_id: Release ID
-            mb_release: MusicBrainz release data (for track info)
+            recording_id: Our database recording ID
+            release_id: Our database release ID
+            mb_recording_id: MusicBrainz recording ID (to find track position)
+            mb_release: MusicBrainz release data (must include media/tracks)
         """
-        # Extract track number from release data
+        # Find track position by matching recording ID
         track_number = None
         disc_number = None
-        
-        # Try to find track info in media
-        media = mb_release.get('media') or []
-        for disc_idx, medium in enumerate(media, 1):
+
+        # Search through media/tracks for the matching recording
+        media = mb_release.get('media') or mb_release.get('medium-list') or []
+        for medium in media:
+            # Use MusicBrainz's 'position' field for disc number (1-indexed)
+            medium_position = medium.get('position', 1)
             tracks = medium.get('tracks') or medium.get('track-list') or []
-            for track_idx, track in enumerate(tracks, 1):
-                # This is simplified - in practice we'd match by recording ID
-                track_number = track_idx
-                disc_number = disc_idx
+
+            for track in tracks:
+                # Get recording info from track
+                track_recording = track.get('recording') or {}
+                track_recording_id = track_recording.get('id')
+
+                # Match by MusicBrainz recording ID
+                if track_recording_id == mb_recording_id:
+                    # Use MusicBrainz's 'position' field (integer), not 'number' (string like "A6")
+                    track_number = track.get('position')
+                    disc_number = medium_position
+                    self.logger.debug(f"      Found track position: disc {disc_number}, track {track_number}")
+                    break
+
+            if track_number is not None:
                 break
-            if track_number:
-                break
-        
+
+        if track_number is None:
+            self.logger.debug(f"      Could not find track position for recording {mb_recording_id[:8]}")
+
         with conn.cursor() as cur:
             cur.execute("""
                 INSERT INTO recording_releases (recording_id, release_id, track_number, disc_number)
@@ -1212,25 +1231,6 @@ class MBReleaseImporter:
             # Set default_release_id if recording doesn't have one
             self._maybe_set_default_release(cur, recording_id, release_id)
 
-    def _link_recording_to_release_fast(self, conn, recording_id: str, release_id: str,
-                                         mb_recording_id: str, mb_release: Dict[str, Any]) -> None:
-        """
-        Fast version of link creation - just creates the link without track info
-
-        Used when release already exists but link doesn't
-        """
-        with conn.cursor() as cur:
-            cur.execute("""
-                INSERT INTO recording_releases (recording_id, release_id)
-                VALUES (%s, %s)
-                ON CONFLICT (recording_id, release_id) DO NOTHING
-            """, (recording_id, release_id))
-
-            self.stats['links_created'] += 1
-
-            # Set default_release_id if recording doesn't have one
-            self._maybe_set_default_release(cur, recording_id, release_id)
-    
     def _parse_release_data(self, mb_release: Dict[str, Any]) -> Dict[str, Any]:
         """
         Parse MusicBrainz release data into our database format
