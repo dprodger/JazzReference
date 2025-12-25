@@ -311,6 +311,12 @@ def normalize_for_comparison(text: str) -> str:
     text = text.replace("\u2018", " ") # U+2018 Left single quote
     text = text.replace("`", " ")     # Backtick
 
+    # Normalize curly double quotes to straight quotes (then remove below)
+    text = text.replace('"', '"')  # U+201C Left double quote
+    text = text.replace('"', '"')  # U+201D Right double quote
+    # Remove double quotes entirely (they add noise to comparisons)
+    text = text.replace('"', '')
+
     # Remove live recording annotations
     text = re.sub(r'\s*-\s*live\s+(at|in|from)\s+.*$', '', text, flags=re.IGNORECASE)
     text = re.sub(r'\s*\(live\s+(at|in|from)\s+[^)]*\).*$', '', text, flags=re.IGNORECASE)
@@ -342,6 +348,12 @@ def normalize_for_comparison(text: str) -> str:
     text = re.sub(r'\s*-\s*feat\.?\s+.*$', '', text, flags=re.IGNORECASE)
     text = re.sub(r'\s*-\s*featuring\s+.*$', '', text, flags=re.IGNORECASE)
     text = re.sub(r'\s*-\s*ft\.?\s+.*$', '', text, flags=re.IGNORECASE)
+
+    # Remove film/show/musical source annotations (common in streaming services)
+    # Handles: "- From the 20th Century-Fox Film, ..." or "(From the Broadway Musical...)"
+    # These annotations indicate the source but shouldn't affect matching
+    text = re.sub(r'\s*-\s*from\s+(the\s+)?([\w\s\-\.]+\s+)?(film|movie|musical|show|motion picture|broadway|soundtrack|production).*$', '', text, flags=re.IGNORECASE)
+    text = re.sub(r'\s*\(from\s+(the\s+)?([\w\s\-\.]+\s+)?(film|movie|musical|show|motion picture|broadway|soundtrack|production)[^)]*\)', '', text, flags=re.IGNORECASE)
 
     # Remove date/venue at end
     text = re.sub(r'\s*/\s+[a-z]+\s+\d+.*$', '', text, flags=re.IGNORECASE)
