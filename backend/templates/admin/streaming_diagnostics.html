@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Streaming Diagnostics: {{ song.title }} - Admin</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f7;
+            color: #333;
+            line-height: 1.6;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        .back-link {
+            display: inline-block;
+            margin-bottom: 15px;
+            color: #0066cc;
+            text-decoration: none;
+            font-size: 14px;
+        }
+        .back-link:hover {
+            text-decoration: underline;
+        }
+        h1 {
+            color: #1d1d1f;
+            margin-bottom: 5px;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 20px;
+        }
+        .subtitle a {
+            color: #0066cc;
+        }
+
+        /* Filter Tabs */
+        .filter-tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        .filter-tab {
+            padding: 8px 16px;
+            border-radius: 20px;
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: 500;
+            background: #fff;
+            color: #666;
+            border: 1px solid #ddd;
+            transition: all 0.2s;
+        }
+        .filter-tab:hover {
+            background: #f0f0f0;
+            border-color: #ccc;
+        }
+        .filter-tab.active {
+            background: #0066cc;
+            color: #fff;
+            border-color: #0066cc;
+        }
+        .filter-tab .count {
+            background: rgba(0,0,0,0.1);
+            padding: 2px 8px;
+            border-radius: 10px;
+            margin-left: 6px;
+            font-size: 11px;
+        }
+        .filter-tab.active .count {
+            background: rgba(255,255,255,0.2);
+        }
+
+        /* Summary Cards */
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 12px;
+            margin-bottom: 25px;
+        }
+        .summary-card {
+            background: #fff;
+            border-radius: 12px;
+            padding: 16px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        .summary-card.spotify {
+            background: linear-gradient(135deg, #1db954 0%, #169c46 100%);
+            color: #fff;
+        }
+        .summary-card.apple {
+            background: linear-gradient(135deg, #fc3c44 0%, #d42f36 100%);
+            color: #fff;
+        }
+        .summary-card.both {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #fff;
+        }
+        .summary-card.neither {
+            background: linear-gradient(135deg, #6c757d 0%, #495057 100%);
+            color: #fff;
+        }
+        .summary-value {
+            font-size: 28px;
+            font-weight: 700;
+            line-height: 1;
+        }
+        .summary-label {
+            font-size: 11px;
+            opacity: 0.9;
+            margin-top: 4px;
+        }
+
+        /* Recording Card */
+        .recording-card {
+            background: #fff;
+            border-radius: 12px;
+            margin-bottom: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .recording-header {
+            padding: 12px 16px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+        }
+        .recording-header:hover {
+            background: #fafafa;
+        }
+        .recording-info {
+            flex: 1;
+        }
+        .recording-title {
+            font-weight: 600;
+            color: #1d1d1f;
+            margin-bottom: 3px;
+        }
+        .recording-meta {
+            font-size: 12px;
+            color: #666;
+        }
+        .recording-meta a {
+            color: #0066cc;
+        }
+        .recording-status {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+        }
+        .toggle-icon {
+            color: #999;
+            transition: transform 0.2s;
+            margin-left: 8px;
+        }
+        .recording-card.expanded .toggle-icon {
+            transform: rotate(180deg);
+        }
+
+        /* Status Pills */
+        .status-pill {
+            display: inline-flex;
+            align-items: center;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            gap: 4px;
+        }
+        .status-pill.spotify.yes {
+            background: #1db954;
+            color: #fff;
+        }
+        .status-pill.spotify.no {
+            background: #e8f5e9;
+            color: #81c784;
+            border: 1px solid #c8e6c9;
+        }
+        .status-pill.apple.yes {
+            background: #fc3c44;
+            color: #fff;
+        }
+        .status-pill.apple.no {
+            background: #ffebee;
+            color: #e57373;
+            border: 1px solid #ffcdd2;
+        }
+        .status-pill .icon {
+            font-size: 10px;
+        }
+
+        /* Release List - Condensed Table Style */
+        .releases-list {
+            display: none;
+            background: #fafafa;
+            border-top: 1px solid #e0e0e0;
+            overflow-x: auto;
+        }
+        .recording-card.expanded .releases-list {
+            display: block;
+        }
+        .releases-table {
+            width: 100%;
+            font-size: 11px;
+            border-collapse: collapse;
+            min-width: 1000px;
+        }
+        .releases-table th {
+            text-align: left;
+            padding: 6px 8px;
+            background: #f0f0f0;
+            color: #666;
+            font-weight: 600;
+            font-size: 9px;
+            text-transform: uppercase;
+            border-bottom: 1px solid #e0e0e0;
+            white-space: nowrap;
+        }
+        .releases-table th:first-child {
+            padding-left: 16px;
+        }
+        .releases-table td {
+            padding: 6px 8px;
+            border-bottom: 1px solid #eee;
+            vertical-align: middle;
+        }
+        .releases-table td:first-child {
+            padding-left: 16px;
+        }
+        .releases-table tr:last-child td {
+            border-bottom: none;
+        }
+        .releases-table tr:hover {
+            background: #f5f5f5;
+        }
+        .releases-table tr.is-default {
+            background: #e8f4fd;
+        }
+        .releases-table tr.is-default:hover {
+            background: #dceefb;
+        }
+        .release-year {
+            color: #666;
+            font-weight: 500;
+            white-space: nowrap;
+        }
+        .release-title-cell {
+            font-weight: 500;
+            color: #1d1d1f;
+            max-width: 200px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .release-artist-cell {
+            color: #666;
+            max-width: 150px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .release-track-cell {
+            color: #888;
+            white-space: nowrap;
+            text-align: center;
+        }
+        .release-links-cell {
+            white-space: nowrap;
+        }
+        .default-star {
+            color: #667eea;
+            font-weight: bold;
+            margin-right: 4px;
+        }
+
+        /* ID Links */
+        .id-link {
+            font-family: 'SF Mono', Monaco, Consolas, monospace;
+            font-size: 9px;
+            text-decoration: none;
+            padding: 2px 4px;
+            border-radius: 3px;
+            display: inline-block;
+            max-width: 80px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .id-link.mb {
+            color: #9c3c78;
+            background: #f8f0f5;
+        }
+        .id-link.mb:hover {
+            background: #f0e0eb;
+        }
+        .id-link.spotify-album {
+            color: #b8860b;
+            background: #fef9e7;
+        }
+        .id-link.spotify-album:hover {
+            background: #fef3cd;
+        }
+        .id-link.spotify-track {
+            color: #169c46;
+            background: #e8f8ed;
+        }
+        .id-link.spotify-track:hover {
+            background: #d4f1dc;
+        }
+        .id-link.apple-album {
+            color: #c0392b;
+            background: #fdecea;
+        }
+        .id-link.apple-album:hover {
+            background: #f9d5d3;
+        }
+        .id-link.apple-track {
+            color: #a93226;
+            background: #fce4e4;
+        }
+        .id-link.apple-track:hover {
+            background: #f5c6c6;
+        }
+        .no-link {
+            color: #ccc;
+            font-size: 10px;
+        }
+
+        /* Section headers in table */
+        .col-group-header {
+            background: #e8e8e8 !important;
+            text-align: center !important;
+            border-left: 2px solid #ccc;
+        }
+        .col-spotify { border-left: 2px solid #1db954; }
+        .col-apple { border-left: 2px solid #fc3c44; }
+
+        /* No default release warning */
+        .no-default-warning {
+            background: #fff3cd;
+            color: #856404;
+            padding: 6px 12px;
+            font-size: 11px;
+            border-left: 3px solid #ffc107;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #666;
+            background: #fff;
+            border-radius: 12px;
+        }
+
+        /* Copy button */
+        .copy-btn {
+            background: #e0e0e0;
+            border: none;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 10px;
+            cursor: pointer;
+            color: #333;
+        }
+        .copy-btn:hover {
+            background: #d0d0d0;
+        }
+        .copy-btn.copied {
+            background: #1db954;
+            color: #fff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="/admin/streaming-availability" class="back-link">&larr; Back to Streaming Availability</a>
+
+        <h1>Streaming Diagnostics</h1>
+        <p class="subtitle">
+            <strong>{{ song.title }}</strong>
+            {% if song.composer %} by {{ song.composer }}{% endif %}
+            {% if song.musicbrainz_id %}
+            &nbsp;·&nbsp;
+            <a href="https://musicbrainz.org/work/{{ song.musicbrainz_id }}" target="_blank">MusicBrainz</a>
+            {% endif %}
+        </p>
+
+        <!-- Filter Tabs -->
+        <div class="filter-tabs">
+            <a href="?filter=all" class="filter-tab {% if current_filter == 'all' %}active{% endif %}">
+                All<span class="count">{{ summary.total_recordings }}</span>
+            </a>
+            <a href="?filter=spotify" class="filter-tab {% if current_filter == 'spotify' %}active{% endif %}">
+                Spotify<span class="count">{{ summary.with_spotify }}</span>
+            </a>
+            <a href="?filter=apple" class="filter-tab {% if current_filter == 'apple' %}active{% endif %}">
+                Apple<span class="count">{{ summary.with_apple }}</span>
+            </a>
+            <a href="?filter=both" class="filter-tab {% if current_filter == 'both' %}active{% endif %}">
+                Both<span class="count">{{ summary.with_both }}</span>
+            </a>
+            <a href="?filter=neither" class="filter-tab {% if current_filter == 'neither' %}active{% endif %}">
+                Neither<span class="count">{{ summary.with_neither }}</span>
+            </a>
+        </div>
+
+        <!-- Summary Cards -->
+        <div class="summary-grid">
+            <div class="summary-card">
+                <div class="summary-value">{{ summary.total_recordings }}</div>
+                <div class="summary-label">Total Recordings</div>
+            </div>
+            <div class="summary-card spotify">
+                <div class="summary-value">{{ summary.with_spotify }}</div>
+                <div class="summary-label">With Spotify</div>
+            </div>
+            <div class="summary-card apple">
+                <div class="summary-value">{{ summary.with_apple }}</div>
+                <div class="summary-label">With Apple</div>
+            </div>
+            <div class="summary-card both">
+                <div class="summary-value">{{ summary.with_both }}</div>
+                <div class="summary-label">With Both</div>
+            </div>
+            <div class="summary-card neither">
+                <div class="summary-value">{{ summary.with_neither }}</div>
+                <div class="summary-label">Neither</div>
+            </div>
+        </div>
+
+        <!-- Showing X of Y message when filtered -->
+        {% if current_filter != 'all' %}
+        <p style="color: #666; font-size: 13px; margin-bottom: 15px;">
+            Showing {{ summary.filtered_count }} of {{ summary.total_recordings }} recordings
+            (filtered to: <strong>{{ current_filter }}</strong>)
+        </p>
+        {% endif %}
+
+        <!-- Recordings List -->
+        {% if recordings %}
+            {% for item in recordings %}
+            {% set rec = item.recording %}
+            {% set releases = item.releases %}
+            <div class="recording-card" onclick="this.classList.toggle('expanded')">
+                <div class="recording-header">
+                    <div class="recording-info">
+                        <div class="recording-title">
+                            {{ rec.album_title or 'Unknown Album' }}
+                            {% if rec.recording_year %}({{ rec.recording_year }}){% endif %}
+                        </div>
+                        <div class="recording-meta">
+                            {% if rec.recording_mb_id %}
+                            <a href="https://musicbrainz.org/recording/{{ rec.recording_mb_id }}" target="_blank" onclick="event.stopPropagation()">MB Recording</a>
+                            &nbsp;·&nbsp;
+                            {% endif %}
+                            {{ rec.release_count }} release(s)
+                            {% if not rec.default_release_id %}
+                            &nbsp;·&nbsp;
+                            <span style="color: #e74c3c;">No default release</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="recording-status">
+                        <button class="copy-btn" onclick="event.stopPropagation(); copyRefs(this, {{ loop.index0 }})" title="Copy references">Copy</button>
+                        <span class="status-pill spotify {% if rec.has_spotify %}yes{% else %}no{% endif %}">
+                            <span class="icon">{% if rec.has_spotify %}✓{% else %}✗{% endif %}</span>
+                            Spotify
+                        </span>
+                        <span class="status-pill apple {% if rec.has_apple %}yes{% else %}no{% endif %}">
+                            <span class="icon">{% if rec.has_apple %}✓{% else %}✗{% endif %}</span>
+                            Apple
+                        </span>
+                        <span class="toggle-icon">▼</span>
+                    </div>
+                </div>
+
+                {% if not rec.default_release_id %}
+                <div class="no-default-warning">
+                    ⚠️ No default release set for this recording
+                </div>
+                {% endif %}
+
+                <div class="releases-list">
+                    <table class="releases-table">
+                        <thead>
+                            <tr>
+                                <th>Year</th>
+                                <th>Release</th>
+                                <th>Artist</th>
+                                <th>Trk</th>
+                                <th>MB Release</th>
+                                <th class="col-spotify">Spotify Album</th>
+                                <th class="col-spotify">Spotify Track</th>
+                                <th class="col-apple">Apple Album</th>
+                                <th class="col-apple">Apple Track</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for rel in releases %}
+                            <tr class="{% if rel.is_default %}is-default{% endif %}">
+                                <td class="release-year">{{ rel.release_year or '—' }}</td>
+                                <td class="release-title-cell" title="{{ rel.title }}">
+                                    {% if rel.is_default %}<span class="default-star">★</span>{% endif %}{{ rel.title }}
+                                </td>
+                                <td class="release-artist-cell" title="{{ rel.artist_credit or '' }}">{{ rel.artist_credit or '—' }}</td>
+                                <td class="release-track-cell">
+                                    {% if rel.disc_number or rel.track_number %}
+                                    {{ rel.disc_number or '?' }}-{{ rel.track_number or '?' }}
+                                    {% else %}—{% endif %}
+                                </td>
+                                <td class="release-links-cell">
+                                    {% if rel.release_mb_id %}
+                                    <a href="https://musicbrainz.org/release/{{ rel.release_mb_id }}" target="_blank" class="id-link mb" onclick="event.stopPropagation()" title="{{ rel.release_mb_id }}">{{ rel.release_mb_id[:8] }}…</a>
+                                    {% else %}
+                                    <span class="no-link">—</span>
+                                    {% endif %}
+                                </td>
+                                <td class="release-links-cell col-spotify">
+                                    {% if rel.spotify_album_id %}
+                                    <a href="https://open.spotify.com/album/{{ rel.spotify_album_id }}" target="_blank" class="id-link spotify-album" onclick="event.stopPropagation()" title="{{ rel.spotify_album_id }}">{{ rel.spotify_album_id[:8] }}…</a>
+                                    {% else %}
+                                    <span class="no-link">—</span>
+                                    {% endif %}
+                                </td>
+                                <td class="release-links-cell col-spotify">
+                                    {% if rel.spotify_track_id %}
+                                    <a href="https://open.spotify.com/track/{{ rel.spotify_track_id }}" target="_blank" class="id-link spotify-track" onclick="event.stopPropagation()" title="{{ rel.spotify_track_id }}">{{ rel.spotify_track_id[:8] }}…</a>
+                                    {% else %}
+                                    <span class="no-link">—</span>
+                                    {% endif %}
+                                </td>
+                                <td class="release-links-cell col-apple">
+                                    {% if rel.apple_album_url %}
+                                    <a href="{{ rel.apple_album_url }}" target="_blank" class="id-link apple-album" onclick="event.stopPropagation()" title="{{ rel.apple_album_id }}">{{ rel.apple_album_id[:8] if rel.apple_album_id else 'View' }}…</a>
+                                    {% else %}
+                                    <span class="no-link">—</span>
+                                    {% endif %}
+                                </td>
+                                <td class="release-links-cell col-apple">
+                                    {% if rel.apple_track_url %}
+                                    <a href="{{ rel.apple_track_url }}" target="_blank" class="id-link apple-track" onclick="event.stopPropagation()" title="{{ rel.apple_track_id }}">{{ rel.apple_track_id[:8] if rel.apple_track_id else 'View' }}…</a>
+                                    {% else %}
+                                    <span class="no-link">—</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+        <div class="empty-state">
+            <h2>No recordings found</h2>
+            {% if current_filter != 'all' %}
+            <p>No recordings match the current filter. <a href="?filter=all">Show all recordings</a></p>
+            {% else %}
+            <p>This song has no recordings in the database.</p>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+
+    <script>
+        // Recording data for copy function
+        const recordingsData = [
+            {% for item in recordings %}
+            {
+                title: {{ (item.recording.album_title or 'Unknown Album') | tojson }},
+                year: {{ (item.recording.recording_year or '') | tojson }},
+                mb_recording_id: {{ (item.recording.recording_mb_id or '') | tojson }},
+                has_spotify: {{ 'true' if item.recording.has_spotify else 'false' }},
+                has_apple: {{ 'true' if item.recording.has_apple else 'false' }},
+                releases: [
+                    {% for rel in item.releases %}
+                    {
+                        title: {{ rel.title | tojson }},
+                        artist: {{ (rel.artist_credit or '') | tojson }},
+                        year: {{ (rel.release_year or '') | tojson }},
+                        is_default: {{ 'true' if rel.is_default else 'false' }},
+                        mb_release_id: {{ (rel.release_mb_id or '') | tojson }},
+                        spotify_album_id: {{ (rel.spotify_album_id or '') | tojson }},
+                        spotify_track_id: {{ (rel.spotify_track_id or '') | tojson }},
+                        apple_album_url: {{ (rel.apple_album_url or '') | tojson }},
+                        apple_track_url: {{ (rel.apple_track_url or '') | tojson }}
+                    }{% if not loop.last %},{% endif %}
+                    {% endfor %}
+                ]
+            }{% if not loop.last %},{% endif %}
+            {% endfor %}
+        ];
+
+        function copyRefs(btn, index) {
+            const rec = recordingsData[index];
+            let text = `${rec.title}`;
+            if (rec.year) text += ` (${rec.year})`;
+            text += '\n';
+
+            if (rec.mb_recording_id) {
+                text += `MB Recording: https://musicbrainz.org/recording/${rec.mb_recording_id}\n`;
+            }
+
+            // Find the default release, or first release with useful data
+            let releaseToShow = rec.releases.find(r => r.is_default) ||
+                                rec.releases.find(r => r.spotify_album_id || r.mb_release_id) ||
+                                rec.releases[0];
+
+            if (releaseToShow) {
+                if (releaseToShow.mb_release_id) {
+                    text += `MB Release: https://musicbrainz.org/release/${releaseToShow.mb_release_id}\n`;
+                }
+                if (releaseToShow.spotify_album_id) {
+                    text += `Spotify Album: https://open.spotify.com/album/${releaseToShow.spotify_album_id}\n`;
+                }
+                if (releaseToShow.spotify_track_id) {
+                    text += `Spotify Track: https://open.spotify.com/track/${releaseToShow.spotify_track_id}\n`;
+                }
+                if (releaseToShow.apple_album_url) {
+                    text += `Apple Album: ${releaseToShow.apple_album_url}\n`;
+                }
+                if (releaseToShow.apple_track_url) {
+                    text += `Apple Track: ${releaseToShow.apple_track_url}\n`;
+                }
+            }
+
+            navigator.clipboard.writeText(text).then(() => {
+                btn.textContent = 'Copied!';
+                btn.classList.add('copied');
+                setTimeout(() => {
+                    btn.textContent = 'Copy';
+                    btn.classList.remove('copied');
+                }, 1500);
+            });
+        }
+    </script>
+</body>
+</html>

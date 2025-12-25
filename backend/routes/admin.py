@@ -13,7 +13,7 @@ This ensures consistent behavior between:
 2. Orphan recording import (this module)
 """
 
-from flask import Blueprint, render_template, request, jsonify
+from flask import Blueprint, render_template, request, jsonify, redirect, url_for
 import logging
 
 from db_utils import get_db_connection
@@ -2048,52 +2048,49 @@ def streaming_availability():
             #
             # TODO: Once Spotify is migrated to recording_release_streaming_links,
             #       update this query to use the new model for both services.
+            # First aggregate streaming availability at the recording level,
+            # then count recordings per song. This avoids double-counting when
+            # a recording has multiple releases with different streaming status.
             query = """
-                WITH song_recording_counts AS (
+                WITH recording_streaming AS (
+                    -- Determine if each recording has Spotify/Apple across ANY of its releases
+                    SELECT
+                        r.id as recording_id,
+                        r.song_id,
+                        -- Has Spotify if ANY release has spotify_track_id
+                        BOOL_OR(rr.spotify_track_id IS NOT NULL) as has_spotify,
+                        -- Has Apple if ANY release has apple music link
+                        BOOL_OR(rrsl_apple.id IS NOT NULL) as has_apple
+                    FROM recordings r
+                    LEFT JOIN recording_releases rr ON rr.recording_id = r.id
+                    LEFT JOIN recording_release_streaming_links rrsl_apple
+                        ON rrsl_apple.recording_release_id = rr.id
+                        AND rrsl_apple.service = 'apple_music'
+                    GROUP BY r.id, r.song_id
+                ),
+                song_recording_counts AS (
                     SELECT
                         s.id as song_id,
                         s.title,
                         s.composer,
-                        COUNT(DISTINCT r.id) as total_recordings,
-                        -- Spotify: uses legacy spotify_track_id on recording_releases
-                        COUNT(DISTINCT CASE
-                            WHEN rr.spotify_track_id IS NOT NULL THEN r.id
-                        END) as spotify_recordings,
-                        -- Apple Music: uses recording_release_streaming_links
-                        COUNT(DISTINCT CASE
-                            WHEN rrsl_apple.id IS NOT NULL THEN r.id
-                        END) as apple_recordings,
-                        COUNT(DISTINCT CASE
-                            WHEN rr.spotify_track_id IS NOT NULL AND rrsl_apple.id IS NOT NULL THEN r.id
-                        END) as both_recordings,
-                        COUNT(DISTINCT CASE
-                            WHEN rr.spotify_track_id IS NOT NULL OR rrsl_apple.id IS NOT NULL THEN r.id
-                        END) as any_playable_recordings,
-                        COUNT(DISTINCT CASE
-                            WHEN rr.spotify_track_id IS NULL AND rrsl_apple.id IS NULL THEN r.id
-                        END) as no_streaming_recordings,
-                        -- Catalog differences
-                        COUNT(DISTINCT CASE
-                            WHEN rr.spotify_track_id IS NOT NULL AND rrsl_apple.id IS NULL THEN r.id
-                        END) as spotify_only_recordings,
-                        COUNT(DISTINCT CASE
-                            WHEN rr.spotify_track_id IS NULL AND rrsl_apple.id IS NOT NULL THEN r.id
-                        END) as apple_only_recordings
+                        COUNT(rs.recording_id) as total_recordings,
+                        COUNT(CASE WHEN rs.has_spotify THEN 1 END) as spotify_recordings,
+                        COUNT(CASE WHEN rs.has_apple THEN 1 END) as apple_recordings,
+                        COUNT(CASE WHEN rs.has_spotify AND rs.has_apple THEN 1 END) as both_recordings,
+                        COUNT(CASE WHEN rs.has_spotify OR rs.has_apple THEN 1 END) as any_playable_recordings,
+                        COUNT(CASE WHEN NOT rs.has_spotify AND NOT rs.has_apple THEN 1 END) as no_streaming_recordings,
+                        COUNT(CASE WHEN rs.has_spotify AND NOT rs.has_apple THEN 1 END) as spotify_only_recordings,
+                        COUNT(CASE WHEN NOT rs.has_spotify AND rs.has_apple THEN 1 END) as apple_only_recordings
                     FROM songs s
-                    LEFT JOIN recordings r ON r.song_id = s.id
-                    LEFT JOIN recording_releases rr ON rr.recording_id = r.id
-                    -- Apple Music uses the new streaming links table
-                    LEFT JOIN recording_release_streaming_links rrsl_apple
-                        ON rrsl_apple.recording_release_id = rr.id
-                        AND rrsl_apple.service = 'apple_music'
+                    LEFT JOIN recording_streaming rs ON rs.song_id = s.id
             """
 
             # Add repertoire join if filtering
             params = []
             if repertoire_id:
                 query += """
-                    INNER JOIN repertoire_songs rs ON rs.song_id = s.id
-                    WHERE rs.repertoire_id = %s
+                    INNER JOIN repertoire_songs repsongs ON repsongs.song_id = s.id
+                    WHERE repsongs.repertoire_id = %s
                 """
                 params.append(repertoire_id)
 
@@ -2183,12 +2180,17 @@ def streaming_availability():
 # SPOTIFY DIAGNOSTICS
 # =============================================================================
 
-@admin_bp.route('/spotify-diagnostics/<song_id>')
-def spotify_diagnostics(song_id):
+@admin_bp.route('/streaming-diagnostics/<song_id>')
+def streaming_diagnostics(song_id):
     """
-    Diagnostic page showing Spotify matching status for all recordings of a song.
-    Shows recordings with their releases and Spotify match status.
+    Diagnostic page showing streaming availability for all recordings of a song.
+    Shows recordings with their releases and Spotify/Apple Music status.
+
+    Query params:
+        filter: 'all' | 'spotify' | 'apple' | 'both' | 'neither' (default: all)
     """
+    filter_type = request.args.get('filter', 'all')
+
     with get_db_connection() as db:
         with db.cursor() as cur:
             # Get song info
@@ -2202,7 +2204,7 @@ def spotify_diagnostics(song_id):
             if not song:
                 return "Song not found", 404
 
-            # Get all recordings for this song with their default release info
+            # Get all recordings with streaming status aggregated across releases
             cur.execute("""
                 SELECT
                     r.id as recording_id,
@@ -2213,38 +2215,64 @@ def spotify_diagnostics(song_id):
                     def_rel.title as default_release_title,
                     def_rel.artist_credit as default_release_artist,
                     def_rel.musicbrainz_release_id as default_release_mb_id,
-                    def_rel.spotify_album_id as default_release_spotify_album_id,
-                    -- Count releases and spotify matches for this recording
+                    -- Count releases
                     (SELECT COUNT(*) FROM recording_releases rr WHERE rr.recording_id = r.id) as release_count,
-                    (SELECT COUNT(*) FROM recording_releases rr
-                     WHERE rr.recording_id = r.id AND rr.spotify_track_id IS NOT NULL) as spotify_track_count,
-                    (SELECT COUNT(*) FROM recording_releases rr
-                     JOIN releases rel ON rr.release_id = rel.id
-                     WHERE rr.recording_id = r.id AND rel.spotify_album_id IS NOT NULL) as spotify_album_count
+                    -- Spotify: has track if ANY release has spotify_track_id
+                    EXISTS(SELECT 1 FROM recording_releases rr
+                           WHERE rr.recording_id = r.id AND rr.spotify_track_id IS NOT NULL) as has_spotify,
+                    -- Apple: has track if ANY release has apple music link
+                    EXISTS(SELECT 1 FROM recording_releases rr
+                           JOIN recording_release_streaming_links rrsl ON rrsl.recording_release_id = rr.id
+                           WHERE rr.recording_id = r.id AND rrsl.service = 'apple_music') as has_apple
                 FROM recordings r
                 LEFT JOIN releases def_rel ON r.default_release_id = def_rel.id
                 WHERE r.song_id = %s
                 ORDER BY r.recording_year, def_rel.title
             """, (song_id,))
-            recordings = cur.fetchall()
+            all_recordings = cur.fetchall()
 
-            # For each recording, get all releases
+            # Apply filter
+            if filter_type == 'spotify':
+                recordings = [r for r in all_recordings if r['has_spotify']]
+            elif filter_type == 'apple':
+                recordings = [r for r in all_recordings if r['has_apple']]
+            elif filter_type == 'both':
+                recordings = [r for r in all_recordings if r['has_spotify'] and r['has_apple']]
+            elif filter_type == 'neither':
+                recordings = [r for r in all_recordings if not r['has_spotify'] and not r['has_apple']]
+            else:
+                recordings = all_recordings
+
+            # For each recording, get all releases with streaming info
             recordings_with_releases = []
             for rec in recordings:
                 cur.execute("""
                     SELECT
                         rel.id as release_id,
+                        rr.id as recording_release_id,
                         rel.title,
                         rel.artist_credit,
                         rel.release_year,
                         rel.musicbrainz_release_id as release_mb_id,
+                        -- Spotify album (on release)
                         rel.spotify_album_id,
+                        -- Spotify track (on recording_release)
                         rr.spotify_track_id,
                         rr.disc_number,
                         rr.track_number,
-                        CASE WHEN rel.id = %s THEN true ELSE false END as is_default
+                        CASE WHEN rel.id = %s THEN true ELSE false END as is_default,
+                        -- Apple album (from release_streaming_links)
+                        rsl_apple.service_id as apple_album_id,
+                        rsl_apple.service_url as apple_album_url,
+                        -- Apple track (from recording_release_streaming_links)
+                        rrsl_apple.service_id as apple_track_id,
+                        rrsl_apple.service_url as apple_track_url
                     FROM recording_releases rr
                     JOIN releases rel ON rr.release_id = rel.id
+                    LEFT JOIN release_streaming_links rsl_apple
+                        ON rsl_apple.release_id = rel.id AND rsl_apple.service = 'apple_music'
+                    LEFT JOIN recording_release_streaming_links rrsl_apple
+                        ON rrsl_apple.recording_release_id = rr.id AND rrsl_apple.service = 'apple_music'
                     WHERE rr.recording_id = %s
                     ORDER BY
                         CASE WHEN rel.id = %s THEN 0 ELSE 1 END,
@@ -2258,27 +2286,36 @@ def spotify_diagnostics(song_id):
                     'releases': releases
                 })
 
-            # Summary stats
-            total_recordings = len(recordings)
-            recordings_with_track = sum(1 for r in recordings if r['spotify_track_count'] > 0)
-            recordings_with_album_only = sum(1 for r in recordings
-                                              if r['spotify_track_count'] == 0 and r['spotify_album_count'] > 0)
-            recordings_no_spotify = sum(1 for r in recordings
-                                         if r['spotify_track_count'] == 0 and r['spotify_album_count'] == 0)
+            # Summary stats (from all recordings, not filtered)
+            total_recordings = len(all_recordings)
+            with_spotify = sum(1 for r in all_recordings if r['has_spotify'])
+            with_apple = sum(1 for r in all_recordings if r['has_apple'])
+            with_both = sum(1 for r in all_recordings if r['has_spotify'] and r['has_apple'])
+            with_neither = sum(1 for r in all_recordings if not r['has_spotify'] and not r['has_apple'])
 
             summary = {
                 'total_recordings': total_recordings,
-                'with_track': recordings_with_track,
-                'with_album_only': recordings_with_album_only,
-                'no_spotify': recordings_no_spotify
+                'with_spotify': with_spotify,
+                'with_apple': with_apple,
+                'with_both': with_both,
+                'with_neither': with_neither,
+                'filtered_count': len(recordings)
             }
 
     return render_template(
-        'admin/spotify_diagnostics.html',
+        'admin/streaming_diagnostics.html',
         song=song,
         recordings=recordings_with_releases,
-        summary=summary
+        summary=summary,
+        current_filter=filter_type
     )
+
+
+# Keep old route for backwards compatibility
+@admin_bp.route('/spotify-diagnostics/<song_id>')
+def spotify_diagnostics_redirect(song_id):
+    """Redirect old URL to new streaming diagnostics page."""
+    return redirect(url_for('admin.streaming_diagnostics', song_id=song_id, **request.args))
 
 
 # =============================================================================
