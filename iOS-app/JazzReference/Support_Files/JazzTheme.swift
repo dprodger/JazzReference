@@ -189,12 +189,9 @@ struct JazzTheme {
             }
         }()
         let fontName = headingFontName(for: fontWeight)
-        print("🔤 JazzTheme: Looking for font '\(fontName)' at size \(size)")
         if let font = UIFont(name: fontName, size: size) {
-            print("✅ JazzTheme: Found font: \(font.fontName)")
             return font
         } else {
-            print("❌ JazzTheme: Font '\(fontName)' NOT FOUND, falling back to system font")
             return UIFont.systemFont(ofSize: size, weight: weight)
         }
     }
@@ -260,14 +257,10 @@ struct NavigationBarConfigurator: UIViewControllerRepresentable {
     func updateUIViewController(_ uiViewController: UIViewController, context: Context) {
         DispatchQueue.main.async {
             if let navController = uiViewController.navigationController {
-                print("🧭 NavigationBarConfigurator: Found navigation controller, applying appearance")
                 let appearance = JazzTheme.navigationBarAppearance()
                 navController.navigationBar.standardAppearance = appearance
                 navController.navigationBar.scrollEdgeAppearance = appearance
                 navController.navigationBar.compactAppearance = appearance
-                print("🧭 NavigationBarConfigurator: Appearance applied")
-            } else {
-                print("⚠️ NavigationBarConfigurator: No navigation controller found")
             }
         }
     }
