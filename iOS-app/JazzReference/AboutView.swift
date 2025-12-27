@@ -16,8 +16,15 @@ struct AboutView: View {
     @State private var isRefreshing: Bool = false
     @State private var rotationAngle: Double = 0
     @State private var showingOnboarding: Bool = false
-    
+
     let networkManager = NetworkManager()
+
+    // Get version from build settings
+    private var appVersion: String {
+        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
+        return "Version \(version) (\(build))"
+    }
     
     var body: some View {
         ZStack {
@@ -198,7 +205,7 @@ struct AboutView: View {
                 
                 Spacer()
                 
-                Text("Version 1.0")
+                Text(appVersion)
                     .font(JazzTheme.caption())
                     .foregroundColor(.white.opacity(0.8))
 
