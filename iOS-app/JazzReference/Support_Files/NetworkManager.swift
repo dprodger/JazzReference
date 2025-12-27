@@ -510,11 +510,11 @@ class NetworkManager: ObservableObject {
             errorMessage = nil
         }
         
-        // Build URL - "all" uses public /songs endpoint, others use protected /repertoires endpoint
+        // Build URL - "all" uses lightweight /songs/index endpoint, others use protected /repertoires endpoint
         var urlString: String
         if repertoireId == "all" {
-            // Use the public songs endpoint (no auth required)
-            urlString = "\(NetworkManager.baseURL)/songs"
+            // Use the lightweight songs index endpoint (no auth required, faster loading)
+            urlString = "\(NetworkManager.baseURL)/songs/index"
         } else {
             // Use the protected repertoire endpoint (requires auth)
             urlString = "\(NetworkManager.baseURL)/repertoires/\(repertoireId)/songs"
@@ -570,7 +570,7 @@ class NetworkManager: ObservableObject {
             }
 
             let endpoint = repertoireId == "all" ?
-                "GET /songs" :
+                "GET /songs/index" :
                 "GET /repertoires/\(repertoireId)/songs"
             NetworkManager.logRequest(endpoint + (searchQuery.isEmpty ? "" : "?search=..."), startTime: startTime)
 
