@@ -213,7 +213,12 @@ def backfill_positions(dry_run: bool = False, limit: int = None, force_refresh: 
 
             try:
                 with get_db_connection() as conn:
-                    logger.debug(f"    DB connection opened, executing updates...")
+                    logger.debug(f"    DB connection opened, testing with SELECT...")
+                    # Test the connection with a simple SELECT first
+                    with conn.cursor() as cur:
+                        cur.execute("SELECT 1")
+                        cur.fetchone()
+                    logger.debug(f"    Connection verified, executing updates...")
                     with conn.cursor() as cur:
                         for update in updates_to_apply:
                             cur.execute("""
@@ -241,8 +246,14 @@ def backfill_positions(dry_run: bool = False, limit: int = None, force_refresh: 
                                       update['recording_id'], update['release_id']))
                         conn.commit()
                         logger.info(f"    Retry succeeded")
+                except DBTimeoutError as retry_e:
+                    # Skip this release and continue - likely has locked rows
+                    logger.error(f"    Retry also timed out - SKIPPING release {mb_release_id}")
+                    logger.error(f"    (Rows may be locked by a previous crashed transaction)")
+                    stats['api_errors'] += 1
+                    continue  # Skip to next release instead of crashing
                 except Exception as retry_e:
-                    logger.error(f"    Retry also failed: {retry_e}")
+                    logger.error(f"    Retry failed with unexpected error: {retry_e}")
                     raise
             except Exception as e:
                 logger.error(f"    DB error for release {mb_release_id}: {e}")
