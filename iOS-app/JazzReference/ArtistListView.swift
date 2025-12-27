@@ -205,6 +205,7 @@ struct ArtistsListView: View {
     }
     
     // Build attributed name with sort key bolded
+    // Uses regular weight for non-sort parts, semibold for the sort key
     private func formattedName(for performer: Performer) -> Text {
         guard let key = sortKey(for: performer),
               let range = performer.name.range(of: key, options: .caseInsensitive) else {
@@ -219,15 +220,15 @@ struct ArtistsListView: View {
         let keyText = String(performer.name[range])
         let after = String(performer.name[range.upperBound...])
 
+        // Use regular weight for non-sort parts, semibold (default) for sort key
         return Text(before)
-            .font(JazzTheme.headline())
+            .font(JazzTheme.headline(weight: .regular))
             .foregroundColor(JazzTheme.charcoal)
         + Text(keyText)
-            .font(JazzTheme.headline())
-            .bold()
+            .font(JazzTheme.headline(weight: .semibold))
             .foregroundColor(JazzTheme.charcoal)
         + Text(after)
-            .font(JazzTheme.headline())
+            .font(JazzTheme.headline(weight: .regular))
             .foregroundColor(JazzTheme.charcoal)
     }
 
