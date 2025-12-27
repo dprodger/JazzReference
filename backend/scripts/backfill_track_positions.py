@@ -110,83 +110,98 @@ def backfill_positions(dry_run: bool = False, limit: int = None, force_refresh: 
         'api_errors': 0,
     }
 
+    # Step 1: Fetch all data from DB, then close connection
+    # This avoids holding DB connection open during long API calls
     with get_db_connection() as conn:
         rows = get_recording_releases_to_update(conn, limit)
-        logger.info(f"Found {len(rows)} recording_releases to check")
-        logger.info("")
 
-        # Group by release to minimize API calls
-        releases = {}
-        for row in rows:
-            mb_release_id = row['musicbrainz_release_id']
-            if mb_release_id not in releases:
-                releases[mb_release_id] = []
-            releases[mb_release_id].append(row)
+    logger.info(f"Found {len(rows)} recording_releases to check")
+    logger.info("")
 
-        logger.info(f"Grouped into {len(releases)} unique releases")
-        logger.info("")
+    # Group by release to minimize API calls
+    releases = {}
+    for row in rows:
+        mb_release_id = row['musicbrainz_release_id']
+        if mb_release_id not in releases:
+            releases[mb_release_id] = []
+        releases[mb_release_id].append(row)
 
-        # Process each release
-        for i, (mb_release_id, release_rows) in enumerate(releases.items(), 1):
-            release_title = release_rows[0]['release_title'][:40]
-            logger.info(f"[{i}/{len(releases)}] {release_title}")
-            logger.info(f"    MB Release: {mb_release_id}")
-            logger.info(f"    Recordings: {len(release_rows)}")
+    logger.info(f"Grouped into {len(releases)} unique releases")
+    logger.info("")
 
-            # Fetch release details using MBSearcher (with caching)
-            release_data = mb_searcher.get_release_details(mb_release_id)
+    # Step 2: Process each release - make API calls OUTSIDE of DB connection
+    for i, (mb_release_id, release_rows) in enumerate(releases.items(), 1):
+        release_title = release_rows[0]['release_title'][:40]
+        logger.info(f"[{i}/{len(releases)}] {release_title}")
+        logger.info(f"    MB Release: {mb_release_id}")
+        logger.info(f"    Recordings: {len(release_rows)}")
 
-            # Track cache hits vs API calls
-            # MBSearcher sets last_made_api_call=True for API, False for cache
-            if mb_searcher.last_made_api_call:
-                stats['releases_fetched'] += 1
-            elif release_data:
-                stats['cache_hits'] += 1
+        # Fetch release details using MBSearcher (with caching)
+        # This is done OUTSIDE the DB connection context
+        logger.info(f"    Fetching from MusicBrainz...")
+        release_data = mb_searcher.get_release_details(mb_release_id)
 
-            # Extract positions from release data
-            positions = extract_track_positions(release_data)
+        # Track cache hits vs API calls
+        # MBSearcher sets last_made_api_call=True for API, False for cache
+        if mb_searcher.last_made_api_call:
+            stats['releases_fetched'] += 1
+        elif release_data:
+            stats['cache_hits'] += 1
 
-            if not positions:
-                logger.warning(f"    Could not fetch positions, skipping")
-                stats['api_errors'] += 1
+        # Extract positions from release data
+        positions = extract_track_positions(release_data)
+
+        if not positions:
+            logger.warning(f"    Could not fetch positions, skipping")
+            stats['api_errors'] += 1
+            continue
+
+        logger.info(f"    Found {len(positions)} tracks in release")
+
+        # Collect updates to apply
+        updates_to_apply = []
+
+        for row in release_rows:
+            stats['rows_checked'] += 1
+            mb_recording_id = row['musicbrainz_recording_id']
+
+            if mb_recording_id not in positions:
+                logger.debug(f"      Recording {mb_recording_id[:8]} not found in release")
+                stats['rows_not_found'] += 1
                 continue
 
-            logger.info(f"    Found {len(positions)} tracks in release")
+            new_track, new_disc = positions[mb_recording_id]
+            current_track = row['current_track']
+            current_disc = row['current_disc']
 
-            # Update each recording_release
-            for row in release_rows:
-                stats['rows_checked'] += 1
-                mb_recording_id = row['musicbrainz_recording_id']
+            # Check if update needed
+            if current_track == new_track and current_disc == new_disc:
+                stats['rows_unchanged'] += 1
+                continue
 
-                if mb_recording_id not in positions:
-                    logger.debug(f"      Recording {mb_recording_id[:8]} not found in release")
-                    stats['rows_not_found'] += 1
-                    continue
+            logger.info(f"      Recording {mb_recording_id[:8]}: "
+                      f"({current_disc}, {current_track}) -> ({new_disc}, {new_track})")
 
-                new_track, new_disc = positions[mb_recording_id]
-                current_track = row['current_track']
-                current_disc = row['current_disc']
+            updates_to_apply.append({
+                'recording_id': row['recording_id'],
+                'release_id': row['release_id'],
+                'track_number': new_track,
+                'disc_number': new_disc
+            })
+            stats['rows_updated'] += 1
 
-                # Check if update needed
-                if current_track == new_track and current_disc == new_disc:
-                    stats['rows_unchanged'] += 1
-                    continue
-
-                logger.info(f"      Recording {mb_recording_id[:8]}: "
-                          f"({current_disc}, {current_track}) -> ({new_disc}, {new_track})")
-
-                if not dry_run:
-                    with conn.cursor() as cur:
+        # Step 3: Apply updates with a fresh DB connection for each release
+        # This prevents connection timeout from long API calls
+        if updates_to_apply and not dry_run:
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    for update in updates_to_apply:
                         cur.execute("""
                             UPDATE recording_releases
                             SET track_number = %s, disc_number = %s
                             WHERE recording_id = %s AND release_id = %s
-                        """, (new_track, new_disc, row['recording_id'], row['release_id']))
-
-                stats['rows_updated'] += 1
-
-            # Commit after each release to avoid long-running transactions
-            if not dry_run:
+                        """, (update['track_number'], update['disc_number'],
+                              update['recording_id'], update['release_id']))
                 conn.commit()
 
     # Print summary

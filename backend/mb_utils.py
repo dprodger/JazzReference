@@ -855,10 +855,12 @@ class MusicBrainzSearcher:
                     'inc': 'artist-credits+recordings+artist-rels',
                     'fmt': 'json'
                 }
-                
-                logger.debug(f"Fetching MusicBrainz release details: {release_id}")
-                
-                response = self.session.get(url, params=params, timeout=15)
+
+                logger.info(f"Fetching MusicBrainz release details: {release_id}")
+
+                # Use tuple timeout: (connect_timeout, read_timeout)
+                # This is more robust than a single timeout for network issues
+                response = self.session.get(url, params=params, timeout=(10, 30))
                 
                 if response.status_code == 200:
                     data = response.json()
