@@ -11,6 +11,7 @@ Usage:
 
 import argparse
 import logging
+import signal
 import sys
 from pathlib import Path
 
@@ -19,6 +20,16 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from db_utils import get_db_connection
 from mb_utils import MusicBrainzSearcher
+
+
+class DBTimeoutError(Exception):
+    """Raised when a database operation times out"""
+    pass
+
+
+def timeout_handler(signum, frame):
+    """Signal handler for timeout"""
+    raise DBTimeoutError("Database operation timed out (likely PgBouncer/Supabase connection issue)")
 
 logging.basicConfig(
     level=logging.INFO,
@@ -194,6 +205,12 @@ def backfill_positions(dry_run: bool = False, limit: int = None, force_refresh: 
         # This prevents connection timeout from long API calls
         if updates_to_apply and not dry_run:
             logger.debug(f"    Opening DB connection for {len(updates_to_apply)} updates...")
+
+            # Set a 60-second timeout for the entire DB operation
+            # This catches PgBouncer/Supabase connection hangs early
+            old_handler = signal.signal(signal.SIGALRM, timeout_handler)
+            signal.alarm(60)  # 60 second timeout
+
             try:
                 with get_db_connection() as conn:
                     logger.debug(f"    DB connection opened, executing updates...")
@@ -208,9 +225,31 @@ def backfill_positions(dry_run: bool = False, limit: int = None, force_refresh: 
                     logger.debug(f"    Committing...")
                     conn.commit()
                     logger.debug(f"    Committed successfully")
+            except DBTimeoutError:
+                logger.error(f"    DB timeout for release {mb_release_id} - retrying...")
+                # Retry once with a fresh connection
+                try:
+                    signal.alarm(60)  # Reset timeout
+                    with get_db_connection() as conn:
+                        with conn.cursor() as cur:
+                            for update in updates_to_apply:
+                                cur.execute("""
+                                    UPDATE recording_releases
+                                    SET track_number = %s, disc_number = %s
+                                    WHERE recording_id = %s AND release_id = %s
+                                """, (update['track_number'], update['disc_number'],
+                                      update['recording_id'], update['release_id']))
+                        conn.commit()
+                        logger.info(f"    Retry succeeded")
+                except Exception as retry_e:
+                    logger.error(f"    Retry also failed: {retry_e}")
+                    raise
             except Exception as e:
                 logger.error(f"    DB error for release {mb_release_id}: {e}")
                 raise
+            finally:
+                signal.alarm(0)  # Cancel the alarm
+                signal.signal(signal.SIGALRM, old_handler)  # Restore old handler
 
     # Print summary
     logger.info("")
