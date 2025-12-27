@@ -193,16 +193,24 @@ def backfill_positions(dry_run: bool = False, limit: int = None, force_refresh: 
         # Step 3: Apply updates with a fresh DB connection for each release
         # This prevents connection timeout from long API calls
         if updates_to_apply and not dry_run:
-            with get_db_connection() as conn:
-                with conn.cursor() as cur:
-                    for update in updates_to_apply:
-                        cur.execute("""
-                            UPDATE recording_releases
-                            SET track_number = %s, disc_number = %s
-                            WHERE recording_id = %s AND release_id = %s
-                        """, (update['track_number'], update['disc_number'],
-                              update['recording_id'], update['release_id']))
-                conn.commit()
+            logger.debug(f"    Opening DB connection for {len(updates_to_apply)} updates...")
+            try:
+                with get_db_connection() as conn:
+                    logger.debug(f"    DB connection opened, executing updates...")
+                    with conn.cursor() as cur:
+                        for update in updates_to_apply:
+                            cur.execute("""
+                                UPDATE recording_releases
+                                SET track_number = %s, disc_number = %s
+                                WHERE recording_id = %s AND release_id = %s
+                            """, (update['track_number'], update['disc_number'],
+                                  update['recording_id'], update['release_id']))
+                    logger.debug(f"    Committing...")
+                    conn.commit()
+                    logger.debug(f"    Committed successfully")
+            except Exception as e:
+                logger.error(f"    DB error for release {mb_release_id}: {e}")
+                raise
 
     # Print summary
     logger.info("")

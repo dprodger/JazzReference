@@ -339,25 +339,38 @@ def check_pool_health():
 def _create_connection():
     """
     Create a simple database connection (only used in simple mode)
-    
-    IMPROVED: Better error messages
-    
+
+    IMPROVED:
+    - Better error messages
+    - TCP keepalive for long-running scripts
+    - Statement timeout to prevent infinite hangs
+
     Returns:
         psycopg connection
     """
     try:
+        # Add TCP keepalive and statement timeout for long-running scripts
         conn = psycopg.connect(
             **DB_CONFIG,
             row_factory=dict_row,
             autocommit=False,
-            prepare_threshold=None
+            prepare_threshold=None,
+            # TCP keepalive settings to detect dead connections faster
+            keepalives=1,
+            keepalives_idle=30,      # Start keepalive after 30s idle
+            keepalives_interval=10,  # Send keepalive every 10s
+            keepalives_count=3,      # Give up after 3 failed keepalives
+            # Connection timeout
+            connect_timeout=30,
+            # Statement timeout (5 minutes max for any query)
+            options='-c statement_timeout=300000'
         )
         logger.debug("Simple database connection created")
         return conn
     except psycopg.OperationalError as e:
         logger.error(f"Failed to connect to database: {e}")
         logger.error(f"Connection details: host={DB_CONFIG['host']}, "
-                    f"port={DB_CONFIG['port']}, database={DB_CONFIG['database']}, "
+                    f"port={DB_CONFIG['port']}, dbname={DB_CONFIG['dbname']}, "
                     f"user={DB_CONFIG['user']}")
         raise
     except Exception as e:
