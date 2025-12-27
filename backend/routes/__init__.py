@@ -18,6 +18,7 @@ def register_blueprints(app):
     from routes.reports import reports_bp
     from routes.authority import authorities_bp
     from routes.admin import admin_bp
+    from routes.videos import videos_bp
 
     app.register_blueprint(health_bp)
     app.register_blueprint(research_bp)
@@ -30,3 +31,4 @@ def register_blueprints(app):
     app.register_blueprint(reports_bp)
     app.register_blueprint(authorities_bp)
     app.register_blueprint(admin_bp)
+    app.register_blueprint(videos_bp)

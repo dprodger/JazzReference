@@ -1,5 +1,5 @@
 # routes/transcriptions.py
-from flask import Blueprint, jsonify
+from flask import Blueprint, jsonify, request
 import logging
 import db_utils as db_tools
 
@@ -116,9 +116,84 @@ def get_transcription_detail(transcription_id):
         
         if not transcription:
             return jsonify({'error': 'Transcription not found'}), 404
-        
+
         return jsonify(transcription)
-        
+
     except Exception as e:
         logger.error(f"Error fetching transcription detail: {e}")
         return jsonify({'error': 'Failed to fetch transcription detail', 'detail': str(e)}), 500
+
+
+@transcriptions_bp.route('/transcriptions', methods=['POST'])
+def create_transcription():
+    """Create a new solo transcription"""
+    try:
+        data = request.get_json()
+
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+
+        song_id = data.get('song_id')
+        recording_id = data.get('recording_id')
+        youtube_url = data.get('youtube_url')
+
+        if not song_id:
+            return jsonify({'error': 'song_id is required'}), 400
+        if not recording_id:
+            return jsonify({'error': 'recording_id is required'}), 400
+        if not youtube_url:
+            return jsonify({'error': 'youtube_url is required'}), 400
+
+        # Validate that the song exists
+        song_check = db_tools.execute_query(
+            "SELECT id FROM songs WHERE id = %s",
+            (song_id,),
+            fetch_one=True
+        )
+        if not song_check:
+            return jsonify({'error': 'Song not found'}), 404
+
+        # Validate that the recording exists and belongs to the song
+        recording_check = db_tools.execute_query(
+            "SELECT id FROM recordings WHERE id = %s AND song_id = %s",
+            (recording_id, song_id),
+            fetch_one=True
+        )
+        if not recording_check:
+            return jsonify({'error': 'Recording not found or does not belong to this song'}), 404
+
+        # Check for duplicate transcription (same recording + youtube URL)
+        duplicate_check = db_tools.execute_query(
+            "SELECT id FROM solo_transcriptions WHERE recording_id = %s AND youtube_url = %s",
+            (recording_id, youtube_url),
+            fetch_one=True
+        )
+        if duplicate_check:
+            return jsonify({'error': 'A transcription with this YouTube URL already exists for this recording'}), 409
+
+        # Create the transcription
+        insert_query = """
+            INSERT INTO solo_transcriptions (song_id, recording_id, youtube_url)
+            VALUES (%s, %s, %s)
+            RETURNING id, song_id, recording_id, youtube_url, created_at
+        """
+        result = db_tools.execute_query(
+            insert_query,
+            (song_id, recording_id, youtube_url),
+            fetch_one=True,
+            commit=True
+        )
+
+        if not result:
+            return jsonify({'error': 'Failed to create transcription'}), 500
+
+        logger.info(f"Created transcription {result['id']} for song {song_id}, recording {recording_id}")
+
+        return jsonify({
+            'message': 'Transcription created successfully',
+            'transcription': result
+        }), 201
+
+    except Exception as e:
+        logger.error(f"Error creating transcription: {e}")
+        return jsonify({'error': 'Failed to create transcription', 'detail': str(e)}), 500
