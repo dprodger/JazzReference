@@ -15,17 +15,22 @@ struct ArtistsListView: View {
     @State private var searchTask: Task<Void, Never>?
     @State private var hasPerformedInitialLoad = false
 
-    // Helper to extract first letter for grouping
-    private func firstLetter(for name: String) -> String {
+    // Helper to get the effective sort name for a performer
+    private func effectiveSortName(for performer: Performer) -> String {
+        performer.sortName ?? performer.name
+    }
+
+    // Helper to extract first letter for grouping (uses sortName)
+    private func firstLetter(for sortName: String) -> String {
         let firstChar: String
 
-        if let commaIndex = name.firstIndex(of: ",") {
+        if let commaIndex = sortName.firstIndex(of: ",") {
             // "Last, First" format - use first letter of last name
-            let lastName = name[..<commaIndex]
+            let lastName = sortName[..<commaIndex]
             firstChar = String(lastName.prefix(1)).uppercased()
         } else {
             // Single name - use first letter
-            firstChar = String(name.prefix(1)).uppercased()
+            firstChar = String(sortName.prefix(1)).uppercased()
         }
 
         // Check if it's a Latin letter (A-Z)
@@ -38,13 +43,24 @@ struct ArtistsListView: View {
         }
     }
 
-    // Computed property to group artists by first letter
+    // Helper to get the sort key (first word of sortName, typically last name)
+    private func sortKey(for performer: Performer) -> String? {
+        guard let sortName = performer.sortName else { return nil }
+        // Get first word (before comma or space)
+        if let commaIndex = sortName.firstIndex(of: ",") {
+            return String(sortName[..<commaIndex])
+        }
+        return sortName.components(separatedBy: " ").first
+    }
+
+    // Computed property to group artists by first letter of sort_name
     // Uses the lightweight index (id, name, sort_name) for all 30k performers
     private var groupedArtists: [(String, [Performer])] {
         let filtered = networkManager.performersIndex
 
+        // Group by first letter of sortName (or name if sortName is nil)
         let grouped = Dictionary(grouping: filtered) { performer in
-            firstLetter(for: performer.name)
+            firstLetter(for: effectiveSortName(for: performer))
         }
 
         return grouped.sorted { lhs, rhs in
@@ -57,7 +73,8 @@ struct ArtistsListView: View {
             // Rest alphabetically
             return lhs.key < rhs.key
         }.map { (key, value) in
-            (key, value.sorted { $0.name < $1.name })
+            // Sort within each group by sortName
+            (key, value.sorted { effectiveSortName(for: $0) < effectiveSortName(for: $1) })
         }
     }
 
@@ -187,12 +204,37 @@ struct ArtistsListView: View {
         }
     }
     
-    private func artistRowView(performer: Performer) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(performer.name)
+    // Build attributed name with sort key bolded
+    private func formattedName(for performer: Performer) -> Text {
+        guard let key = sortKey(for: performer),
+              let range = performer.name.range(of: key, options: .caseInsensitive) else {
+            // No sort key or not found in name - just return plain name
+            return Text(performer.name)
                 .font(JazzTheme.headline())
                 .foregroundColor(JazzTheme.charcoal)
-            
+        }
+
+        // Split name into parts: before, the key, and after
+        let before = String(performer.name[..<range.lowerBound])
+        let keyText = String(performer.name[range])
+        let after = String(performer.name[range.upperBound...])
+
+        return Text(before)
+            .font(JazzTheme.headline())
+            .foregroundColor(JazzTheme.charcoal)
+        + Text(keyText)
+            .font(JazzTheme.headline())
+            .bold()
+            .foregroundColor(JazzTheme.charcoal)
+        + Text(after)
+            .font(JazzTheme.headline())
+            .foregroundColor(JazzTheme.charcoal)
+    }
+
+    private func artistRowView(performer: Performer) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            formattedName(for: performer)
+
             if let instrument = performer.instrument {
                 Text(instrument)
                     .font(JazzTheme.subheadline())
