@@ -69,6 +69,12 @@ struct SongsListView: View {
                         hasPerformedInitialLoad = true
                     }
                 }
+                .onReceive(NotificationCenter.default.publisher(for: .songCreated)) { _ in
+                    // Refresh songs list when a new song is created
+                    Task {
+                        await loadSongs()
+                    }
+                }
                 .onChange(of: authManager.isAuthenticated) { wasAuthenticated, isAuthenticated in
                     // Dismiss login prompt when user successfully authenticates
                     if isAuthenticated && showLoginPrompt {

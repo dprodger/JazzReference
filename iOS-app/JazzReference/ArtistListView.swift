@@ -93,6 +93,12 @@ struct ArtistsListView: View {
                         hasPerformedInitialLoad = true
                     }
                 }
+                .onReceive(NotificationCenter.default.publisher(for: .artistCreated)) { _ in
+                    // Refresh artists list when a new artist is created
+                    Task {
+                        await networkManager.fetchPerformersIndex(searchQuery: searchText)
+                    }
+                }
         }
         .tint(JazzTheme.amber)
     }

@@ -7,6 +7,11 @@
 
 import SwiftUI
 
+// Notification for when a song is created and lists need to refresh
+extension Notification.Name {
+    static let songCreated = Notification.Name("songCreated")
+}
+
 struct SongCreationView: View {
     @Environment(\.dismiss) var dismiss
     
@@ -115,6 +120,8 @@ struct SongCreationView: View {
                 await MainActor.run {
                     isSaving = false
                     print("✅ Song saved successfully")
+                    // Notify SongsListView to refresh
+                    NotificationCenter.default.post(name: .songCreated, object: nil)
                     dismiss()
                 }
             } catch {

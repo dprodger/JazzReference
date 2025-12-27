@@ -8,6 +8,11 @@
 
 import SwiftUI
 
+// Notification for when an artist is created and lists need to refresh
+extension Notification.Name {
+    static let artistCreated = Notification.Name("artistCreated")
+}
+
 struct ArtistCreationView: View {
     @Environment(\.dismiss) var dismiss
     
@@ -105,6 +110,8 @@ struct ArtistCreationView: View {
                 await MainActor.run {
                     isSaving = false
                     print("✅ Artist saved successfully")
+                    // Notify ArtistsListView to refresh
+                    NotificationCenter.default.post(name: .artistCreated, object: nil)
                     dismiss()
                 }
             } catch {
