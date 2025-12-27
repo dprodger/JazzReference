@@ -1046,5 +1046,50 @@ def format_external_references(external_refs):
             'url': url,
             'display_name': source_names.get(key, key.title())
         })
-    
     return formatted
+
+
+# ============================================================================
+# LIGHTWEIGHT INDEX ENDPOINT
+# ============================================================================
+
+@songs_bp.route('/songs/index', methods=['GET'])
+def get_songs_index():
+    """
+    Get lightweight list of all songs for building the list view.
+
+    Returns only id, title, composer, composed_year - minimal data for fast loading.
+    This enables the iOS app to show the songs list quickly while loading
+    detailed data only when a song is selected.
+
+    Query Parameters:
+        search: Filter songs by title or composer (case-insensitive partial match)
+
+    Returns:
+        Array of {id, title, composer, composed_year} objects
+    """
+    search_query = request.args.get('search', '')
+
+    try:
+        if search_query:
+            query = """
+                SELECT id, title, composer, composed_year
+                FROM songs
+                WHERE title ILIKE %s OR composer ILIKE %s
+                ORDER BY title
+            """
+            params = (f'%{search_query}%', f'%{search_query}%')
+        else:
+            query = """
+                SELECT id, title, composer, composed_year
+                FROM songs
+                ORDER BY title
+            """
+            params = None
+
+        songs = db_tools.execute_query(query, params)
+        return jsonify(songs)
+
+    except Exception as e:
+        logger.error(f"Error fetching songs index: {e}")
+        return jsonify({'error': 'Failed to fetch songs index', 'detail': str(e)}), 500
