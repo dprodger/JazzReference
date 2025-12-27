@@ -69,18 +69,17 @@ def create_video():
         if duplicate_check:
             return jsonify({'error': 'A video with this YouTube URL already exists'}), 409
 
-        # Create the video
-        insert_query = """
-            INSERT INTO videos (song_id, recording_id, youtube_url, video_type, title, description)
-            VALUES (%s, %s, %s, %s, %s, %s)
-            RETURNING id, song_id, recording_id, youtube_url, video_type, title, description, created_at
-        """
-        result = db_tools.execute_query(
-            insert_query,
-            (song_id, recording_id, youtube_url, video_type, title, description),
-            fetch_one=True,
-            commit=True
-        )
+        # Create the video using direct connection for INSERT
+        with db_tools.get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    INSERT INTO videos (song_id, recording_id, youtube_url, video_type, title, description)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                    RETURNING id, song_id, recording_id, youtube_url, video_type, title, description, created_at
+                """, (song_id, recording_id, youtube_url, video_type, title, description))
+
+                result = cur.fetchone()
+                conn.commit()
 
         if not result:
             return jsonify({'error': 'Failed to create video'}), 500
@@ -89,7 +88,7 @@ def create_video():
 
         return jsonify({
             'message': 'Video created successfully',
-            'video': result
+            'video': dict(result)
         }), 201
 
     except Exception as e:

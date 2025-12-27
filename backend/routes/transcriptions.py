@@ -171,18 +171,17 @@ def create_transcription():
         if duplicate_check:
             return jsonify({'error': 'A transcription with this YouTube URL already exists for this recording'}), 409
 
-        # Create the transcription
-        insert_query = """
-            INSERT INTO solo_transcriptions (song_id, recording_id, youtube_url)
-            VALUES (%s, %s, %s)
-            RETURNING id, song_id, recording_id, youtube_url, created_at
-        """
-        result = db_tools.execute_query(
-            insert_query,
-            (song_id, recording_id, youtube_url),
-            fetch_one=True,
-            commit=True
-        )
+        # Create the transcription using direct connection for INSERT
+        with db_tools.get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    INSERT INTO solo_transcriptions (song_id, recording_id, youtube_url)
+                    VALUES (%s, %s, %s)
+                    RETURNING id, song_id, recording_id, youtube_url, created_at
+                """, (song_id, recording_id, youtube_url))
+
+                result = cur.fetchone()
+                conn.commit()
 
         if not result:
             return jsonify({'error': 'Failed to create transcription'}), 500
@@ -191,7 +190,7 @@ def create_transcription():
 
         return jsonify({
             'message': 'Transcription created successfully',
-            'transcription': result
+            'transcription': dict(result)
         }), 201
 
     except Exception as e:
