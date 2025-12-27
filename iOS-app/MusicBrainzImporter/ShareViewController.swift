@@ -19,7 +19,9 @@ class ShareViewController: UIViewController {
     private var existingArtist: ExistingArtist?
     private var songData: SongData?
     private var existingSong: ExistingSong?
+    private var youtubeData: YouTubeData?
     private var isSongImport: Bool = false
+    private var isYouTubeImport: Bool = false
     private let appGroupIdentifier = "group.me.rodger.david.JazzReference"
     
     // MARK: - Lifecycle
@@ -132,17 +134,21 @@ class ShareViewController: UIViewController {
     // MARK: - Data Processing
     private func processExtractedData(_ data: [String: Any]) {
         NSLog("📄 Processing extracted data...")
-        
+
         // Check for error from JavaScript
         if let error = data["error"] as? String {
             NSLog("❌ JavaScript error: \(error)")
             showError(error)
             return
         }
-        
+
         // Detect page type based on the fields present in the JavaScript results
+        // YouTube pages have "pageType" = "youtube"
         // Song/work pages have "title", artist pages have "name"
-        if let _ = data["title"] as? String {
+        if let pageType = data["pageType"] as? String, pageType == "youtube" {
+            NSLog("📍 Detected: YouTube page")
+            processYouTubeData(data)
+        } else if let _ = data["title"] as? String {
             NSLog("📍 Detected: Song/Work page (has 'title' field)")
             processSongData(data)
         } else if let _ = data["name"] as? String {
@@ -336,22 +342,75 @@ class ShareViewController: UIViewController {
         case .notFound:
             NSLog("✓ Song not found in database - showing import view")
             showSongConfirmationView(with: songData)
-            
+
         case .exactMatch(let existingSong):
             NSLog("⚠️ Exact match found - song already exists")
             self.existingSong = existingSong
             showSongExactMatchView(songData: songData, existingSong: existingSong)
-            
+
         case .titleMatchNoMbid(let existingSong):
             NSLog("⚠️ Title match with no MusicBrainz ID")
             self.existingSong = existingSong
             showSongTitleMatchNoMbidView(songData: songData, existingSong: existingSong)
-            
+
         case .titleMatchDifferentMbid(let existingSong):
             NSLog("⚠️ Title match with different MusicBrainz ID")
             self.existingSong = existingSong
             showSongTitleMatchDifferentMbidView(songData: songData, existingSong: existingSong)
         }
+    }
+
+    // MARK: - YouTube Processing
+
+    private func processYouTubeData(_ data: [String: Any]) {
+        NSLog("🎬 Processing YouTube data...")
+        NSLog("   Data keys: \(data.keys.joined(separator: ", "))")
+
+        // Extract required fields
+        guard let videoId = data["videoId"] as? String, !videoId.isEmpty else {
+            NSLog("❌ Missing or empty video ID")
+            showError("Could not extract video ID from YouTube page")
+            return
+        }
+
+        guard let title = data["title"] as? String, !title.isEmpty else {
+            NSLog("❌ Missing or empty title")
+            showError("Could not extract video title from YouTube page")
+            return
+        }
+
+        guard let url = data["url"] as? String else {
+            NSLog("❌ Missing URL")
+            showError("Could not get YouTube URL")
+            return
+        }
+
+        NSLog("   Video ID: \(videoId)")
+        NSLog("   Title: \(title)")
+
+        // Extract optional fields
+        let channelName = data["channelName"] as? String
+        let description = data["description"] as? String
+
+        // Create YouTubeData
+        let youtubeData = YouTubeData(
+            videoId: videoId,
+            title: title,
+            url: url,
+            channelName: channelName,
+            description: description,
+            videoType: nil,
+            songId: nil,
+            recordingId: nil
+        )
+
+        self.youtubeData = youtubeData
+        self.isYouTubeImport = true
+
+        NSLog("✅ YouTube data validation passed")
+
+        // Show YouTube type selection view
+        showYouTubeTypeSelectionView(with: youtubeData)
     }
     
     // MARK: - UI Views
@@ -496,7 +555,41 @@ class ShareViewController: UIViewController {
         
         replaceCurrentView(with: view)
     }
-    
+
+    // MARK: - YouTube UI Views
+
+    private func showYouTubeTypeSelectionView(with youtubeData: YouTubeData) {
+        NSLog("🎨 Showing YouTube type selection view")
+
+        let view = YouTubeTypeSelectionView(
+            youtubeData: youtubeData,
+            onSelectType: { [weak self] selectedType in
+                self?.handleYouTubeTypeSelected(youtubeData: youtubeData, type: selectedType)
+            },
+            onCancel: { [weak self] in
+                self?.cancelImport()
+            }
+        )
+
+        replaceCurrentView(with: view)
+    }
+
+    private func handleYouTubeTypeSelected(youtubeData: YouTubeData, type: YouTubeVideoType) {
+        NSLog("🎬 YouTube type selected: \(type.rawValue)")
+
+        // Update youtubeData with selected type
+        var updatedData = youtubeData
+        updatedData.videoType = type
+
+        self.youtubeData = updatedData
+
+        // Save to shared container and open main app for song selection
+        SharedYouTubeData.saveSharedData(updatedData, appGroup: appGroupIdentifier)
+
+        // Open main app to continue import (song selection happens there)
+        openMainApp(path: "import-youtube")
+    }
+
     private func showError(_ message: String) {
         NSLog("⚠️ Showing error: \(message)")
         

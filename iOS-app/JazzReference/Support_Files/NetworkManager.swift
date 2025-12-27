@@ -936,7 +936,96 @@ class NetworkManager: ObservableObject {
             return nil
         }
     }
-    
+
+    // MARK: - Song Search
+
+    func searchSongs(query: String) async throws -> [Song] {
+        let encodedQuery = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? query
+        guard let url = URL(string: "\(NetworkManager.baseURL)/songs?search=\(encodedQuery)&limit=20") else {
+            throw URLError(.badURL)
+        }
+
+        let (data, response) = try await URLSession.shared.data(from: url)
+
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            throw URLError(.badServerResponse)
+        }
+
+        let decoder = JSONDecoder()
+        let songs = try decoder.decode([Song].self, from: data)
+        return songs
+    }
+
+    // MARK: - Create Transcription
+
+    func createTranscription(songId: String, recordingId: String, youtubeUrl: String) async throws {
+        guard let url = URL(string: "\(NetworkManager.baseURL)/transcriptions") else {
+            throw URLError(.badURL)
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        let body: [String: Any] = [
+            "song_id": songId,
+            "recording_id": recordingId,
+            "youtube_url": youtubeUrl
+        ]
+
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw URLError(.badServerResponse)
+        }
+
+        if httpResponse.statusCode >= 400 {
+            // Try to extract error message from response
+            if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let error = json["error"] as? String {
+                throw NSError(domain: "APIError", code: httpResponse.statusCode, userInfo: [NSLocalizedDescriptionKey: error])
+            }
+            throw URLError(.badServerResponse)
+        }
+    }
+
+    // MARK: - Create Video
+
+    func createVideo(songId: String, youtubeUrl: String, videoType: String, title: String) async throws {
+        guard let url = URL(string: "\(NetworkManager.baseURL)/videos") else {
+            throw URLError(.badURL)
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        let body: [String: Any] = [
+            "song_id": songId,
+            "youtube_url": youtubeUrl,
+            "video_type": videoType,
+            "title": title
+        ]
+
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw URLError(.badServerResponse)
+        }
+
+        if httpResponse.statusCode >= 400 {
+            if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let error = json["error"] as? String {
+                throw NSError(domain: "APIError", code: httpResponse.statusCode, userInfo: [NSLocalizedDescriptionKey: error])
+            }
+            throw URLError(.badServerResponse)
+        }
+    }
+
     // MARK: - Recordings
 
     /// Total count of recordings in the database (fetched separately for performance)

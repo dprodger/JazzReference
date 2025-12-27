@@ -436,6 +436,15 @@ struct SongDetailView: View {
             .task {
                 await loadSongData()
             }
+            .onReceive(NotificationCenter.default.publisher(for: .transcriptionCreated)) { notification in
+                // Refresh if this notification is for our song
+                if let songId = notification.userInfo?["songId"] as? String,
+                   songId == currentSongId {
+                    Task {
+                        await loadSongData()
+                    }
+                }
+            }
             .gesture(swipeGesture)
             .sheet(isPresented: $showAddToRepertoireSheet) {
                 repertoireSheet

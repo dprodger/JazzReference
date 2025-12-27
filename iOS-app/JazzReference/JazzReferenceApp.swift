@@ -196,6 +196,7 @@ struct JazzReferenceApp: App {
     @Environment(\.scenePhase) var scenePhase
     @State private var showingSongCreation = false
     @State private var importedSongData: ImportedSongData?
+    @State private var importedYouTubeData: ImportedYouTubeData?
     @StateObject private var repertoireManager = RepertoireManager()
     @StateObject private var authManager = AuthenticationManager()
 
@@ -294,6 +295,11 @@ struct JazzReferenceApp: App {
                         NSLog("🎵 Song import deep link detected")
                         checkForImportedSong()
                     }
+                    // Handle YouTube import: jazzreference://import-youtube
+                    else if url.scheme == "jazzreference" && url.host == "import-youtube" {
+                        NSLog("🎬 YouTube import deep link detected")
+                        checkForImportedYouTube()
+                    }
                     // Handle song view: jazzreference://song/{songId}
                     else if url.scheme == "jazzreference" && url.host == "song" {
                         let songId = url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
@@ -323,11 +329,12 @@ struct JazzReferenceApp: App {
                 .onAppear {
                     checkForImportedArtist()
                     checkForImportedSong()
-                    
+                    checkForImportedYouTube()
+
                     // PHASE 5: Connect RepertoireManager to AuthenticationManager
                     repertoireManager.setAuthManager(authManager)
                     print("📚 Connected RepertoireManager to AuthenticationManager")
-                    
+
                     // Show onboarding on first launch
                     if !hasCompletedOnboarding {
                         showingOnboarding = true
@@ -340,6 +347,7 @@ struct JazzReferenceApp: App {
                         if deepLinkSongId == nil && deepLinkArtistId == nil {
                             checkForImportedArtist()
                             checkForImportedSong()
+                            checkForImportedYouTube()
                         }
                     }
                 }
@@ -392,6 +400,18 @@ struct JazzReferenceApp: App {
                         PerformerDetailView(performerId: data.artistId)
                     }
                 }
+                .sheet(item: $importedYouTubeData) { data in
+                    NavigationStack {
+                        YouTubeImportView(youtubeData: data) {
+                            // On successful import, clear the data
+                            SharedYouTubeDataManager.clearSharedData()
+                            importedYouTubeData = nil
+                        } onCancel: {
+                            SharedYouTubeDataManager.clearSharedData()
+                            importedYouTubeData = nil
+                        }
+                    }
+                }
                 .fullScreenCover(isPresented: $showingOnboarding) {
                     OnboardingView(isPresented: $showingOnboarding)
                         .onDisappear {
@@ -425,6 +445,15 @@ struct JazzReferenceApp: App {
             showingSongCreation = true
         } else {
             NSLog("ℹ️ No imported song data found")
+        }
+    }
+
+    private func checkForImportedYouTube() {
+        if let data = SharedYouTubeDataManager.retrieveSharedData() {
+            NSLog("📥 Imported YouTube data detected: %@", data.title)
+            importedYouTubeData = data
+        } else {
+            NSLog("ℹ️ No imported YouTube data found")
         }
     }
     

@@ -8,24 +8,17 @@ ExtractMusicBrainzData.prototype = {
     run: function(arguments) {
         // Extract the URL to determine page type
         var url = document.location.href;
-        
-        // Check if this is a MusicBrainz page
-        if (!url.includes('musicbrainz.org')) {
-            arguments.completionFunction({
-                "error": "This extension only works on MusicBrainz pages",
-                "url": url
-            });
-            return;
-        }
-        
+
         // Determine page type and extract appropriate data
         if (url.includes('musicbrainz.org/artist/')) {
             this.extractArtistData(arguments, url);
         } else if (url.includes('musicbrainz.org/work/')) {
             this.extractSongData(arguments, url);
+        } else if (url.includes('youtube.com/watch') || url.includes('youtu.be/')) {
+            this.extractYouTubeData(arguments, url);
         } else {
             arguments.completionFunction({
-                "error": "This extension only works on MusicBrainz artist or work pages",
+                "error": "This extension works on MusicBrainz artist/work pages or YouTube videos",
                 "url": url
             });
         }
@@ -252,7 +245,89 @@ ExtractMusicBrainzData.prototype = {
         // Return results to the extension
         arguments.completionFunction(result);
     },
-    
+
+    extractYouTubeData: function(arguments, url) {
+        // Extract YouTube video ID from URL
+        var videoId = "";
+
+        // Handle youtube.com/watch?v=VIDEO_ID format
+        var watchMatch = url.match(/[?&]v=([^&]+)/);
+        if (watchMatch) {
+            videoId = watchMatch[1];
+        }
+
+        // Handle youtu.be/VIDEO_ID format
+        if (!videoId) {
+            var shortMatch = url.match(/youtu\.be\/([^?&]+)/);
+            if (shortMatch) {
+                videoId = shortMatch[1];
+            }
+        }
+
+        // Extract video title from page
+        var title = "";
+
+        // Try the main title element (works on most YouTube pages)
+        var titleElement = document.querySelector('h1.ytd-watch-metadata yt-formatted-string');
+        if (titleElement) {
+            title = titleElement.textContent.trim();
+        }
+
+        // Fallback to meta title
+        if (!title) {
+            var metaTitle = document.querySelector('meta[name="title"]');
+            if (metaTitle) {
+                title = metaTitle.getAttribute('content') || '';
+            }
+        }
+
+        // Fallback to document title
+        if (!title) {
+            title = document.title.replace(/ - YouTube$/, '').trim();
+        }
+
+        // Extract channel name
+        var channelName = "";
+        var channelElement = document.querySelector('#owner #channel-name yt-formatted-string a');
+        if (channelElement) {
+            channelName = channelElement.textContent.trim();
+        }
+
+        // Fallback for channel name
+        if (!channelName) {
+            var ownerElement = document.querySelector('ytd-channel-name yt-formatted-string a');
+            if (ownerElement) {
+                channelName = ownerElement.textContent.trim();
+            }
+        }
+
+        // Extract video description (first 500 chars)
+        var description = "";
+        var descElement = document.querySelector('#description-inline-expander yt-attributed-string');
+        if (descElement) {
+            description = descElement.textContent.trim().substring(0, 500);
+        }
+
+        // Prepare the result object
+        var result = {
+            "pageType": "youtube",
+            "videoId": videoId,
+            "title": title,
+            "url": url
+        };
+
+        if (channelName) {
+            result.channelName = channelName;
+        }
+
+        if (description) {
+            result.description = description;
+        }
+
+        // Return results to the extension
+        arguments.completionFunction(result);
+    },
+
     // This is called before the run function to allow page finalization
     finalize: function(arguments) {
         // No finalization needed
@@ -260,5 +335,4 @@ ExtractMusicBrainzData.prototype = {
 };
 
 // Create the instance
-var ExtensionPreprocessingJS = new ExtractMusicBrainzData;
 var ExtensionPreprocessingJS = new ExtractMusicBrainzData;

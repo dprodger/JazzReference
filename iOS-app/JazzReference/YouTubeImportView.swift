@@ -1,0 +1,566 @@
+//
+//  YouTubeImportView.swift
+//  JazzReference
+//
+//  View for completing YouTube video import by selecting a song
+//
+
+import SwiftUI
+
+extension Notification.Name {
+    static let transcriptionCreated = Notification.Name("transcriptionCreated")
+    static let videoCreated = Notification.Name("videoCreated")
+}
+
+struct YouTubeImportView: View {
+    let youtubeData: ImportedYouTubeData
+    let onSuccess: () -> Void
+    let onCancel: () -> Void
+
+    @State private var searchText = ""
+    @State private var searchResults: [Song] = []
+    @State private var isSearching = false
+    @State private var selectedSong: Song?
+    @State private var isImporting = false
+    @State private var importError: String?
+    @State private var showingRecordingPicker = false
+
+    @Environment(\.dismiss) private var dismiss
+
+    private let networkManager = NetworkManager()
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // Video Info Header
+            videoInfoHeader
+
+            Divider()
+
+            // Song Search
+            songSearchSection
+
+            Spacer()
+
+            // Action Buttons
+            actionButtons
+        }
+        .background(JazzTheme.backgroundLight)
+        .navigationTitle("Link to Song")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button("Cancel") {
+                    onCancel()
+                    dismiss()
+                }
+            }
+        }
+        .alert("Import Error", isPresented: Binding(
+            get: { importError != nil },
+            set: { if !$0 { importError = nil } }
+        )) {
+            Button("OK") { importError = nil }
+        } message: {
+            Text(importError ?? "Unknown error")
+        }
+        .sheet(isPresented: $showingRecordingPicker) {
+            if let song = selectedSong {
+                RecordingPickerView(
+                    song: song,
+                    youtubeData: youtubeData,
+                    onSelect: { recordingId in
+                        Task {
+                            await importVideo(songId: song.id, recordingId: recordingId)
+                        }
+                    },
+                    onCancel: {
+                        showingRecordingPicker = false
+                    }
+                )
+            }
+        }
+        .onAppear {
+            // Pre-populate search with video title keywords
+            let keywords = extractKeywords(from: youtubeData.title)
+            if !keywords.isEmpty {
+                searchText = keywords
+                Task {
+                    await searchSongs()
+                }
+            }
+        }
+    }
+
+    // MARK: - Video Info Header
+
+    private var videoInfoHeader: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 12) {
+                // YouTube icon
+                Image(systemName: "play.rectangle.fill")
+                    .font(.title)
+                    .foregroundColor(.red)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(youtubeData.title)
+                        .font(JazzTheme.headline())
+                        .foregroundColor(JazzTheme.charcoal)
+                        .lineLimit(2)
+
+                    HStack(spacing: 8) {
+                        Text(youtubeData.videoType.displayName)
+                            .font(JazzTheme.caption())
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 2)
+                            .background(youtubeData.videoType == .transcription ? Color.blue : Color.green)
+                            .cornerRadius(4)
+
+                        if let channel = youtubeData.channelName {
+                            Text(channel)
+                                .font(JazzTheme.caption())
+                                .foregroundColor(JazzTheme.smokeGray)
+                        }
+                    }
+                }
+            }
+        }
+        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(JazzTheme.cardBackground)
+    }
+
+    // MARK: - Song Search Section
+
+    private var songSearchSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Search for a song to link this video to:")
+                .font(JazzTheme.subheadline())
+                .foregroundColor(JazzTheme.smokeGray)
+                .padding(.horizontal)
+                .padding(.top)
+
+            // Search field
+            HStack {
+                Image(systemName: "magnifyingglass")
+                    .foregroundColor(JazzTheme.smokeGray)
+
+                TextField("Search songs...", text: $searchText)
+                    .textFieldStyle(.plain)
+                    .onSubmit {
+                        Task { await searchSongs() }
+                    }
+
+                if !searchText.isEmpty {
+                    Button(action: {
+                        searchText = ""
+                        searchResults = []
+                    }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundColor(JazzTheme.smokeGray)
+                    }
+                }
+
+                if isSearching {
+                    ProgressView()
+                        .scaleEffect(0.8)
+                }
+            }
+            .padding()
+            .background(JazzTheme.cardBackground)
+            .cornerRadius(10)
+            .padding(.horizontal)
+
+            // Search Results
+            if !searchResults.isEmpty {
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        ForEach(searchResults) { song in
+                            songRow(song)
+                        }
+                    }
+                }
+            } else if !searchText.isEmpty && !isSearching {
+                VStack(spacing: 8) {
+                    Image(systemName: "music.note")
+                        .font(.largeTitle)
+                        .foregroundColor(JazzTheme.smokeGray)
+
+                    Text("No songs found")
+                        .font(JazzTheme.body())
+                        .foregroundColor(JazzTheme.smokeGray)
+
+                    Text("Try different keywords")
+                        .font(JazzTheme.caption())
+                        .foregroundColor(JazzTheme.smokeGray)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.top, 40)
+            }
+        }
+    }
+
+    private func songRow(_ song: Song) -> some View {
+        VStack(spacing: 0) {
+            Button(action: {
+                selectedSong = song
+                // For transcriptions, we need to pick a recording
+                // For backing tracks, we can link directly to the song
+                if youtubeData.videoType == .transcription {
+                    showingRecordingPicker = true
+                } else {
+                    Task {
+                        await importVideo(songId: song.id, recordingId: nil)
+                    }
+                }
+            }) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(song.title)
+                            .font(JazzTheme.headline())
+                            .foregroundColor(JazzTheme.charcoal)
+
+                        if let composer = song.composer {
+                            Text(composer)
+                                .font(JazzTheme.subheadline())
+                                .foregroundColor(JazzTheme.smokeGray)
+                        }
+                    }
+
+                    Spacer()
+
+                    Image(systemName: "chevron.right")
+                        .foregroundColor(JazzTheme.smokeGray)
+                }
+                .padding()
+                .background(selectedSong?.id == song.id ? JazzTheme.burgundy.opacity(0.1) : Color.clear)
+            }
+            .buttonStyle(.plain)
+
+            Divider()
+                .padding(.leading)
+        }
+    }
+
+    // MARK: - Action Buttons
+
+    private var actionButtons: some View {
+        VStack(spacing: 12) {
+            if isImporting {
+                ProgressView("Importing...")
+                    .padding()
+            }
+        }
+        .padding()
+    }
+
+    // MARK: - Helper Functions
+
+    private func extractKeywords(from title: String) -> String {
+        // Remove common YouTube video prefixes/suffixes and extract song-related keywords
+        var cleaned = title
+            .replacingOccurrences(of: "Solo Transcription", with: "", options: .caseInsensitive)
+            .replacingOccurrences(of: "Transcription", with: "", options: .caseInsensitive)
+            .replacingOccurrences(of: "Backing Track", with: "", options: .caseInsensitive)
+            .replacingOccurrences(of: "Play Along", with: "", options: .caseInsensitive)
+            .replacingOccurrences(of: "Play-Along", with: "", options: .caseInsensitive)
+
+        // Remove content in parentheses
+        if let regex = try? NSRegularExpression(pattern: "\\([^)]*\\)", options: []) {
+            cleaned = regex.stringByReplacingMatches(in: cleaned, range: NSRange(cleaned.startIndex..., in: cleaned), withTemplate: "")
+        }
+
+        // Take first few words
+        let words = cleaned.split(separator: " ").prefix(3)
+        return words.joined(separator: " ").trimmingCharacters(in: .whitespaces)
+    }
+
+    private func searchSongs() async {
+        guard !searchText.isEmpty else { return }
+
+        isSearching = true
+        defer { isSearching = false }
+
+        do {
+            searchResults = try await networkManager.searchSongs(query: searchText)
+        } catch {
+            print("Search error: \(error)")
+            searchResults = []
+        }
+    }
+
+    private func importVideo(songId: String, recordingId: String?) async {
+        isImporting = true
+        defer { isImporting = false }
+
+        do {
+            if youtubeData.videoType == .transcription {
+                guard let recordingId = recordingId else {
+                    importError = "A recording must be selected for transcriptions"
+                    return
+                }
+
+                try await networkManager.createTranscription(
+                    songId: songId,
+                    recordingId: recordingId,
+                    youtubeUrl: youtubeData.url
+                )
+            } else {
+                try await networkManager.createVideo(
+                    songId: songId,
+                    youtubeUrl: youtubeData.url,
+                    videoType: "backing_track",
+                    title: youtubeData.title
+                )
+            }
+
+            // Success - post notification to refresh song detail
+            await MainActor.run {
+                if youtubeData.videoType == .transcription {
+                    NotificationCenter.default.post(
+                        name: .transcriptionCreated,
+                        object: nil,
+                        userInfo: ["songId": songId]
+                    )
+                } else {
+                    NotificationCenter.default.post(
+                        name: .videoCreated,
+                        object: nil,
+                        userInfo: ["songId": songId]
+                    )
+                }
+                onSuccess()
+                dismiss()
+            }
+        } catch {
+            importError = error.localizedDescription
+        }
+    }
+}
+
+// MARK: - Recording Picker View
+
+struct RecordingPickerView: View {
+    let song: Song
+    let youtubeData: ImportedYouTubeData
+    let onSelect: (String) -> Void
+    let onCancel: () -> Void
+
+    @State private var recordings: [Recording] = []
+    @State private var isLoading = true
+    @State private var loadError: String?
+    @State private var searchText = ""
+
+    @Environment(\.dismiss) private var dismiss
+
+    private let networkManager = NetworkManager()
+
+    /// Recordings sorted by artist name
+    private var sortedRecordings: [Recording] {
+        recordings.sorted { r1, r2 in
+            let artist1 = r1.artistCredit ?? ""
+            let artist2 = r2.artistCredit ?? ""
+            return artist1.localizedCaseInsensitiveCompare(artist2) == .orderedAscending
+        }
+    }
+
+    /// Filtered recordings based on search text
+    private var filteredRecordings: [Recording] {
+        if searchText.isEmpty {
+            return sortedRecordings
+        }
+        let query = searchText.lowercased()
+        return sortedRecordings.filter { recording in
+            (recording.artistCredit?.lowercased().contains(query) ?? false) ||
+            (recording.albumTitle?.lowercased().contains(query) ?? false) ||
+            (recording.recordingYear.map { String($0).contains(query) } ?? false)
+        }
+    }
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 0) {
+                if isLoading {
+                    Spacer()
+                    ProgressView("Loading recordings...")
+                    Spacer()
+                } else if let error = loadError {
+                    Spacer()
+                    VStack(spacing: 12) {
+                        Image(systemName: "exclamationmark.triangle")
+                            .font(.largeTitle)
+                            .foregroundColor(.orange)
+                        Text(error)
+                            .font(JazzTheme.body())
+                            .foregroundColor(JazzTheme.smokeGray)
+                    }
+                    Spacer()
+                } else if recordings.isEmpty {
+                    Spacer()
+                    VStack(spacing: 12) {
+                        Image(systemName: "opticaldisc")
+                            .font(.largeTitle)
+                            .foregroundColor(JazzTheme.smokeGray)
+                        Text("No recordings found")
+                            .font(JazzTheme.body())
+                            .foregroundColor(JazzTheme.smokeGray)
+                        Text("This song doesn't have any recordings yet")
+                            .font(JazzTheme.caption())
+                            .foregroundColor(JazzTheme.smokeGray)
+                    }
+                    Spacer()
+                } else {
+                    // Search field
+                    HStack {
+                        Image(systemName: "magnifyingglass")
+                            .foregroundColor(JazzTheme.smokeGray)
+
+                        TextField("Search by artist or album...", text: $searchText)
+                            .textFieldStyle(.plain)
+
+                        if !searchText.isEmpty {
+                            Button(action: { searchText = "" }) {
+                                Image(systemName: "xmark.circle.fill")
+                                    .foregroundColor(JazzTheme.smokeGray)
+                            }
+                        }
+                    }
+                    .padding()
+                    .background(JazzTheme.cardBackground)
+
+                    Divider()
+
+                    // Results count
+                    HStack {
+                        Text("\(filteredRecordings.count) recording\(filteredRecordings.count == 1 ? "" : "s")")
+                            .font(JazzTheme.caption())
+                            .foregroundColor(JazzTheme.smokeGray)
+                        Spacer()
+                        Text("Sorted by artist")
+                            .font(JazzTheme.caption())
+                            .foregroundColor(JazzTheme.smokeGray)
+                    }
+                    .padding(.horizontal)
+                    .padding(.vertical, 8)
+
+                    // Recordings list
+                    if filteredRecordings.isEmpty {
+                        Spacer()
+                        VStack(spacing: 8) {
+                            Image(systemName: "magnifyingglass")
+                                .font(.largeTitle)
+                                .foregroundColor(JazzTheme.smokeGray)
+                            Text("No matching recordings")
+                                .font(JazzTheme.body())
+                                .foregroundColor(JazzTheme.smokeGray)
+                        }
+                        Spacer()
+                    } else {
+                        List(filteredRecordings) { recording in
+                            Button(action: {
+                                onSelect(recording.id)
+                                dismiss()
+                            }) {
+                                recordingRow(recording)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        .listStyle(.plain)
+                    }
+                }
+            }
+            .navigationTitle("Select Recording")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        onCancel()
+                        dismiss()
+                    }
+                }
+            }
+        }
+        .task {
+            await loadRecordings()
+        }
+    }
+
+    private func recordingRow(_ recording: Recording) -> some View {
+        HStack(spacing: 12) {
+            // Album art
+            if let artUrl = recording.bestAlbumArtSmall, let url = URL(string: artUrl) {
+                AsyncImage(url: url) { image in
+                    image.resizable().aspectRatio(contentMode: .fill)
+                } placeholder: {
+                    Color.gray.opacity(0.3)
+                }
+                .frame(width: 50, height: 50)
+                .cornerRadius(4)
+            } else {
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(Color.gray.opacity(0.3))
+                    .frame(width: 50, height: 50)
+                    .overlay {
+                        Image(systemName: "opticaldisc")
+                            .foregroundColor(.gray)
+                    }
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(recording.albumTitle ?? "Unknown Album")
+                    .font(JazzTheme.headline())
+                    .foregroundColor(JazzTheme.charcoal)
+
+                HStack(spacing: 8) {
+                    if let artist = recording.artistCredit {
+                        Text(artist)
+                            .font(JazzTheme.caption())
+                            .foregroundColor(JazzTheme.smokeGray)
+                    }
+
+                    if let year = recording.recordingYear {
+                        Text("(\(String(year)))")
+                            .font(JazzTheme.caption())
+                            .foregroundColor(JazzTheme.smokeGray)
+                    }
+                }
+            }
+
+            Spacer()
+
+            Image(systemName: "chevron.right")
+                .foregroundColor(JazzTheme.smokeGray)
+        }
+        .padding(.vertical, 4)
+    }
+
+    private func loadRecordings() async {
+        isLoading = true
+        defer { isLoading = false }
+
+        if let songDetail = await networkManager.fetchSongDetail(id: song.id) {
+            recordings = songDetail.recordings ?? []
+        } else {
+            loadError = "Failed to load recordings"
+        }
+    }
+}
+
+// MARK: - Preview
+
+#Preview {
+    NavigationStack {
+        YouTubeImportView(
+            youtubeData: ImportedYouTubeData(
+                videoId: "abc123",
+                title: "Chet Baker - Born to be Blue (Solo Transcription)",
+                url: "https://www.youtube.com/watch?v=abc123",
+                channelName: "Jazz Transcriptions",
+                description: nil,
+                videoType: .transcription
+            ),
+            onSuccess: { print("Success") },
+            onCancel: { print("Cancel") }
+        )
+    }
+}

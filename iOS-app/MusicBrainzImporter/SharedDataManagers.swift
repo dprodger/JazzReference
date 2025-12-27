@@ -34,7 +34,7 @@ class SharedSongData {
             print("❌ Failed to get shared UserDefaults")
             return
         }
-        
+
         let encoder = JSONEncoder()
         if let encoded = try? encoder.encode(songData) {
             sharedDefaults.set(encoded, forKey: "pendingSongImport")
@@ -43,6 +43,27 @@ class SharedSongData {
             print("✅ Song data saved to shared container")
         } else {
             print("❌ Failed to encode song data")
+        }
+    }
+}
+
+class SharedYouTubeData {
+    static func saveSharedData(_ youtubeData: YouTubeData, appGroup: String) {
+        guard let sharedDefaults = UserDefaults(suiteName: appGroup) else {
+            print("❌ Failed to get shared UserDefaults")
+            return
+        }
+
+        let encoder = JSONEncoder()
+        if let encoded = try? encoder.encode(youtubeData) {
+            sharedDefaults.set(encoded, forKey: "pendingYouTubeImport")
+            // Clear any other pending imports
+            sharedDefaults.removeObject(forKey: "pendingArtistImport")
+            sharedDefaults.removeObject(forKey: "pendingSongImport")
+            sharedDefaults.synchronize()
+            print("✅ YouTube data saved to shared container")
+        } else {
+            print("❌ Failed to encode YouTube data")
         }
     }
 }

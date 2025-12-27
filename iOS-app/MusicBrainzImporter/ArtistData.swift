@@ -82,16 +82,61 @@ struct ExistingSong: Codable {
     let composer: String?
     let structure: String?
     var musicbrainzId: String?
-    
+
     var shortInfo: String {
         if let composer = composer, !composer.isEmpty {
             return "by \(composer)"
         }
         return "No composer information"
     }
-    
+
     enum CodingKeys: String, CodingKey {
         case id, title, composer, structure
         case musicbrainzId = "musicbrainz_id"
     }
+}
+
+// MARK: - YouTube Data Models
+
+enum YouTubeVideoType: String, Codable {
+    case transcription = "transcription"
+    case backingTrack = "backing_track"
+
+    var displayName: String {
+        switch self {
+        case .transcription:
+            return "Solo Transcription"
+        case .backingTrack:
+            return "Backing Track"
+        }
+    }
+
+    var description: String {
+        switch self {
+        case .transcription:
+            return "A video showing a transcribed solo with notation or analysis"
+        case .backingTrack:
+            return "A play-along or backing track for practicing"
+        }
+    }
+
+    var iconName: String {
+        switch self {
+        case .transcription:
+            return "music.quarternote.3"
+        case .backingTrack:
+            return "play.circle"
+        }
+    }
+}
+
+struct YouTubeData: Codable {
+    let videoId: String
+    let title: String
+    let url: String
+    let channelName: String?
+    let description: String?
+    var videoType: YouTubeVideoType?
+    var songId: String?
+    var recordingId: String?
 }
