@@ -24,25 +24,34 @@ struct YouTubeImportView: View {
     @State private var isImporting = false
     @State private var importError: String?
     @State private var showingRecordingPicker = false
+    @State private var showingRecordingChoice = false
+    @State private var showingLogin = false
 
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject var authManager: AuthenticationManager
 
     private let networkManager = NetworkManager()
 
     var body: some View {
-        VStack(spacing: 0) {
-            // Video Info Header
-            videoInfoHeader
+        Group {
+            if !authManager.isAuthenticated {
+                authRequiredView
+            } else {
+                VStack(spacing: 0) {
+                    // Video Info Header
+                    videoInfoHeader
 
-            Divider()
+                    Divider()
 
-            // Song Search
-            songSearchSection
+                    // Song Search
+                    songSearchSection
 
-            Spacer()
+                    Spacer()
 
-            // Action Buttons
-            actionButtons
+                    // Action Buttons
+                    actionButtons
+                }
+            }
         }
         .background(JazzTheme.backgroundLight)
         .navigationTitle("Link to Song")
@@ -79,15 +88,99 @@ struct YouTubeImportView: View {
                 )
             }
         }
-        .onAppear {
-            // Pre-populate search with video title keywords
-            let keywords = extractKeywords(from: youtubeData.title)
-            if !keywords.isEmpty {
-                searchText = keywords
-                Task {
-                    await searchSongs()
+        .confirmationDialog(
+            "Link to Recording?",
+            isPresented: $showingRecordingChoice,
+            titleVisibility: .visible
+        ) {
+            Button("Pick a Recording") {
+                showingRecordingPicker = true
+            }
+            Button("Skip - Link to Song Only") {
+                if let song = selectedSong {
+                    Task {
+                        await importVideo(songId: song.id, recordingId: nil)
+                    }
                 }
             }
+            Button("Cancel", role: .cancel) {
+                selectedSong = nil
+            }
+        } message: {
+            Text("You can link this transcription to a specific recording, or just to the song.")
+        }
+        .onAppear {
+            // Pre-populate search with video title keywords
+            if authManager.isAuthenticated {
+                let keywords = extractKeywords(from: youtubeData.title)
+                if !keywords.isEmpty {
+                    searchText = keywords
+                    Task {
+                        await searchSongs()
+                    }
+                }
+            }
+        }
+        .onChange(of: authManager.isAuthenticated) { _, isAuthenticated in
+            // When user logs in, trigger the search
+            if isAuthenticated {
+                let keywords = extractKeywords(from: youtubeData.title)
+                if !keywords.isEmpty {
+                    searchText = keywords
+                    Task {
+                        await searchSongs()
+                    }
+                }
+            }
+        }
+        .sheet(isPresented: $showingLogin) {
+            LoginView()
+                .environmentObject(authManager)
+        }
+    }
+
+    // MARK: - Auth Required View
+
+    private var authRequiredView: some View {
+        VStack(spacing: 0) {
+            // Video Info Header (show what they're trying to import)
+            videoInfoHeader
+
+            Divider()
+
+            Spacer()
+
+            VStack(spacing: 24) {
+                Image(systemName: "lock.fill")
+                    .font(.system(size: 60))
+                    .foregroundColor(JazzTheme.burgundy.opacity(0.6))
+
+                Text("Sign In Required")
+                    .font(JazzTheme.title2())
+                    .fontWeight(.semibold)
+                    .foregroundColor(JazzTheme.charcoal)
+
+                Text("You need to be signed in to import YouTube videos")
+                    .font(JazzTheme.body())
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 32)
+
+                Button(action: {
+                    showingLogin = true
+                }) {
+                    Text("Sign In")
+                        .fontWeight(.semibold)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(JazzTheme.burgundy)
+                        .foregroundColor(.white)
+                        .cornerRadius(10)
+                }
+                .padding(.horizontal, 32)
+            }
+
+            Spacer()
         }
     }
 
@@ -204,10 +297,10 @@ struct YouTubeImportView: View {
         VStack(spacing: 0) {
             Button(action: {
                 selectedSong = song
-                // For transcriptions, we need to pick a recording
+                // For transcriptions, offer choice to pick a recording or skip
                 // For backing tracks, we can link directly to the song
                 if youtubeData.videoType == .transcription {
-                    showingRecordingPicker = true
+                    showingRecordingChoice = true
                 } else {
                     Task {
                         await importVideo(songId: song.id, recordingId: nil)
@@ -293,24 +386,23 @@ struct YouTubeImportView: View {
         isImporting = true
         defer { isImporting = false }
 
+        let userId = authManager.currentUser?.id
+
         do {
             if youtubeData.videoType == .transcription {
-                guard let recordingId = recordingId else {
-                    importError = "A recording must be selected for transcriptions"
-                    return
-                }
-
                 try await networkManager.createTranscription(
                     songId: songId,
                     recordingId: recordingId,
-                    youtubeUrl: youtubeData.url
+                    youtubeUrl: youtubeData.url,
+                    userId: userId
                 )
             } else {
                 try await networkManager.createVideo(
                     songId: songId,
                     youtubeUrl: youtubeData.url,
                     videoType: "backing_track",
-                    title: youtubeData.title
+                    title: youtubeData.title,
+                    userId: userId
                 )
             }
 

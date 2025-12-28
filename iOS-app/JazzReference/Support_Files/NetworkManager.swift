@@ -958,7 +958,7 @@ class NetworkManager: ObservableObject {
 
     // MARK: - Create Transcription
 
-    func createTranscription(songId: String, recordingId: String, youtubeUrl: String) async throws {
+    func createTranscription(songId: String, recordingId: String?, youtubeUrl: String, userId: String? = nil) async throws {
         guard let url = URL(string: "\(NetworkManager.baseURL)/transcriptions") else {
             throw URLError(.badURL)
         }
@@ -967,11 +967,16 @@ class NetworkManager: ObservableObject {
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
-        let body: [String: Any] = [
+        var body: [String: Any] = [
             "song_id": songId,
-            "recording_id": recordingId,
             "youtube_url": youtubeUrl
         ]
+        if let recordingId = recordingId {
+            body["recording_id"] = recordingId
+        }
+        if let userId = userId {
+            body["created_by"] = userId
+        }
 
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
@@ -993,7 +998,7 @@ class NetworkManager: ObservableObject {
 
     // MARK: - Create Video
 
-    func createVideo(songId: String, youtubeUrl: String, videoType: String, title: String) async throws {
+    func createVideo(songId: String, youtubeUrl: String, videoType: String, title: String, userId: String? = nil) async throws {
         guard let url = URL(string: "\(NetworkManager.baseURL)/videos") else {
             throw URLError(.badURL)
         }
@@ -1002,12 +1007,15 @@ class NetworkManager: ObservableObject {
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
-        let body: [String: Any] = [
+        var body: [String: Any] = [
             "song_id": songId,
             "youtube_url": youtubeUrl,
             "video_type": videoType,
             "title": title
         ]
+        if let userId = userId {
+            body["created_by"] = userId
+        }
 
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 

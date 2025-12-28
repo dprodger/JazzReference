@@ -47,88 +47,296 @@ class ShareViewController: UIViewController {
     
     private func extractData() {
         NSLog("🔍 Extracting page data...")
-        
+
         // Get the extension context
         guard let extensionItem = extensionContext?.inputItems.first as? NSExtensionItem else {
             NSLog("❌ No extension item found")
             showError("No data available")
             return
         }
-        
-        guard let itemProvider = extensionItem.attachments?.first else {
-            NSLog("❌ No item provider found")
+
+        guard let attachments = extensionItem.attachments, !attachments.isEmpty else {
+            NSLog("❌ No attachments found")
             showError("No data available")
             return
         }
-        
-        NSLog("✓ Extension item and provider found")
-        
-        // Check for property list (JavaScript preprocessing results)
+
+        NSLog("✓ Extension item found with %d attachment(s)", attachments.count)
+
+        // Log type identifiers for debugging
+        for (index, provider) in attachments.enumerated() {
+            print("📋 Attachment \(index) type identifiers: \(provider.registeredTypeIdentifiers)")
+        }
+
+        // Try to find the best attachment to use
+        // Priority: property-list (Safari JS), then URL, then plain-text
         let propertyListType = "com.apple.property-list"
-        
-        if itemProvider.hasItemConformingToTypeIdentifier(propertyListType) {
-            NSLog("✓ Property list type found, loading item...")
-            
-            itemProvider.loadItem(forTypeIdentifier: propertyListType, options: nil) { [weak self] (item, error) in
+
+        // First, look for property list in any attachment (Safari JavaScript preprocessing)
+        if let itemProvider = attachments.first(where: { $0.hasItemConformingToTypeIdentifier(propertyListType) }) {
+            NSLog("✓ Found attachment with property list type")
+            loadPropertyList(from: itemProvider)
+            return
+        }
+
+        // DEBUG: Show what types we got if no property list found
+        NSLog("⚠️ No property list type found in any attachment")
+
+        // Fall back to first attachment for other types
+        let itemProvider = attachments[0]
+
+        if itemProvider.hasItemConformingToTypeIdentifier("public.url") {
+            // Handle URL shared from apps (like YouTube app)
+            NSLog("✓ URL type found, loading URL...")
+
+            itemProvider.loadItem(forTypeIdentifier: "public.url", options: nil) { [weak self] (item, error) in
                 guard let self = self else { return }
-                
+
                 if let error = error {
-                    NSLog("❌ Error loading item: \(error.localizedDescription)")
+                    NSLog("❌ Error loading URL: \(error.localizedDescription)")
                     DispatchQueue.main.async {
-                        self.showError("Failed to load page data")
+                        self.showError("Failed to load URL")
                     }
                     return
                 }
-                
-                NSLog("✓ Item loaded successfully")
-                
-                // The item should be a Dictionary containing the JavaScript preprocessing results
-                if let dictionary = item as? [String: Any] {
-                    NSLog("✓ Got dictionary from item")
-                    
-                    // Check for the JavaScript preprocessing results key
-                    if let results = dictionary[NSExtensionJavaScriptPreprocessingResultsKey] as? [String: Any] {
-                        NSLog("✓ Got JavaScript preprocessing results")
-                        
-                        DispatchQueue.main.async {
-                            self.processExtractedData(results)
-                        }
-                    } else {
-                        NSLog("❌ No JavaScript preprocessing results found")
-                        DispatchQueue.main.async {
-                            self.showError("Could not extract data from page")
-                        }
-                    }
-                } else if let data = item as? Data {
-                    NSLog("✓ Got Data, attempting to deserialize...")
-                    do {
-                        if let dict = try PropertyListSerialization.propertyList(from: data, options: [], format: nil) as? [String: Any] {
-                            NSLog("✓ Successfully deserialized property list")
-                            if let results = dict[NSExtensionJavaScriptPreprocessingResultsKey] as? [String: Any] {
-                                NSLog("✓ Got JavaScript preprocessing results from deserialized data")
-                                DispatchQueue.main.async {
-                                    self.processExtractedData(results)
-                                }
-                                return
-                            }
-                        }
-                    } catch {
-                        NSLog("❌ Failed to deserialize property list: \(error)")
-                    }
+
+                if let url = item as? URL {
+                    NSLog("✓ Got URL: \(url.absoluteString)")
                     DispatchQueue.main.async {
-                        self.showError("Invalid data format")
+                        self.processSharedURL(url)
+                    }
+                } else if let urlString = item as? String, let url = URL(string: urlString) {
+                    NSLog("✓ Got URL string: \(urlString)")
+                    DispatchQueue.main.async {
+                        self.processSharedURL(url)
                     }
                 } else {
-                    NSLog("❌ Item is not Dictionary or Data: \(type(of: item))")
+                    NSLog("❌ Item is not URL: \(type(of: item))")
                     DispatchQueue.main.async {
-                        self.showError("Invalid data format")
+                        self.showError("Invalid URL format")
+                    }
+                }
+            }
+        } else if itemProvider.hasItemConformingToTypeIdentifier("public.plain-text") {
+            // Handle plain text (YouTube app sometimes shares URLs as text)
+            NSLog("✓ Plain text type found, loading text...")
+
+            itemProvider.loadItem(forTypeIdentifier: "public.plain-text", options: nil) { [weak self] (item, error) in
+                guard let self = self else { return }
+
+                if let error = error {
+                    NSLog("❌ Error loading text: \(error.localizedDescription)")
+                    DispatchQueue.main.async {
+                        self.showError("Failed to load shared content")
+                    }
+                    return
+                }
+
+                if let text = item as? String {
+                    NSLog("✓ Got text: \(text)")
+                    // Try to extract a URL from the text
+                    if let url = self.extractURL(from: text) {
+                        DispatchQueue.main.async {
+                            self.processSharedURL(url)
+                        }
+                    } else {
+                        NSLog("❌ No valid URL found in text")
+                        DispatchQueue.main.async {
+                            self.showError("No valid URL found in shared content")
+                        }
+                    }
+                } else {
+                    NSLog("❌ Item is not String: \(type(of: item))")
+                    DispatchQueue.main.async {
+                        self.showError("Invalid content format")
                     }
                 }
             }
         } else {
-            NSLog("❌ No property list type found")
-            showError("This extension only works with web pages(!)")
+            NSLog("❌ No supported type found. Available: \(itemProvider.registeredTypeIdentifiers)")
+            showError("This extension only works with web pages and URLs")
         }
+    }
+
+    private func loadPropertyList(from itemProvider: NSItemProvider) {
+        let propertyListType = "com.apple.property-list"
+        NSLog("✓ Loading property list...")
+
+        itemProvider.loadItem(forTypeIdentifier: propertyListType, options: nil) { [weak self] (item, error) in
+            guard let self = self else { return }
+
+            if let error = error {
+                NSLog("❌ Error loading item: \(error.localizedDescription)")
+                DispatchQueue.main.async {
+                    self.showError("Failed to load page data")
+                }
+                return
+            }
+
+            NSLog("✓ Item loaded successfully, type: \(type(of: item))")
+
+            // The item should be a Dictionary containing the JavaScript preprocessing results
+            if let dictionary = item as? [String: Any] {
+                NSLog("✓ Got dictionary from item")
+
+                // Check for the JavaScript preprocessing results key
+                if let results = dictionary[NSExtensionJavaScriptPreprocessingResultsKey] as? [String: Any] {
+                    NSLog("✓ Got JavaScript preprocessing results")
+
+                    DispatchQueue.main.async {
+                        self.processExtractedData(results)
+                    }
+                } else {
+                    NSLog("❌ No JavaScript preprocessing results found in dictionary")
+                    NSLog("   Dictionary keys: \(dictionary.keys)")
+                    DispatchQueue.main.async {
+                        self.showError("Could not extract data from page")
+                    }
+                }
+            } else if let data = item as? Data {
+                NSLog("✓ Got Data (\(data.count) bytes), attempting to deserialize...")
+                do {
+                    if let dict = try PropertyListSerialization.propertyList(from: data, options: [], format: nil) as? [String: Any] {
+                        NSLog("✓ Successfully deserialized property list")
+                        if let results = dict[NSExtensionJavaScriptPreprocessingResultsKey] as? [String: Any] {
+                            NSLog("✓ Got JavaScript preprocessing results from deserialized data")
+                            DispatchQueue.main.async {
+                                self.processExtractedData(results)
+                            }
+                            return
+                        } else {
+                            NSLog("❌ No JS results key in deserialized dict. Keys: \(dict.keys)")
+                        }
+                    }
+                } catch {
+                    NSLog("❌ Failed to deserialize property list: \(error)")
+                }
+                DispatchQueue.main.async {
+                    self.showError("Invalid data format")
+                }
+            } else {
+                NSLog("❌ Item is not Dictionary or Data: \(type(of: item))")
+                DispatchQueue.main.async {
+                    self.showError("Invalid data format")
+                }
+            }
+        }
+    }
+
+    private func extractURL(from text: String) -> URL? {
+        // Try to find a YouTube URL in the text
+        let patterns = [
+            "https?://(?:www\\.)?youtube\\.com/watch\\?[^\\s]+",
+            "https?://(?:www\\.)?youtube\\.com/shorts/[^\\s]+",
+            "https?://youtu\\.be/[^\\s]+",
+            "https?://(?:www\\.)?youtube\\.com/[^\\s]+"
+        ]
+
+        for pattern in patterns {
+            if let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive) {
+                let range = NSRange(text.startIndex..., in: text)
+                if let match = regex.firstMatch(in: text, options: [], range: range) {
+                    if let urlRange = Range(match.range, in: text) {
+                        let urlString = String(text[urlRange])
+                        if let url = URL(string: urlString) {
+                            return url
+                        }
+                    }
+                }
+            }
+        }
+
+        // Fallback: try the whole text as a URL
+        return URL(string: text.trimmingCharacters(in: .whitespacesAndNewlines))
+    }
+
+    // MARK: - URL Processing
+
+    private func processSharedURL(_ url: URL) {
+        NSLog("🔗 Processing shared URL: \(url.absoluteString)")
+
+        // Check if this is a YouTube URL
+        if isYouTubeURL(url) {
+            processYouTubeURL(url)
+        } else if isMusicBrainzURL(url) {
+            // For MusicBrainz URLs, we can't extract data without JavaScript
+            // Show an error asking to use Safari
+            showError("Please share MusicBrainz pages from Safari to extract full data")
+        } else {
+            showError("This URL is not supported. Share from YouTube or MusicBrainz.")
+        }
+    }
+
+    private func isYouTubeURL(_ url: URL) -> Bool {
+        let host = url.host?.lowercased() ?? ""
+        return host.contains("youtube.com") || host.contains("youtu.be")
+    }
+
+    private func isMusicBrainzURL(_ url: URL) -> Bool {
+        let host = url.host?.lowercased() ?? ""
+        return host.contains("musicbrainz.org")
+    }
+
+    private func processYouTubeURL(_ url: URL) {
+        NSLog("🎬 Processing YouTube URL: \(url.absoluteString)")
+
+        // Extract video ID from URL
+        guard let videoId = extractYouTubeVideoId(from: url) else {
+            NSLog("❌ Could not extract video ID from URL")
+            showError("Could not extract video ID from YouTube URL")
+            return
+        }
+
+        NSLog("✓ Extracted video ID: \(videoId)")
+
+        // Create YouTubeData with minimal info (we don't have the title from app share)
+        // The title will be "YouTube Video" as a placeholder
+        let youtubeData = YouTubeData(
+            videoId: videoId,
+            title: "YouTube Video",  // Placeholder - we don't have access to the title from app share
+            url: url.absoluteString,
+            channelName: nil,
+            description: nil,
+            videoType: nil,
+            songId: nil,
+            recordingId: nil
+        )
+
+        self.youtubeData = youtubeData
+        self.isYouTubeImport = true
+
+        NSLog("✅ YouTube data created from URL")
+
+        // Show YouTube type selection view
+        showYouTubeTypeSelectionView(with: youtubeData)
+    }
+
+    private func extractYouTubeVideoId(from url: URL) -> String? {
+        // Handle youtu.be short URLs
+        if url.host?.lowercased().contains("youtu.be") == true {
+            // Format: https://youtu.be/VIDEO_ID or https://youtu.be/VIDEO_ID?...
+            return url.pathComponents.last
+        }
+
+        // Handle youtube.com URLs
+        if let queryItems = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems {
+            // Standard watch URL: https://www.youtube.com/watch?v=VIDEO_ID
+            if let videoId = queryItems.first(where: { $0.name == "v" })?.value {
+                return videoId
+            }
+        }
+
+        // Handle embed URLs: https://www.youtube.com/embed/VIDEO_ID
+        if url.pathComponents.contains("embed"), let videoId = url.pathComponents.last {
+            return videoId
+        }
+
+        // Handle shorts URLs: https://www.youtube.com/shorts/VIDEO_ID
+        if url.pathComponents.contains("shorts"), let videoId = url.pathComponents.last {
+            return videoId
+        }
+
+        return nil
     }
     
     // MARK: - Data Processing

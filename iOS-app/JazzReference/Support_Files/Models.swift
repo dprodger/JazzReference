@@ -705,7 +705,7 @@ struct Repertoire: Codable, Identifiable, Hashable {
 struct SoloTranscription: Codable, Identifiable {
     let id: String
     let songId: String
-    let recordingId: String
+    let recordingId: String?  // Optional - transcription may be linked to song only
     let youtubeUrl: String?
     let createdAt: String?
     let updatedAt: String?

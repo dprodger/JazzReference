@@ -14,11 +14,17 @@ ExtractMusicBrainzData.prototype = {
             this.extractArtistData(arguments, url);
         } else if (url.includes('musicbrainz.org/work/')) {
             this.extractSongData(arguments, url);
-        } else if (url.includes('youtube.com/watch') || url.includes('youtu.be/')) {
+        } else if (url.includes('youtube.com/watch') || url.includes('youtube.com/shorts/') || url.includes('youtu.be/')) {
             this.extractYouTubeData(arguments, url);
+        } else if (url.includes('musicbrainz.org/recording/')) {
+            // Recording pages are not supported - direct user to work page
+            arguments.completionFunction({
+                "error": "Recording pages are not supported. Please navigate to the Work page for this song.",
+                "url": url
+            });
         } else {
             arguments.completionFunction({
-                "error": "This extension works on MusicBrainz artist/work pages or YouTube videos",
+                "error": "This extension works on MusicBrainz artist/work pages or YouTube videos.",
                 "url": url
             });
         }

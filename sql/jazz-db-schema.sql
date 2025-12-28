@@ -118,6 +118,7 @@ CREATE TABLE videos (
     duration_seconds INTEGER,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+	created_by VARCHAR(100) NOT NULL;
     CONSTRAINT video_must_link_to_song_or_recording CHECK (
         (song_id IS NOT NULL) OR (recording_id IS NOT NULL)
     )
@@ -169,7 +170,7 @@ CREATE TABLE IF NOT EXISTS artist_images (
 CREATE TABLE IF NOT EXISTS solo_transcriptions (
     id uuid DEFAULT uuid_generate_v4() PRIMARY KEY,
     song_id uuid NOT NULL REFERENCES songs(id) ON DELETE CASCADE,
-    recording_id uuid NOT NULL REFERENCES recordings(id) ON DELETE CASCADE,
+    recording_id uuid REFERENCES recordings(id),
     youtube_url character varying(500),
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
