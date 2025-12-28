@@ -22,6 +22,7 @@ def create_video():
         video_type = data.get('video_type')
         title = data.get('title')
         description = data.get('description')
+        created_by = data.get('created_by')  # Optional - user ID
 
         if not youtube_url:
             return jsonify({'error': 'youtube_url is required'}), 400
@@ -73,10 +74,10 @@ def create_video():
         with db_tools.get_db_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute("""
-                    INSERT INTO videos (song_id, recording_id, youtube_url, video_type, title, description)
-                    VALUES (%s, %s, %s, %s, %s, %s)
-                    RETURNING id, song_id, recording_id, youtube_url, video_type, title, description, created_at
-                """, (song_id, recording_id, youtube_url, video_type, title, description))
+                    INSERT INTO videos (song_id, recording_id, youtube_url, video_type, title, description, created_by)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    RETURNING id, song_id, recording_id, youtube_url, video_type, title, description, created_at, created_by
+                """, (song_id, recording_id, youtube_url, video_type, title, description, created_by))
 
                 result = cur.fetchone()
                 conn.commit()
@@ -84,7 +85,7 @@ def create_video():
         if not result:
             return jsonify({'error': 'Failed to create video'}), 500
 
-        logger.info(f"Created video {result['id']} ({video_type}) for song {song_id}")
+        logger.info(f"Created video {result['id']} ({video_type}) for song {song_id}, created_by {created_by}")
 
         return jsonify({
             'message': 'Video created successfully',

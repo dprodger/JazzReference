@@ -35,10 +35,10 @@ def get_song_transcriptions(song_id):
                 s.title as song_title
             FROM solo_transcriptions st
             JOIN songs s ON st.song_id = s.id
-            JOIN recordings r ON st.recording_id = r.id
+            LEFT JOIN recordings r ON st.recording_id = r.id
             LEFT JOIN releases def_rel ON r.default_release_id = def_rel.id
             WHERE st.song_id = %s
-            ORDER BY r.recording_year DESC
+            ORDER BY r.recording_year DESC NULLS LAST
         """
         
         transcriptions = db_tools.execute_query(query, (song_id,), fetch_all=True)
@@ -107,7 +107,7 @@ def get_transcription_detail(transcription_id):
                 r.label
             FROM solo_transcriptions st
             JOIN songs s ON st.song_id = s.id
-            JOIN recordings r ON st.recording_id = r.id
+            LEFT JOIN recordings r ON st.recording_id = r.id
             LEFT JOIN releases def_rel ON r.default_release_id = def_rel.id
             WHERE st.id = %s
         """
@@ -134,13 +134,12 @@ def create_transcription():
             return jsonify({'error': 'No data provided'}), 400
 
         song_id = data.get('song_id')
-        recording_id = data.get('recording_id')
+        recording_id = data.get('recording_id')  # Optional - can be None
         youtube_url = data.get('youtube_url')
+        created_by = data.get('created_by')  # Optional - user ID
 
         if not song_id:
             return jsonify({'error': 'song_id is required'}), 400
-        if not recording_id:
-            return jsonify({'error': 'recording_id is required'}), 400
         if not youtube_url:
             return jsonify({'error': 'youtube_url is required'}), 400
 
@@ -153,32 +152,42 @@ def create_transcription():
         if not song_check:
             return jsonify({'error': 'Song not found'}), 404
 
-        # Validate that the recording exists and belongs to the song
-        recording_check = db_tools.execute_query(
-            "SELECT id FROM recordings WHERE id = %s AND song_id = %s",
-            (recording_id, song_id),
-            fetch_one=True
-        )
-        if not recording_check:
-            return jsonify({'error': 'Recording not found or does not belong to this song'}), 404
+        # If recording_id is provided, validate it exists and belongs to the song
+        if recording_id:
+            recording_check = db_tools.execute_query(
+                "SELECT id FROM recordings WHERE id = %s AND song_id = %s",
+                (recording_id, song_id),
+                fetch_one=True
+            )
+            if not recording_check:
+                return jsonify({'error': 'Recording not found or does not belong to this song'}), 404
 
-        # Check for duplicate transcription (same recording + youtube URL)
-        duplicate_check = db_tools.execute_query(
-            "SELECT id FROM solo_transcriptions WHERE recording_id = %s AND youtube_url = %s",
-            (recording_id, youtube_url),
-            fetch_one=True
-        )
-        if duplicate_check:
-            return jsonify({'error': 'A transcription with this YouTube URL already exists for this recording'}), 409
+            # Check for duplicate transcription (same recording + youtube URL)
+            duplicate_check = db_tools.execute_query(
+                "SELECT id FROM solo_transcriptions WHERE recording_id = %s AND youtube_url = %s",
+                (recording_id, youtube_url),
+                fetch_one=True
+            )
+            if duplicate_check:
+                return jsonify({'error': 'A transcription with this YouTube URL already exists for this recording'}), 409
+        else:
+            # Check for duplicate transcription without recording (same song + youtube URL with no recording)
+            duplicate_check = db_tools.execute_query(
+                "SELECT id FROM solo_transcriptions WHERE song_id = %s AND recording_id IS NULL AND youtube_url = %s",
+                (song_id, youtube_url),
+                fetch_one=True
+            )
+            if duplicate_check:
+                return jsonify({'error': 'A transcription with this YouTube URL already exists for this song'}), 409
 
         # Create the transcription using direct connection for INSERT
         with db_tools.get_db_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute("""
-                    INSERT INTO solo_transcriptions (song_id, recording_id, youtube_url)
-                    VALUES (%s, %s, %s)
-                    RETURNING id, song_id, recording_id, youtube_url, created_at
-                """, (song_id, recording_id, youtube_url))
+                    INSERT INTO solo_transcriptions (song_id, recording_id, youtube_url, created_by)
+                    VALUES (%s, %s, %s, %s)
+                    RETURNING id, song_id, recording_id, youtube_url, created_at, created_by
+                """, (song_id, recording_id, youtube_url, created_by))
 
                 result = cur.fetchone()
                 conn.commit()
@@ -186,7 +195,7 @@ def create_transcription():
         if not result:
             return jsonify({'error': 'Failed to create transcription'}), 500
 
-        logger.info(f"Created transcription {result['id']} for song {song_id}, recording {recording_id}")
+        logger.info(f"Created transcription {result['id']} for song {song_id}, recording {recording_id}, created_by {created_by}")
 
         return jsonify({
             'message': 'Transcription created successfully',
