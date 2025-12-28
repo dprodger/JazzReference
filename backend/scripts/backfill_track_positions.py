@@ -11,7 +11,6 @@ Usage:
 
 import argparse
 import logging
-import signal
 import sys
 from pathlib import Path
 
@@ -20,16 +19,6 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from db_utils import get_db_connection
 from mb_utils import MusicBrainzSearcher
-
-
-class DBTimeoutError(Exception):
-    """Raised when a database operation times out"""
-    pass
-
-
-def timeout_handler(signum, frame):
-    """Signal handler for timeout"""
-    raise DBTimeoutError("Database operation timed out (likely PgBouncer/Supabase connection issue)")
 
 logging.basicConfig(
     level=logging.INFO,
@@ -206,20 +195,20 @@ def backfill_positions(dry_run: bool = False, limit: int = None, force_refresh: 
         if updates_to_apply and not dry_run:
             logger.debug(f"    Opening DB connection for {len(updates_to_apply)} updates...")
 
-            # Set a 60-second timeout for the entire DB operation
-            # This catches PgBouncer/Supabase connection hangs early
-            old_handler = signal.signal(signal.SIGALRM, timeout_handler)
-            signal.alarm(60)  # 60 second timeout
-
             try:
                 with get_db_connection() as conn:
-                    logger.debug(f"    DB connection opened, testing with SELECT...")
-                    # Test the connection with a simple SELECT first
                     with conn.cursor() as cur:
+                        # Use PostgreSQL's built-in timeouts - these actually work unlike SIGALRM
+                        # statement_timeout: max time for any statement (30 seconds)
+                        # lock_timeout: max time to wait for a lock (10 seconds)
+                        cur.execute("SET statement_timeout = '30s'")
+                        cur.execute("SET lock_timeout = '10s'")
+
+                        logger.debug(f"    DB connection opened, testing with SELECT...")
                         cur.execute("SELECT 1")
                         cur.fetchone()
-                    logger.debug(f"    Connection verified, executing updates...")
-                    with conn.cursor() as cur:
+                        logger.debug(f"    Connection verified, executing updates...")
+
                         for update in updates_to_apply:
                             cur.execute("""
                                 UPDATE recording_releases
@@ -230,37 +219,17 @@ def backfill_positions(dry_run: bool = False, limit: int = None, force_refresh: 
                     logger.debug(f"    Committing...")
                     conn.commit()
                     logger.debug(f"    Committed successfully")
-            except DBTimeoutError:
-                logger.error(f"    DB timeout for release {mb_release_id} - retrying...")
-                # Retry once with a fresh connection
-                try:
-                    signal.alarm(60)  # Reset timeout
-                    with get_db_connection() as conn:
-                        with conn.cursor() as cur:
-                            for update in updates_to_apply:
-                                cur.execute("""
-                                    UPDATE recording_releases
-                                    SET track_number = %s, disc_number = %s
-                                    WHERE recording_id = %s AND release_id = %s
-                                """, (update['track_number'], update['disc_number'],
-                                      update['recording_id'], update['release_id']))
-                        conn.commit()
-                        logger.info(f"    Retry succeeded")
-                except DBTimeoutError as retry_e:
-                    # Skip this release and continue - likely has locked rows
-                    logger.error(f"    Retry also timed out - SKIPPING release {mb_release_id}")
-                    logger.error(f"    (Rows may be locked by a previous crashed transaction)")
+            except Exception as e:
+                error_msg = str(e).lower()
+                if 'lock' in error_msg or 'timeout' in error_msg:
+                    # Lock timeout or statement timeout - skip and continue
+                    logger.error(f"    Timeout/lock error for release {mb_release_id}: {e}")
+                    logger.error(f"    (Rows may be locked by another transaction - SKIPPING)")
                     stats['api_errors'] += 1
                     continue  # Skip to next release instead of crashing
-                except Exception as retry_e:
-                    logger.error(f"    Retry failed with unexpected error: {retry_e}")
+                else:
+                    logger.error(f"    DB error for release {mb_release_id}: {e}")
                     raise
-            except Exception as e:
-                logger.error(f"    DB error for release {mb_release_id}: {e}")
-                raise
-            finally:
-                signal.alarm(0)  # Cancel the alarm
-                signal.signal(signal.SIGALRM, old_handler)  # Restore old handler
 
     # Print summary
     logger.info("")
