@@ -61,10 +61,9 @@ struct SongsListView: View {
                     }
                 }
                 .task {
-                    // Load repertoires first
-                    await repertoireManager.loadRepertoires()
-                    // Only load songs on initial appear, not when returning from detail view
+                    // Only load on initial appear, not when returning from detail view
                     if !hasPerformedInitialLoad {
+                        await repertoireManager.loadRepertoires()
                         await loadSongs()
                         hasPerformedInitialLoad = true
                     }
