@@ -25,6 +25,7 @@ struct SongDetailView: View {
     @State private var song: Song?
     @State private var isLoading = true
     @State private var transcriptions: [SoloTranscription] = []
+    @State private var backingTracks: [Video] = []
     
     // NEW: Drag gesture state for visual feedback
     @GestureState private var dragOffset: CGFloat = 0
@@ -95,6 +96,7 @@ struct SongDetailView: View {
     }
     
     private func loadCurrentSong() {
+        print("📺 [loadCurrentSong] Called for song: \(currentSongId)")
         isLoading = true
         isRecordingsLoading = true
         Task {
@@ -104,6 +106,19 @@ struct SongDetailView: View {
                 song = fetchedSong
                 transcriptions = fetchedSong?.transcriptions ?? []
                 isLoading = false
+            }
+
+            // Load backing tracks
+            print("📺 [loadCurrentSong] Fetching backing tracks for song: \(currentSongId)")
+            do {
+                let videos = try await networkManager.fetchSongVideos(songId: currentSongId, videoType: "backing_track")
+                print("📺 [loadCurrentSong] Fetched \(videos.count) backing tracks")
+                await MainActor.run {
+                    backingTracks = videos
+                    print("📺 [loadCurrentSong] Updated backingTracks state, count: \(backingTracks.count)")
+                }
+            } catch {
+                print("📺 [loadCurrentSong] Error fetching backing tracks: \(error)")
             }
 
             // Phase 2: Load all recordings in background
@@ -285,6 +300,9 @@ struct SongDetailView: View {
                 )
             // MARK: - TRANSCRIPTIONS SECTION
             TranscriptionsSection(transcriptions: transcriptions)
+
+            // MARK: - BACKING TRACKS SECTION
+            BackingTracksSection(videos: backingTracks)
         }
         .padding(.bottom)
         }
@@ -442,6 +460,26 @@ struct SongDetailView: View {
                    songId == currentSongId {
                     Task {
                         await loadSongData()
+                    }
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .videoCreated)) { notification in
+                // Refresh backing tracks if this notification is for our song
+                print("📺 [videoCreated] Received notification, checking songId...")
+                if let songId = notification.userInfo?["songId"] as? String,
+                   songId == currentSongId {
+                    print("📺 [videoCreated] Matches current song, fetching backing tracks...")
+                    Task {
+                        do {
+                            let videos = try await networkManager.fetchSongVideos(songId: currentSongId, videoType: "backing_track")
+                            print("📺 [videoCreated] Fetched \(videos.count) backing tracks")
+                            await MainActor.run {
+                                backingTracks = videos
+                                print("📺 [videoCreated] Updated backingTracks state, count: \(backingTracks.count)")
+                            }
+                        } catch {
+                            print("📺 [videoCreated] Error fetching backing tracks: \(error)")
+                        }
                     }
                 }
             }
@@ -638,6 +676,19 @@ struct SongDetailView: View {
             }
         }
 
+        // Load backing tracks
+        print("📺 [forceRefresh] Fetching backing tracks for song: \(currentSongId)")
+        do {
+            let videos = try await networkManager.fetchSongVideos(songId: currentSongId, videoType: "backing_track")
+            print("📺 [forceRefresh] Fetched \(videos.count) backing tracks")
+            await MainActor.run {
+                backingTracks = videos
+                print("📺 [forceRefresh] Updated backingTracks state, count: \(backingTracks.count)")
+            }
+        } catch {
+            print("📺 [forceRefresh] Error fetching backing tracks: \(error)")
+        }
+
         // Phase 2: Load all recordings in background
         if let recordings = await networkManager.fetchSongRecordings(id: currentSongId, sortBy: recordingSortOrder) {
             await MainActor.run {
@@ -653,7 +704,9 @@ struct SongDetailView: View {
     private func loadSongData() async {
         // Guard: Don't reload if we already have data for the current song
         // This preserves state when navigating back from RecordingDetailView
+        print("📺 [loadSongData] Called. song=\(song?.id ?? "nil"), currentSongId=\(currentSongId), isLoading=\(isLoading), backingTracks=\(backingTracks.count)")
         if song != nil && song?.id == currentSongId && !isLoading {
+            print("📺 [loadSongData] Early return - already have data for this song")
             return
         }
 
@@ -675,6 +728,19 @@ struct SongDetailView: View {
             isLoading = false
         }
 
+        // Load backing tracks
+        print("📺 [loadSongData] Fetching backing tracks for song: \(currentSongId)")
+        do {
+            let videos = try await networkManager.fetchSongVideos(songId: currentSongId, videoType: "backing_track")
+            print("📺 [loadSongData] Fetched \(videos.count) backing tracks")
+            await MainActor.run {
+                backingTracks = videos
+                print("📺 [loadSongData] Updated backingTracks state, count: \(backingTracks.count)")
+            }
+        } catch {
+            print("📺 [loadSongData] Error fetching backing tracks: \(error)")
+        }
+
         // Phase 2: Load all recordings in background
         if let recordings = await networkManager.fetchSongRecordings(id: currentSongId, sortBy: recordingSortOrder) {
             await MainActor.run {
@@ -687,7 +753,7 @@ struct SongDetailView: View {
             }
         }
     }
-    
+
     // MARK: - Helper for Page Dots
     
     private func calculateVisibleDotRange(current: Int, total: Int) -> Range<Int> {

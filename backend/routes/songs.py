@@ -27,9 +27,9 @@ songs_bp = Blueprint('songs', __name__)
 # ============================================================================
 # SQL FRAGMENTS FOR ALBUM ART (same as recordings.py)
 # ============================================================================
-# These fragments implement the priority: 
+# These fragments implement the priority:
 #   1. release_imagery (CAA) for default_release
-#   2. releases table (Spotify) for default_release  
+#   2. releases table (Spotify) for default_release
 #   3. release_imagery (CAA) for any linked release
 #   4. releases table (Spotify) for any linked release
 

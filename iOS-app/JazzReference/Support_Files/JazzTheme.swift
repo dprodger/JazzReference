@@ -325,7 +325,10 @@ extension JazzTheme {
     
     /// Deep teal - cool accent
     static let teal = Color(red: 0.20, green: 0.35, blue: 0.40) // #335966
-    
+
+    /// Forest green - for backing tracks and practice materials
+    static let green = Color(red: 0.25, green: 0.50, blue: 0.35) // #408059
+
     // MARK: - Neutrals
     
     /// Rich charcoal - primary text on light backgrounds

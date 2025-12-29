@@ -1,76 +1,78 @@
 // TranscriptionRowView.swift
-// Standalone component for displaying solo transcriptions
-// Add this to your project if you prefer a separate file
+// Tappable row component for displaying solo transcriptions
+// YouTube player is shown in a sheet for better performance
 
 import SwiftUI
-import YouTubePlayerKit
 
 // MARK: - Transcription Row View
 struct TranscriptionRowView: View {
     let transcription: SoloTranscription
+    let onTap: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            // Album/Recording title
-            if let albumTitle = transcription.albumTitle {
-                Text(albumTitle)
-                    .font(JazzTheme.headline())
-                    .foregroundColor(JazzTheme.charcoal)
-            } else {
-                Text("Solo Transcription")
-                    .font(JazzTheme.headline())
-                    .foregroundColor(JazzTheme.charcoal)
-            }
-            
-            // Recording details
+        Button(action: onTap) {
             HStack(spacing: 12) {
-                if let year = transcription.recordingYear {
-                    HStack(spacing: 4) {
-                        Image(systemName: "calendar")
-                            .foregroundColor(JazzTheme.brass)
-                            .font(JazzTheme.caption())
-                        Text(String(format: "%d", year))
-                            .font(JazzTheme.subheadline())
-                            .foregroundColor(JazzTheme.smokeGray)
+                // Play button thumbnail
+                ZStack {
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(JazzTheme.teal.opacity(0.15))
+                        .frame(width: 80, height: 45)
+
+                    Image(systemName: "play.fill")
+                        .font(.system(size: 20))
+                        .foregroundColor(JazzTheme.teal)
+                }
+
+                // Transcription info
+                VStack(alignment: .leading, spacing: 4) {
+                    // Album/Recording title
+                    Text(transcription.albumTitle ?? "Solo Transcription")
+                        .font(JazzTheme.headline())
+                        .foregroundColor(JazzTheme.charcoal)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+
+                    // Recording details
+                    HStack(spacing: 12) {
+                        if let year = transcription.recordingYear {
+                            HStack(spacing: 4) {
+                                Image(systemName: "calendar")
+                                    .foregroundColor(JazzTheme.brass)
+                                    .font(JazzTheme.caption())
+                                Text(String(format: "%d", year))
+                                    .font(JazzTheme.subheadline())
+                                    .foregroundColor(JazzTheme.smokeGray)
+                            }
+                        }
+
+                        if let label = transcription.label {
+                            HStack(spacing: 4) {
+                                Image(systemName: "opticaldisc")
+                                    .foregroundColor(JazzTheme.brass)
+                                    .font(JazzTheme.caption())
+                                Text(label)
+                                    .font(JazzTheme.subheadline())
+                                    .foregroundColor(JazzTheme.smokeGray)
+                                    .lineLimit(1)
+                            }
+                        }
                     }
                 }
-                
-                if let label = transcription.label {
-                    HStack(spacing: 4) {
-                        Image(systemName: "opticaldisc")
-                            .foregroundColor(JazzTheme.brass)
-                            .font(JazzTheme.caption())
-                        Text(label)
-                            .font(JazzTheme.subheadline())
-                            .foregroundColor(JazzTheme.smokeGray)
-                    }
-                }
+
+                Spacer()
+
+                // Chevron indicator
+                Image(systemName: "chevron.right")
+                    .font(JazzTheme.subheadline())
+                    .foregroundColor(JazzTheme.smokeGray)
             }
-            // YouTube link button
-            if let youtubeUrl = transcription.youtubeUrl {
-                YouTubePlayerView(.init(stringLiteral: youtubeUrl)) { state in
-                    // An optional overlay view for the current state of the player
-                    switch state {
-                    case .idle:
-                        ProgressView()
-                    case .ready:
-                        EmptyView()
-                    case .error(let error):
-                        ContentUnavailableView(
-                            "Error",
-                            systemImage: "exclamationmark.triangle.fill",
-                            description: Text("YouTube player couldn't be loaded: \(error)")
-                        )
-                    }
-                }
-                .aspectRatio(16/9, contentMode: .fit)
-            }
+            .padding()
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(JazzTheme.cardBackground)
+            .cornerRadius(10)
+            .padding(.horizontal)
         }
-        .padding()
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(JazzTheme.cardBackground)
-        .cornerRadius(10)
-        .padding(.horizontal)
+        .buttonStyle(.plain)
     }
 }
 
@@ -90,9 +92,10 @@ struct TranscriptionRowView: View {
                 recordingYear: 1959,
                 composer: "Joseph Kosma",
                 label: "Columbia"
-            )
+            ),
+            onTap: {}
         )
-        
+
         TranscriptionRowView(
             transcription: SoloTranscription(
                 id: "preview-2",
@@ -106,7 +109,8 @@ struct TranscriptionRowView: View {
                 recordingYear: nil,
                 composer: nil,
                 label: nil
-            )
+            ),
+            onTap: {}
         )
     }
 }

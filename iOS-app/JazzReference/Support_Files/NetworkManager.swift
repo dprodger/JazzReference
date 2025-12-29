@@ -1034,6 +1034,32 @@ class NetworkManager: ObservableObject {
         }
     }
 
+    // MARK: - Fetch Song Videos
+
+    func fetchSongVideos(songId: String, videoType: String? = nil) async throws -> [Video] {
+        var urlString = "\(NetworkManager.baseURL)/songs/\(songId)/videos"
+        if let videoType = videoType {
+            urlString += "?type=\(videoType)"
+        }
+
+        guard let url = URL(string: urlString) else {
+            throw URLError(.badURL)
+        }
+
+        let (data, response) = try await URLSession.shared.data(from: url)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw URLError(.badServerResponse)
+        }
+
+        if httpResponse.statusCode >= 400 {
+            throw URLError(.badServerResponse)
+        }
+
+        let decoder = JSONDecoder()
+        return try decoder.decode([Video].self, from: data)
+    }
+
     // MARK: - Recordings
 
     /// Total count of recordings in the database (fetched separately for performance)

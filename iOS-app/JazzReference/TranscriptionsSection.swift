@@ -2,35 +2,38 @@
 //  TranscriptionsSection.swift
 //  JazzReference
 //
-//  Created by Dave Rodger on 11/12/25.
-//
 //  Collapsible section displaying solo transcriptions
+//  Uses a single shared YouTube player presented in a sheet for better performance
 //
 
 import SwiftUI
+import YouTubePlayerKit
 
 struct TranscriptionsSection: View {
     let transcriptions: [SoloTranscription]
-    
+
     @State private var isSectionExpanded: Bool = true
-    
+    @State private var selectedTranscription: SoloTranscription?
+
     var body: some View {
         if !transcriptions.isEmpty {
             Divider()
                 .padding(.horizontal)
                 .padding(.top, 16)
-            
+
             // HStack with explicit spacers ensures DisclosureGroup chevron is properly inset
             HStack(spacing: 0) {
                 Spacer().frame(width: 16)
-                
+
                 VStack(alignment: .leading, spacing: 0) {
                     DisclosureGroup(
                         isExpanded: $isSectionExpanded,
                     content: {
                         VStack(alignment: .leading, spacing: 12) {
                             ForEach(transcriptions) { transcription in
-                                TranscriptionRowView(transcription: transcription)
+                                TranscriptionRowView(transcription: transcription) {
+                                    selectedTranscription = transcription
+                                }
                             }
                         }
                         .padding(.top, 12)
@@ -43,9 +46,9 @@ struct TranscriptionsSection: View {
                                 .font(JazzTheme.title2())
                                 .bold()
                                 .foregroundColor(JazzTheme.charcoal)
-                            
+
                             Spacer()
-                            
+
                             Text("\(transcriptions.count)")
                                 .font(JazzTheme.subheadline())
                                 .foregroundColor(JazzTheme.smokeGray)
@@ -59,10 +62,107 @@ struct TranscriptionsSection: View {
                 )
                 .tint(JazzTheme.teal)
             }
-            
+
             Spacer().frame(width: 16)
             }
             .background(JazzTheme.backgroundLight)
+            .sheet(item: $selectedTranscription) { transcription in
+                TranscriptionPlayerSheet(transcription: transcription)
+            }
+        }
+    }
+}
+
+// MARK: - Transcription Player Sheet
+
+struct TranscriptionPlayerSheet: View {
+    let transcription: SoloTranscription
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 0) {
+                // YouTube Player
+                if let youtubeUrl = transcription.youtubeUrl {
+                    YouTubePlayerView(.init(stringLiteral: youtubeUrl)) { state in
+                        switch state {
+                        case .idle:
+                            ZStack {
+                                Rectangle()
+                                    .fill(Color.black)
+                                ProgressView()
+                                    .tint(.white)
+                            }
+                        case .ready:
+                            EmptyView()
+                        case .error(let error):
+                            ContentUnavailableView(
+                                "Error",
+                                systemImage: "exclamationmark.triangle.fill",
+                                description: Text("YouTube player couldn't be loaded: \(error)")
+                            )
+                        }
+                    }
+                    .aspectRatio(16/9, contentMode: .fit)
+                } else {
+                    ContentUnavailableView(
+                        "No Video",
+                        systemImage: "video.slash",
+                        description: Text("This transcription has no video URL")
+                    )
+                    .frame(height: 200)
+                }
+
+                // Transcription details
+                VStack(alignment: .leading, spacing: 12) {
+                    // Recording details
+                    HStack(spacing: 16) {
+                        if let year = transcription.recordingYear {
+                            HStack(spacing: 4) {
+                                Image(systemName: "calendar")
+                                    .foregroundColor(JazzTheme.brass)
+                                Text(String(format: "%d", year))
+                                    .font(JazzTheme.subheadline())
+                                    .foregroundColor(JazzTheme.smokeGray)
+                            }
+                        }
+
+                        if let label = transcription.label {
+                            HStack(spacing: 4) {
+                                Image(systemName: "opticaldisc")
+                                    .foregroundColor(JazzTheme.brass)
+                                Text(label)
+                                    .font(JazzTheme.subheadline())
+                                    .foregroundColor(JazzTheme.smokeGray)
+                            }
+                        }
+                    }
+
+                    if let composer = transcription.composer {
+                        HStack(spacing: 4) {
+                            Image(systemName: "music.note.list")
+                                .foregroundColor(JazzTheme.brass)
+                            Text("Composed by \(composer)")
+                                .font(JazzTheme.subheadline())
+                                .foregroundColor(JazzTheme.smokeGray)
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding()
+
+                Spacer()
+            }
+            .background(JazzTheme.backgroundLight)
+            .navigationTitle(transcription.albumTitle ?? "Solo Transcription")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
+            }
         }
     }
 }
