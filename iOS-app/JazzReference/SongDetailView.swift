@@ -704,9 +704,7 @@ struct SongDetailView: View {
     private func loadSongData() async {
         // Guard: Don't reload if we already have data for the current song
         // This preserves state when navigating back from RecordingDetailView
-        print("📺 [loadSongData] Called. song=\(song?.id ?? "nil"), currentSongId=\(currentSongId), isLoading=\(isLoading), backingTracks=\(backingTracks.count)")
         if song != nil && song?.id == currentSongId && !isLoading {
-            print("📺 [loadSongData] Early return - already have data for this song")
             return
         }
 
@@ -729,16 +727,13 @@ struct SongDetailView: View {
         }
 
         // Load backing tracks
-        print("📺 [loadSongData] Fetching backing tracks for song: \(currentSongId)")
         do {
             let videos = try await networkManager.fetchSongVideos(songId: currentSongId, videoType: "backing_track")
-            print("📺 [loadSongData] Fetched \(videos.count) backing tracks")
             await MainActor.run {
                 backingTracks = videos
-                print("📺 [loadSongData] Updated backingTracks state, count: \(backingTracks.count)")
             }
         } catch {
-            print("📺 [loadSongData] Error fetching backing tracks: \(error)")
+            print("❌ Error fetching backing tracks: \(error)")
         }
 
         // Phase 2: Load all recordings in background
