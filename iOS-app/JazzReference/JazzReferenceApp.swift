@@ -391,8 +391,6 @@ struct JazzReferenceApp: App {
             NSLog("📥 Imported artist data detected: %@", data.name)
             importedArtistData = data
             showingArtistCreation = true
-        } else {
-            NSLog("ℹ️ No imported artist data found")
         }
     }
     
@@ -401,8 +399,6 @@ struct JazzReferenceApp: App {
             NSLog("📥 Imported song data detected: %@", data.title)
             importedSongData = data
             showingSongCreation = true
-        } else {
-            NSLog("ℹ️ No imported song data found")
         }
     }
 
@@ -418,8 +414,6 @@ struct JazzReferenceApp: App {
             // Clear the shared data immediately to prevent duplicate imports
             SharedYouTubeDataManager.clearSharedData()
             importedYouTubeData = data
-        } else {
-            NSLog("ℹ️ No imported YouTube data found")
         }
     }
     

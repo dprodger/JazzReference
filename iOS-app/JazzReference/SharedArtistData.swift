@@ -28,15 +28,12 @@ class SharedArtistDataManager {
     /// Retrieve artist data in the main app
     /// Call this when your app launches to check for pending imports
     static func retrieveSharedData() -> ImportedArtistData? {
-        print("🔍 Checking for pending artist import...")
-        
         guard let sharedDefaults = UserDefaults(suiteName: appGroupIdentifier) else {
             print("❌ Failed to access App Group UserDefaults")
             return nil
         }
-        
+
         guard let savedData = sharedDefaults.data(forKey: sharedDataKey) else {
-            print("ℹ️ No pending import found")
             return nil
         }
         
@@ -191,15 +188,12 @@ class SharedYouTubeDataManager {
 
     /// Retrieve YouTube data in the main app
     static func retrieveSharedData() -> ImportedYouTubeData? {
-        print("🔍 Checking for pending YouTube import...")
-
         guard let sharedDefaults = UserDefaults(suiteName: appGroupIdentifier) else {
             print("❌ Failed to access App Group UserDefaults")
             return nil
         }
 
         guard let savedData = sharedDefaults.data(forKey: sharedDataKey) else {
-            print("ℹ️ No pending YouTube import found")
             return nil
         }
 

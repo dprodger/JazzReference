@@ -39,15 +39,12 @@ class SharedSongDataManager {
     /// Retrieve song data in the main app
     /// Call this when your app launches to check for pending imports
     static func retrieveSharedData() -> ImportedSongData? {
-        print("🔍 Checking for pending song import...")
-        
         guard let sharedDefaults = UserDefaults(suiteName: appGroupIdentifier) else {
             print("❌ Failed to access App Group UserDefaults")
             return nil
         }
-        
+
         guard let savedData = sharedDefaults.data(forKey: sharedDataKey) else {
-            print("ℹ️ No pending song import found")
             return nil
         }
         
