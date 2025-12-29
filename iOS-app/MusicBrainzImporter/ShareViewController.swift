@@ -65,7 +65,7 @@ class ShareViewController: UIViewController {
 
         // Log type identifiers for debugging
         for (index, provider) in attachments.enumerated() {
-            print("📋 Attachment \(index) type identifiers: \(provider.registeredTypeIdentifiers)")
+            NSLog("📋 Attachment %d type identifiers: %{public}@", index, provider.registeredTypeIdentifiers.joined(separator: ", "))
         }
 
         // Try to find the best attachment to use
@@ -82,80 +82,169 @@ class ShareViewController: UIViewController {
         // DEBUG: Show what types we got if no property list found
         NSLog("⚠️ No property list type found in any attachment")
 
-        // Fall back to first attachment for other types
-        let itemProvider = attachments[0]
+        // Check for plain-text first (contains both title and URL from YouTube app)
+        // Then fall back to URL only
+        let plainTextProvider = attachments.first { $0.hasItemConformingToTypeIdentifier("public.plain-text") }
+        let urlProvider = attachments.first { $0.hasItemConformingToTypeIdentifier("public.url") }
 
-        if itemProvider.hasItemConformingToTypeIdentifier("public.url") {
-            // Handle URL shared from apps (like YouTube app)
-            NSLog("✓ URL type found, loading URL...")
+        // Try to extract title from extension item metadata (works for some apps)
+        let metadataTitle = self.extractTitleFromExtensionItem(extensionItem)
+        if let title = metadataTitle {
+            NSLog("📝 Found title from extension item metadata: %{public}@", title)
+        }
 
-            itemProvider.loadItem(forTypeIdentifier: "public.url", options: nil) { [weak self] (item, error) in
-                guard let self = self else { return }
+        // Prefer plain-text if available (contains title + URL)
+        if let plainTextProvider = plainTextProvider {
+            NSLog("✓ Plain text type found, loading text (preferred for title extraction)...")
 
-                if let error = error {
-                    NSLog("❌ Error loading URL: \(error.localizedDescription)")
-                    DispatchQueue.main.async {
-                        self.showError("Failed to load URL")
-                    }
-                    return
-                }
-
-                if let url = item as? URL {
-                    NSLog("✓ Got URL: \(url.absoluteString)")
-                    DispatchQueue.main.async {
-                        self.processSharedURL(url)
-                    }
-                } else if let urlString = item as? String, let url = URL(string: urlString) {
-                    NSLog("✓ Got URL string: \(urlString)")
-                    DispatchQueue.main.async {
-                        self.processSharedURL(url)
-                    }
-                } else {
-                    NSLog("❌ Item is not URL: \(type(of: item))")
-                    DispatchQueue.main.async {
-                        self.showError("Invalid URL format")
-                    }
-                }
-            }
-        } else if itemProvider.hasItemConformingToTypeIdentifier("public.plain-text") {
-            // Handle plain text (YouTube app sometimes shares URLs as text)
-            NSLog("✓ Plain text type found, loading text...")
-
-            itemProvider.loadItem(forTypeIdentifier: "public.plain-text", options: nil) { [weak self] (item, error) in
+            plainTextProvider.loadItem(forTypeIdentifier: "public.plain-text", options: nil) { [weak self] (item, error) in
                 guard let self = self else { return }
 
                 if let error = error {
                     NSLog("❌ Error loading text: \(error.localizedDescription)")
-                    DispatchQueue.main.async {
-                        self.showError("Failed to load shared content")
+                    // Fall back to URL if plain-text fails
+                    if let urlProvider = urlProvider {
+                        self.loadURLProvider(urlProvider, title: metadataTitle)
+                    } else {
+                        DispatchQueue.main.async {
+                            self.showError("Failed to load shared content")
+                        }
                     }
                     return
                 }
 
                 if let text = item as? String {
-                    NSLog("✓ Got text: \(text)")
-                    // Try to extract a URL from the text
-                    if let url = self.extractURL(from: text) {
+                    NSLog("✓ Got text: %{public}@", text)
+                    // Try to extract URL and title from the text
+                    if let (url, title) = self.extractURLAndTitle(from: text) {
+                        let finalTitle = title ?? metadataTitle
+                        NSLog("✅ Extracted URL: %{public}@, title: %{public}@", url.absoluteString, finalTitle ?? "(none)")
                         DispatchQueue.main.async {
-                            self.processSharedURL(url)
+                            self.processSharedURL(url, title: finalTitle)
                         }
                     } else {
-                        NSLog("❌ No valid URL found in text")
-                        DispatchQueue.main.async {
-                            self.showError("No valid URL found in shared content")
+                        NSLog("❌ No valid URL found in text, trying URL provider")
+                        if let urlProvider = urlProvider {
+                            self.loadURLProvider(urlProvider, title: metadataTitle)
+                        } else {
+                            DispatchQueue.main.async {
+                                self.showError("No valid URL found in shared content")
+                            }
                         }
                     }
                 } else {
                     NSLog("❌ Item is not String: \(type(of: item))")
-                    DispatchQueue.main.async {
-                        self.showError("Invalid content format")
+                    if let urlProvider = urlProvider {
+                        self.loadURLProvider(urlProvider, title: metadataTitle)
+                    } else {
+                        DispatchQueue.main.async {
+                            self.showError("Invalid content format")
+                        }
                     }
                 }
             }
+        } else if let urlProvider = urlProvider {
+            // No plain-text, fall back to URL only
+            loadURLProvider(urlProvider, title: metadataTitle)
         } else {
-            NSLog("❌ No supported type found. Available: \(itemProvider.registeredTypeIdentifiers)")
+            NSLog("❌ No supported type found. Available: \(attachments[0].registeredTypeIdentifiers)")
             showError("This extension only works with web pages and URLs")
         }
+    }
+
+    private func loadURLProvider(_ urlProvider: NSItemProvider, title: String?) {
+        NSLog("✓ URL type found, loading URL...")
+
+        urlProvider.loadItem(forTypeIdentifier: "public.url", options: nil) { [weak self] (item, error) in
+            guard let self = self else { return }
+
+            if let error = error {
+                NSLog("❌ Error loading URL: \(error.localizedDescription)")
+                DispatchQueue.main.async {
+                    self.showError("Failed to load URL")
+                }
+                return
+            }
+
+            if let url = item as? URL {
+                NSLog("✓ Got URL: %{public}@", url.absoluteString)
+                DispatchQueue.main.async {
+                    self.processSharedURL(url, title: title)
+                }
+            } else if let urlString = item as? String, let url = URL(string: urlString) {
+                NSLog("✓ Got URL string: %{public}@", urlString)
+                DispatchQueue.main.async {
+                    self.processSharedURL(url, title: title)
+                }
+            } else {
+                NSLog("❌ Item is not URL: \(type(of: item))")
+                DispatchQueue.main.async {
+                    self.showError("Invalid URL format")
+                }
+            }
+        }
+    }
+
+    private func extractTitleFromExtensionItem(_ extensionItem: NSExtensionItem) -> String? {
+        // Log available metadata for debugging (use %{public}@ to avoid <private> redaction)
+        NSLog("📋 Extension item metadata:")
+        if let attributedContentText = extensionItem.attributedContentText {
+            NSLog("   attributedContentText: %{public}@", attributedContentText.string)
+        } else {
+            NSLog("   attributedContentText: nil")
+        }
+        if let attributedTitle = extensionItem.attributedTitle {
+            NSLog("   attributedTitle: %{public}@", attributedTitle.string)
+        } else {
+            NSLog("   attributedTitle: nil")
+        }
+        if let userInfo = extensionItem.userInfo {
+            NSLog("   userInfo keys: %{public}@", "\(userInfo.keys)")
+        }
+
+        // Also check item provider suggested names
+        if let attachments = extensionItem.attachments {
+            for (index, provider) in attachments.enumerated() {
+                if let suggestedName = provider.suggestedName {
+                    NSLog("   attachment %d suggestedName: %{public}@", index, suggestedName)
+                }
+            }
+        }
+
+        // Try attributedTitle first (most reliable for title)
+        if let attributedTitle = extensionItem.attributedTitle {
+            let title = attributedTitle.string.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !title.isEmpty {
+                return title
+            }
+        }
+
+        // Try attributedContentText (YouTube often puts title here)
+        if let attributedContentText = extensionItem.attributedContentText {
+            let text = attributedContentText.string.trimmingCharacters(in: .whitespacesAndNewlines)
+            // The content text might contain the title followed by the URL
+            // Extract just the title part (before any URL)
+            if let (_, title) = extractURLAndTitle(from: text), let extractedTitle = title {
+                return extractedTitle
+            }
+            // If no URL found, use the whole text if it's not too long
+            if !text.isEmpty && text.count < 200 && !text.hasPrefix("http") {
+                return text
+            }
+        }
+
+        // Try item provider suggested names as last resort
+        if let attachments = extensionItem.attachments {
+            for provider in attachments {
+                if let suggestedName = provider.suggestedName,
+                   !suggestedName.isEmpty,
+                   !suggestedName.hasPrefix("http") {
+                    return suggestedName
+                }
+            }
+        }
+
+        return nil
     }
 
     private func loadPropertyList(from itemProvider: NSItemProvider) {
@@ -223,7 +312,7 @@ class ShareViewController: UIViewController {
         }
     }
 
-    private func extractURL(from text: String) -> URL? {
+    private func extractURLAndTitle(from text: String) -> (URL, String?)? {
         // Try to find a YouTube URL in the text
         let patterns = [
             "https?://(?:www\\.)?youtube\\.com/watch\\?[^\\s]+",
@@ -239,25 +328,61 @@ class ShareViewController: UIViewController {
                     if let urlRange = Range(match.range, in: text) {
                         let urlString = String(text[urlRange])
                         if let url = URL(string: urlString) {
-                            return url
+                            // Extract title from text before the URL
+                            let beforeURL = String(text[..<urlRange.lowerBound])
+                            let title = extractTitle(from: beforeURL)
+                            return (url, title)
                         }
                     }
                 }
             }
         }
 
-        // Fallback: try the whole text as a URL
-        return URL(string: text.trimmingCharacters(in: .whitespacesAndNewlines))
+        // Fallback: try the whole text as a URL (no title in this case)
+        if let url = URL(string: text.trimmingCharacters(in: .whitespacesAndNewlines)) {
+            return (url, nil)
+        }
+        return nil
+    }
+
+    private func extractTitle(from text: String) -> String? {
+        // Clean up the text that appears before the URL
+        var title = text
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: "\n", with: " ")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // Remove common prefixes like "Check out this video:"
+        let prefixesToRemove = [
+            "Check out this video:",
+            "Check out:",
+            "Watch:",
+            "Video:"
+        ]
+        for prefix in prefixesToRemove {
+            if title.lowercased().hasPrefix(prefix.lowercased()) {
+                title = String(title.dropFirst(prefix.count)).trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+        }
+
+        // Return nil if empty or too short
+        guard title.count >= 2 else { return nil }
+
+        NSLog("📝 Extracted title from shared text: %{public}@", title)
+        return title
     }
 
     // MARK: - URL Processing
 
-    private func processSharedURL(_ url: URL) {
-        NSLog("🔗 Processing shared URL: \(url.absoluteString)")
+    private func processSharedURL(_ url: URL, title: String? = nil) {
+        NSLog("🔗 Processing shared URL: %{public}@", url.absoluteString)
+        if let title = title {
+            NSLog("📝 With title: %{public}@", title)
+        }
 
         // Check if this is a YouTube URL
         if isYouTubeURL(url) {
-            processYouTubeURL(url)
+            processYouTubeURL(url, title: title)
         } else if isMusicBrainzURL(url) {
             // For MusicBrainz URLs, we can't extract data without JavaScript
             // Show an error asking to use Safari
@@ -277,8 +402,11 @@ class ShareViewController: UIViewController {
         return host.contains("musicbrainz.org")
     }
 
-    private func processYouTubeURL(_ url: URL) {
-        NSLog("🎬 Processing YouTube URL: \(url.absoluteString)")
+    private func processYouTubeURL(_ url: URL, title: String? = nil) {
+        NSLog("🎬 Processing YouTube URL: %{public}@", url.absoluteString)
+        if let title = title {
+            NSLog("📝 With title: %{public}@", title)
+        }
 
         // Extract video ID from URL
         guard let videoId = extractYouTubeVideoId(from: url) else {
@@ -287,15 +415,79 @@ class ShareViewController: UIViewController {
             return
         }
 
-        NSLog("✓ Extracted video ID: \(videoId)")
+        NSLog("✓ Extracted video ID: %{public}@", videoId)
 
-        // Create YouTubeData with minimal info (we don't have the title from app share)
-        // The title will be "YouTube Video" as a placeholder
+        // If we don't have a title, fetch it from YouTube oEmbed API
+        if title == nil {
+            NSLog("📡 No title provided, fetching from YouTube oEmbed API...")
+            fetchYouTubeTitle(for: url, videoId: videoId)
+        } else {
+            createYouTubeData(videoId: videoId, title: title!, url: url, channelName: nil)
+        }
+    }
+
+    private func fetchYouTubeTitle(for url: URL, videoId: String) {
+        // YouTube oEmbed API - no auth required
+        let oembedURLString = "https://www.youtube.com/oembed?url=\(url.absoluteString.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? url.absoluteString)&format=json"
+
+        guard let oembedURL = URL(string: oembedURLString) else {
+            NSLog("❌ Failed to create oEmbed URL")
+            createYouTubeData(videoId: videoId, title: "YouTube Video", url: url, channelName: nil)
+            return
+        }
+
+        NSLog("📡 Fetching: %{public}@", oembedURLString)
+
+        let task = URLSession.shared.dataTask(with: oembedURL) { [weak self] data, response, error in
+            guard let self = self else { return }
+
+            if let error = error {
+                NSLog("❌ oEmbed fetch error: %{public}@", error.localizedDescription)
+                DispatchQueue.main.async {
+                    self.createYouTubeData(videoId: videoId, title: "YouTube Video", url: url, channelName: nil)
+                }
+                return
+            }
+
+            guard let data = data else {
+                NSLog("❌ No data from oEmbed")
+                DispatchQueue.main.async {
+                    self.createYouTubeData(videoId: videoId, title: "YouTube Video", url: url, channelName: nil)
+                }
+                return
+            }
+
+            do {
+                if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                    let title = json["title"] as? String ?? "YouTube Video"
+                    let authorName = json["author_name"] as? String
+                    NSLog("✅ oEmbed response - title: %{public}@, author: %{public}@", title, authorName ?? "(none)")
+
+                    DispatchQueue.main.async {
+                        self.createYouTubeData(videoId: videoId, title: title, url: url, channelName: authorName)
+                    }
+                } else {
+                    NSLog("❌ Failed to parse oEmbed JSON")
+                    DispatchQueue.main.async {
+                        self.createYouTubeData(videoId: videoId, title: "YouTube Video", url: url, channelName: nil)
+                    }
+                }
+            } catch {
+                NSLog("❌ JSON parse error: %{public}@", error.localizedDescription)
+                DispatchQueue.main.async {
+                    self.createYouTubeData(videoId: videoId, title: "YouTube Video", url: url, channelName: nil)
+                }
+            }
+        }
+        task.resume()
+    }
+
+    private func createYouTubeData(videoId: String, title: String, url: URL, channelName: String?) {
         let youtubeData = YouTubeData(
             videoId: videoId,
-            title: "YouTube Video",  // Placeholder - we don't have access to the title from app share
+            title: title,
             url: url.absoluteString,
-            channelName: nil,
+            channelName: channelName,
             description: nil,
             videoType: nil,
             songId: nil,
@@ -305,7 +497,7 @@ class ShareViewController: UIViewController {
         self.youtubeData = youtubeData
         self.isYouTubeImport = true
 
-        NSLog("✅ YouTube data created from URL")
+        NSLog("✅ YouTube data created with title: %{public}@", title)
 
         // Show YouTube type selection view
         showYouTubeTypeSelectionView(with: youtubeData)

@@ -64,6 +64,13 @@ struct YouTubeImportView: View {
                 }
             }
         }
+        .onAppear {
+            print("📺 YouTubeImportView received data:")
+            print("   Title: '\(youtubeData.title)'")
+            print("   URL: \(youtubeData.url)")
+            print("   VideoType: \(youtubeData.videoType.rawValue)")
+            print("   Channel: \(youtubeData.channelName ?? "(none)")")
+        }
         .alert("Import Error", isPresented: Binding(
             get: { importError != nil },
             set: { if !$0 { importError = nil } }
