@@ -449,8 +449,16 @@ struct JazzReferenceApp: App {
     }
 
     private func checkForImportedYouTube() {
+        // Don't check if we already have YouTube data being displayed
+        guard importedYouTubeData == nil else {
+            NSLog("ℹ️ YouTube import already in progress, skipping check")
+            return
+        }
+
         if let data = SharedYouTubeDataManager.retrieveSharedData() {
             NSLog("📥 Imported YouTube data detected: %@", data.title)
+            // Clear the shared data immediately to prevent duplicate imports
+            SharedYouTubeDataManager.clearSharedData()
             importedYouTubeData = data
         } else {
             NSLog("ℹ️ No imported YouTube data found")
