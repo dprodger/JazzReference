@@ -8,10 +8,7 @@ import YouTubePlayerKit
 // MARK: - Transcription Row View
 struct TranscriptionRowView: View {
     let transcription: SoloTranscription
-    
-    let youTubePlayer: YouTubePlayer = "https://youtube.com/watch?v=psL_5RIBqnY"
 
-    
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             // Album/Recording title
