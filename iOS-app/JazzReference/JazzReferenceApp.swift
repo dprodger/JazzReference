@@ -216,45 +216,7 @@ struct JazzReferenceApp: App {
         // Configure navigation bar fonts from JazzTheme
         JazzTheme.configureNavigationBarAppearance()
 
-        // Diagnostic: Check URL scheme registration
-        NSLog("========================================")
-        NSLog("🔧 MAIN APP URL SCHEME DIAGNOSTICS")
-        NSLog("========================================")
-        
-        // Check if CFBundleURLTypes is in Info.plist
-        if let urlTypes = Bundle.main.object(forInfoDictionaryKey: "CFBundleURLTypes") as? [[String: Any]] {
-            NSLog("✅ CFBundleURLTypes found in Info.plist")
-            NSLog("   Number of URL types: %d", urlTypes.count)
-            
-            for (index, urlType) in urlTypes.enumerated() {
-                NSLog("\n   URL Type %d:", index)
-                
-                if let name = urlType["CFBundleURLName"] as? String {
-                    NSLog("   - Name: %@", name)
-                }
-                
-                if let schemes = urlType["CFBundleURLSchemes"] as? [String] {
-                    NSLog("   - Schemes: %@", schemes.joined(separator: ", "))
-                    
-                    if schemes.contains("jazzreference") {
-                        NSLog("   ✅ Contains 'jazzreference'")
-                    }
-                }
-                
-                if let role = urlType["CFBundleTypeRole"] as? String {
-                    NSLog("   - Role: %@", role)
-                }
-            }
-        } else {
-            NSLog("❌ CFBundleURLTypes NOT FOUND in Info.plist")
-            NSLog("   URL scheme may be in build settings only")
-            NSLog("   Extensions require it in Info.plist!")
-        }
-        
-        NSLog("\nBundle ID: %@", Bundle.main.bundleIdentifier ?? "nil")
-        NSLog("========================================\n")
-        
-        // In your App init or AppDelegate didFinishLaunching
+        // Restore previous Google Sign-In session
         GIDSignIn.sharedInstance.restorePreviousSignIn { user, error in
             if error != nil || user == nil {
                 // User is not signed in
