@@ -302,7 +302,28 @@ struct YouTubeImportView: View {
 
     private func songRow(_ song: Song) -> some View {
         VStack(spacing: 0) {
-            Button(action: {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(song.title)
+                        .font(JazzTheme.headline())
+                        .foregroundColor(JazzTheme.charcoal)
+
+                    if let composer = song.composer {
+                        Text(composer)
+                            .font(JazzTheme.subheadline())
+                            .foregroundColor(JazzTheme.smokeGray)
+                    }
+                }
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .foregroundColor(JazzTheme.smokeGray)
+            }
+            .padding()
+            .background(selectedSong?.id == song.id ? JazzTheme.burgundy.opacity(0.1) : Color.clear)
+            .contentShape(Rectangle())
+            .onTapGesture {
                 selectedSong = song
                 // For transcriptions, offer choice to pick a recording or skip
                 // For backing tracks, we can link directly to the song
@@ -313,29 +334,7 @@ struct YouTubeImportView: View {
                         await importVideo(songId: song.id, recordingId: nil)
                     }
                 }
-            }) {
-                HStack {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(song.title)
-                            .font(JazzTheme.headline())
-                            .foregroundColor(JazzTheme.charcoal)
-
-                        if let composer = song.composer {
-                            Text(composer)
-                                .font(JazzTheme.subheadline())
-                                .foregroundColor(JazzTheme.smokeGray)
-                        }
-                    }
-
-                    Spacer()
-
-                    Image(systemName: "chevron.right")
-                        .foregroundColor(JazzTheme.smokeGray)
-                }
-                .padding()
-                .background(selectedSong?.id == song.id ? JazzTheme.burgundy.opacity(0.1) : Color.clear)
             }
-            .buttonStyle(.plain)
 
             Divider()
                 .padding(.leading)
