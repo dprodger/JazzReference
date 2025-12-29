@@ -289,10 +289,6 @@ struct JazzReferenceApp: App {
                     }
                 }
                 .onAppear {
-                    checkForImportedArtist()
-                    checkForImportedSong()
-                    checkForImportedYouTube()
-
                     // PHASE 5: Connect RepertoireManager to AuthenticationManager
                     repertoireManager.setAuthManager(authManager)
                     print("📚 Connected RepertoireManager to AuthenticationManager")
