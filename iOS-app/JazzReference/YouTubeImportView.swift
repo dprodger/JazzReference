@@ -111,11 +111,15 @@ struct YouTubeImportView: View {
         }
         .onAppear {
             // Pre-populate search with video title keywords
+            // Use a small delay to let the view settle before triggering search
             if authManager.isAuthenticated {
-                let keywords = extractKeywords(from: youtubeData.title)
-                if !keywords.isEmpty {
-                    searchText = keywords
-                    Task {
+                Task {
+                    try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 second delay
+                    let keywords = extractKeywords(from: youtubeData.title)
+                    if !keywords.isEmpty {
+                        await MainActor.run {
+                            searchText = keywords
+                        }
                         await searchSongs()
                     }
                 }
@@ -124,10 +128,13 @@ struct YouTubeImportView: View {
         .onChange(of: authManager.isAuthenticated) { _, isAuthenticated in
             // When user logs in, trigger the search
             if isAuthenticated {
-                let keywords = extractKeywords(from: youtubeData.title)
-                if !keywords.isEmpty {
-                    searchText = keywords
-                    Task {
+                Task {
+                    try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 second delay
+                    let keywords = extractKeywords(from: youtubeData.title)
+                    if !keywords.isEmpty {
+                        await MainActor.run {
+                            searchText = keywords
+                        }
                         await searchSongs()
                     }
                 }
