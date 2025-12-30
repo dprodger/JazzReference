@@ -59,7 +59,7 @@ def get_user_favorites():
                         rl.title as album_title,
                         r.recording_year,
                         COALESCE(
-                            ri.url,
+                            ri.image_url_small,
                             rl.cover_art_small
                         ) as best_album_art_small,
                         rf.created_at as favorited_at
