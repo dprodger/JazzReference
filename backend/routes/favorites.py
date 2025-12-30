@@ -74,7 +74,19 @@ def get_user_favorites():
 
                 favorites = cur.fetchall()
 
-                return jsonify([dict(fav) for fav in favorites]), 200
+                # Convert to JSON-serializable format
+                result = []
+                for fav in favorites:
+                    result.append({
+                        'id': str(fav['id']),
+                        'song_title': fav['song_title'],
+                        'album_title': fav['album_title'],
+                        'recording_year': fav['recording_year'],
+                        'best_album_art_small': fav['best_album_art_small'],
+                        'favorited_at': fav['favorited_at'].isoformat() if fav['favorited_at'] else None
+                    })
+
+                return jsonify(result), 200
 
     except Exception as e:
         logger.error(f"Error fetching favorites: {e}", exc_info=True)
