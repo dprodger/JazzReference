@@ -120,6 +120,7 @@ class SpotifyMatcher:
             'tracks_matched': 0,
             'tracks_skipped': 0,
             'tracks_no_match': 0,
+            'tracks_had_previous': 0,  # Tracks that had a match before but failed rematch
             'tracks_blocked': 0,  # Tracks blocked via bad_streaming_matches
             'errors': 0,
             'cache_hits': 0,
@@ -209,7 +210,34 @@ class SpotifyMatcher:
             self.logger.debug(f"    Cached track match failure")
         except Exception as e:
             self.logger.warning(f"    Failed to cache track match failure: {e}")
-    
+
+    def _log_orphaned_track(self, release_id: str, recording_id: str, spotify_track_url: str):
+        """
+        Log details of a track that had a previous Spotify match but failed rematch.
+        Appends to a CSV file in the current working directory for later investigation.
+        """
+        from datetime import datetime
+        from pathlib import Path
+        import csv
+
+        log_file = Path('spotify_orphaned_tracks.csv')
+        file_exists = log_file.exists()
+
+        try:
+            with open(log_file, 'a', newline='') as f:
+                writer = csv.writer(f)
+                # Write header if file is new
+                if not file_exists:
+                    writer.writerow(['timestamp', 'release_id', 'recording_id', 'spotify_track_url'])
+                writer.writerow([
+                    datetime.now().isoformat(),
+                    str(release_id),
+                    str(recording_id),
+                    spotify_track_url
+                ])
+        except Exception as e:
+            self.logger.warning(f"    Failed to log orphaned track: {e}")
+
     # ========================================================================
     # DELEGATED PROPERTIES (for backwards compatibility)
     # ========================================================================
@@ -1410,6 +1438,20 @@ class SpotifyMatcher:
                     self.logger.debug(f"      Also tried alt titles: {alt_titles}")
                 self.logger.debug(f"      Album tracks: {track_names}{more}")
                 self.stats['tracks_no_match'] += 1
+
+                # Check if this recording had a previous match that would now be lost
+                if recording.get('spotify_track_id'):
+                    self.stats['tracks_had_previous'] += 1
+                    previous_track_id = recording['spotify_track_id']
+                    previous_url = f"https://open.spotify.com/track/{previous_track_id}"
+                    self.logger.warning(f"      ⚠ Had previous track ID: {previous_track_id} (would be orphaned)")
+
+                    # Log to file for later investigation/cleanup
+                    self._log_orphaned_track(
+                        release_id=release_id,
+                        recording_id=recording['recording_id'],
+                        spotify_track_url=previous_url
+                    )
         
         return any_matched
     

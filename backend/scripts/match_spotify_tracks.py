@@ -128,7 +128,7 @@ Examples:
     # Print summary
     if result['success']:
         stats = result['stats']
-        script.print_summary({
+        summary = {
             "Releases processed": stats['releases_processed'],
             "Releases already had URL": stats['releases_skipped'],
             "Spotify matches found": stats['releases_with_spotify'],
@@ -140,7 +140,11 @@ Examples:
             "Errors": stats['errors'],
             "Cache hits": stats['cache_hits'],
             "API calls": stats['api_calls'],
-        }, title="MATCHING SUMMARY")
+        }
+        # Only show "had previous" stat if there were any (relevant for rematch modes)
+        if stats.get('tracks_had_previous', 0) > 0:
+            summary["Tracks had previous match"] = stats['tracks_had_previous']
+        script.print_summary(summary, title="MATCHING SUMMARY")
     else:
         script.logger.error(f"Matching failed: {result.get('error', 'Unknown error')}")
 
