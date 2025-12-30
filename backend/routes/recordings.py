@@ -14,9 +14,10 @@ UPDATED: Release Imagery Support
 
 Provides endpoints for listing and searching recordings, including releases.
 """
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, g
 import logging
 import db_utils as db_tools
+from middleware.auth_middleware import optional_auth
 
 logger = logging.getLogger(__name__)
 recordings_bp = Blueprint('recordings', __name__)
@@ -147,6 +148,10 @@ HAS_BACK_COVER_SQL = """
         WHERE rr.recording_id = r.id AND ri.type = 'Back'
     ) as has_back_cover"""
 
+# SQL fragment for favorite count (subquery)
+FAVORITE_COUNT_SQL = """
+    (SELECT COUNT(*) FROM recording_favorites rf WHERE rf.recording_id = r.id) as favorite_count"""
+
 # For release-level queries (get_recording_releases), we check imagery for specific release
 RELEASE_ART_SMALL_SQL = """
     COALESCE(
@@ -246,7 +251,9 @@ def get_recordings():
                     r.is_canonical,
                     r.notes,
                     s.title as song_title,
-                    s.composer
+                    s.composer,
+                    -- Favorite count
+                    (SELECT COUNT(*) FROM recording_favorites rf WHERE rf.recording_id = r.id) as favorite_count
                 FROM recordings r
                 JOIN songs s ON r.song_id = s.id
                 LEFT JOIN releases def_rel ON r.default_release_id = def_rel.id
@@ -296,7 +303,9 @@ def get_recordings():
                     r.is_canonical,
                     r.notes,
                     s.title as song_title,
-                    s.composer
+                    s.composer,
+                    -- Favorite count
+                    (SELECT COUNT(*) FROM recording_favorites rf WHERE rf.recording_id = r.id) as favorite_count
                 FROM recordings r
                 JOIN songs s ON r.song_id = s.id
                 LEFT JOIN releases def_rel ON r.default_release_id = def_rel.id
@@ -316,6 +325,7 @@ def get_recordings():
 
 
 @recordings_bp.route('/recordings/<recording_id>', methods=['GET'])
+@optional_auth
 def get_recording_detail(recording_id):
     """
     Get detailed information about a specific recording, including releases
@@ -482,6 +492,18 @@ def get_recording_detail(recording_id):
                 JOIN recording_release_streaming_links rrsl ON rrsl.recording_release_id = rr.id
                 WHERE rr.recording_id = %s
                 ORDER BY service, rrsl.match_confidence DESC NULLS LAST
+            ),
+            -- Favorites data
+            favorites_data AS (
+                SELECT
+                    COUNT(*) as favorite_count,
+                    COALESCE(json_agg(
+                        json_build_object('id', u.id::text, 'display_name', u.display_name)
+                        ORDER BY rf.created_at DESC
+                    ) FILTER (WHERE u.id IS NOT NULL), '[]'::json) as favorited_by
+                FROM recording_favorites rf
+                LEFT JOIN users u ON rf.user_id = u.id
+                WHERE rf.recording_id = %s
             )
             SELECT
                 (SELECT row_to_json(recording_data.*) FROM recording_data) as recording,
@@ -489,13 +511,14 @@ def get_recording_detail(recording_id):
                 (SELECT COALESCE(json_agg(releases_data.*), '[]'::json) FROM releases_data) as releases,
                 (SELECT COALESCE(json_agg(authority_data.*), '[]'::json) FROM authority_data) as authority_recommendations,
                 (SELECT COALESCE(json_agg(transcriptions_data.*), '[]'::json) FROM transcriptions_data) as transcriptions,
-                (SELECT COALESCE(json_agg(streaming_links_data.*), '[]'::json) FROM streaming_links_data) as streaming_links
+                (SELECT COALESCE(json_agg(streaming_links_data.*), '[]'::json) FROM streaming_links_data) as streaming_links,
+                (SELECT row_to_json(favorites_data.*) FROM favorites_data) as favorites
         """
 
-        # Execute the single query with recording_id passed 6 times (for each CTE)
+        # Execute the single query with recording_id passed 7 times (for each CTE)
         result = db_tools.execute_query(
             combined_query,
-            (recording_id, recording_id, recording_id, recording_id, recording_id, recording_id),
+            (recording_id, recording_id, recording_id, recording_id, recording_id, recording_id, recording_id),
             fetch_one=True
         )
 
@@ -536,6 +559,21 @@ def get_recording_detail(recording_id):
             }
 
         recording_dict['streaming_links'] = streaming_links_dict
+
+        # Add favorites data
+        favorites_data = result.get('favorites') or {}
+        recording_dict['favorite_count'] = favorites_data.get('favorite_count', 0)
+        recording_dict['favorited_by'] = favorites_data.get('favorited_by', [])
+
+        # Check if current user has favorited (only if authenticated)
+        if hasattr(g, 'current_user') and g.current_user:
+            current_user_id = str(g.current_user['id'])
+            recording_dict['is_favorited'] = any(
+                user.get('id') == current_user_id
+                for user in recording_dict['favorited_by']
+            )
+        else:
+            recording_dict['is_favorited'] = None
 
         return jsonify(recording_dict)
         
