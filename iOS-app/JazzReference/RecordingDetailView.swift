@@ -17,6 +17,10 @@ struct RecordingDetailView: View {
     // Persistent network manager to prevent request cancellation during refresh
     @StateObject private var networkManager = NetworkManager()
 
+    // Environment objects for favorites
+    @EnvironmentObject var authManager: AuthenticationManager
+    @EnvironmentObject var favoritesManager: FavoritesManager
+
     @State private var recording: Recording?
     @State private var isLoading = true
     @State private var reportingInfo: ReportingInfo?
@@ -29,6 +33,8 @@ struct RecordingDetailView: View {
     @State private var showingStreamingPicker = false
     @State private var isLearnMoreExpanded = false
     @State private var showingBackCover = false
+    @State private var showingLoginAlert = false
+    @State private var localFavoriteCount: Int?
     private let maxReleasesToShow = 5
     @Environment(\.openURL) var openURL
     
@@ -124,7 +130,19 @@ struct RecordingDetailView: View {
     private var hasStreamingSource: Bool {
         !availableStreamingSources.isEmpty
     }
-    
+
+    // MARK: - Favorites Computed Properties
+
+    /// Whether the current user has favorited this recording
+    private var isFavorited: Bool {
+        favoritesManager.isFavorited(recordingId)
+    }
+
+    /// Display count for favorites (uses local count if available, otherwise from recording)
+    private var displayFavoriteCount: Int {
+        localFavoriteCount ?? recording?.favoriteCount ?? 0
+    }
+
     struct ReportingInfo: Identifiable {
         let id = UUID()
         let source: String
@@ -327,6 +345,44 @@ struct RecordingDetailView: View {
                             }
                         }
 
+                        // Favorited By Section
+                        if let favoritedBy = recording.favoritedBy, !favoritedBy.isEmpty {
+                            VStack(alignment: .leading, spacing: 12) {
+                                HStack {
+                                    Image(systemName: "heart.fill")
+                                        .foregroundColor(.red)
+                                    Text("Favorited by \(favoritedBy.count) \(favoritedBy.count == 1 ? "person" : "people")")
+                                        .font(JazzTheme.headline())
+                                        .foregroundColor(JazzTheme.charcoal)
+                                }
+                                .padding(.horizontal)
+
+                                ScrollView(.horizontal, showsIndicators: false) {
+                                    HStack(spacing: 12) {
+                                        ForEach(favoritedBy) { user in
+                                            VStack(spacing: 4) {
+                                                Circle()
+                                                    .fill(JazzTheme.brass.opacity(0.2))
+                                                    .frame(width: 40, height: 40)
+                                                    .overlay(
+                                                        Text(String((user.displayName ?? "?").prefix(1)).uppercased())
+                                                            .font(JazzTheme.headline())
+                                                            .foregroundColor(JazzTheme.brass)
+                                                    )
+                                                Text(user.displayName ?? "User")
+                                                    .font(JazzTheme.caption())
+                                                    .foregroundColor(JazzTheme.smokeGray)
+                                                    .lineLimit(1)
+                                            }
+                                            .frame(width: 60)
+                                        }
+                                    }
+                                    .padding(.horizontal)
+                                }
+                            }
+                            .padding(.vertical, 8)
+                        }
+
                         // Transcriptions Section
                         if let transcriptions = recording.transcriptions, !transcriptions.isEmpty {
                             TranscriptionsSection(transcriptions: transcriptions)
@@ -352,12 +408,35 @@ struct RecordingDetailView: View {
         .jazzNavigationBar(title: displayAlbumTitle, color: JazzTheme.brass)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
-                Button {
-                    showingAuthoritySheet = true
-                } label: {
-                    Image(systemName: "checkmark.seal")
+                HStack(spacing: 16) {
+                    // Favorite button
+                    Button {
+                        handleFavoriteButtonTap()
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: isFavorited ? "heart.fill" : "heart")
+                                .foregroundColor(isFavorited ? .red : JazzTheme.smokeGray)
+                            if displayFavoriteCount > 0 {
+                                Text("\(displayFavoriteCount)")
+                                    .font(JazzTheme.caption())
+                                    .foregroundColor(JazzTheme.smokeGray)
+                            }
+                        }
+                    }
+
+                    // Authority recommendations button
+                    Button {
+                        showingAuthoritySheet = true
+                    } label: {
+                        Image(systemName: "checkmark.seal")
+                    }
                 }
             }
+        }
+        .alert("Sign In Required", isPresented: $showingLoginAlert) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text("Please sign in to favorite recordings.")
         }
         .sheet(item: $reportingInfo) { info in
             ReportLinkIssueView(
@@ -424,6 +503,22 @@ struct RecordingDetailView: View {
         if let fetchedRecording = await networkManager.fetchRecordingDetail(id: recordingId) {
             recording = fetchedRecording
             autoSelectFirstRelease()
+        }
+    }
+
+    // MARK: - Favorites
+
+    /// Handle favorite button tap - toggle favorite or show login prompt
+    private func handleFavoriteButtonTap() {
+        guard authManager.isAuthenticated else {
+            showingLoginAlert = true
+            return
+        }
+
+        Task {
+            if let newCount = await favoritesManager.toggleFavorite(recordingId: recordingId) {
+                localFavoriteCount = newCount
+            }
         }
     }
 
@@ -888,10 +983,14 @@ struct RecordingDetailView: View {
 #Preview("Recording Detail - Full") {
     NavigationStack {
         RecordingDetailView(recordingId: "preview-recording-1")
+            .environmentObject(AuthenticationManager())
+            .environmentObject(FavoritesManager())
     }
 }
 #Preview("Recording Detail - Minimal") {
     NavigationStack {
         RecordingDetailView(recordingId: "preview-recording-3")
+            .environmentObject(AuthenticationManager())
+            .environmentObject(FavoritesManager())
     }
 }

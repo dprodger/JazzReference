@@ -78,6 +78,7 @@ struct ContentView: View {
 
 struct SettingsView: View {
     @EnvironmentObject var authManager: AuthenticationManager
+    @EnvironmentObject var favoritesManager: FavoritesManager
     @AppStorage("preferredStreamingService") private var preferredStreamingService: String = StreamingService.spotify.rawValue
 
     var body: some View {
@@ -154,6 +155,94 @@ struct SettingsView: View {
                     Divider()
                         .padding(.horizontal)
 
+                    // Favorites Section
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            Image(systemName: "heart.fill")
+                                .foregroundColor(.red)
+                            Text("Favorites")
+                                .font(JazzTheme.headline())
+                                .foregroundColor(JazzTheme.charcoal)
+                        }
+                        .padding(.horizontal)
+
+                        if favoritesManager.isLoading {
+                            HStack {
+                                Spacer()
+                                ProgressView()
+                                    .tint(JazzTheme.brass)
+                                Spacer()
+                            }
+                            .padding()
+                        } else if favoritesManager.favoriteRecordings.isEmpty {
+                            Text("No favorite recordings yet")
+                                .font(JazzTheme.body())
+                                .foregroundColor(JazzTheme.smokeGray)
+                                .padding(.horizontal)
+                        } else {
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 16) {
+                                    ForEach(favoritesManager.favoriteRecordings, id: \.id) { recording in
+                                        NavigationLink(destination: RecordingDetailView(recordingId: recording.id)) {
+                                            VStack(spacing: 8) {
+                                                // Album art
+                                                if let artUrl = recording.bestAlbumArtSmall,
+                                                   let url = URL(string: artUrl) {
+                                                    CachedAsyncImage(
+                                                        url: url,
+                                                        content: { image in
+                                                            image
+                                                                .resizable()
+                                                                .aspectRatio(contentMode: .fill)
+                                                                .frame(width: 80, height: 80)
+                                                                .cornerRadius(8)
+                                                        },
+                                                        placeholder: {
+                                                            Rectangle()
+                                                                .fill(JazzTheme.cardBackground)
+                                                                .frame(width: 80, height: 80)
+                                                                .cornerRadius(8)
+                                                        }
+                                                    )
+                                                } else {
+                                                    Rectangle()
+                                                        .fill(JazzTheme.cardBackground)
+                                                        .frame(width: 80, height: 80)
+                                                        .cornerRadius(8)
+                                                        .overlay(
+                                                            Image(systemName: "opticaldisc")
+                                                                .foregroundColor(JazzTheme.smokeGray)
+                                                        )
+                                                }
+
+                                                // Song title
+                                                Text(recording.songTitle ?? "Unknown")
+                                                    .font(JazzTheme.caption())
+                                                    .fontWeight(.medium)
+                                                    .foregroundColor(JazzTheme.charcoal)
+                                                    .lineLimit(2)
+                                                    .multilineTextAlignment(.center)
+                                            }
+                                            .frame(width: 80)
+                                        }
+                                        .buttonStyle(.plain)
+                                    }
+                                }
+                                .padding(.horizontal)
+                            }
+                        }
+
+                        if favoritesManager.favoriteCount > 0 {
+                            Text("\(favoritesManager.favoriteCount) \(favoritesManager.favoriteCount == 1 ? "recording" : "recordings")")
+                                .font(JazzTheme.caption())
+                                .foregroundColor(JazzTheme.smokeGray)
+                                .padding(.horizontal)
+                        }
+                    }
+
+                    Divider()
+                        .padding(.horizontal)
+
                     // Account Actions
                     VStack(spacing: 0) {
                         // Log Out Button
@@ -199,6 +288,7 @@ struct JazzReferenceApp: App {
     @State private var importedYouTubeData: ImportedYouTubeData?
     @StateObject private var repertoireManager = RepertoireManager()
     @StateObject private var authManager = AuthenticationManager()
+    @StateObject private var favoritesManager = FavoritesManager()
 
     // Password reset state
     @State private var resetPasswordToken: String?
@@ -293,6 +383,10 @@ struct JazzReferenceApp: App {
                     repertoireManager.setAuthManager(authManager)
                     print("📚 Connected RepertoireManager to AuthenticationManager")
 
+                    // Connect FavoritesManager to AuthenticationManager
+                    favoritesManager.setAuthManager(authManager)
+                    print("❤️ Connected FavoritesManager to AuthenticationManager")
+
                     // Show onboarding on first launch
                     if !hasCompletedOnboarding {
                         showingOnboarding = true
@@ -316,11 +410,17 @@ struct JazzReferenceApp: App {
                         Task {
                             await repertoireManager.loadRepertoires()
                         }
+                        print("❤️ User authenticated - loading favorites")
+                        Task {
+                            await favoritesManager.loadFavorites()
+                        }
                     } else {
                         print("📚 User logged out - clearing repertoires")
                         Task {
                             await repertoireManager.loadRepertoires()
                         }
+                        print("❤️ User logged out - clearing favorites")
+                        favoritesManager.clearFavorites()
                     }
                 }
                 .sheet(item: $importedArtistData) { data in
@@ -383,6 +483,7 @@ struct JazzReferenceApp: App {
                     GIDSignIn.sharedInstance.handle(url)
                 }
                 .environmentObject(repertoireManager)
+                .environmentObject(favoritesManager)
         }
     }
     

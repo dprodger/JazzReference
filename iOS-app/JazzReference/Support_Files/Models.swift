@@ -151,6 +151,11 @@ struct Recording: Codable, Identifiable {
     // NEW: List of streaming services available for this recording
     let streamingServices: [String]?
 
+    // MARK: - Favorites
+    let favoriteCount: Int?
+    let isFavorited: Bool?
+    let favoritedBy: [FavoriteUser]?
+
     enum CodingKeys: String, CodingKey {
         case id, label, notes, composer, performers, releases, transcriptions
         case songId = "song_id"
@@ -181,6 +186,9 @@ struct Recording: Codable, Identifiable {
         case hasAppleMusic = "has_apple_music"
         case hasYoutube = "has_youtube"
         case streamingServices = "streaming_services"
+        case favoriteCount = "favorite_count"
+        case isFavorited = "is_favorited"
+        case favoritedBy = "favorited_by"
     }
     
     // Helper computed properties
@@ -385,6 +393,19 @@ struct StreamingLink: Codable {
     /// Best available URL for playback (prefer track, fall back to album)
     var bestPlaybackUrl: String? {
         trackUrl ?? albumUrl
+    }
+}
+
+// MARK: - Favorite User Model
+
+/// Represents a user who has favorited a recording
+struct FavoriteUser: Codable, Identifiable {
+    let id: String
+    let displayName: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case displayName = "display_name"
     }
 }
 

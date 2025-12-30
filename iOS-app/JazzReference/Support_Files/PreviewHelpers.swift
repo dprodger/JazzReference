@@ -107,7 +107,13 @@ extension Recording {
         hasSpotify: true,
         hasAppleMusic: true,
         hasYoutube: true,
-        streamingServices: ["spotify", "apple_music", "youtube"]
+        streamingServices: ["spotify", "apple_music", "youtube"],
+        favoriteCount: 5,
+        isFavorited: true,
+        favoritedBy: [
+            FavoriteUser(id: "user-1", displayName: "John Doe"),
+            FavoriteUser(id: "user-2", displayName: "Jane Smith")
+        ]
     )
 
     static let preview2 = Recording(
@@ -153,7 +159,12 @@ extension Recording {
         hasSpotify: true,
         hasAppleMusic: false,
         hasYoutube: true,
-        streamingServices: ["spotify", "youtube"]
+        streamingServices: ["spotify", "youtube"],
+        favoriteCount: 2,
+        isFavorited: false,
+        favoritedBy: [
+            FavoriteUser(id: "user-3", displayName: "Jazz Fan")
+        ]
     )
 
     static let previewMinimal = Recording(
@@ -188,7 +199,10 @@ extension Recording {
         hasSpotify: false,
         hasAppleMusic: false,
         hasYoutube: false,
-        streamingServices: nil
+        streamingServices: nil,
+        favoriteCount: 0,
+        isFavorited: nil,
+        favoritedBy: nil
     )
 }
 
