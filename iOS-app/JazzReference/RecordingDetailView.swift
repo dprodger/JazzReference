@@ -37,6 +37,7 @@ struct RecordingDetailView: View {
     @State private var localFavoriteCount: Int?
     private let maxReleasesToShow = 5
     @Environment(\.openURL) var openURL
+    @AppStorage("preferredStreamingService") private var preferredStreamingService: String = StreamingService.spotify.rawValue
     
     // MARK: - Computed Properties for Selected Release
     
@@ -828,13 +829,20 @@ struct RecordingDetailView: View {
     
     private func handlePlayButtonTap() {
         let sources = availableStreamingSources
-        
+
         if sources.count == 1, let firstSource = sources.first, let url = URL(string: firstSource.url) {
             // Single source - open directly
             openURL(url)
         } else if sources.count > 1 {
-            // Multiple sources - show picker
-            showingStreamingPicker = true
+            // Check if preferred service is available
+            if let preferredSource = sources.first(where: { $0.service.rawValue == preferredStreamingService }),
+               let url = URL(string: preferredSource.url) {
+                // Preferred service available - open directly
+                openURL(url)
+            } else {
+                // Preferred service not available - show picker
+                showingStreamingPicker = true
+            }
         }
     }
     
