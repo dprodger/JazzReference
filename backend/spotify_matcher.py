@@ -1168,6 +1168,14 @@ class SpotifyMatcher:
                         continue
 
                     self.logger.info(f"[{i}/{len(releases)}] {title} ({artist_name or 'Unknown'}, {year or 'Unknown'}) - ↻ Re-matching tracks...")
+                    # Fetch Spotify tracks BEFORE opening DB connection
+                    # to avoid holding the connection idle during API calls
+                    spotify_tracks = self.get_album_tracks(existing_album_id)
+                    if not spotify_tracks:
+                        self.logger.info(f"[{i}/{len(releases)}] {title} ({artist_name or 'Unknown'}, {year or 'Unknown'}) - ✗ Could not fetch Spotify album tracks")
+                        self.stats['releases_no_match'] += 1
+                        continue
+
                     with get_db_connection() as conn:
                         track_matched = self.match_tracks_for_release(
                             conn,
@@ -1175,7 +1183,8 @@ class SpotifyMatcher:
                             release['id'],
                             existing_album_id,
                             song['title'],
-                            alt_titles=song.get('alt_titles')
+                            alt_titles=song.get('alt_titles'),
+                            spotify_tracks=spotify_tracks
                         )
                         if track_matched:
                             self.stats['releases_with_spotify'] += 1
@@ -1211,17 +1220,27 @@ class SpotifyMatcher:
                         self.stats['releases_no_match'] += 1
                         continue
                     
+                    # IMPORTANT: Fetch Spotify tracks BEFORE opening DB connection
+                    # to avoid holding the connection idle during API calls
+                    # (Supabase's PgBouncer has ~6 min idle timeout)
+                    spotify_tracks = self.get_album_tracks(spotify_match['id'])
+                    if not spotify_tracks:
+                        self.logger.info(f"[{i}/{len(releases)}] {title} ({artist_name or 'Unknown'}, {year or 'Unknown'}) - ✗ Could not fetch Spotify album tracks")
+                        self.stats['releases_no_match'] += 1
+                        continue
+
                     with get_db_connection() as conn:
-                        # First try to match tracks - this validates the album match
+                        # Match tracks using pre-fetched data (no API calls inside DB transaction)
                         track_matched = self.match_tracks_for_release(
                             conn,
                             song['id'],
                             release['id'],
                             spotify_match['id'],
                             song['title'],
-                            alt_titles=song.get('alt_titles')
+                            alt_titles=song.get('alt_titles'),
+                            spotify_tracks=spotify_tracks
                         )
-                        
+
                         if track_matched:
                             # Only store album data if track was found (validates album match)
                             self.stats['releases_with_spotify'] += 1
@@ -1362,18 +1381,19 @@ class SpotifyMatcher:
 
         return best_match
     
-    def match_tracks_for_release(self, conn, song_id: str, release_id: str, 
+    def match_tracks_for_release(self, conn, song_id: str, release_id: str,
                                   spotify_album_id: str, song_title: str,
-                                  alt_titles: List[str] = None) -> bool:
+                                  alt_titles: List[str] = None,
+                                  spotify_tracks: List[dict] = None) -> bool:
         """
         Match Spotify tracks to recordings for a release
-        
+
         After we've matched a release to a Spotify album, this method:
-        1. Fetches all tracks from the Spotify album
+        1. Fetches all tracks from the Spotify album (or uses pre-fetched tracks)
         2. Gets our recordings linked to this release
         3. Fuzzy matches the song title to find the right track
         4. Updates the recording_releases junction table with the track ID
-        
+
         Args:
             conn: Database connection
             song_id: Our song ID
@@ -1381,12 +1401,17 @@ class SpotifyMatcher:
             spotify_album_id: Spotify album ID we matched to
             song_title: The song title to search for
             alt_titles: Alternative titles to try if primary doesn't match
-            
+            spotify_tracks: Pre-fetched Spotify tracks (optional). If provided, skips
+                           the API call. IMPORTANT: Pass this when calling from within
+                           a DB transaction to avoid holding the connection idle during
+                           API calls (which can cause connection timeouts).
+
         Returns:
             bool: True if at least one track was matched, False otherwise
         """
-        # Get tracks from Spotify album
-        spotify_tracks = self.get_album_tracks(spotify_album_id)
+        # Get tracks from Spotify album (use pre-fetched if provided)
+        if spotify_tracks is None:
+            spotify_tracks = self.get_album_tracks(spotify_album_id)
         if not spotify_tracks:
             self.logger.debug(f"    Could not fetch tracks for album {spotify_album_id}")
             return False
