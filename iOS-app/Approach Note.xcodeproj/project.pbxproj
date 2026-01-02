@@ -8,7 +8,6 @@
 
 /* Begin PBXBuildFile section */
 		B41D0FAE2EE633EE00DB427C /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B41D0FA22EE633EE00DB427C /* Assets.xcassets */; };
-		B41D0FAF2EE633EE00DB427C /* Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = B41D0FA42EE633EE00DB427C /* Info.plist */; };
 		B41D0FB02EE633EE00DB427C /* JazzReferenceMacApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B41D0FA62EE633EE00DB427C /* JazzReferenceMacApp.swift */; };
 		B41D0FB12EE633EE00DB427C /* PerformerDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B41D0FA82EE633EE00DB427C /* PerformerDetailView.swift */; };
 		B41D0FB22EE633EE00DB427C /* SongDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B41D0FAB2EE633EE00DB427C /* SongDetailView.swift */; };
@@ -417,7 +416,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				B41D0FAE2EE633EE00DB427C /* Assets.xcassets in Resources */,
-				B41D0FAF2EE633EE00DB427C /* Info.plist in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -574,7 +572,8 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				AUTOMATION_APPLE_EVENTS = NO;
 				CODE_SIGN_ENTITLEMENTS = JazzReferenceMac/JazzReferenceMac.entitlements;
-				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
+				CODE_SIGN_IDENTITY = "Apple Development";
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
@@ -601,6 +600,7 @@
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "me.rodger.david.Jazz-Liner-Notes";
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				REGISTER_APP_GROUPS = YES;
 				RUNTIME_EXCEPTION_ALLOW_DYLD_ENVIRONMENT_VARIABLES = NO;
 				RUNTIME_EXCEPTION_ALLOW_JIT = NO;
@@ -873,6 +873,7 @@
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = FX893D85BJ;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 1.0;
@@ -894,6 +895,7 @@
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = FX893D85BJ;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 1.0;
@@ -914,6 +916,7 @@
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = FX893D85BJ;
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = me.rodger.david.JazzReferenceUITests;
@@ -933,6 +936,7 @@
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = FX893D85BJ;
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = me.rodger.david.JazzReferenceUITests;
