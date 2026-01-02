@@ -8,8 +8,14 @@
 
 import SwiftUI
 import Combine
-#if os(iOS)
+#if canImport(GoogleSignIn)
 import GoogleSignIn
+#endif
+#if canImport(AppKit)
+import AppKit
+#endif
+#if canImport(UIKit)
+import UIKit
 #endif
 
 @MainActor
@@ -517,63 +523,97 @@ class AuthenticationManager: ObservableObject {
         }
     }
     
-    #if os(iOS)
+    #if canImport(GoogleSignIn)
     @MainActor
     func signInWithGoogle() async -> Bool {
         isLoading = true
         errorMessage = nil
-        
-        // Get the presenting view controller
-        guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-              let rootViewController = windowScene.windows.first?.rootViewController else {
-            errorMessage = "Unable to find window"
-            isLoading = false
-            return false
-        }
-        
+
         // Get the GIDClientID from Info.plist
         guard let clientID = Bundle.main.object(forInfoDictionaryKey: "GIDClientID") as? String else {
             errorMessage = "Google Client ID not configured"
             isLoading = false
             return false
         }
-        
+
         // Configure Google Sign In
         let config = GIDConfiguration(clientID: clientID)
         GIDSignIn.sharedInstance.configuration = config
-        
+
+        #if os(iOS)
+        // iOS: Get the presenting view controller
+        guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+              let rootViewController = windowScene.windows.first?.rootViewController else {
+            errorMessage = "Unable to find window"
+            isLoading = false
+            return false
+        }
+
         do {
-            // Start Google Sign In
+            // Start Google Sign In on iOS
             let result = try await GIDSignIn.sharedInstance.signIn(
                 withPresenting: rootViewController
             )
-            
+
             // Get ID token
             guard let idToken = result.user.idToken?.tokenString else {
                 errorMessage = "Failed to get ID token from Google"
                 isLoading = false
                 return false
             }
-            
+
             // Send ID token to backend
             let success = await authenticateWithGoogle(idToken: idToken)
             isLoading = false
             return success
-            
+
         } catch {
             errorMessage = "Google Sign In failed: \(error.localizedDescription)"
             isLoading = false
             return false
         }
+
+        #elseif os(macOS)
+        // macOS: Get the presenting window
+        guard let window = NSApplication.shared.keyWindow else {
+            errorMessage = "Unable to find window"
+            isLoading = false
+            return false
+        }
+
+        do {
+            // Start Google Sign In on macOS
+            let result = try await GIDSignIn.sharedInstance.signIn(
+                withPresenting: window
+            )
+
+            // Get ID token
+            guard let idToken = result.user.idToken?.tokenString else {
+                errorMessage = "Failed to get ID token from Google"
+                isLoading = false
+                return false
+            }
+
+            // Send ID token to backend
+            let success = await authenticateWithGoogle(idToken: idToken)
+            isLoading = false
+            return success
+
+        } catch {
+            errorMessage = "Google Sign In failed: \(error.localizedDescription)"
+            isLoading = false
+            return false
+        }
+        #endif
     }
-#else
+    #else
     @MainActor
     func signInWithGoogle() async -> Bool {
-        // macOS placeholder - implement later if needed
-        errorMessage = "Google Sign-In not yet available on macOS"
+        // GoogleSignIn not available
+        errorMessage = "Google Sign-In is not available"
         return false
     }
-#endif
+    #endif
     
     private func authenticateWithGoogle(idToken: String) async -> Bool {
         let url = URL(string: "\(NetworkManager.baseURL)/auth/google")!

@@ -16,6 +16,12 @@
 		B41D0FB52EE633EE00DB427C /* ArtistsListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B41D0FA72EE633EE00DB427C /* ArtistsListView.swift */; };
 		B41D0FB62EE633EE00DB427C /* RecordingsListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B41D0FAA2EE633EE00DB427C /* RecordingsListView.swift */; };
 		B41D0FB72EE633EE00DB427C /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B41D0FA32EE633EE00DB427C /* ContentView.swift */; };
+		B45A16A52F08800600259452 /* MacResetPasswordView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B45A16A42F08800600259452 /* MacResetPasswordView.swift */; };
+		B45A16A62F08800600259452 /* MacForgotPasswordView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B45A16A12F08800600259452 /* MacForgotPasswordView.swift */; };
+		B45A16A72F08800600259452 /* MacLoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B45A16A22F08800600259452 /* MacLoginView.swift */; };
+		B45A16A82F08800600259452 /* MacRegisterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B45A16A32F08800600259452 /* MacRegisterView.swift */; };
+		B45A16AB2F08802C00259452 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = B45A16AA2F08802C00259452 /* GoogleSignIn */; };
+		B45A16AD2F08802C00259452 /* GoogleSignInSwift in Frameworks */ = {isa = PBXBuildFile; productRef = B45A16AC2F08802C00259452 /* GoogleSignInSwift */; };
 		B4C535842ECE5FFF0030A127 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = B4C535832ECE5FFF0030A127 /* GoogleSignIn */; };
 		B4C535862ECE5FFF0030A127 /* GoogleSignInSwift in Frameworks */ = {isa = PBXBuildFile; productRef = B4C535852ECE5FFF0030A127 /* GoogleSignInSwift */; };
 		B4EE328C2EB3ED5E00C643D1 /* MusicBrainzImporter.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = B4911D2A2EB316F600326CA7 /* MusicBrainzImporter.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
@@ -73,6 +79,10 @@
 		B41D0FAA2EE633EE00DB427C /* RecordingsListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingsListView.swift; sourceTree = "<group>"; };
 		B41D0FAB2EE633EE00DB427C /* SongDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SongDetailView.swift; sourceTree = "<group>"; };
 		B41D0FAC2EE633EE00DB427C /* SongsListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SongsListView.swift; sourceTree = "<group>"; };
+		B45A16A12F08800600259452 /* MacForgotPasswordView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacForgotPasswordView.swift; sourceTree = "<group>"; };
+		B45A16A22F08800600259452 /* MacLoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacLoginView.swift; sourceTree = "<group>"; };
+		B45A16A32F08800600259452 /* MacRegisterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacRegisterView.swift; sourceTree = "<group>"; };
+		B45A16A42F08800600259452 /* MacResetPasswordView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacResetPasswordView.swift; sourceTree = "<group>"; };
 		B4911D2A2EB316F600326CA7 /* MusicBrainzImporter.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = MusicBrainzImporter.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		B4C160402E91B03600EB8D2C /* Approach Note.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Approach Note.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		B4C1604D2E91B03700EB8D2C /* JazzReferenceTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = JazzReferenceTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -157,6 +167,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B45A16AB2F08802C00259452 /* GoogleSignIn in Frameworks */,
+				B45A16AD2F08802C00259452 /* GoogleSignInSwift in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -197,6 +209,10 @@
 		B41D0FAD2EE633EE00DB427C /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				B45A16A12F08800600259452 /* MacForgotPasswordView.swift */,
+				B45A16A22F08800600259452 /* MacLoginView.swift */,
+				B45A16A32F08800600259452 /* MacRegisterView.swift */,
+				B45A16A42F08800600259452 /* MacResetPasswordView.swift */,
 				B41D0FA72EE633EE00DB427C /* ArtistsListView.swift */,
 				B41D0FA82EE633EE00DB427C /* PerformerDetailView.swift */,
 				B41D0FA92EE633EE00DB427C /* RecordingDetailView.swift */,
@@ -206,6 +222,13 @@
 			);
 			name = Views;
 			path = JazzReferenceMac/Views;
+			sourceTree = "<group>";
+		};
+		B45A16A92F08802C00259452 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 		B4C160372E91B03600EB8D2C = {
@@ -221,6 +244,7 @@
 				B4C160502E91B03700EB8D2C /* JazzReferenceTests */,
 				B4C1605A2E91B03700EB8D2C /* JazzReferenceUITests */,
 				B4911D2B2EB316F600326CA7 /* MusicBrainzImporter */,
+				B45A16A92F08802C00259452 /* Frameworks */,
 				B4C160412E91B03600EB8D2C /* Products */,
 			);
 			sourceTree = "<group>";
@@ -254,6 +278,8 @@
 			);
 			name = "Approach Note Mac";
 			packageProductDependencies = (
+				B45A16AA2F08802C00259452 /* GoogleSignIn */,
+				B45A16AC2F08802C00259452 /* GoogleSignInSwift */,
 			);
 			productName = "Approach Note";
 			productReference = B41D0F972EE6337400DB427C /* Approach Note Mac.app */;
@@ -459,6 +485,10 @@
 				B41D0FB22EE633EE00DB427C /* SongDetailView.swift in Sources */,
 				B41D0FB32EE633EE00DB427C /* RecordingDetailView.swift in Sources */,
 				B41D0FB42EE633EE00DB427C /* SongsListView.swift in Sources */,
+				B45A16A52F08800600259452 /* MacResetPasswordView.swift in Sources */,
+				B45A16A62F08800600259452 /* MacForgotPasswordView.swift in Sources */,
+				B45A16A72F08800600259452 /* MacLoginView.swift in Sources */,
+				B45A16A82F08800600259452 /* MacRegisterView.swift in Sources */,
 				B41D0FB52EE633EE00DB427C /* ArtistsListView.swift in Sources */,
 				B41D0FB62EE633EE00DB427C /* RecordingsListView.swift in Sources */,
 				B41D0FB72EE633EE00DB427C /* ContentView.swift in Sources */,
@@ -521,7 +551,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				AUTOMATION_APPLE_EVENTS = NO;
 				CODE_SIGN_ENTITLEMENTS = JazzReferenceMac/JazzReferenceMac.entitlements;
-				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
+				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
@@ -545,9 +575,10 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.6;
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.1;
 				PRODUCT_BUNDLE_IDENTIFIER = "me.rodger.david.Jazz-Liner-Notes";
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				REGISTER_APP_GROUPS = YES;
 				RUNTIME_EXCEPTION_ALLOW_DYLD_ENVIRONMENT_VARIABLES = NO;
 				RUNTIME_EXCEPTION_ALLOW_JIT = NO;
@@ -573,7 +604,6 @@
 				AUTOMATION_APPLE_EVENTS = NO;
 				CODE_SIGN_ENTITLEMENTS = JazzReferenceMac/JazzReferenceMac.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
-				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
@@ -597,7 +627,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.6;
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.1;
 				PRODUCT_BUNDLE_IDENTIFIER = "me.rodger.david.Jazz-Liner-Notes";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -1030,6 +1060,16 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		B45A16AA2F08802C00259452 /* GoogleSignIn */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B4C535822ECE5FFF0030A127 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
+			productName = GoogleSignIn;
+		};
+		B45A16AC2F08802C00259452 /* GoogleSignInSwift */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B4C535822ECE5FFF0030A127 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
+			productName = GoogleSignInSwift;
+		};
 		B4C535832ECE5FFF0030A127 /* GoogleSignIn */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = B4C535822ECE5FFF0030A127 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;

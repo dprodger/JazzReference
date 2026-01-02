@@ -9,10 +9,13 @@
 import Foundation
 import Security
 
-/// Helper class for securely storing and retrieving tokens from iOS Keychain
+/// Helper class for securely storing and retrieving tokens from Keychain
 class KeychainHelper {
     static let shared = KeychainHelper()
-    
+
+    /// Service identifier for keychain items (required for sandboxed Mac apps)
+    private let service = "me.rodger.david.JazzReference"
+
     private init() {}
     
     // MARK: - Public Methods
@@ -33,6 +36,7 @@ class KeychainHelper {
         
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
             kSecAttrAccount as String: key,
             kSecValueData as String: data,
             kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlocked
@@ -55,6 +59,7 @@ class KeychainHelper {
     func load(forKey key: String) -> String? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
             kSecAttrAccount as String: key,
             kSecReturnData as String: true,
             kSecMatchLimit as String: kSecMatchLimitOne
@@ -83,6 +88,7 @@ class KeychainHelper {
     func delete(forKey key: String) -> Bool {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
             kSecAttrAccount as String: key
         ]
         

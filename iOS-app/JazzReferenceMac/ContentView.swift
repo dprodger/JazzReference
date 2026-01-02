@@ -77,7 +77,8 @@ struct SettingsView: View {
                     Label("General", systemImage: "gearshape")
                 }
         }
-        .frame(width: 450, height: 250)
+        .frame(width: 450, height: authManager.isAuthenticated ? 200 : 550)
+        .animation(.easeInOut, value: authManager.isAuthenticated)
     }
 }
 
@@ -85,33 +86,56 @@ struct AccountSettingsView: View {
     @EnvironmentObject var authManager: AuthenticationManager
 
     var body: some View {
+        if authManager.isAuthenticated {
+            authenticatedView
+        } else {
+            MacLoginView(isInline: true)
+                .environmentObject(authManager)
+        }
+    }
+
+    @ViewBuilder
+    private var authenticatedView: some View {
         Form {
-            if authManager.isAuthenticated {
-                Section {
-                    LabeledContent("Name") {
-                        Text(authManager.currentUser?.displayName ?? "—")
+            Section {
+                HStack(spacing: 12) {
+                    // Profile image or placeholder
+                    if let imageUrl = authManager.currentUser?.profileImageUrl,
+                       let url = URL(string: imageUrl) {
+                        AsyncImage(url: url) { image in
+                            image
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                        } placeholder: {
+                            Image(systemName: "person.circle.fill")
+                                .font(.system(size: 40))
+                                .foregroundColor(JazzTheme.smokeGray)
+                        }
+                        .frame(width: 50, height: 50)
+                        .clipShape(Circle())
+                    } else {
+                        Image(systemName: "person.circle.fill")
+                            .font(.system(size: 50))
+                            .foregroundColor(JazzTheme.smokeGray)
                     }
-                    LabeledContent("Email") {
-                        Text(authManager.currentUser?.email ?? "—")
-                    }
-                }
 
-                Section {
-                    Button("Sign Out") {
-                        authManager.logout()
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(authManager.currentUser?.displayName ?? "User")
+                            .font(JazzTheme.headline())
+                            .foregroundColor(JazzTheme.charcoal)
+                        Text(authManager.currentUser?.email ?? "")
+                            .font(JazzTheme.subheadline())
+                            .foregroundColor(.secondary)
                     }
-                    .foregroundColor(.red)
                 }
-            } else {
-                Section {
-                    Text("Sign in to access your repertoires and sync your data.")
-                        .foregroundColor(.secondary)
+                .padding(.vertical, 8)
+            }
 
-                    // Login form would go here
-                    Text("Login functionality coming soon")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+            Section {
+                Button("Sign Out") {
+                    authManager.logout()
                 }
+                .foregroundColor(.red)
             }
         }
         .formStyle(.grouped)
@@ -120,11 +144,17 @@ struct AccountSettingsView: View {
 }
 
 struct GeneralSettingsView: View {
+    @AppStorage("preferredStreamingService") private var preferredStreamingService: String = "spotify"
+
     var body: some View {
         Form {
-            Section("Display") {
-                Text("Display settings will appear here")
-                    .foregroundColor(.secondary)
+            Section("Playback") {
+                Picker("Preferred Streaming Service", selection: $preferredStreamingService) {
+                    Text("Spotify").tag("spotify")
+                    Text("Apple Music").tag("apple_music")
+                    Text("YouTube").tag("youtube")
+                }
+                .pickerStyle(.radioGroup)
             }
         }
         .formStyle(.grouped)
