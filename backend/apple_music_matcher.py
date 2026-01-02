@@ -709,8 +709,8 @@ class AppleMusicMatcher:
             apple_album_id: Apple Music album ID we matched
             from_local_catalog: If True, album was matched from local catalog
         """
-        # Get our recordings on this release
-        recordings = get_recordings_for_release(song_id, release_id)
+        # Get our recordings on this release (use existing connection to avoid idle timeout)
+        recordings = get_recordings_for_release(song_id, release_id, conn=conn)
 
         if not recordings:
             self.logger.debug(f"    No recordings found for this release")

@@ -219,22 +219,25 @@ def get_releases_without_artwork() -> List[dict]:
             return cur.fetchall()
 
 
-def get_recordings_for_release(song_id: str, release_id: str) -> List[dict]:
+def get_recordings_for_release(song_id: str, release_id: str, conn=None) -> List[dict]:
     """
     Get recordings linked to a specific release for a specific song
-    
+
     Args:
         song_id: Our database song ID
         release_id: Our database release ID
-        
+        conn: Optional existing database connection. If provided, uses it
+              instead of opening a new connection (avoids idle connection
+              timeout issues when called from within a transaction).
+
     Returns:
-        List of recording dicts with 'recording_id', 'song_title', 
+        List of recording dicts with 'recording_id', 'song_title',
         'disc_number', 'track_number', 'spotify_track_id' (existing if any)
     """
-    with get_db_connection() as conn:
-        with conn.cursor() as cur:
+    def _execute(c):
+        with c.cursor() as cur:
             cur.execute("""
-                SELECT 
+                SELECT
                     rr.recording_id,
                     s.title as song_title,
                     rr.disc_number,
@@ -248,6 +251,12 @@ def get_recordings_for_release(song_id: str, release_id: str) -> List[dict]:
                 ORDER BY rr.disc_number, rr.track_number
             """, (release_id, song_id))
             return cur.fetchall()
+
+    if conn is not None:
+        return _execute(conn)
+    else:
+        with get_db_connection() as new_conn:
+            return _execute(new_conn)
 
 
 def update_release_spotify_data(conn, release_id: str, spotify_data: dict,
@@ -290,8 +299,7 @@ def update_release_spotify_data(conn, release_id: str, spotify_data: dict,
             album_art.get('large'),
             release_id
         ))
-
-        conn.commit()
+        # Note: commit is handled by the caller's context manager
 
 
 def update_release_artwork(conn, release_id: str, album_art: dict,
@@ -317,8 +325,7 @@ def update_release_artwork(conn, release_id: str, album_art: dict,
             album_art.get('large'),
             release_id
         ))
-        
-        conn.commit()
+        # Note: commit is handled by the caller's context manager
 
 
 def update_recording_release_track_id(conn, recording_id: str, release_id: str,
@@ -353,8 +360,7 @@ def update_recording_release_track_id(conn, recording_id: str, release_id: str,
                 track_number = COALESCE(%s, track_number)
             WHERE recording_id = %s AND release_id = %s
         """, (track_id, disc_number, track_number, recording_id, release_id))
-
-        conn.commit()
+        # Note: commit is handled by the caller's context manager
 
 
 def update_recording_default_release(conn, song_id: str, release_id: str,
@@ -464,19 +470,22 @@ def is_album_blocked(song_id: str, album_id: str, service: str = 'spotify') -> b
             return cur.fetchone() is not None
 
 
-def get_blocked_tracks_for_song(song_id: str, service: str = 'spotify') -> List[str]:
+def get_blocked_tracks_for_song(song_id: str, service: str = 'spotify', conn=None) -> List[str]:
     """
     Get all blocked track IDs for a song.
 
     Args:
         song_id: Our database song ID
         service: Streaming service name (default: 'spotify')
+        conn: Optional existing database connection. If provided, uses it
+              instead of opening a new connection (avoids idle connection
+              timeout issues when called from within a transaction).
 
     Returns:
         List of blocked track IDs
     """
-    with get_db_connection() as conn:
-        with conn.cursor() as cur:
+    def _execute(c):
+        with c.cursor() as cur:
             cur.execute("""
                 SELECT service_id FROM bad_streaming_matches
                 WHERE service = %s
@@ -485,6 +494,12 @@ def get_blocked_tracks_for_song(song_id: str, service: str = 'spotify') -> List[
             """, (service, song_id))
             rows = cur.fetchall()
             return [row['service_id'] for row in rows]
+
+    if conn is not None:
+        return _execute(conn)
+    else:
+        with get_db_connection() as new_conn:
+            return _execute(new_conn)
 
 
 def get_blocked_albums_for_song(song_id: str, service: str = 'spotify') -> List[str]:

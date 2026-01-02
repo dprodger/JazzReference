@@ -339,9 +339,9 @@ class SpotifyMatcher:
         """Get releases with Spotify URL but no cover artwork"""
         return get_releases_without_artwork()
     
-    def get_recordings_for_release(self, song_id: str, release_id: str) -> List[dict]:
+    def get_recordings_for_release(self, song_id: str, release_id: str, conn=None) -> List[dict]:
         """Get recordings linked to a specific release for a specific song"""
-        return get_recordings_for_release(song_id, release_id)
+        return get_recordings_for_release(song_id, release_id, conn=conn)
     
     def update_release_spotify_data(self, conn, release_id: str, spotify_data: dict,
                                     release_title: str = None, artist: str = None,
@@ -849,6 +849,19 @@ class SpotifyMatcher:
         search_album = normalize_for_search(album_title)
         search_artist = normalize_for_search(artist_name) if artist_name else None
 
+        # Truncate very long artist names to avoid Spotify API 400 errors
+        # (Some releases have absurdly long artist credits with full orchestra rosters)
+        MAX_ARTIST_LENGTH = 100
+        if search_artist and len(search_artist) > MAX_ARTIST_LENGTH:
+            # Try to truncate at a natural break point (comma, hyphen, etc.)
+            truncated = search_artist[:MAX_ARTIST_LENGTH]
+            for sep in [', ', ' - ', ' & ', ' and ']:
+                if sep in truncated:
+                    truncated = truncated.rsplit(sep, 1)[0]
+                    break
+            self.logger.debug(f"  Truncated long artist name: '{search_artist[:50]}...' -> '{truncated}'")
+            search_artist = truncated
+
         # Check if album title has a live suffix we can strip (e.g., "Solo: Live" -> "Solo")
         stripped_album = strip_live_suffix(search_album)
         has_stripped_album = stripped_album != search_album
@@ -1072,13 +1085,16 @@ class SpotifyMatcher:
     # MAIN ORCHESTRATION METHODS
     # ========================================================================
     
-    def match_releases(self, song_identifier: str) -> Dict[str, Any]:
+    def match_releases(self, song_identifier: str, start_from: int = 1) -> Dict[str, Any]:
         """
         Main method to match Spotify albums for a song's releases
-        
+
         Args:
             song_identifier: Song name or database ID
-            
+            start_from: Release number to start from (1-indexed). Use this to resume
+                       after a previous run was interrupted. Releases before this
+                       number will be skipped.
+
         Returns:
             dict: {
                 'success': bool,
@@ -1120,12 +1136,18 @@ class SpotifyMatcher:
                 }
             
             self.logger.info(f"Found {len(releases)} releases to process")
+            if start_from > 1:
+                self.logger.info(f"Resuming from release #{start_from} (skipping first {start_from - 1})")
             self.logger.info("")
-            
+
             # Process each release
             for i, release in enumerate(releases, 1):
+                # Skip releases before start_from (for resuming interrupted runs)
+                if i < start_from:
+                    continue
+
                 self.stats['releases_processed'] += 1
-                
+
                 # Report progress via callback
                 if self.progress_callback:
                     self.progress_callback('spotify_track_match', i, len(releases))
@@ -1292,7 +1314,7 @@ class SpotifyMatcher:
     def match_track_to_recording(self, song_title: str, spotify_tracks: List[dict],
                                    expected_disc: int = None, expected_track: int = None,
                                    alt_titles: List[str] = None,
-                                   song_id: str = None) -> Optional[dict]:
+                                   song_id: str = None, conn=None) -> Optional[dict]:
         """
         Find the best matching Spotify track for a song title
 
@@ -1303,6 +1325,9 @@ class SpotifyMatcher:
             expected_track: Expected track number (optional, for position-based fallback)
             alt_titles: Alternative titles to try if primary title doesn't match
             song_id: Our database song ID (for blocklist checking)
+            conn: Optional existing database connection. If provided, uses it
+                  instead of opening a new connection (avoids idle connection
+                  timeout issues when called from within a transaction).
 
         Returns:
             Best matching track dict or None if no good match
@@ -1314,7 +1339,7 @@ class SpotifyMatcher:
         blocked_track_ids = set()
         if song_id:
             from spotify_db import get_blocked_tracks_for_song
-            blocked_track_ids = set(get_blocked_tracks_for_song(song_id))
+            blocked_track_ids = set(get_blocked_tracks_for_song(song_id, conn=conn))
             if blocked_track_ids:
                 self.logger.debug(f"      Found {len(blocked_track_ids)} blocked track(s) for this song")
 
@@ -1418,8 +1443,8 @@ class SpotifyMatcher:
         
         self.logger.debug(f"    Matching tracks ({len(spotify_tracks)} tracks in album)...")
         
-        # Get our recordings for this release
-        recordings = self.get_recordings_for_release(song_id, release_id)
+        # Get our recordings for this release (use existing connection to avoid idle timeout)
+        recordings = self.get_recordings_for_release(song_id, release_id, conn=conn)
 
         any_matched = False
         for recording in recordings:
@@ -1433,13 +1458,15 @@ class SpotifyMatcher:
                 self.logger.debug(f"      Recording has track ID but rematch_all mode, re-matching...")
             
             # Match song title to a track, passing position info for fallback matching
+            # Pass conn to avoid nested connections and idle timeout issues
             matched_track = self.match_track_to_recording(
                 song_title,
                 spotify_tracks,
                 expected_disc=recording.get('disc_number'),
                 expected_track=recording.get('track_number'),
                 alt_titles=alt_titles,
-                song_id=song_id
+                song_id=song_id,
+                conn=conn
             )
             
             if matched_track:

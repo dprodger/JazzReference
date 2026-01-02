@@ -137,7 +137,7 @@ def get_releases_for_song(song_id: str, artist_filter: str = None) -> List[dict]
             return cur.fetchall()
 
 
-def get_recordings_for_release(song_id: str, release_id: str) -> List[dict]:
+def get_recordings_for_release(song_id: str, release_id: str, conn=None) -> List[dict]:
     """
     Get recordings linked to a specific release for a specific song.
 
@@ -146,6 +146,9 @@ def get_recordings_for_release(song_id: str, release_id: str) -> List[dict]:
     Args:
         song_id: Our database song ID
         release_id: Our database release ID
+        conn: Optional existing database connection. If provided, uses it
+              instead of opening a new connection (avoids idle connection
+              timeout issues when called from within a transaction).
 
     Returns:
         List of recording dicts with:
@@ -153,8 +156,8 @@ def get_recordings_for_release(song_id: str, release_id: str) -> List[dict]:
         - song_title, disc_number, track_number
         - apple_music_track_id (if already matched)
     """
-    with get_db_connection() as conn:
-        with conn.cursor() as cur:
+    def _execute(c):
+        with c.cursor() as cur:
             cur.execute("""
                 SELECT
                     rr.id as recording_release_id,
@@ -175,6 +178,12 @@ def get_recordings_for_release(song_id: str, release_id: str) -> List[dict]:
                 ORDER BY rr.disc_number, rr.track_number
             """, (SERVICE_NAME, release_id, song_id))
             return cur.fetchall()
+
+    if conn is not None:
+        return _execute(conn)
+    else:
+        with get_db_connection() as new_conn:
+            return _execute(new_conn)
 
 
 def get_releases_without_apple_music() -> List[dict]:

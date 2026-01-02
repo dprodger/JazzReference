@@ -44,6 +44,9 @@ Examples:
 
   # Enable debug logging to see validation details and cache operations
   python match_spotify_tracks.py --name "Autumn Leaves" --debug
+
+  # Resume from a specific release number (after interrupted run)
+  python match_spotify_tracks.py --name "Take Five" --rematch-all --start-from 2972
         """
     )
 
@@ -81,6 +84,14 @@ Examples:
         help='Full re-match from scratch: ignore cache, re-match albums and all tracks regardless of existing IDs'
     )
 
+    script.parser.add_argument(
+        '--start-from',
+        type=int,
+        default=1,
+        metavar='N',
+        help='Resume from release number N (1-indexed). Use to continue after an interrupted run.'
+    )
+
     # Parse arguments
     args = script.parse_args()
 
@@ -111,6 +122,7 @@ Examples:
         "FORCE REFRESH": force_refresh,
         "REMATCH ALL": args.rematch_all,
         "REMATCH TRACKS": rematch_tracks and not args.rematch_all,
+        f"START FROM #{args.start_from}": args.start_from > 1,
     }
     script.print_header(modes)
 
@@ -123,7 +135,7 @@ Examples:
 
     # Get song identifier and run matcher
     song_identifier = args.name or args.id
-    result = matcher.match_releases(song_identifier)
+    result = matcher.match_releases(song_identifier, start_from=args.start_from)
 
     # Print summary
     if result['success']:
