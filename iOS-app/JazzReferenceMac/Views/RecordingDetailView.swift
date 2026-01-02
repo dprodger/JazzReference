@@ -11,6 +11,7 @@ struct RecordingDetailView: View {
     let recordingId: String
     @State private var recording: Recording?
     @State private var isLoading = true
+    @Environment(\.dismiss) private var dismiss
 
     private let networkManager = NetworkManager()
 
@@ -51,7 +52,14 @@ struct RecordingDetailView: View {
             }
         }
         .background(JazzTheme.backgroundLight)
-        .task {
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button("Close") {
+                    dismiss()
+                }
+            }
+        }
+        .task(id: recordingId) {
             await loadRecording()
         }
     }

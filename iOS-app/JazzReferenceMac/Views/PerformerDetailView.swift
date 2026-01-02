@@ -55,7 +55,7 @@ struct PerformerDetailView: View {
             }
         }
         .background(JazzTheme.backgroundLight)
-        .task {
+        .task(id: performerId) {
             await loadPerformer()
         }
     }

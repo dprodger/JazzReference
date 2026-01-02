@@ -375,6 +375,29 @@ struct Recording: Codable, Identifiable {
         }
         return services
     }
+
+    // MARK: - Filter Helpers (shared between iOS and Mac)
+
+    /// Whether this recording is playable on any streaming service
+    var isPlayable: Bool {
+        hasSpotifyAvailable || hasAppleMusicAvailable
+    }
+
+    /// Whether this recording is available on Spotify
+    var hasSpotifyAvailable: Bool {
+        if hasSpotify == true { return true }
+        if bestSpotifyUrl != nil { return true }
+        if streamingLinks?["spotify"] != nil { return true }
+        return false
+    }
+
+    /// Whether this recording is available on Apple Music
+    var hasAppleMusicAvailable: Bool {
+        if hasAppleMusic == true { return true }
+        if appleMusicUrl != nil { return true }
+        if streamingLinks?["apple_music"] != nil { return true }
+        return false
+    }
 }
 
 // MARK: - Streaming Link Model

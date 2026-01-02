@@ -2,7 +2,7 @@
 //  ContentView.swift
 //  JazzReferenceMac
 //
-//  Main content view with sidebar navigation for macOS
+//  Main content view with tab navigation for macOS
 //
 
 import SwiftUI
@@ -24,87 +24,39 @@ enum NavigationItem: String, CaseIterable, Identifiable {
 }
 
 struct ContentView: View {
-    @State private var selectedItem: NavigationItem? = .songs
-    @State private var columnVisibility: NavigationSplitViewVisibility = .all
+    @State private var selectedTab: NavigationItem = .songs
     @EnvironmentObject var authManager: AuthenticationManager
     @EnvironmentObject var repertoireManager: RepertoireManager
 
     var body: some View {
-        NavigationSplitView(columnVisibility: $columnVisibility) {
-            // Sidebar
-            List(NavigationItem.allCases, selection: $selectedItem) { item in
-                NavigationLink(value: item) {
-                    Label(item.rawValue, systemImage: item.icon)
+        TabView(selection: $selectedTab) {
+            SongsListView()
+                .tabItem {
+                    Label("Songs", systemImage: "music.note.list")
                 }
-            }
-            .listStyle(.sidebar)
-            .navigationSplitViewColumnWidth(min: 180, ideal: 200)
-            .toolbar {
-                ToolbarItem(placement: .automatic) {
-                    Button(action: toggleSidebar) {
-                        Image(systemName: "sidebar.leading")
-                    }
+                .tag(NavigationItem.songs)
+
+            ArtistsListView()
+                .tabItem {
+                    Label("Artists", systemImage: "person.2.fill")
                 }
-            }
+                .tag(NavigationItem.artists)
 
-            // User status at bottom of sidebar
-            Spacer()
-
-            VStack(alignment: .leading, spacing: 8) {
-                Divider()
-
-                if authManager.isAuthenticated {
-                    HStack {
-                        Image(systemName: "person.circle.fill")
-                            .foregroundColor(JazzTheme.burgundy)
-                        VStack(alignment: .leading) {
-                            Text(authManager.currentUser?.displayName ?? "User")
-                                .font(.subheadline)
-                                .fontWeight(.medium)
-                            Text(authManager.currentUser?.email ?? "")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                    }
-                    .padding(.horizontal)
-                    .padding(.bottom, 8)
-                } else {
-                    Button("Sign In") {
-                        // Show login sheet
-                    }
-                    .padding(.horizontal)
-                    .padding(.bottom, 8)
+            RecordingsListView()
+                .tabItem {
+                    Label("Recordings", systemImage: "opticaldisc")
                 }
-            }
-        } detail: {
-            // Main content area
-            switch selectedItem {
-            case .songs:
-                SongsListView()
-            case .artists:
-                ArtistsListView()
-            case .recordings:
-                RecordingsListView()
-            case .none:
-                Text("Select an item from the sidebar")
-                    .foregroundColor(.secondary)
-            }
+                .tag(NavigationItem.recordings)
         }
         .onReceive(NotificationCenter.default.publisher(for: .navigateToSongs)) { _ in
-            selectedItem = .songs
+            selectedTab = .songs
         }
         .onReceive(NotificationCenter.default.publisher(for: .navigateToArtists)) { _ in
-            selectedItem = .artists
+            selectedTab = .artists
         }
         .onReceive(NotificationCenter.default.publisher(for: .navigateToRecordings)) { _ in
-            selectedItem = .recordings
+            selectedTab = .recordings
         }
-    }
-
-    private func toggleSidebar() {
-        #if os(macOS)
-        NSApp.keyWindow?.firstResponder?.tryToPerform(#selector(NSSplitViewController.toggleSidebar(_:)), with: nil)
-        #endif
     }
 }
 

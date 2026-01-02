@@ -7,14 +7,47 @@
 
 import SwiftUI
 
+// MARK: - Recording Filter Enum
+enum SongRecordingFilter: String, CaseIterable, Identifiable {
+    case all = "All"
+    case playable = "Playable"
+    case withSpotify = "Spotify"
+    case withAppleMusic = "Apple Music"
+
+    var id: String { rawValue }
+
+    var displayName: String { rawValue }
+
+    var icon: String {
+        switch self {
+        case .all: return "music.note.list"
+        case .playable: return "play.circle"
+        case .withSpotify: return "play.circle.fill"
+        case .withAppleMusic: return "play.circle.fill"
+        }
+    }
+
+    var iconColor: Color {
+        switch self {
+        case .all: return JazzTheme.smokeGray
+        case .playable: return JazzTheme.burgundy
+        case .withSpotify: return .green
+        case .withAppleMusic: return .pink
+        }
+    }
+}
+
 struct SongDetailView: View {
     let songId: String
     @State private var song: Song?
     @State private var isLoading = true
+    @State private var isRecordingsLoading = true
     @State private var sortOrder: RecordingSortOrder = .year
+    @State private var selectedRecordingId: String?
+    @State private var selectedFilter: SongRecordingFilter = .all
     @EnvironmentObject var repertoireManager: RepertoireManager
 
-    private let networkManager = NetworkManager()
+    @StateObject private var networkManager = NetworkManager()
 
     var body: some View {
         ScrollView {
@@ -50,12 +83,12 @@ struct SongDetailView: View {
             }
         }
         .background(JazzTheme.backgroundLight)
-        .task {
+        .task(id: songId) {
             await loadSong()
         }
         .onChange(of: sortOrder) { _, _ in
             Task {
-                await loadSong()
+                await reloadRecordings()
             }
         }
     }
@@ -121,16 +154,69 @@ struct SongDetailView: View {
         }
     }
 
+    // MARK: - Filtered Recordings
+    private func filteredRecordings(_ recordings: [Recording]) -> [Recording] {
+        switch selectedFilter {
+        case .all:
+            return recordings
+        case .playable:
+            return recordings.filter { $0.isPlayable }
+        case .withSpotify:
+            return recordings.filter { $0.hasSpotifyAvailable }
+        case .withAppleMusic:
+            return recordings.filter { $0.hasAppleMusicAvailable }
+        }
+    }
+
     @ViewBuilder
     private func recordingsSection(_ recordings: [Recording]) -> some View {
+        let filtered = filteredRecordings(recordings)
+
         VStack(alignment: .leading, spacing: 12) {
+            // Header with count, filter, and sort
             HStack {
-                Text("Recordings (\(recordings.count.formatted()))")
+                Text("Recordings")
                     .font(.headline)
                     .foregroundColor(JazzTheme.charcoal)
 
+                Text("(\(filtered.count))")
+                    .font(.subheadline)
+                    .foregroundColor(JazzTheme.smokeGray)
+
                 Spacer()
 
+                // Filter menu
+                Menu {
+                    ForEach(SongRecordingFilter.allCases) { filter in
+                        Button(action: { selectedFilter = filter }) {
+                            HStack {
+                                Image(systemName: filter.icon)
+                                    .foregroundColor(filter.iconColor)
+                                Text(filter.displayName)
+                                if selectedFilter == filter {
+                                    Spacer()
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: selectedFilter.icon)
+                            .foregroundColor(selectedFilter.iconColor)
+                        Text(selectedFilter.displayName)
+                            .font(.subheadline)
+                        Image(systemName: "chevron.down")
+                            .font(.caption2)
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(selectedFilter == .all ? JazzTheme.cardBackground : selectedFilter.iconColor.opacity(0.15))
+                    .cornerRadius(8)
+                }
+                .menuStyle(.borderlessButton)
+
+                // Sort picker
                 Picker("Sort by", selection: $sortOrder) {
                     ForEach(RecordingSortOrder.allCases) { order in
                         Text(order.displayName).tag(order)
@@ -140,8 +226,49 @@ struct SongDetailView: View {
                 .frame(width: 150)
             }
 
-            ForEach(recordings) { recording in
-                RecordingCard(recording: recording)
+            // Recordings list
+            if isRecordingsLoading {
+                VStack(spacing: 12) {
+                    ProgressView()
+                        .scaleEffect(1.2)
+                    Text("Loading recordings...")
+                        .font(.subheadline)
+                        .foregroundColor(JazzTheme.smokeGray)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 40)
+            } else if filtered.isEmpty {
+                VStack(spacing: 12) {
+                    Image(systemName: "music.note.slash")
+                        .font(.system(size: 40))
+                        .foregroundColor(JazzTheme.smokeGray.opacity(0.5))
+                    Text("No recordings match the current filter")
+                        .font(.subheadline)
+                        .foregroundColor(JazzTheme.smokeGray)
+                    Button("Clear Filter") {
+                        selectedFilter = .all
+                    }
+                    .buttonStyle(.link)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 40)
+            } else {
+                ForEach(filtered) { recording in
+                    RecordingCard(recording: recording)
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            selectedRecordingId = recording.id
+                        }
+                }
+            }
+        }
+        .sheet(isPresented: Binding(
+            get: { selectedRecordingId != nil },
+            set: { if !$0 { selectedRecordingId = nil } }
+        )) {
+            if let recordingId = selectedRecordingId {
+                RecordingDetailView(recordingId: recordingId)
+                    .frame(minWidth: 600, minHeight: 500)
             }
         }
     }
@@ -150,8 +277,26 @@ struct SongDetailView: View {
 
     private func loadSong() async {
         isLoading = true
-        song = await networkManager.fetchSongDetail(id: songId, sortBy: sortOrder)
+        isRecordingsLoading = true
+
+        // Phase 1: Load summary (fast) - includes song metadata, featured recordings
+        let fetchedSong = await networkManager.fetchSongSummary(id: songId)
+        song = fetchedSong
         isLoading = false
+
+        // Phase 2: Load all recordings with full streaming data
+        if let recordings = await networkManager.fetchSongRecordings(id: songId, sortBy: sortOrder) {
+            song?.recordings = recordings
+        }
+        isRecordingsLoading = false
+    }
+
+    private func reloadRecordings() async {
+        isRecordingsLoading = true
+        if let recordings = await networkManager.fetchSongRecordings(id: songId, sortBy: sortOrder) {
+            song?.recordings = recordings
+        }
+        isRecordingsLoading = false
     }
 }
 
@@ -159,6 +304,7 @@ struct SongDetailView: View {
 
 struct RecordingCard: View {
     let recording: Recording
+    @State private var isHovering = false
 
     var body: some View {
         HStack(spacing: 16) {
@@ -251,8 +397,16 @@ struct RecordingCard: View {
             }
         }
         .padding()
-        .background(JazzTheme.cardBackground)
+        .background(isHovering ? JazzTheme.cardBackground.opacity(0.7) : JazzTheme.cardBackground)
         .cornerRadius(10)
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(isHovering ? JazzTheme.burgundy.opacity(0.5) : Color.clear, lineWidth: 2)
+        )
+        .onHover { hovering in
+            isHovering = hovering
+        }
+        .animation(.easeInOut(duration: 0.15), value: isHovering)
     }
 }
 

@@ -349,20 +349,11 @@ struct RecordingsSection: View {
         case .all:
             break
         case .playable:
-            // Any streaming service available
-            result = result.filter {
-                $0.hasStreaming == true || $0.hasAnyStreamingLink
-            }
+            result = result.filter { $0.isPlayable }
         case .withSpotify:
-            // Use API's has_spotify flag, fall back to legacy checks
-            result = result.filter {
-                $0.hasSpotify == true || $0.bestSpotifyUrl != nil
-            }
+            result = result.filter { $0.hasSpotifyAvailable }
         case .withAppleMusic:
-            // Use API's has_apple_music flag
-            result = result.filter {
-                $0.hasAppleMusic == true
-            }
+            result = result.filter { $0.hasAppleMusicAvailable }
         }
         
         return result

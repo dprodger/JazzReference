@@ -54,7 +54,7 @@ struct SongsListView: View {
                 }
                 .listStyle(.inset(alternatesRowBackgrounds: true))
             }
-            .frame(minWidth: 300, idealWidth: 350)
+            .frame(minWidth: 200, idealWidth: 250, maxWidth: 300)
 
             // Song detail (right pane)
             if let songId = selectedSongId {
@@ -136,11 +136,11 @@ struct SongRowView: View {
         VStack(alignment: .leading, spacing: 2) {
             Text(song.title)
                 .font(.headline)
-                .foregroundColor(JazzTheme.charcoal)
+                .foregroundColor(.primary)
             if let composer = song.composer {
                 Text(composer)
                     .font(.subheadline)
-                    .foregroundColor(JazzTheme.smokeGray)
+                    .foregroundColor(.secondary)
             }
         }
         .padding(.vertical, 4)

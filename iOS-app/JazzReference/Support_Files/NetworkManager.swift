@@ -1,3 +1,18 @@
+// MARK: - Performer Recording Sort Order Enum
+enum PerformerRecordingSortOrder: String, CaseIterable, Identifiable {
+    case year = "year"
+    case name = "name"
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .year: return "Year"
+        case .name: return "Song"
+        }
+    }
+}
+
 // MARK: - Queue Status Models
 struct CurrentSong: Codable {
     let songId: String

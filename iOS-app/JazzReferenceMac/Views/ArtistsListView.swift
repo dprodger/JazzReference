@@ -29,7 +29,7 @@ struct ArtistsListView: View {
                 }
                 .listStyle(.inset(alternatesRowBackgrounds: true))
             }
-            .frame(minWidth: 300, idealWidth: 350)
+            .frame(minWidth: 200, idealWidth: 250, maxWidth: 300)
 
             // Artist detail (right pane)
             if let performerId = selectedPerformerId {
@@ -89,11 +89,11 @@ struct ArtistRowView: View {
         VStack(alignment: .leading, spacing: 2) {
             Text(performer.name)
                 .font(.headline)
-                .foregroundColor(JazzTheme.charcoal)
+                .foregroundColor(.primary)
             if let instrument = performer.instrument {
                 Text(instrument)
                     .font(.subheadline)
-                    .foregroundColor(JazzTheme.smokeGray)
+                    .foregroundColor(.secondary)
             }
         }
         .padding(.vertical, 4)

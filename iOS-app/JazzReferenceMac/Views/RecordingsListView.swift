@@ -40,7 +40,7 @@ struct RecordingsListView: View {
                 }
                 .listStyle(.inset(alternatesRowBackgrounds: true))
             }
-            .frame(minWidth: 350, idealWidth: 400)
+            .frame(minWidth: 200, idealWidth: 280, maxWidth: 350)
 
             // Recording detail (right pane)
             if let recordingId = selectedRecordingId {
@@ -102,13 +102,13 @@ struct RecordingRowView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(recording.albumTitle ?? "Unknown Album")
                     .font(.headline)
-                    .foregroundColor(JazzTheme.charcoal)
+                    .foregroundColor(.primary)
                     .lineLimit(1)
 
                 if let songTitle = recording.songTitle {
                     Text(songTitle)
                         .font(.subheadline)
-                        .foregroundColor(JazzTheme.smokeGray)
+                        .foregroundColor(.secondary)
                         .lineLimit(1)
                 }
 
@@ -116,16 +116,16 @@ struct RecordingRowView: View {
                     if let year = recording.recordingYear {
                         Text("\(year)")
                             .font(.caption)
-                            .foregroundColor(JazzTheme.smokeGray)
+                            .foregroundColor(.secondary)
                     }
 
                     if let label = recording.label {
                         Text("•")
                             .font(.caption)
-                            .foregroundColor(JazzTheme.smokeGray)
+                            .foregroundColor(.secondary)
                         Text(label)
                             .font(.caption)
-                            .foregroundColor(JazzTheme.smokeGray)
+                            .foregroundColor(.secondary)
                             .lineLimit(1)
                     }
                 }
