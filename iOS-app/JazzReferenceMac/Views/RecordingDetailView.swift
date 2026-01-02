@@ -156,6 +156,30 @@ struct RecordingDetailView: View {
         }
     }
 
+    /// Get Spotify URL from streamingLinks or legacy field
+    private func spotifyUrl(for recording: Recording) -> String? {
+        if let link = recording.streamingLinks?["spotify"], let url = link.bestPlaybackUrl {
+            return url
+        }
+        return recording.bestSpotifyUrl
+    }
+
+    /// Get Apple Music URL from streamingLinks or legacy field
+    private func appleMusicUrl(for recording: Recording) -> String? {
+        if let link = recording.streamingLinks?["apple_music"], let url = link.bestPlaybackUrl {
+            return url
+        }
+        return recording.appleMusicUrl
+    }
+
+    /// Get YouTube URL from streamingLinks or legacy field
+    private func youtubeUrl(for recording: Recording) -> String? {
+        if let link = recording.streamingLinks?["youtube"], let url = link.bestPlaybackUrl {
+            return url
+        }
+        return recording.youtubeUrl
+    }
+
     @ViewBuilder
     private func streamingSection(_ recording: Recording) -> some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -164,8 +188,8 @@ struct RecordingDetailView: View {
                 .foregroundColor(JazzTheme.charcoal)
 
             HStack(spacing: 16) {
-                if let spotifyUrl = recording.bestSpotifyUrl,
-                   let url = URL(string: spotifyUrl) {
+                if let spotifyUrlString = spotifyUrl(for: recording),
+                   let url = URL(string: spotifyUrlString) {
                     Link(destination: url) {
                         HStack {
                             Image(systemName: "play.circle.fill")
@@ -181,8 +205,25 @@ struct RecordingDetailView: View {
                     .buttonStyle(.plain)
                 }
 
-                if let youtubeUrl = recording.youtubeUrl,
-                   let url = URL(string: youtubeUrl) {
+                if let appleMusicUrlString = appleMusicUrl(for: recording),
+                   let url = URL(string: appleMusicUrlString) {
+                    Link(destination: url) {
+                        HStack {
+                            Image(systemName: "applelogo")
+                                .font(.title2)
+                            Text("Apple Music")
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 10)
+                        .background(Color(red: 252/255, green: 60/255, blue: 68/255))
+                        .foregroundColor(.white)
+                        .cornerRadius(8)
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                if let youtubeUrlString = youtubeUrl(for: recording),
+                   let url = URL(string: youtubeUrlString) {
                     Link(destination: url) {
                         HStack {
                             Image(systemName: "play.rectangle.fill")
@@ -192,23 +233,6 @@ struct RecordingDetailView: View {
                         .padding(.horizontal, 16)
                         .padding(.vertical, 10)
                         .background(Color.red)
-                        .foregroundColor(.white)
-                        .cornerRadius(8)
-                    }
-                    .buttonStyle(.plain)
-                }
-
-                if let appleMusicUrl = recording.appleMusicUrl,
-                   let url = URL(string: appleMusicUrl) {
-                    Link(destination: url) {
-                        HStack {
-                            Image(systemName: "applelogo")
-                                .font(.title2)
-                            Text("Apple Music")
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 10)
-                        .background(Color.pink)
                         .foregroundColor(.white)
                         .cornerRadius(8)
                     }

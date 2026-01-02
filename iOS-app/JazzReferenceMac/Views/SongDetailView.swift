@@ -690,7 +690,7 @@ struct RecordingCard: View {
 
                 HStack(spacing: 8) {
                     if let year = recording.recordingYear {
-                        Text("\(year)")
+                        Text(String(year))
                             .font(JazzTheme.caption())
                             .foregroundColor(JazzTheme.smokeGray)
                     }
@@ -708,29 +708,7 @@ struct RecordingCard: View {
             Spacer()
 
             // Streaming buttons
-            HStack(spacing: 8) {
-                if let spotifyUrl = recording.bestSpotifyUrl,
-                   let url = URL(string: spotifyUrl) {
-                    Link(destination: url) {
-                        Image(systemName: "play.circle.fill")
-                            .font(.title2)
-                            .foregroundColor(.green)
-                    }
-                    .buttonStyle(.plain)
-                    .help("Open in Spotify")
-                }
-
-                if let youtubeUrl = recording.youtubeUrl,
-                   let url = URL(string: youtubeUrl) {
-                    Link(destination: url) {
-                        Image(systemName: "play.rectangle.fill")
-                            .font(.title2)
-                            .foregroundColor(.red)
-                    }
-                    .buttonStyle(.plain)
-                    .help("Watch on YouTube")
-                }
-            }
+            StreamingButtons(recording: recording)
         }
         .padding()
         .background(isHovering ? JazzTheme.cardBackground.opacity(0.7) : JazzTheme.cardBackground)
@@ -991,6 +969,70 @@ struct BackingTrackRow: View {
         let minutes = seconds / 60
         let remainingSeconds = seconds % 60
         return String(format: "%d:%02d", minutes, remainingSeconds)
+    }
+}
+
+// MARK: - Streaming Buttons
+
+struct StreamingButtons: View {
+    let recording: Recording
+
+    /// Get Spotify URL from streamingLinks or legacy field
+    private var spotifyUrl: String? {
+        if let link = recording.streamingLinks?["spotify"], let url = link.bestPlaybackUrl {
+            return url
+        }
+        return recording.bestSpotifyUrl
+    }
+
+    /// Get Apple Music URL from streamingLinks or legacy field
+    private var appleMusicUrl: String? {
+        if let link = recording.streamingLinks?["apple_music"], let url = link.bestPlaybackUrl {
+            return url
+        }
+        return recording.appleMusicUrl
+    }
+
+    /// Get YouTube URL from streamingLinks or legacy field
+    private var youtubeUrl: String? {
+        if let link = recording.streamingLinks?["youtube"], let url = link.bestPlaybackUrl {
+            return url
+        }
+        return recording.youtubeUrl
+    }
+
+    var body: some View {
+        HStack(spacing: 8) {
+            if let urlString = spotifyUrl, let url = URL(string: urlString) {
+                Link(destination: url) {
+                    Image(systemName: "play.circle.fill")
+                        .font(.title2)
+                        .foregroundColor(.green)
+                }
+                .buttonStyle(.plain)
+                .help("Open in Spotify")
+            }
+
+            if let urlString = appleMusicUrl, let url = URL(string: urlString) {
+                Link(destination: url) {
+                    Image(systemName: "music.note")
+                        .font(.title2)
+                        .foregroundColor(Color(red: 252/255, green: 60/255, blue: 68/255))
+                }
+                .buttonStyle(.plain)
+                .help("Open in Apple Music")
+            }
+
+            if let urlString = youtubeUrl, let url = URL(string: urlString) {
+                Link(destination: url) {
+                    Image(systemName: "play.rectangle.fill")
+                        .font(.title2)
+                        .foregroundColor(.red)
+                }
+                .buttonStyle(.plain)
+                .help("Open in YouTube")
+            }
+        }
     }
 }
 
