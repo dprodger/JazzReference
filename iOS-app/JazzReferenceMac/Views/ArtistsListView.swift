@@ -19,7 +19,7 @@ struct ArtistsListView: View {
             VStack(spacing: 0) {
                 List(selection: $selectedPerformerId) {
                     ForEach(groupedPerformers, id: \.0) { letter, performers in
-                        Section(header: Text(letter).font(.headline).foregroundColor(JazzTheme.burgundy)) {
+                        Section(header: Text(letter).font(JazzTheme.headline()).foregroundColor(JazzTheme.burgundy)) {
                             ForEach(performers) { performer in
                                 ArtistRowView(performer: performer)
                                     .tag(performer.id)
@@ -41,7 +41,7 @@ struct ArtistsListView: View {
                         .font(.system(size: 60))
                         .foregroundColor(JazzTheme.smokeGray.opacity(0.5))
                     Text("Select an artist")
-                        .font(.title2)
+                        .font(JazzTheme.title2())
                         .foregroundColor(JazzTheme.smokeGray)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -88,11 +88,11 @@ struct ArtistRowView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(performer.name)
-                .font(.headline)
+                .font(JazzTheme.headline())
                 .foregroundColor(.primary)
             if let instrument = performer.instrument {
                 Text(instrument)
-                    .font(.subheadline)
+                    .font(JazzTheme.subheadline())
                     .foregroundColor(.secondary)
             }
         }

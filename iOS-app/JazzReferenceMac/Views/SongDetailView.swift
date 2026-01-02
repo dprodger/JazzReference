@@ -45,6 +45,9 @@ struct SongDetailView: View {
     @State private var sortOrder: RecordingSortOrder = .year
     @State private var selectedRecordingId: String?
     @State private var selectedFilter: SongRecordingFilter = .all
+    @State private var transcriptions: [SoloTranscription] = []
+    @State private var backingTracks: [Video] = []
+    @State private var isSummaryInfoExpanded = false
     @EnvironmentObject var repertoireManager: RepertoireManager
 
     @StateObject private var networkManager = NetworkManager()
@@ -56,23 +59,35 @@ struct SongDetailView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .padding(.top, 100)
             } else if let song = song {
-                VStack(alignment: .leading, spacing: 24) {
+                VStack(alignment: .leading, spacing: 16) {
                     // Header
                     songHeader(song)
 
-                    Divider()
-
-                    // Song info
-                    songInfo(song)
-
-                    // External references
-                    if !song.externalReferencesList.isEmpty {
-                        externalReferencesSection(song)
+                    // Summary Information (collapsible)
+                    if hasSummaryContent(for: song) {
+                        summaryInfoSection(song)
                     }
+
+                    // Featured Recordings carousel
+                    if let featured = song.featuredRecordings, !featured.isEmpty {
+                        featuredRecordingsSection(featured)
+                    }
+
+                    Divider()
 
                     // Recordings
                     if let recordings = song.recordings, !recordings.isEmpty {
                         recordingsSection(recordings)
+                    }
+
+                    // Transcriptions
+                    if !transcriptions.isEmpty {
+                        transcriptionsSection
+                    }
+
+                    // Backing Tracks
+                    if !backingTracks.isEmpty {
+                        backingTracksSection
                     }
                 }
                 .padding()
@@ -97,61 +112,153 @@ struct SongDetailView: View {
 
     @ViewBuilder
     private func songHeader(_ song: Song) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(song.title)
-                .font(.largeTitle)
-                .fontWeight(.bold)
-                .foregroundColor(JazzTheme.charcoal)
-
-            if let composer = song.composer {
-                Text("by \(composer)")
-                    .font(.title3)
-                    .foregroundColor(JazzTheme.smokeGray)
-            }
-        }
-    }
-
-    @ViewBuilder
-    private func songInfo(_ song: Song) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            if let structure = song.structure {
-                DetailRow(icon: "doc.text", label: "Structure", value: structure)
-            }
-
-            if let recordingCount = song.recordingCount {
-                DetailRow(icon: "opticaldisc", label: "Recordings", value: "\(recordingCount)")
-            }
-        }
-    }
-
-    @ViewBuilder
-    private func externalReferencesSection(_ song: Song) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("External References")
-                .font(.headline)
-                .foregroundColor(JazzTheme.charcoal)
-
-            ForEach(song.externalReferencesList) { reference in
-                Link(destination: URL(string: reference.url)!) {
-                    HStack {
-                        Image(systemName: reference.iconName)
-                            .foregroundColor(JazzTheme.burgundy)
-                            .frame(width: 24)
-                        Text(reference.displayName)
-                            .foregroundColor(JazzTheme.charcoal)
-                        Spacer()
-                        Image(systemName: "arrow.up.right.square")
-                            .foregroundColor(JazzTheme.smokeGray)
-                            .font(.caption)
-                    }
-                    .padding(.vertical, 8)
-                    .padding(.horizontal, 12)
-                    .background(JazzTheme.cardBackground)
-                    .cornerRadius(8)
+            // Title with composed year
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(song.title)
+                    .font(JazzTheme.largeTitle())
+                    .foregroundColor(JazzTheme.charcoal)
+                if let year = song.composedYear {
+                    Text("(\(String(year)))")
+                        .font(JazzTheme.title2())
+                        .foregroundColor(JazzTheme.smokeGray)
                 }
-                .buttonStyle(.plain)
+            }
+
+            // Composer with icon
+            if let composer = song.composer {
+                HStack {
+                    Image(systemName: "music.note.list")
+                        .foregroundColor(JazzTheme.brass)
+                    Text(composer)
+                        .font(JazzTheme.title3())
+                        .foregroundColor(JazzTheme.smokeGray)
+                }
+            }
+
+            // Song Reference (if available)
+            if let songRef = song.songReference {
+                HStack(alignment: .top, spacing: 8) {
+                    Image(systemName: "book.closed.fill")
+                        .foregroundColor(JazzTheme.brass)
+                        .font(JazzTheme.subheadline())
+                    Text(songRef)
+                        .font(JazzTheme.subheadline())
+                        .foregroundColor(JazzTheme.smokeGray)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(.top, 4)
             }
         }
+    }
+
+    // MARK: - Summary Information Helpers
+
+    private func hasSummaryContent(for song: Song) -> Bool {
+        let hasStructure = song.structure != nil
+        let hasComposedKey = song.composedKey != nil
+        let hasWikipedia = song.wikipediaUrl != nil
+        let hasMusicbrainz = song.musicbrainzId != nil
+        let hasJazzStandards = song.externalReferences?["jazzstandards"] != nil
+        return hasStructure || hasComposedKey || hasWikipedia || hasMusicbrainz || hasJazzStandards || !song.externalReferencesList.isEmpty
+    }
+
+    @ViewBuilder
+    private func summaryInfoSection(_ song: Song) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // Collapsible Header
+            Button(action: {
+                withAnimation {
+                    isSummaryInfoExpanded.toggle()
+                }
+            }) {
+                HStack {
+                    Text("Summary Information")
+                        .font(JazzTheme.title3())
+                        .foregroundColor(JazzTheme.charcoal)
+                    Spacer()
+                    Image(systemName: isSummaryInfoExpanded ? "chevron.up" : "chevron.down")
+                        .foregroundColor(JazzTheme.brass)
+                }
+                .padding()
+                .background(JazzTheme.cardBackground)
+            }
+            .buttonStyle(.plain)
+
+            // Expandable Content
+            if isSummaryInfoExpanded {
+                VStack(alignment: .leading, spacing: 16) {
+                    // Structure
+                    if let structure = song.structure {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Structure")
+                                .font(JazzTheme.headline())
+                                .foregroundColor(JazzTheme.charcoal)
+                            Text(structure)
+                                .font(JazzTheme.body())
+                                .foregroundColor(JazzTheme.smokeGray)
+                        }
+                        .padding()
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Color.white)
+                        .cornerRadius(8)
+                    }
+
+                    // Composed Key
+                    if let composedKey = song.composedKey {
+                        HStack(spacing: 8) {
+                            Image(systemName: "tuningfork")
+                                .foregroundColor(JazzTheme.brass)
+                            Text("Original Key:")
+                                .font(JazzTheme.headline())
+                                .foregroundColor(JazzTheme.charcoal)
+                            Text(composedKey)
+                                .font(JazzTheme.body())
+                                .foregroundColor(JazzTheme.smokeGray)
+                        }
+                        .padding()
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Color.white)
+                        .cornerRadius(8)
+                    }
+
+                    // External References
+                    if !song.externalReferencesList.isEmpty {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Learn More")
+                                .font(JazzTheme.headline())
+                                .foregroundColor(JazzTheme.charcoal)
+
+                            ForEach(song.externalReferencesList) { reference in
+                                Link(destination: URL(string: reference.url)!) {
+                                    HStack {
+                                        Image(systemName: reference.iconName)
+                                            .foregroundColor(JazzTheme.burgundy)
+                                            .frame(width: 24)
+                                        Text(reference.displayName)
+                                            .font(JazzTheme.body())
+                                            .foregroundColor(JazzTheme.charcoal)
+                                        Spacer()
+                                        Image(systemName: "arrow.up.right.square")
+                                            .foregroundColor(JazzTheme.smokeGray)
+                                            .font(JazzTheme.caption())
+                                    }
+                                    .padding(.vertical, 6)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        .padding()
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Color.white)
+                        .cornerRadius(8)
+                    }
+                }
+                .padding()
+                .background(JazzTheme.cardBackground)
+            }
+        }
+        .cornerRadius(10)
     }
 
     // MARK: - Filtered Recordings
@@ -168,19 +275,107 @@ struct SongDetailView: View {
         }
     }
 
+    // MARK: - Grouped Recordings
+    private func groupedRecordings(_ recordings: [Recording]) -> [(groupKey: String, recordings: [Recording])] {
+        let filtered = filteredRecordings(recordings)
+        switch sortOrder {
+        case .year:
+            return groupByDecade(filtered)
+        case .name:
+            return groupByArtistWithConsolidation(filtered)
+        }
+    }
+
+    private func groupByDecade(_ recordings: [Recording]) -> [(groupKey: String, recordings: [Recording])] {
+        var decadeOrder: [String] = []
+        var decades: [String: [Recording]] = [:]
+
+        for recording in recordings {
+            let decadeKey: String
+            if let year = recording.recordingYear {
+                let decade = (year / 10) * 10
+                decadeKey = "\(decade)s"
+            } else {
+                decadeKey = "Unknown Year"
+            }
+
+            if decades[decadeKey] == nil {
+                decadeOrder.append(decadeKey)
+            }
+            decades[decadeKey, default: []].append(recording)
+        }
+
+        return decadeOrder.compactMap { key in
+            guard let recs = decades[key] else { return nil }
+            return (groupKey: key, recordings: recs)
+        }
+    }
+
+    private func groupByArtistWithConsolidation(_ recordings: [Recording]) -> [(groupKey: String, recordings: [Recording])] {
+        // First pass: count recordings per artist
+        var artistCounts: [String: Int] = [:]
+        for recording in recordings {
+            let artist = recording.performers?.first { $0.role == "leader" }?.name ?? "Unknown"
+            artistCounts[artist, default: 0] += 1
+        }
+
+        // Second pass: separate featured artists from singles
+        var featuredOrder: [String] = []
+        var featuredGroups: [String: [Recording]] = [:]
+        var moreRecordings: [Recording] = []
+
+        for recording in recordings {
+            let artist = recording.performers?.first { $0.role == "leader" }?.name ?? "Unknown"
+
+            if artistCounts[artist, default: 0] >= 2 {
+                if featuredGroups[artist] == nil {
+                    featuredOrder.append(artist)
+                }
+                featuredGroups[artist, default: []].append(recording)
+            } else {
+                moreRecordings.append(recording)
+            }
+        }
+
+        // Build result
+        var result: [(groupKey: String, recordings: [Recording])] = []
+
+        for artist in featuredOrder {
+            if let recs = featuredGroups[artist] {
+                result.append((groupKey: artist, recordings: recs))
+            }
+        }
+
+        if !moreRecordings.isEmpty {
+            let sortedMore = moreRecordings.sorted { rec1, rec2 in
+                let leader1 = rec1.performers?.first { $0.role == "leader" }
+                let leader2 = rec2.performers?.first { $0.role == "leader" }
+                let sortKey1 = leader1?.sortName ?? leader1?.name ?? "Unknown"
+                let sortKey2 = leader2?.sortName ?? leader2?.name ?? "Unknown"
+                return sortKey1.localizedCaseInsensitiveCompare(sortKey2) == .orderedAscending
+            }
+            result.append((groupKey: "More Recordings", recordings: sortedMore))
+        }
+
+        return result
+    }
+
     @ViewBuilder
     private func recordingsSection(_ recordings: [Recording]) -> some View {
         let filtered = filteredRecordings(recordings)
+        let grouped = groupedRecordings(recordings)
 
         VStack(alignment: .leading, spacing: 12) {
             // Header with count, filter, and sort
             HStack {
+                Image(systemName: "music.note.list")
+                    .foregroundColor(JazzTheme.burgundy)
                 Text("Recordings")
-                    .font(.headline)
+                    .font(JazzTheme.title2())
                     .foregroundColor(JazzTheme.charcoal)
 
                 Text("(\(filtered.count))")
-                    .font(.subheadline)
+                    .font(JazzTheme.subheadline())
                     .foregroundColor(JazzTheme.smokeGray)
 
                 Spacer()
@@ -205,9 +400,9 @@ struct SongDetailView: View {
                         Image(systemName: selectedFilter.icon)
                             .foregroundColor(selectedFilter.iconColor)
                         Text(selectedFilter.displayName)
-                            .font(.subheadline)
+                            .font(JazzTheme.subheadline())
                         Image(systemName: "chevron.down")
-                            .font(.caption2)
+                            .font(JazzTheme.caption2())
                     }
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
@@ -216,14 +411,32 @@ struct SongDetailView: View {
                 }
                 .menuStyle(.borderlessButton)
 
-                // Sort picker
-                Picker("Sort by", selection: $sortOrder) {
+                // Sort menu (matching iOS style)
+                Menu {
                     ForEach(RecordingSortOrder.allCases) { order in
-                        Text(order.displayName).tag(order)
+                        Button(action: { sortOrder = order }) {
+                            HStack {
+                                Text(order.displayName)
+                                if sortOrder == order {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
                     }
+                } label: {
+                    HStack(spacing: 3) {
+                        Text(sortOrder.displayName)
+                            .font(JazzTheme.caption())
+                        Image(systemName: "chevron.down")
+                            .font(JazzTheme.caption2())
+                    }
+                    .foregroundColor(JazzTheme.burgundy)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 5)
+                    .background(JazzTheme.burgundy.opacity(0.1))
+                    .cornerRadius(6)
                 }
-                .pickerStyle(.segmented)
-                .frame(width: 150)
+                .menuStyle(.borderlessButton)
             }
 
             // Recordings list
@@ -232,7 +445,7 @@ struct SongDetailView: View {
                     ProgressView()
                         .scaleEffect(1.2)
                     Text("Loading recordings...")
-                        .font(.subheadline)
+                        .font(JazzTheme.subheadline())
                         .foregroundColor(JazzTheme.smokeGray)
                 }
                 .frame(maxWidth: .infinity)
@@ -243,7 +456,7 @@ struct SongDetailView: View {
                         .font(.system(size: 40))
                         .foregroundColor(JazzTheme.smokeGray.opacity(0.5))
                     Text("No recordings match the current filter")
-                        .font(.subheadline)
+                        .font(JazzTheme.subheadline())
                         .foregroundColor(JazzTheme.smokeGray)
                     Button("Clear Filter") {
                         selectedFilter = .all
@@ -253,12 +466,29 @@ struct SongDetailView: View {
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 40)
             } else {
-                ForEach(filtered) { recording in
-                    RecordingCard(recording: recording)
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            selectedRecordingId = recording.id
+                // Grouped recordings
+                ForEach(grouped, id: \.groupKey) { group in
+                    VStack(alignment: .leading, spacing: 8) {
+                        // Group header
+                        Text("\(group.groupKey) (\(group.recordings.count))")
+                            .font(JazzTheme.headline())
+                            .foregroundColor(JazzTheme.burgundy)
+                            .padding(.top, 8)
+
+                        // Horizontal scroll of recordings in this group
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(alignment: .top, spacing: 12) {
+                                ForEach(group.recordings) { recording in
+                                    RecordingCard(recording: recording, showArtistName: sortOrder == .year || group.groupKey == "More Recordings")
+                                        .frame(width: 300)
+                                        .contentShape(Rectangle())
+                                        .onTapGesture {
+                                            selectedRecordingId = recording.id
+                                        }
+                                }
+                            }
                         }
+                    }
                 }
             }
         }
@@ -273,16 +503,119 @@ struct SongDetailView: View {
         }
     }
 
+    // MARK: - Featured Recordings Carousel
+
+    @ViewBuilder
+    private func featuredRecordingsSection(_ recordings: [Recording]) -> some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Featured Recordings")
+                .font(JazzTheme.title2())
+                .foregroundColor(JazzTheme.charcoal)
+
+            Text("Important recordings for this song")
+                .font(JazzTheme.subheadline())
+                .foregroundColor(JazzTheme.smokeGray)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(alignment: .top, spacing: 20) {
+                    ForEach(recordings) { recording in
+                        FeaturedRecordingCard(recording: recording)
+                            .onTapGesture {
+                                selectedRecordingId = recording.id
+                            }
+                    }
+                }
+                .padding(.horizontal, 4)
+            }
+        }
+        .padding(16)
+        .background(JazzTheme.cardBackground)
+        .cornerRadius(12)
+    }
+
+    // MARK: - Transcriptions Section
+
+    @ViewBuilder
+    private var transcriptionsSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Image(systemName: "music.quarternote.3")
+                    .foregroundColor(JazzTheme.teal)
+                Text("Solo Transcriptions")
+                    .font(JazzTheme.title2())
+                    .foregroundColor(JazzTheme.charcoal)
+
+                Spacer()
+
+                Text("\(transcriptions.count)")
+                    .font(JazzTheme.subheadline())
+                    .foregroundColor(JazzTheme.smokeGray)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(JazzTheme.teal.opacity(0.1))
+                    .cornerRadius(6)
+            }
+
+            ForEach(transcriptions) { transcription in
+                TranscriptionRow(transcription: transcription)
+            }
+        }
+        .padding(16)
+        .background(JazzTheme.cardBackground)
+        .cornerRadius(12)
+    }
+
+    // MARK: - Backing Tracks Section
+
+    @ViewBuilder
+    private var backingTracksSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Image(systemName: "play.circle.fill")
+                    .foregroundColor(JazzTheme.green)
+                Text("Backing Tracks")
+                    .font(JazzTheme.title2())
+                    .foregroundColor(JazzTheme.charcoal)
+
+                Spacer()
+
+                Text("\(backingTracks.count)")
+                    .font(JazzTheme.subheadline())
+                    .foregroundColor(JazzTheme.smokeGray)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(JazzTheme.green.opacity(0.1))
+                    .cornerRadius(6)
+            }
+
+            ForEach(backingTracks) { video in
+                BackingTrackRow(video: video)
+            }
+        }
+        .padding(16)
+        .background(JazzTheme.cardBackground)
+        .cornerRadius(12)
+    }
+
     // MARK: - Data Loading
 
     private func loadSong() async {
         isLoading = true
         isRecordingsLoading = true
 
-        // Phase 1: Load summary (fast) - includes song metadata, featured recordings
+        // Phase 1: Load summary (fast) - includes song metadata, featured recordings, transcriptions
         let fetchedSong = await networkManager.fetchSongSummary(id: songId)
         song = fetchedSong
+        transcriptions = fetchedSong?.transcriptions ?? []
         isLoading = false
+
+        // Load backing tracks
+        do {
+            let videos = try await networkManager.fetchSongVideos(songId: songId, videoType: "backing_track")
+            backingTracks = videos
+        } catch {
+            print("Error fetching backing tracks: \(error)")
+        }
 
         // Phase 2: Load all recordings with full streaming data
         if let recordings = await networkManager.fetchSongRecordings(id: songId, sortBy: sortOrder) {
@@ -304,6 +637,7 @@ struct SongDetailView: View {
 
 struct RecordingCard: View {
     let recording: Recording
+    var showArtistName: Bool = true
     @State private var isHovering = false
 
     var body: some View {
@@ -330,16 +664,17 @@ struct RecordingCard: View {
                     if recording.isCanonical == true {
                         Image(systemName: "star.fill")
                             .foregroundColor(JazzTheme.gold)
-                            .font(.caption)
+                            .font(JazzTheme.caption())
                     }
 
                     Text(recording.albumTitle ?? "Unknown Album")
-                        .font(.headline)
+                        .font(JazzTheme.headline())
                         .foregroundColor(JazzTheme.charcoal)
+                        .lineLimit(1)
                 }
 
-                // Performers
-                if let performers = recording.performers {
+                // Performers (only show if showArtistName is true)
+                if showArtistName, let performers = recording.performers {
                     let leaderNames = performers
                         .filter { $0.role == "leader" }
                         .map { $0.name }
@@ -347,15 +682,16 @@ struct RecordingCard: View {
 
                     if !leaderNames.isEmpty {
                         Text(leaderNames)
-                            .font(.subheadline)
+                            .font(JazzTheme.subheadline())
                             .foregroundColor(JazzTheme.smokeGray)
+                            .lineLimit(1)
                     }
                 }
 
                 HStack(spacing: 8) {
                     if let year = recording.recordingYear {
                         Text("\(year)")
-                            .font(.caption)
+                            .font(JazzTheme.caption())
                             .foregroundColor(JazzTheme.smokeGray)
                     }
 
@@ -363,7 +699,7 @@ struct RecordingCard: View {
                         Text("•")
                             .foregroundColor(JazzTheme.smokeGray)
                         Text(label)
-                            .font(.caption)
+                            .font(JazzTheme.caption())
                             .foregroundColor(JazzTheme.smokeGray)
                     }
                 }
@@ -407,6 +743,254 @@ struct RecordingCard: View {
             isHovering = hovering
         }
         .animation(.easeInOut(duration: 0.15), value: isHovering)
+    }
+}
+
+// MARK: - Featured Recording Card
+
+struct FeaturedRecordingCard: View {
+    let recording: Recording
+    @State private var isHovering = false
+
+    private var artistName: String {
+        if let artistCredit = recording.artistCredit, !artistCredit.isEmpty {
+            return artistCredit
+        }
+        if let performers = recording.performers {
+            if let leader = performers.first(where: { $0.role?.lowercased() == "leader" }) {
+                return leader.name
+            }
+            if let first = performers.first {
+                return first.name
+            }
+        }
+        return "Various Artists"
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // Album Art
+            AsyncImage(url: URL(string: recording.bestAlbumArtLarge ?? recording.bestAlbumArtMedium ?? "")) { phase in
+                switch phase {
+                case .empty:
+                    Rectangle()
+                        .fill(JazzTheme.smokeGray.opacity(0.2))
+                        .overlay { ProgressView() }
+                case .success(let image):
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                case .failure:
+                    Rectangle()
+                        .fill(JazzTheme.smokeGray.opacity(0.2))
+                        .overlay {
+                            Image(systemName: "music.note")
+                                .font(.system(size: 40))
+                                .foregroundColor(JazzTheme.smokeGray)
+                        }
+                @unknown default:
+                    EmptyView()
+                }
+            }
+            .frame(width: 180, height: 180)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .shadow(color: .black.opacity(0.15), radius: 8, x: 0, y: 4)
+
+            // Recording Info
+            VStack(alignment: .leading, spacing: 4) {
+                Text(artistName)
+                    .font(JazzTheme.subheadline(weight: .semibold))
+                    .foregroundColor(JazzTheme.brass)
+                    .lineLimit(1)
+
+                Text(recording.albumTitle ?? "Unknown Album")
+                    .font(JazzTheme.body(weight: .medium))
+                    .foregroundColor(JazzTheme.charcoal)
+                    .lineLimit(2)
+
+                if let year = recording.recordingYear {
+                    Text(String(year))
+                        .font(JazzTheme.caption())
+                        .foregroundColor(JazzTheme.smokeGray)
+                }
+            }
+            .frame(width: 180, alignment: .leading)
+        }
+        .padding(12)
+        .background(isHovering ? JazzTheme.backgroundLight : Color.white)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(isHovering ? JazzTheme.burgundy.opacity(0.5) : Color.clear, lineWidth: 2)
+        )
+        .onHover { hovering in
+            isHovering = hovering
+        }
+        .animation(.easeInOut(duration: 0.15), value: isHovering)
+    }
+}
+
+// MARK: - Transcription Row
+
+struct TranscriptionRow: View {
+    let transcription: SoloTranscription
+    @State private var isHovering = false
+    @Environment(\.openURL) private var openURL
+
+    var body: some View {
+        Button(action: openYouTube) {
+            HStack(spacing: 12) {
+                // Play button thumbnail
+                ZStack {
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(JazzTheme.teal.opacity(0.15))
+                        .frame(width: 80, height: 45)
+
+                    Image(systemName: "play.fill")
+                        .font(.system(size: 20))
+                        .foregroundColor(JazzTheme.teal)
+                }
+
+                // Transcription info
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(transcription.albumTitle ?? "Solo Transcription")
+                        .font(JazzTheme.headline())
+                        .foregroundColor(JazzTheme.charcoal)
+                        .lineLimit(2)
+
+                    HStack(spacing: 12) {
+                        if let year = transcription.recordingYear {
+                            HStack(spacing: 4) {
+                                Image(systemName: "calendar")
+                                    .foregroundColor(JazzTheme.brass)
+                                    .font(JazzTheme.caption())
+                                Text(String(format: "%d", year))
+                                    .font(JazzTheme.subheadline())
+                                    .foregroundColor(JazzTheme.smokeGray)
+                            }
+                        }
+
+                        if let label = transcription.label {
+                            HStack(spacing: 4) {
+                                Image(systemName: "opticaldisc")
+                                    .foregroundColor(JazzTheme.brass)
+                                    .font(JazzTheme.caption())
+                                Text(label)
+                                    .font(JazzTheme.subheadline())
+                                    .foregroundColor(JazzTheme.smokeGray)
+                                    .lineLimit(1)
+                            }
+                        }
+                    }
+                }
+
+                Spacer()
+
+                // YouTube icon indicator
+                if transcription.youtubeUrl != nil {
+                    Image(systemName: "play.rectangle.fill")
+                        .font(.title2)
+                        .foregroundColor(.red)
+                }
+            }
+            .padding()
+            .background(isHovering ? JazzTheme.backgroundLight : Color.white)
+            .cornerRadius(10)
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .stroke(isHovering ? JazzTheme.teal.opacity(0.5) : Color.clear, lineWidth: 2)
+            )
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering in
+            isHovering = hovering
+        }
+        .animation(.easeInOut(duration: 0.15), value: isHovering)
+        .help(transcription.youtubeUrl != nil ? "Watch on YouTube" : "No video available")
+    }
+
+    private func openYouTube() {
+        guard let urlString = transcription.youtubeUrl,
+              let url = URL(string: urlString) else { return }
+        openURL(url)
+    }
+}
+
+// MARK: - Backing Track Row
+
+struct BackingTrackRow: View {
+    let video: Video
+    @State private var isHovering = false
+    @Environment(\.openURL) private var openURL
+
+    var body: some View {
+        Button(action: openYouTube) {
+            HStack(spacing: 12) {
+                // Play button thumbnail
+                ZStack {
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(JazzTheme.green.opacity(0.15))
+                        .frame(width: 80, height: 45)
+
+                    Image(systemName: "play.fill")
+                        .font(.system(size: 20))
+                        .foregroundColor(JazzTheme.green)
+                }
+
+                // Video info
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(video.title ?? "Backing Track")
+                        .font(JazzTheme.headline())
+                        .foregroundColor(JazzTheme.charcoal)
+                        .lineLimit(2)
+
+                    if let duration = video.durationSeconds {
+                        HStack(spacing: 4) {
+                            Image(systemName: "clock")
+                                .foregroundColor(JazzTheme.brass)
+                                .font(JazzTheme.caption())
+                            Text(formatDuration(duration))
+                                .font(JazzTheme.subheadline())
+                                .foregroundColor(JazzTheme.smokeGray)
+                        }
+                    }
+                }
+
+                Spacer()
+
+                // YouTube icon indicator
+                if video.youtubeUrl != nil {
+                    Image(systemName: "play.rectangle.fill")
+                        .font(.title2)
+                        .foregroundColor(.red)
+                }
+            }
+            .padding()
+            .background(isHovering ? JazzTheme.backgroundLight : Color.white)
+            .cornerRadius(10)
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .stroke(isHovering ? JazzTheme.green.opacity(0.5) : Color.clear, lineWidth: 2)
+            )
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering in
+            isHovering = hovering
+        }
+        .animation(.easeInOut(duration: 0.15), value: isHovering)
+        .help(video.youtubeUrl != nil ? "Watch on YouTube" : "No video available")
+    }
+
+    private func openYouTube() {
+        guard let urlString = video.youtubeUrl,
+              let url = URL(string: urlString) else { return }
+        openURL(url)
+    }
+
+    private func formatDuration(_ seconds: Int) -> String {
+        let minutes = seconds / 60
+        let remainingSeconds = seconds % 60
+        return String(format: "%d:%02d", minutes, remainingSeconds)
     }
 }
 

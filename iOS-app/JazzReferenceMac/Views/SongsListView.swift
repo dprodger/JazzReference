@@ -19,13 +19,32 @@ struct SongsListView: View {
         HSplitView {
             // Song list (left pane)
             VStack(spacing: 0) {
+                // Search bar
+                HStack {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundColor(JazzTheme.smokeGray)
+                    TextField("Search songs", text: $searchText)
+                        .textFieldStyle(.plain)
+                    if !searchText.isEmpty {
+                        Button(action: { searchText = "" }) {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundColor(JazzTheme.smokeGray)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(8)
+                .background(Color.white)
+                .cornerRadius(8)
+                .padding(.horizontal, 8)
+                .padding(.top, 8)
+
                 // Repertoire selector
                 HStack {
                     Image(systemName: "music.note.list")
                         .foregroundColor(JazzTheme.burgundy)
                     Text(repertoireManager.currentRepertoireDisplayName)
-                        .font(.subheadline)
-                        .fontWeight(.medium)
+                        .font(JazzTheme.subheadline(weight: .medium))
                     Spacer()
                     Menu("Change") {
                         ForEach(repertoireManager.repertoires) { repertoire in
@@ -44,7 +63,7 @@ struct SongsListView: View {
                 // Song list
                 List(selection: $selectedSongId) {
                     ForEach(groupedSongs, id: \.0) { letter, songs in
-                        Section(header: Text(letter).font(.headline).foregroundColor(JazzTheme.burgundy)) {
+                        Section(header: Text(letter).font(JazzTheme.headline()).foregroundColor(JazzTheme.burgundy)) {
                             ForEach(songs) { song in
                                 SongRowView(song: song)
                                     .tag(song.id)
@@ -66,14 +85,13 @@ struct SongsListView: View {
                         .font(.system(size: 60))
                         .foregroundColor(JazzTheme.smokeGray.opacity(0.5))
                     Text("Select a song")
-                        .font(.title2)
+                        .font(JazzTheme.title2())
                         .foregroundColor(JazzTheme.smokeGray)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(JazzTheme.backgroundLight)
             }
         }
-        .searchable(text: $searchText, prompt: "Search songs")
         .onChange(of: searchText) { _, newValue in
             searchTask?.cancel()
             searchTask = Task {
@@ -135,11 +153,11 @@ struct SongRowView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(song.title)
-                .font(.headline)
+                .font(JazzTheme.headline())
                 .foregroundColor(.primary)
             if let composer = song.composer {
                 Text(composer)
-                    .font(.subheadline)
+                    .font(JazzTheme.subheadline())
                     .foregroundColor(.secondary)
             }
         }

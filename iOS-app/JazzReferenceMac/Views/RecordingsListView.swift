@@ -23,7 +23,7 @@ struct RecordingsListView: View {
                         Image(systemName: "info.circle")
                             .foregroundColor(JazzTheme.burgundy)
                         Text("Search to browse \(networkManager.recordingsCount > 0 ? "\(networkManager.recordingsCount) " : "")recordings")
-                            .font(.subheadline)
+                            .font(JazzTheme.subheadline())
                         Spacer()
                     }
                     .padding()
@@ -52,7 +52,7 @@ struct RecordingsListView: View {
                         .font(.system(size: 60))
                         .foregroundColor(JazzTheme.smokeGray.opacity(0.5))
                     Text("Select a recording")
-                        .font(.title2)
+                        .font(JazzTheme.title2())
                         .foregroundColor(JazzTheme.smokeGray)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -101,13 +101,13 @@ struct RecordingRowView: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(recording.albumTitle ?? "Unknown Album")
-                    .font(.headline)
+                    .font(JazzTheme.headline())
                     .foregroundColor(.primary)
                     .lineLimit(1)
 
                 if let songTitle = recording.songTitle {
                     Text(songTitle)
-                        .font(.subheadline)
+                        .font(JazzTheme.subheadline())
                         .foregroundColor(.secondary)
                         .lineLimit(1)
                 }
@@ -115,16 +115,16 @@ struct RecordingRowView: View {
                 HStack(spacing: 4) {
                     if let year = recording.recordingYear {
                         Text("\(year)")
-                            .font(.caption)
+                            .font(JazzTheme.caption())
                             .foregroundColor(.secondary)
                     }
 
                     if let label = recording.label {
                         Text("•")
-                            .font(.caption)
+                            .font(JazzTheme.caption())
                             .foregroundColor(.secondary)
                         Text(label)
-                            .font(.caption)
+                            .font(JazzTheme.caption())
                             .foregroundColor(.secondary)
                             .lineLimit(1)
                     }

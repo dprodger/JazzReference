@@ -97,15 +97,14 @@ struct RecordingDetailView: View {
                     if let songTitle = recording.songTitle {
                         let yearSuffix = recording.recordingYear.map { " (\($0))" } ?? ""
                         Text("\(songTitle)\(yearSuffix)")
-                            .font(.largeTitle)
-                            .fontWeight(.bold)
+                            .font(JazzTheme.largeTitle())
                             .foregroundColor(JazzTheme.charcoal)
                     }
                 }
 
                 // Release Name
                 Text(recording.albumTitle ?? "Unknown Album")
-                    .font(.title2)
+                    .font(JazzTheme.title2())
                     .foregroundColor(JazzTheme.smokeGray)
 
                 // Leader names
@@ -113,7 +112,7 @@ struct RecordingDetailView: View {
                     let leaders = performers.filter { $0.role == "leader" }
                     if !leaders.isEmpty {
                         Text(leaders.map { $0.name }.joined(separator: ", "))
-                            .font(.title3)
+                            .font(JazzTheme.title3())
                             .foregroundColor(JazzTheme.brass)
                     }
                 }
@@ -121,7 +120,7 @@ struct RecordingDetailView: View {
                 // Label
                 if let label = recording.label {
                     Label(label, systemImage: "building.2")
-                        .font(.subheadline)
+                        .font(JazzTheme.subheadline())
                         .foregroundColor(JazzTheme.smokeGray)
                         .padding(.top, 4)
                 }
@@ -143,10 +142,10 @@ struct RecordingDetailView: View {
             if let notes = recording.notes, !notes.isEmpty {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Notes")
-                        .font(.headline)
+                        .font(JazzTheme.headline())
                         .foregroundColor(JazzTheme.charcoal)
                     Text(notes)
-                        .font(.body)
+                        .font(JazzTheme.body())
                         .foregroundColor(JazzTheme.charcoal)
                 }
             }
@@ -161,7 +160,7 @@ struct RecordingDetailView: View {
     private func streamingSection(_ recording: Recording) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Listen")
-                .font(.headline)
+                .font(JazzTheme.headline())
                 .foregroundColor(JazzTheme.charcoal)
 
             HStack(spacing: 16) {
@@ -223,7 +222,7 @@ struct RecordingDetailView: View {
     private func performersSection(_ performers: [Performer]) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Personnel (\(performers.count.formatted()))")
-                .font(.headline)
+                .font(JazzTheme.headline())
                 .foregroundColor(JazzTheme.charcoal)
 
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
@@ -231,13 +230,12 @@ struct RecordingDetailView: View {
                     HStack {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(performer.name)
-                                .font(.subheadline)
-                                .fontWeight(.medium)
+                                .font(JazzTheme.subheadline(weight: .medium))
                                 .foregroundColor(JazzTheme.charcoal)
 
                             if let instrument = performer.instrument {
                                 Text(instrument)
-                                    .font(.caption)
+                                    .font(JazzTheme.caption())
                                     .foregroundColor(JazzTheme.smokeGray)
                             }
                         }
@@ -246,7 +244,7 @@ struct RecordingDetailView: View {
 
                         if let role = performer.role {
                             Text(role.capitalized)
-                                .font(.caption2)
+                                .font(JazzTheme.caption2())
                                 .padding(.horizontal, 6)
                                 .padding(.vertical, 2)
                                 .background(role == "leader" ? JazzTheme.burgundy : JazzTheme.brass.opacity(0.3))
@@ -266,7 +264,7 @@ struct RecordingDetailView: View {
     private func releasesSection(_ releases: [Release]) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Releases (\(releases.count.formatted()))")
-                .font(.headline)
+                .font(JazzTheme.headline())
                 .foregroundColor(JazzTheme.charcoal)
 
             ForEach(releases) { release in
@@ -289,21 +287,20 @@ struct RecordingDetailView: View {
 
                     VStack(alignment: .leading, spacing: 2) {
                         Text(release.title)
-                            .font(.subheadline)
-                            .fontWeight(.medium)
+                            .font(JazzTheme.subheadline(weight: .medium))
                             .foregroundColor(JazzTheme.charcoal)
                             .lineLimit(1)
 
                         HStack(spacing: 8) {
                             Text(release.yearDisplay)
-                                .font(.caption)
+                                .font(JazzTheme.caption())
                                 .foregroundColor(JazzTheme.smokeGray)
 
                             if let format = release.formatName {
                                 Text("•")
                                     .foregroundColor(JazzTheme.smokeGray)
                                 Text(format)
-                                    .font(.caption)
+                                    .font(JazzTheme.caption())
                                     .foregroundColor(JazzTheme.smokeGray)
                             }
 
@@ -311,7 +308,7 @@ struct RecordingDetailView: View {
                                 Text("•")
                                     .foregroundColor(JazzTheme.smokeGray)
                                 Text(label)
-                                    .font(.caption)
+                                    .font(JazzTheme.caption())
                                     .foregroundColor(JazzTheme.smokeGray)
                                     .lineLimit(1)
                             }

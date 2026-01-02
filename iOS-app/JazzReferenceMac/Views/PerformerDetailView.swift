@@ -96,8 +96,7 @@ struct PerformerDetailView: View {
 
             VStack(alignment: .leading, spacing: 8) {
                 Text(performer.name)
-                    .font(.largeTitle)
-                    .fontWeight(.bold)
+                    .font(JazzTheme.largeTitle())
                     .foregroundColor(JazzTheme.charcoal)
 
                 if let birthDate = performer.birthDate {
@@ -108,7 +107,7 @@ struct PerformerDetailView: View {
                             Text(deathDate)
                         }
                     }
-                    .font(.subheadline)
+                    .font(JazzTheme.subheadline())
                     .foregroundColor(JazzTheme.smokeGray)
                 }
 
@@ -117,7 +116,7 @@ struct PerformerDetailView: View {
                     let instrumentNames = instruments.map { $0.name }.joined(separator: ", ")
                     if !instrumentNames.isEmpty {
                         Text(instrumentNames)
-                            .font(.title3)
+                            .font(JazzTheme.title3())
                             .foregroundColor(JazzTheme.brass)
                     }
                 }
@@ -131,11 +130,11 @@ struct PerformerDetailView: View {
     private func biographySection(_ bio: String) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Biography")
-                .font(.headline)
+                .font(JazzTheme.headline())
                 .foregroundColor(JazzTheme.charcoal)
 
             Text(bio)
-                .font(.body)
+                .font(JazzTheme.body())
                 .foregroundColor(JazzTheme.charcoal)
                 .lineSpacing(4)
         }
@@ -145,13 +144,13 @@ struct PerformerDetailView: View {
     private func instrumentsSection(_ instruments: [PerformerInstrument]) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Instruments")
-                .font(.headline)
+                .font(JazzTheme.headline())
                 .foregroundColor(JazzTheme.charcoal)
 
             FlowLayout(spacing: 8) {
                 ForEach(instruments, id: \.name) { instrument in
                     Text(instrument.name)
-                        .font(.caption)
+                        .font(JazzTheme.caption())
                         .padding(.horizontal, 12)
                         .padding(.vertical, 6)
                         .background(instrument.isPrimary == true ? JazzTheme.burgundy : JazzTheme.cardBackground)
@@ -166,7 +165,7 @@ struct PerformerDetailView: View {
     private func externalLinksSection(_ links: [String: String]) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("External Links")
-                .font(.headline)
+                .font(JazzTheme.headline())
                 .foregroundColor(JazzTheme.charcoal)
 
             ForEach(Array(links.keys.sorted()), id: \.self) { key in
@@ -177,11 +176,12 @@ struct PerformerDetailView: View {
                                 .foregroundColor(JazzTheme.burgundy)
                                 .frame(width: 24)
                             Text(displayNameForLink(key))
+                                .font(JazzTheme.body())
                                 .foregroundColor(JazzTheme.charcoal)
                             Spacer()
                             Image(systemName: "arrow.up.right.square")
                                 .foregroundColor(JazzTheme.smokeGray)
-                                .font(.caption)
+                                .font(JazzTheme.caption())
                         }
                         .padding(.vertical, 8)
                         .padding(.horizontal, 12)
@@ -198,32 +198,32 @@ struct PerformerDetailView: View {
     private func recordingsSection(_ recordings: [PerformerRecording]) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Recordings (\(recordings.count.formatted()))")
-                .font(.headline)
+                .font(JazzTheme.headline())
                 .foregroundColor(JazzTheme.charcoal)
 
             ForEach(recordings) { recording in
                 HStack {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(recording.songTitle)
-                            .font(.headline)
+                            .font(JazzTheme.headline())
                             .foregroundColor(JazzTheme.charcoal)
 
                         if let album = recording.albumTitle {
                             Text(album)
-                                .font(.subheadline)
+                                .font(JazzTheme.subheadline())
                                 .foregroundColor(JazzTheme.smokeGray)
                         }
 
                         HStack(spacing: 8) {
                             if let year = recording.recordingYear {
                                 Text("\(year)")
-                                    .font(.caption)
+                                    .font(JazzTheme.caption())
                                     .foregroundColor(JazzTheme.smokeGray)
                             }
 
                             if let role = recording.role {
                                 Text(role.capitalized)
-                                    .font(.caption)
+                                    .font(JazzTheme.caption())
                                     .padding(.horizontal, 6)
                                     .padding(.vertical, 2)
                                     .background(role == "leader" ? JazzTheme.burgundy : JazzTheme.brass.opacity(0.3))
