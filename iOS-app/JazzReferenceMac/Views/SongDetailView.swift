@@ -226,10 +226,34 @@ struct SongDetailView: View {
     private func hasSummaryContent(for song: Song) -> Bool {
         let hasStructure = song.structure != nil
         let hasComposedKey = song.composedKey != nil
+        return hasStructure || hasComposedKey || hasExternalLinks(for: song)
+    }
+
+    private func hasExternalLinks(for song: Song) -> Bool {
         let hasWikipedia = song.wikipediaUrl != nil
         let hasMusicbrainz = song.musicbrainzId != nil
         let hasJazzStandards = song.externalReferences?["jazzstandards"] != nil
-        return hasStructure || hasComposedKey || hasWikipedia || hasMusicbrainz || hasJazzStandards || !song.externalReferencesList.isEmpty
+        return hasWikipedia || hasMusicbrainz || hasJazzStandards
+    }
+
+    @ViewBuilder
+    private func externalLinkRow(icon: String, label: String, color: Color, url: URL) -> some View {
+        Link(destination: url) {
+            HStack {
+                Image(systemName: icon)
+                    .foregroundColor(color)
+                    .frame(width: 24)
+                Text(label)
+                    .font(JazzTheme.body())
+                    .foregroundColor(JazzTheme.charcoal)
+                Spacer()
+                Image(systemName: "arrow.up.right.square")
+                    .foregroundColor(JazzTheme.smokeGray)
+                    .font(JazzTheme.caption())
+            }
+            .padding(.vertical, 6)
+        }
+        .buttonStyle(.plain)
     }
 
     @ViewBuilder
@@ -291,30 +315,26 @@ struct SongDetailView: View {
                         .cornerRadius(8)
                     }
 
-                    // External References
-                    if !song.externalReferencesList.isEmpty {
+                    // External References (Learn More)
+                    if hasExternalLinks(for: song) {
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Learn More")
                                 .font(JazzTheme.headline())
                                 .foregroundColor(JazzTheme.charcoal)
 
-                            ForEach(song.externalReferencesList) { reference in
-                                Link(destination: URL(string: reference.url)!) {
-                                    HStack {
-                                        Image(systemName: reference.iconName)
-                                            .foregroundColor(JazzTheme.burgundy)
-                                            .frame(width: 24)
-                                        Text(reference.displayName)
-                                            .font(JazzTheme.body())
-                                            .foregroundColor(JazzTheme.charcoal)
-                                        Spacer()
-                                        Image(systemName: "arrow.up.right.square")
-                                            .foregroundColor(JazzTheme.smokeGray)
-                                            .font(JazzTheme.caption())
-                                    }
-                                    .padding(.vertical, 6)
-                                }
-                                .buttonStyle(.plain)
+                            // Wikipedia
+                            if let wikipediaUrl = song.wikipediaUrl, let url = URL(string: wikipediaUrl) {
+                                externalLinkRow(icon: "book.fill", label: "Wikipedia", color: JazzTheme.teal, url: url)
+                            }
+
+                            // Jazz Standards
+                            if let jazzStandardsUrl = song.externalReferences?["jazzstandards"], let url = URL(string: jazzStandardsUrl) {
+                                externalLinkRow(icon: "music.note.list", label: "JazzStandards.com", color: JazzTheme.brass, url: url)
+                            }
+
+                            // MusicBrainz
+                            if let musicbrainzId = song.musicbrainzId, let url = URL(string: "https://musicbrainz.org/work/\(musicbrainzId)") {
+                                externalLinkRow(icon: "waveform.circle.fill", label: "MusicBrainz", color: JazzTheme.charcoal, url: url)
                             }
                         }
                         .padding()
