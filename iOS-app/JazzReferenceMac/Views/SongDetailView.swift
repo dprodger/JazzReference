@@ -165,6 +165,7 @@ struct SongDetailView: View {
                 // Add to Repertoire button
                 Button(action: { showAddToRepertoire = true }) {
                     Label("Add to Repertoire", systemImage: "plus.circle")
+                        .padding(.vertical, 4)
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(JazzTheme.burgundy)
@@ -257,6 +258,27 @@ struct SongDetailView: View {
     }
 
     @ViewBuilder
+    private func compactExternalLink(icon: String, label: String, color: Color, url: URL) -> some View {
+        Link(destination: url) {
+            HStack(spacing: 6) {
+                Image(systemName: icon)
+                    .foregroundColor(color)
+                Text(label)
+                    .font(JazzTheme.subheadline())
+                    .foregroundColor(JazzTheme.charcoal)
+                Image(systemName: "arrow.up.right")
+                    .font(JazzTheme.caption2())
+                    .foregroundColor(JazzTheme.smokeGray)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(JazzTheme.cardBackground)
+            .cornerRadius(8)
+        }
+        .buttonStyle(.plain)
+    }
+
+    @ViewBuilder
     private func summaryInfoSection(_ song: Song) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             // Collapsible Header
@@ -317,24 +339,26 @@ struct SongDetailView: View {
 
                     // External References (Learn More)
                     if hasExternalLinks(for: song) {
-                        VStack(alignment: .leading, spacing: 8) {
+                        VStack(alignment: .leading, spacing: 12) {
                             Text("Learn More")
                                 .font(JazzTheme.headline())
                                 .foregroundColor(JazzTheme.charcoal)
 
-                            // Wikipedia
-                            if let wikipediaUrl = song.wikipediaUrl, let url = URL(string: wikipediaUrl) {
-                                externalLinkRow(icon: "book.fill", label: "Wikipedia", color: JazzTheme.teal, url: url)
-                            }
+                            HStack(spacing: 12) {
+                                // Wikipedia
+                                if let wikipediaUrl = song.wikipediaUrl, let url = URL(string: wikipediaUrl) {
+                                    compactExternalLink(icon: "book.fill", label: "Wikipedia", color: JazzTheme.teal, url: url)
+                                }
 
-                            // Jazz Standards
-                            if let jazzStandardsUrl = song.externalReferences?["jazzstandards"], let url = URL(string: jazzStandardsUrl) {
-                                externalLinkRow(icon: "music.note.list", label: "JazzStandards.com", color: JazzTheme.brass, url: url)
-                            }
+                                // Jazz Standards
+                                if let jazzStandardsUrl = song.externalReferences?["jazzstandards"], let url = URL(string: jazzStandardsUrl) {
+                                    compactExternalLink(icon: "music.note.list", label: "JazzStandards.com", color: JazzTheme.brass, url: url)
+                                }
 
-                            // MusicBrainz
-                            if let musicbrainzId = song.musicbrainzId, let url = URL(string: "https://musicbrainz.org/work/\(musicbrainzId)") {
-                                externalLinkRow(icon: "waveform.circle.fill", label: "MusicBrainz", color: JazzTheme.charcoal, url: url)
+                                // MusicBrainz
+                                if let musicbrainzId = song.musicbrainzId, let url = URL(string: "https://musicbrainz.org/work/\(musicbrainzId)") {
+                                    compactExternalLink(icon: "waveform.circle.fill", label: "MusicBrainz", color: JazzTheme.charcoal, url: url)
+                                }
                             }
                         }
                         .padding()
@@ -621,7 +645,7 @@ struct SongDetailView: View {
             }
         }
         .padding(16)
-        .background(JazzTheme.cardBackground)
+        .background(Color.white)
         .cornerRadius(12)
     }
 
@@ -887,7 +911,7 @@ struct FeaturedRecordingCard: View {
             .frame(width: 180, alignment: .leading)
         }
         .padding(12)
-        .background(isHovering ? JazzTheme.backgroundLight : Color.white)
+        .background(isHovering ? JazzTheme.backgroundLight : JazzTheme.cardBackground)
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .overlay(
             RoundedRectangle(cornerRadius: 12)

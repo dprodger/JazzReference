@@ -116,6 +116,10 @@ struct SongsListView: View {
                             Text(letter)
                                 .font(JazzTheme.headline())
                                 .foregroundColor(JazzTheme.burgundy)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(JazzTheme.amber.opacity(0.3))
+                                .cornerRadius(4)
                                 .listRowInsets(EdgeInsets())
                         ) {
                             ForEach(songs) { song in
@@ -228,6 +232,7 @@ struct SongRowView: View {
             }
         }
         .padding(.vertical, 4)
+        .padding(.horizontal, 8)
     }
 }
 
