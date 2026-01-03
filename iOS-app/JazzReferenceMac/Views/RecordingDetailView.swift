@@ -13,11 +13,53 @@ struct RecordingDetailView: View {
     @State private var isLoading = true
     @State private var localFavoriteCount: Int?
     @State private var showingLoginAlert = false
+    @State private var selectedReleaseId: String?
+    @State private var showingBackCover = false
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var authManager: AuthenticationManager
     @EnvironmentObject var favoritesManager: FavoritesManager
 
     private let networkManager = NetworkManager()
+
+    // MARK: - Computed Properties for Selected Release
+
+    /// The currently selected release, or nil to use recording defaults
+    private var selectedRelease: Release? {
+        guard let releaseId = selectedReleaseId,
+              let releases = recording?.releases else { return nil }
+        return releases.first { $0.id == releaseId }
+    }
+
+    /// Front cover art URL - uses selected release if user picked one, otherwise uses bestAlbumArt*
+    private var displayAlbumArtLarge: String? {
+        if let release = selectedRelease {
+            return release.coverArtLarge ?? release.coverArtMedium
+        }
+        return recording?.bestAlbumArtLarge ?? recording?.bestAlbumArtMedium
+    }
+
+    /// Back cover art URL - uses recording's back cover fields
+    private var displayBackCoverArtLarge: String? {
+        return recording?.backCoverArtLarge ?? recording?.backCoverArtMedium
+    }
+
+    /// Whether the recording has a back cover available for flipping
+    private var canFlipToBackCover: Bool {
+        recording?.canFlipToBackCover ?? false
+    }
+
+    /// Display title - selected release title or recording album title
+    private var displayAlbumTitle: String {
+        selectedRelease?.title ?? recording?.albumTitle ?? "Unknown Album"
+    }
+
+    /// Spotify URL - uses selected release if user picked one, otherwise uses bestSpotifyUrl
+    private var displaySpotifyUrl: String? {
+        if let release = selectedRelease {
+            return release.spotifyTrackUrl
+        }
+        return recording?.bestSpotifyUrl
+    }
 
     // MARK: - Favorites Computed Properties
 
@@ -105,25 +147,82 @@ struct RecordingDetailView: View {
 
     @ViewBuilder
     private func recordingHeader(_ recording: Recording) -> some View {
-        HStack(alignment: .top, spacing: 24) {
-            // Album art
-            AsyncImage(url: URL(string: recording.bestAlbumArtLarge ?? recording.bestAlbumArtMedium ?? "")) { image in
-                image
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-            } placeholder: {
-                Rectangle()
-                    .fill(JazzTheme.cardBackground)
-                    .overlay {
-                        Image(systemName: "music.note")
-                            .font(.system(size: 50))
-                            .foregroundColor(JazzTheme.smokeGray)
+        VStack(alignment: .leading, spacing: 16) {
+            // Full-width album art with flip support
+            ZStack(alignment: .topTrailing) {
+                // Card-flip container
+                ZStack {
+                    // Front cover
+                    if let frontUrl = displayAlbumArtLarge {
+                        AsyncImage(url: URL(string: frontUrl)) { image in
+                            image
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                        } placeholder: {
+                            Rectangle()
+                                .fill(JazzTheme.cardBackground)
+                                .aspectRatio(1, contentMode: .fit)
+                                .overlay {
+                                    ProgressView()
+                                        .tint(JazzTheme.brass)
+                                }
+                        }
+                        .opacity(showingBackCover ? 0 : 1)
+                    } else {
+                        albumArtPlaceholder
+                            .aspectRatio(1, contentMode: .fit)
+                            .opacity(showingBackCover ? 0 : 1)
                     }
-            }
-            .frame(width: 200, height: 200)
-            .cornerRadius(12)
-            .shadow(radius: 4)
 
+                    // Back cover (pre-rotated so it appears correct after flip)
+                    if let backUrl = displayBackCoverArtLarge {
+                        AsyncImage(url: URL(string: backUrl)) { image in
+                            image
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                        } placeholder: {
+                            Rectangle()
+                                .fill(JazzTheme.cardBackground)
+                                .aspectRatio(1, contentMode: .fit)
+                                .overlay {
+                                    ProgressView()
+                                        .tint(JazzTheme.brass)
+                                }
+                        }
+                        .rotation3DEffect(.degrees(180), axis: (x: 0, y: 1, z: 0))
+                        .opacity(showingBackCover ? 1 : 0)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .cornerRadius(12)
+                .rotation3DEffect(
+                    .degrees(showingBackCover ? 180 : 0),
+                    axis: (x: 0, y: 1, z: 0)
+                )
+                .shadow(radius: 4)
+                .animation(.easeInOut(duration: 0.3), value: selectedReleaseId)
+
+                // Flip button badge (shown when back cover available)
+                if canFlipToBackCover {
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.4)) {
+                            showingBackCover.toggle()
+                        }
+                    } label: {
+                        Image(systemName: showingBackCover ? "arrow.uturn.backward" : "arrow.trianglehead.2.clockwise.rotate.90")
+                            .foregroundColor(.white)
+                            .font(.system(size: 14, weight: .semibold))
+                            .padding(10)
+                            .background(Color.black.opacity(0.6))
+                            .clipShape(Circle())
+                    }
+                    .buttonStyle(.plain)
+                    .padding(12)
+                    .help(showingBackCover ? "Show front cover" : "Show back cover")
+                }
+            }
+
+            // Song title, album title, and artist below the image
             VStack(alignment: .leading, spacing: 8) {
                 // Recording Name (Year)
                 HStack {
@@ -139,10 +238,11 @@ struct RecordingDetailView: View {
                     }
                 }
 
-                // Release Name
-                Text(recording.albumTitle ?? "Unknown Album")
+                // Release Name (uses selected release if available)
+                Text(displayAlbumTitle)
                     .font(JazzTheme.title2())
                     .foregroundColor(JazzTheme.smokeGray)
+                    .animation(.easeInOut(duration: 0.3), value: selectedReleaseId)
 
                 // Leader names
                 if let performers = recording.performers {
@@ -154,23 +254,30 @@ struct RecordingDetailView: View {
                     }
                 }
 
-                // Label
-                if let label = recording.label {
-                    Label(label, systemImage: "building.2")
-                        .font(JazzTheme.subheadline())
-                        .foregroundColor(JazzTheme.smokeGray)
-                        .padding(.top, 4)
-                }
+                // Label and Authority badge on the same row
+                HStack(spacing: 12) {
+                    if let label = recording.label {
+                        Label(label, systemImage: "building.2")
+                            .font(JazzTheme.subheadline())
+                            .foregroundColor(JazzTheme.smokeGray)
+                    }
 
-                // Authority badge
-                if recording.hasAuthority, let badgeText = recording.authorityBadgeText {
-                    AuthorityBadge(text: badgeText, source: recording.primaryAuthoritySource)
-                        .padding(.top, 8)
+                    if recording.hasAuthority, let badgeText = recording.authorityBadgeText {
+                        AuthorityBadge(text: badgeText, source: recording.primaryAuthoritySource)
+                    }
                 }
             }
-
-            Spacer()
         }
+    }
+
+    private var albumArtPlaceholder: some View {
+        Rectangle()
+            .fill(JazzTheme.cardBackground)
+            .overlay {
+                Image(systemName: "music.note")
+                    .font(.system(size: 50))
+                    .foregroundColor(JazzTheme.smokeGray)
+            }
     }
 
     @ViewBuilder
@@ -193,8 +300,13 @@ struct RecordingDetailView: View {
         }
     }
 
-    /// Get Spotify URL from streamingLinks or legacy field
+    /// Get Spotify URL - uses selected release if available, otherwise falls back to streaming links or legacy field
     private func spotifyUrl(for recording: Recording) -> String? {
+        // First check if we have a selected release with a Spotify URL
+        if let release = selectedRelease, let trackUrl = release.spotifyTrackUrl {
+            return trackUrl
+        }
+        // Fall back to streamingLinks or legacy field
         if let link = recording.streamingLinks?["spotify"], let url = link.bestPlaybackUrl {
             return url
         }
@@ -324,70 +436,104 @@ struct RecordingDetailView: View {
     @ViewBuilder
     private func releasesSection(_ releases: [Release]) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Releases (\(releases.count.formatted()))")
-                .font(JazzTheme.headline())
-                .foregroundColor(JazzTheme.charcoal)
+            HStack {
+                Text("Releases (\(releases.count.formatted()))")
+                    .font(JazzTheme.headline())
+                    .foregroundColor(JazzTheme.charcoal)
+
+                Spacer()
+
+                Text("Click to change cover art")
+                    .font(JazzTheme.caption())
+                    .foregroundColor(JazzTheme.smokeGray)
+            }
 
             ForEach(releases) { release in
-                HStack(spacing: 12) {
-                    // Release cover art
-                    AsyncImage(url: URL(string: release.coverArtSmall ?? "")) { image in
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                    } placeholder: {
-                        Rectangle()
-                            .fill(JazzTheme.cardBackground)
-                            .overlay {
-                                Image(systemName: "opticaldisc")
-                                    .foregroundColor(JazzTheme.smokeGray)
-                            }
+                let isSelected = selectedReleaseId == release.id
+
+                Button {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        if selectedReleaseId == release.id {
+                            // Deselect if already selected
+                            selectedReleaseId = nil
+                        } else {
+                            selectedReleaseId = release.id
+                        }
+                        // Reset back cover when changing release
+                        showingBackCover = false
                     }
-                    .frame(width: 50, height: 50)
-                    .cornerRadius(4)
+                } label: {
+                    HStack(spacing: 12) {
+                        // Selection indicator
+                        Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                            .font(JazzTheme.title3())
+                            .foregroundColor(isSelected ? JazzTheme.burgundy : JazzTheme.smokeGray.opacity(0.5))
 
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(release.title)
-                            .font(JazzTheme.subheadline(weight: .medium))
-                            .foregroundColor(JazzTheme.charcoal)
-                            .lineLimit(1)
+                        // Release cover art
+                        AsyncImage(url: URL(string: release.coverArtSmall ?? "")) { image in
+                            image
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                        } placeholder: {
+                            Rectangle()
+                                .fill(JazzTheme.cardBackground)
+                                .overlay {
+                                    Image(systemName: "opticaldisc")
+                                        .foregroundColor(JazzTheme.smokeGray)
+                                }
+                        }
+                        .frame(width: 50, height: 50)
+                        .cornerRadius(4)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 4)
+                                .stroke(isSelected ? JazzTheme.burgundy : Color.clear, lineWidth: 2)
+                        )
 
-                        HStack(spacing: 8) {
-                            Text(release.yearDisplay)
-                                .font(JazzTheme.caption())
-                                .foregroundColor(JazzTheme.smokeGray)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(release.title)
+                                .font(JazzTheme.subheadline(weight: isSelected ? .bold : .medium))
+                                .foregroundColor(isSelected ? JazzTheme.burgundy : JazzTheme.charcoal)
+                                .lineLimit(1)
 
-                            if let format = release.formatName {
-                                Text("•")
-                                    .foregroundColor(JazzTheme.smokeGray)
-                                Text(format)
+                            HStack(spacing: 8) {
+                                Text(release.yearDisplay)
                                     .font(JazzTheme.caption())
                                     .foregroundColor(JazzTheme.smokeGray)
-                            }
 
-                            if let label = release.label {
-                                Text("•")
-                                    .foregroundColor(JazzTheme.smokeGray)
-                                Text(label)
-                                    .font(JazzTheme.caption())
-                                    .foregroundColor(JazzTheme.smokeGray)
-                                    .lineLimit(1)
+                                if let format = release.formatName {
+                                    Text("•")
+                                        .foregroundColor(JazzTheme.smokeGray)
+                                    Text(format)
+                                        .font(JazzTheme.caption())
+                                        .foregroundColor(JazzTheme.smokeGray)
+                                }
+
+                                if let label = release.label {
+                                    Text("•")
+                                        .foregroundColor(JazzTheme.smokeGray)
+                                    Text(label)
+                                        .font(JazzTheme.caption())
+                                        .foregroundColor(JazzTheme.smokeGray)
+                                        .lineLimit(1)
+                                }
                             }
                         }
-                    }
 
-                    Spacer()
+                        Spacer()
 
-                    // Spotify indicator
-                    if release.hasSpotify {
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundColor(.green)
-                            .help("Available on Spotify")
+                        // Spotify indicator
+                        if release.hasSpotify {
+                            Image(systemName: "music.note")
+                                .foregroundColor(.green)
+                                .help("Available on Spotify")
+                        }
                     }
+                    .padding(10)
+                    .background(isSelected ? JazzTheme.burgundy.opacity(0.1) : JazzTheme.cardBackground)
+                    .cornerRadius(8)
+                    .contentShape(Rectangle())
                 }
-                .padding(10)
-                .background(JazzTheme.cardBackground)
-                .cornerRadius(8)
+                .buttonStyle(.plain)
             }
         }
     }
@@ -397,7 +543,50 @@ struct RecordingDetailView: View {
     private func loadRecording() async {
         isLoading = true
         recording = await networkManager.fetchRecordingDetail(id: recordingId)
+        autoSelectFirstRelease()
         isLoading = false
+    }
+
+    /// Auto-select the default release from the API, falling back to first release with art
+    private func autoSelectFirstRelease() {
+        guard let releases = recording?.releases, !releases.isEmpty else { return }
+
+        // Prefer the API's default_release_id - this is computed server-side
+        // to match the best_cover_art_* and best_spotify_url logic
+        if let defaultId = recording?.defaultReleaseId,
+           releases.contains(where: { $0.id == defaultId }) {
+            selectedReleaseId = defaultId
+            return
+        }
+
+        // Fallback: Sort and pick the first release with Spotify and cover art
+        let sorted = releases.sorted { r1, r2 in
+            let r1HasSpotify = r1.spotifyAlbumId != nil
+            let r2HasSpotify = r2.spotifyAlbumId != nil
+            if r1HasSpotify != r2HasSpotify {
+                return r1HasSpotify && !r2HasSpotify
+            }
+            switch (r1.releaseYear, r2.releaseYear) {
+            case (nil, nil): return false
+            case (nil, _): return false
+            case (_, nil): return true
+            case let (y1?, y2?): return y1 > y2
+            }
+        }
+
+        if let releaseWithSpotifyAndArt = sorted.first(where: {
+            $0.spotifyAlbumId != nil && ($0.coverArtLarge != nil || $0.coverArtMedium != nil)
+        }) {
+            selectedReleaseId = releaseWithSpotifyAndArt.id
+            return
+        }
+
+        if let releaseWithArt = sorted.first(where: { $0.coverArtLarge != nil || $0.coverArtMedium != nil }) {
+            selectedReleaseId = releaseWithArt.id
+            return
+        }
+
+        selectedReleaseId = sorted.first?.id
     }
 
     // MARK: - Favorites
