@@ -14,6 +14,8 @@ struct SongsListView: View {
     @State private var searchText = ""
     @State private var searchTask: Task<Void, Never>?
     @State private var selectedSongId: String?
+    @State private var showCreateRepertoire = false
+    @State private var showLoginSheet = false
 
     var body: some View {
         HSplitView {
@@ -46,15 +48,35 @@ struct SongsListView: View {
                     Text(repertoireManager.currentRepertoireDisplayName)
                         .font(JazzTheme.subheadline(weight: .medium))
                     Spacer()
-                    Menu("Change") {
-                        ForEach(repertoireManager.repertoires) { repertoire in
-                            Button(repertoire.name) {
-                                repertoireManager.selectRepertoire(repertoire)
+
+                    if authManager.isAuthenticated {
+                        Menu("Change") {
+                            ForEach(repertoireManager.repertoires) { repertoire in
+                                Button(action: { repertoireManager.selectRepertoire(repertoire) }) {
+                                    HStack {
+                                        Text(repertoire.name)
+                                        if repertoire.id == repertoireManager.selectedRepertoire.id {
+                                            Image(systemName: "checkmark")
+                                        }
+                                    }
+                                }
+                            }
+
+                            Divider()
+
+                            Button(action: { showCreateRepertoire = true }) {
+                                Label("Create New Repertoire", systemImage: "plus.circle")
                             }
                         }
+                        .menuStyle(.borderlessButton)
+                        .foregroundColor(JazzTheme.burgundy)
+                    } else {
+                        Button("Sign In") {
+                            showLoginSheet = true
+                        }
+                        .buttonStyle(.link)
+                        .foregroundColor(JazzTheme.burgundy)
                     }
-                    .menuStyle(.borderlessButton)
-                    .foregroundColor(JazzTheme.burgundy)
                 }
                 .padding(.horizontal)
                 .padding(.vertical, 8)
@@ -111,6 +133,13 @@ struct SongsListView: View {
             await loadSongs()
         }
         .navigationTitle("Songs (\(networkManager.songs.count.formatted()))")
+        .sheet(isPresented: $showCreateRepertoire) {
+            MacCreateRepertoireView(repertoireManager: repertoireManager)
+        }
+        .sheet(isPresented: $showLoginSheet) {
+            MacLoginView()
+                .environmentObject(authManager)
+        }
     }
 
     // MARK: - Helper Methods

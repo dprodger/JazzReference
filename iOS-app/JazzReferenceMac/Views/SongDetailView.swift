@@ -48,7 +48,11 @@ struct SongDetailView: View {
     @State private var transcriptions: [SoloTranscription] = []
     @State private var backingTracks: [Video] = []
     @State private var isSummaryInfoExpanded = false
+    @State private var showAddToRepertoire = false
+    @State private var successMessage: String?
+    @State private var errorMessage: String?
     @EnvironmentObject var repertoireManager: RepertoireManager
+    @EnvironmentObject var authManager: AuthenticationManager
 
     @StateObject private var networkManager = NetworkManager()
 
@@ -98,6 +102,35 @@ struct SongDetailView: View {
             }
         }
         .background(JazzTheme.backgroundLight)
+        .sheet(isPresented: $showAddToRepertoire) {
+            if let song = song {
+                MacAddToRepertoireSheet(
+                    songId: songId,
+                    songTitle: song.title,
+                    repertoireManager: repertoireManager,
+                    onSuccess: { message in
+                        successMessage = message
+                        // Auto-dismiss success message after 3 seconds
+                        Task {
+                            try? await Task.sleep(nanoseconds: 3_000_000_000)
+                            await MainActor.run {
+                                successMessage = nil
+                            }
+                        }
+                    },
+                    onError: { message in
+                        errorMessage = message
+                        // Auto-dismiss error message after 5 seconds
+                        Task {
+                            try? await Task.sleep(nanoseconds: 5_000_000_000)
+                            await MainActor.run {
+                                errorMessage = nil
+                            }
+                        }
+                    }
+                )
+            }
+        }
         .task(id: songId) {
             await loadSong()
         }
@@ -113,16 +146,29 @@ struct SongDetailView: View {
     @ViewBuilder
     private func songHeader(_ song: Song) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            // Title with composed year
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text(song.title)
-                    .font(JazzTheme.largeTitle())
-                    .foregroundColor(JazzTheme.charcoal)
-                if let year = song.composedYear {
-                    Text("(\(String(year)))")
-                        .font(JazzTheme.title2())
-                        .foregroundColor(JazzTheme.smokeGray)
+            // Title row with Add to Repertoire button
+            HStack(alignment: .firstTextBaseline) {
+                // Title with composed year
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(song.title)
+                        .font(JazzTheme.largeTitle())
+                        .foregroundColor(JazzTheme.charcoal)
+                    if let year = song.composedYear {
+                        Text("(\(String(year)))")
+                            .font(JazzTheme.title2())
+                            .foregroundColor(JazzTheme.smokeGray)
+                    }
                 }
+
+                Spacer()
+
+                // Add to Repertoire button
+                Button(action: { showAddToRepertoire = true }) {
+                    Label("Add to Repertoire", systemImage: "plus.circle")
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(JazzTheme.burgundy)
+                .help("Add this song to a repertoire")
             }
 
             // Composer with icon
@@ -148,6 +194,29 @@ struct SongDetailView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 .padding(.top, 4)
+            }
+
+            // Success/Error messages
+            if let message = successMessage {
+                HStack {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundColor(.green)
+                    Text(message)
+                        .foregroundColor(.green)
+                }
+                .font(JazzTheme.subheadline())
+                .padding(.vertical, 4)
+            }
+
+            if let message = errorMessage {
+                HStack {
+                    Image(systemName: "exclamationmark.circle.fill")
+                        .foregroundColor(.red)
+                    Text(message)
+                        .foregroundColor(.red)
+                }
+                .font(JazzTheme.subheadline())
+                .padding(.vertical, 4)
             }
         }
     }
@@ -1039,4 +1108,5 @@ struct StreamingButtons: View {
 #Preview {
     SongDetailView(songId: "preview-id")
         .environmentObject(RepertoireManager())
+        .environmentObject(AuthenticationManager())
 }

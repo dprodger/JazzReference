@@ -22,6 +22,8 @@
 		B45A16A82F08800600259452 /* MacRegisterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B45A16A32F08800600259452 /* MacRegisterView.swift */; };
 		B45A16AB2F08802C00259452 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = B45A16AA2F08802C00259452 /* GoogleSignIn */; };
 		B45A16AD2F08802C00259452 /* GoogleSignInSwift in Frameworks */ = {isa = PBXBuildFile; productRef = B45A16AC2F08802C00259452 /* GoogleSignInSwift */; };
+		B45A16B02F08876C00259452 /* MacAddToRepertoireSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = B45A16AE2F08876C00259452 /* MacAddToRepertoireSheet.swift */; };
+		B45A16B12F08876C00259452 /* MacCreateRepertoireView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B45A16AF2F08876C00259452 /* MacCreateRepertoireView.swift */; };
 		B4C535842ECE5FFF0030A127 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = B4C535832ECE5FFF0030A127 /* GoogleSignIn */; };
 		B4C535862ECE5FFF0030A127 /* GoogleSignInSwift in Frameworks */ = {isa = PBXBuildFile; productRef = B4C535852ECE5FFF0030A127 /* GoogleSignInSwift */; };
 		B4EE328C2EB3ED5E00C643D1 /* MusicBrainzImporter.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = B4911D2A2EB316F600326CA7 /* MusicBrainzImporter.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
@@ -83,6 +85,8 @@
 		B45A16A22F08800600259452 /* MacLoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacLoginView.swift; sourceTree = "<group>"; };
 		B45A16A32F08800600259452 /* MacRegisterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacRegisterView.swift; sourceTree = "<group>"; };
 		B45A16A42F08800600259452 /* MacResetPasswordView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacResetPasswordView.swift; sourceTree = "<group>"; };
+		B45A16AE2F08876C00259452 /* MacAddToRepertoireSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = MacAddToRepertoireSheet.swift; path = Repertoire/MacAddToRepertoireSheet.swift; sourceTree = "<group>"; };
+		B45A16AF2F08876C00259452 /* MacCreateRepertoireView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = MacCreateRepertoireView.swift; path = Repertoire/MacCreateRepertoireView.swift; sourceTree = "<group>"; };
 		B4911D2A2EB316F600326CA7 /* MusicBrainzImporter.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = MusicBrainzImporter.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		B4C160402E91B03600EB8D2C /* Approach Note.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Approach Note.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		B4C1604D2E91B03700EB8D2C /* JazzReferenceTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = JazzReferenceTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -209,6 +213,8 @@
 		B41D0FAD2EE633EE00DB427C /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				B45A16AE2F08876C00259452 /* MacAddToRepertoireSheet.swift */,
+				B45A16AF2F08876C00259452 /* MacCreateRepertoireView.swift */,
 				B45A16A12F08800600259452 /* MacForgotPasswordView.swift */,
 				B45A16A22F08800600259452 /* MacLoginView.swift */,
 				B45A16A32F08800600259452 /* MacRegisterView.swift */,
@@ -489,6 +495,8 @@
 				B45A16A62F08800600259452 /* MacForgotPasswordView.swift in Sources */,
 				B45A16A72F08800600259452 /* MacLoginView.swift in Sources */,
 				B45A16A82F08800600259452 /* MacRegisterView.swift in Sources */,
+				B45A16B02F08876C00259452 /* MacAddToRepertoireSheet.swift in Sources */,
+				B45A16B12F08876C00259452 /* MacCreateRepertoireView.swift in Sources */,
 				B41D0FB52EE633EE00DB427C /* ArtistsListView.swift in Sources */,
 				B41D0FB62EE633EE00DB427C /* RecordingsListView.swift in Sources */,
 				B41D0FB72EE633EE00DB427C /* ContentView.swift in Sources */,
