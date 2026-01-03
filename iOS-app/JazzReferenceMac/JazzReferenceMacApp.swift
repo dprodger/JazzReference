@@ -16,6 +16,10 @@ struct JazzReferenceMacApp: App {
     @StateObject private var repertoireManager = RepertoireManager()
     @StateObject private var favoritesManager = FavoritesManager()
 
+    // Onboarding state - persisted across launches
+    @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
+    @State private var showingOnboarding = false
+
     // Deep link state for password reset
     @State private var resetPasswordToken: String?
     @State private var showResetPasswordSheet = false
@@ -39,6 +43,11 @@ struct JazzReferenceMacApp: App {
                         }
                     }
                     #endif
+
+                    // Show onboarding on first launch
+                    if !hasCompletedOnboarding {
+                        showingOnboarding = true
+                    }
                 }
                 .onChange(of: authManager.isAuthenticated) { _, isAuthenticated in
                     Task {
@@ -56,6 +65,13 @@ struct JazzReferenceMacApp: App {
                         MacResetPasswordView(token: token)
                             .environmentObject(authManager)
                     }
+                }
+                .sheet(isPresented: $showingOnboarding) {
+                    MacOnboardingView(isPresented: $showingOnboarding)
+                        .onDisappear {
+                            // Mark onboarding as completed when dismissed
+                            hasCompletedOnboarding = true
+                        }
                 }
         }
         .windowStyle(.automatic)
