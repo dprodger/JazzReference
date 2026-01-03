@@ -37,6 +37,61 @@ enum SongRecordingFilter: String, CaseIterable, Identifiable {
     }
 }
 
+// MARK: - Instrument Family Enum
+enum InstrumentFamily: String, CaseIterable, Hashable, Identifiable {
+    case guitar = "Guitar"
+    case saxophone = "Saxophone"
+    case trumpet = "Trumpet"
+    case trombone = "Trombone"
+    case piano = "Piano"
+    case organ = "Organ"
+    case bass = "Bass"
+    case drums = "Drums"
+    case clarinet = "Clarinet"
+    case flute = "Flute"
+    case vibraphone = "Vibraphone"
+    case vocals = "Vocals"
+
+    var id: String { rawValue }
+
+    // Map specific instruments to their family
+    static func family(for instrument: String) -> InstrumentFamily? {
+        let normalized = instrument.lowercased()
+
+        if normalized.contains("guitar") { return .guitar }
+        if normalized.contains("sax") { return .saxophone }
+        if normalized.contains("trumpet") || normalized.contains("flugelhorn") { return .trumpet }
+        if normalized.contains("trombone") { return .trombone }
+        if normalized.contains("piano") && !normalized.contains("organ") { return .piano }
+        if normalized.contains("organ") { return .organ }
+        if normalized.contains("bass") && !normalized.contains("brass") { return .bass }
+        if normalized.contains("drum") || normalized == "percussion" { return .drums }
+        if normalized.contains("clarinet") { return .clarinet }
+        if normalized.contains("flute") { return .flute }
+        if normalized.contains("vibraphone") || normalized.contains("vibes") { return .vibraphone }
+        if normalized.contains("vocal") || normalized.contains("voice") || normalized.contains("singer") { return .vocals }
+
+        return nil
+    }
+
+    var icon: String {
+        switch self {
+        case .guitar: return "guitars"
+        case .saxophone: return "music.note"
+        case .trumpet: return "music.note"
+        case .trombone: return "music.note"
+        case .piano: return "pianokeys"
+        case .organ: return "pianokeys"
+        case .bass: return "music.note"
+        case .drums: return "drum"
+        case .clarinet: return "music.note"
+        case .flute: return "music.note"
+        case .vibraphone: return "music.note"
+        case .vocals: return "mic"
+        }
+    }
+}
+
 struct SongDetailView: View {
     let songId: String
     @State private var song: Song?
@@ -45,6 +100,7 @@ struct SongDetailView: View {
     @State private var sortOrder: RecordingSortOrder = .year
     @State private var selectedRecordingId: String?
     @State private var selectedFilter: SongRecordingFilter = .all
+    @State private var selectedInstrument: InstrumentFamily? = nil
     @State private var transcriptions: [SoloTranscription] = []
     @State private var backingTracks: [Video] = []
     @State private var isSummaryInfoExpanded = false
@@ -374,18 +430,50 @@ struct SongDetailView: View {
         .cornerRadius(10)
     }
 
+    // MARK: - Available Instruments
+    private func availableInstruments(_ recordings: [Recording]) -> [InstrumentFamily] {
+        var families = Set<InstrumentFamily>()
+        for recording in recordings {
+            if let performers = recording.performers {
+                for performer in performers {
+                    if let instrument = performer.instrument,
+                       let family = InstrumentFamily.family(for: instrument) {
+                        families.insert(family)
+                    }
+                }
+            }
+        }
+        return families.sorted { $0.rawValue < $1.rawValue }
+    }
+
     // MARK: - Filtered Recordings
     private func filteredRecordings(_ recordings: [Recording]) -> [Recording] {
+        var result = recordings
+
+        // First, apply instrument family filter if selected
+        if let family = selectedInstrument {
+            result = result.filter { recording in
+                guard let performers = recording.performers else { return false }
+                return performers.contains { performer in
+                    guard let instrument = performer.instrument else { return false }
+                    return InstrumentFamily.family(for: instrument) == family
+                }
+            }
+        }
+
+        // Then, apply streaming service filter
         switch selectedFilter {
         case .all:
-            return recordings
+            break
         case .playable:
-            return recordings.filter { $0.isPlayable }
+            result = result.filter { $0.isPlayable }
         case .withSpotify:
-            return recordings.filter { $0.hasSpotifyAvailable }
+            result = result.filter { $0.hasSpotifyAvailable }
         case .withAppleMusic:
-            return recordings.filter { $0.hasAppleMusicAvailable }
+            result = result.filter { $0.hasAppleMusicAvailable }
         }
+
+        return result
     }
 
     // MARK: - Grouped Recordings
@@ -526,6 +614,62 @@ struct SongDetailView: View {
                 }
                 .menuStyle(.borderlessButton)
 
+                // Instrument filter menu (only show if instruments are available)
+                let instruments = availableInstruments(recordings)
+                if !instruments.isEmpty {
+                    Menu {
+                        Button(action: { selectedInstrument = nil }) {
+                            HStack {
+                                Text("All Instruments")
+                                if selectedInstrument == nil {
+                                    Spacer()
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+
+                        Divider()
+
+                        ForEach(instruments) { family in
+                            Button(action: { selectedInstrument = family }) {
+                                HStack {
+                                    Image(systemName: family.icon)
+                                    Text(family.rawValue)
+                                    if selectedInstrument == family {
+                                        Spacer()
+                                        Image(systemName: "checkmark")
+                                    }
+                                }
+                            }
+                        }
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: selectedInstrument?.icon ?? "pianokeys")
+                            Text(selectedInstrument?.rawValue ?? "Instrument")
+                                .font(JazzTheme.subheadline())
+                            Image(systemName: "chevron.down")
+                                .font(JazzTheme.caption2())
+                        }
+                        .foregroundColor(JazzTheme.charcoal)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(JazzTheme.cardBackground)
+                        .cornerRadius(8)
+                    }
+                    .menuStyle(.borderlessButton)
+
+                    // Clear button when instrument filter is active
+                    if selectedInstrument != nil {
+                        Button(action: { selectedInstrument = nil }) {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundColor(JazzTheme.burgundy)
+                                .font(.system(size: 16))
+                        }
+                        .buttonStyle(.plain)
+                        .help("Clear instrument filter")
+                    }
+                }
+
                 // Sort menu (matching iOS style)
                 Menu {
                     ForEach(RecordingSortOrder.allCases) { order in
@@ -571,11 +715,12 @@ struct SongDetailView: View {
                     Image(systemName: "music.note.slash")
                         .font(.system(size: 40))
                         .foregroundColor(JazzTheme.smokeGray.opacity(0.5))
-                    Text("No recordings match the current filter")
+                    Text("No recordings match the current filters")
                         .font(JazzTheme.subheadline())
                         .foregroundColor(JazzTheme.smokeGray)
-                    Button("Clear Filter") {
+                    Button("Clear Filters") {
                         selectedFilter = .all
+                        selectedInstrument = nil
                     }
                     .buttonStyle(.link)
                 }
