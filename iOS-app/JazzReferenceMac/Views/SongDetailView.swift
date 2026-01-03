@@ -467,11 +467,13 @@ struct SongDetailView: View {
                 } label: {
                     HStack(spacing: 4) {
                         Image(systemName: selectedFilter.icon)
-                            .foregroundColor(selectedFilter.iconColor)
+                            .foregroundColor(selectedFilter == .all ? JazzTheme.charcoal : selectedFilter.iconColor)
                         Text(selectedFilter.displayName)
                             .font(JazzTheme.subheadline())
+                            .foregroundColor(JazzTheme.charcoal)
                         Image(systemName: "chevron.down")
                             .font(JazzTheme.caption2())
+                            .foregroundColor(JazzTheme.charcoal)
                     }
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
@@ -496,13 +498,14 @@ struct SongDetailView: View {
                     HStack(spacing: 3) {
                         Text(sortOrder.displayName)
                             .font(JazzTheme.caption())
+                            .foregroundColor(JazzTheme.charcoal)
                         Image(systemName: "chevron.down")
                             .font(JazzTheme.caption2())
+                            .foregroundColor(JazzTheme.charcoal)
                     }
-                    .foregroundColor(JazzTheme.burgundy)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 5)
-                    .background(JazzTheme.burgundy.opacity(0.1))
+                    .background(JazzTheme.burgundy.opacity(0.2))
                     .cornerRadius(6)
                 }
                 .menuStyle(.borderlessButton)

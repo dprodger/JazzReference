@@ -107,6 +107,7 @@
 				Auth/AuthenticationManager.swift,
 				Auth/KeychainHelper.swift,
 				Auth/Models/User.swift,
+				FavoritesManager.swift,
 				RepertoireManager.swift,
 				Support_Files/HelperViews.swift,
 				Support_Files/JazzTheme.swift,

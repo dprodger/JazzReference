@@ -21,36 +21,21 @@ struct SongsListView: View {
         HSplitView {
             // Song list (left pane)
             VStack(spacing: 0) {
-                // Search bar
-                HStack {
-                    Image(systemName: "magnifyingglass")
-                        .foregroundColor(JazzTheme.smokeGray)
-                    TextField("Search songs", text: $searchText)
-                        .textFieldStyle(.plain)
-                    if !searchText.isEmpty {
-                        Button(action: { searchText = "" }) {
-                            Image(systemName: "xmark.circle.fill")
-                                .foregroundColor(JazzTheme.smokeGray)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(8)
-                .background(Color.white)
-                .cornerRadius(8)
-                .padding(.horizontal, 8)
-                .padding(.top, 8)
-
                 // Repertoire selector
-                HStack {
+                HStack(spacing: 6) {
                     Image(systemName: "music.note.list")
                         .foregroundColor(JazzTheme.burgundy)
+                        .frame(width: 16)
+
                     Text(repertoireManager.currentRepertoireDisplayName)
                         .font(JazzTheme.subheadline(weight: .medium))
-                    Spacer()
+                        .foregroundColor(JazzTheme.charcoal)
+                        .lineLimit(1)
+
+                    Spacer(minLength: 4)
 
                     if authManager.isAuthenticated {
-                        Menu("Change") {
+                        Menu {
                             ForEach(repertoireManager.repertoires) { repertoire in
                                 Button(action: { repertoireManager.selectRepertoire(repertoire) }) {
                                     HStack {
@@ -67,35 +52,72 @@ struct SongsListView: View {
                             Button(action: { showCreateRepertoire = true }) {
                                 Label("Create New Repertoire", systemImage: "plus.circle")
                             }
+                        } label: {
+                            Image(systemName: "chevron.down")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundColor(JazzTheme.charcoal)
                         }
                         .menuStyle(.borderlessButton)
-                        .foregroundColor(JazzTheme.burgundy)
+                        .menuIndicator(.hidden)
                     } else {
                         Button("Sign In") {
                             showLoginSheet = true
                         }
-                        .buttonStyle(.link)
+                        .font(JazzTheme.caption())
+                        .buttonStyle(.plain)
                         .foregroundColor(JazzTheme.burgundy)
                     }
                 }
-                .padding(.horizontal)
+                .padding(.horizontal, 12)
                 .padding(.vertical, 8)
-                .background(JazzTheme.amber.opacity(0.15))
+                .background(JazzTheme.amber.opacity(0.3))
+
+                // Search bar
+                HStack {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundColor(JazzTheme.charcoal.opacity(0.6))
+                    TextField("Search songs", text: $searchText)
+                        .textFieldStyle(.plain)
+                        .foregroundColor(JazzTheme.charcoal)
+                    if !searchText.isEmpty {
+                        Button(action: { searchText = "" }) {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundColor(JazzTheme.charcoal.opacity(0.6))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(8)
+                .background(Color.white)
+                .cornerRadius(8)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 8)
+                .background(JazzTheme.backgroundLight)
 
                 // Song list
                 List(selection: $selectedSongId) {
                     ForEach(groupedSongs, id: \.0) { letter, songs in
-                        Section(header: Text(letter).font(JazzTheme.headline()).foregroundColor(JazzTheme.burgundy)) {
+                        Section(header:
+                            Text(letter)
+                                .font(JazzTheme.headline())
+                                .foregroundColor(JazzTheme.burgundy)
+                                .listRowInsets(EdgeInsets())
+                        ) {
                             ForEach(songs) { song in
                                 SongRowView(song: song)
                                     .tag(song.id)
+                                    .listRowBackground(JazzTheme.backgroundLight)
                             }
                         }
                     }
                 }
-                .listStyle(.inset(alternatesRowBackgrounds: true))
+                .listStyle(.plain)
+                .scrollContentBackground(.hidden)
+                .background(JazzTheme.backgroundLight)
             }
             .frame(minWidth: 200, idealWidth: 250, maxWidth: 300)
+            .background(JazzTheme.backgroundLight)
+            .preferredColorScheme(.light)
 
             // Song detail (right pane)
             if let songId = selectedSongId {
@@ -183,11 +205,11 @@ struct SongRowView: View {
         VStack(alignment: .leading, spacing: 2) {
             Text(song.title)
                 .font(JazzTheme.headline())
-                .foregroundColor(.primary)
+                .foregroundColor(JazzTheme.charcoal)
             if let composer = song.composer {
                 Text(composer)
                     .font(JazzTheme.subheadline())
-                    .foregroundColor(.secondary)
+                    .foregroundColor(JazzTheme.charcoal.opacity(0.7))
             }
         }
         .padding(.vertical, 4)

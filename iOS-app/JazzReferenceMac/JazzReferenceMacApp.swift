@@ -14,6 +14,7 @@ import GoogleSignIn
 struct JazzReferenceMacApp: App {
     @StateObject private var authManager = AuthenticationManager()
     @StateObject private var repertoireManager = RepertoireManager()
+    @StateObject private var favoritesManager = FavoritesManager()
 
     // Deep link state for password reset
     @State private var resetPasswordToken: String?
@@ -24,9 +25,11 @@ struct JazzReferenceMacApp: App {
             ContentView()
                 .environmentObject(authManager)
                 .environmentObject(repertoireManager)
+                .environmentObject(favoritesManager)
                 .onAppear {
-                    // Connect RepertoireManager to AuthenticationManager
+                    // Connect managers to AuthenticationManager
                     repertoireManager.setAuthManager(authManager)
+                    favoritesManager.setAuthManager(authManager)
 
                     #if canImport(GoogleSignIn)
                     // Restore Google Sign-In session if available
@@ -40,6 +43,9 @@ struct JazzReferenceMacApp: App {
                 .onChange(of: authManager.isAuthenticated) { _, isAuthenticated in
                     Task {
                         await repertoireManager.loadRepertoires()
+                        if isAuthenticated {
+                            await favoritesManager.loadFavorites()
+                        }
                     }
                 }
                 .onOpenURL { url in
@@ -80,6 +86,7 @@ struct JazzReferenceMacApp: App {
         Settings {
             SettingsView()
                 .environmentObject(authManager)
+                .environmentObject(favoritesManager)
         }
         #endif
     }

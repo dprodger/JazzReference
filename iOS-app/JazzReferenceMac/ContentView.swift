@@ -64,6 +64,7 @@ struct ContentView: View {
 
 struct SettingsView: View {
     @EnvironmentObject var authManager: AuthenticationManager
+    @EnvironmentObject var favoritesManager: FavoritesManager
 
     var body: some View {
         TabView {
@@ -77,13 +78,15 @@ struct SettingsView: View {
                     Label("General", systemImage: "gearshape")
                 }
         }
-        .frame(width: 450, height: authManager.isAuthenticated ? 200 : 550)
+        .frame(width: 500, height: authManager.isAuthenticated ? 400 : 550)
         .animation(.easeInOut, value: authManager.isAuthenticated)
     }
 }
 
 struct AccountSettingsView: View {
     @EnvironmentObject var authManager: AuthenticationManager
+    @EnvironmentObject var favoritesManager: FavoritesManager
+    @State private var selectedRecordingId: String?
 
     var body: some View {
         if authManager.isAuthenticated {
@@ -96,50 +99,153 @@ struct AccountSettingsView: View {
 
     @ViewBuilder
     private var authenticatedView: some View {
-        Form {
-            Section {
-                HStack(spacing: 12) {
-                    // Profile image or placeholder
-                    if let imageUrl = authManager.currentUser?.profileImageUrl,
-                       let url = URL(string: imageUrl) {
-                        AsyncImage(url: url) { image in
-                            image
-                                .resizable()
-                                .aspectRatio(contentMode: .fill)
-                        } placeholder: {
+        VStack(spacing: 0) {
+            Form {
+                Section {
+                    HStack(spacing: 12) {
+                        // Profile image or placeholder
+                        if let imageUrl = authManager.currentUser?.profileImageUrl,
+                           let url = URL(string: imageUrl) {
+                            AsyncImage(url: url) { image in
+                                image
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                            } placeholder: {
+                                Image(systemName: "person.circle.fill")
+                                    .font(.system(size: 40))
+                                    .foregroundColor(JazzTheme.smokeGray)
+                            }
+                            .frame(width: 50, height: 50)
+                            .clipShape(Circle())
+                        } else {
                             Image(systemName: "person.circle.fill")
-                                .font(.system(size: 40))
+                                .font(.system(size: 50))
                                 .foregroundColor(JazzTheme.smokeGray)
                         }
-                        .frame(width: 50, height: 50)
-                        .clipShape(Circle())
-                    } else {
-                        Image(systemName: "person.circle.fill")
-                            .font(.system(size: 50))
-                            .foregroundColor(JazzTheme.smokeGray)
-                    }
 
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(authManager.currentUser?.displayName ?? "User")
-                            .font(JazzTheme.headline())
-                            .foregroundColor(JazzTheme.charcoal)
-                        Text(authManager.currentUser?.email ?? "")
-                            .font(JazzTheme.subheadline())
-                            .foregroundColor(.secondary)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(authManager.currentUser?.displayName ?? "User")
+                                .font(JazzTheme.headline())
+                                .foregroundColor(JazzTheme.charcoal)
+                            Text(authManager.currentUser?.email ?? "")
+                                .font(JazzTheme.subheadline())
+                                .foregroundColor(.secondary)
+                        }
+
+                        Spacer()
+
+                        Button("Sign Out") {
+                            authManager.logout()
+                        }
+                        .foregroundColor(.red)
                     }
+                    .padding(.vertical, 8)
                 }
-                .padding(.vertical, 8)
             }
+            .formStyle(.grouped)
 
-            Section {
-                Button("Sign Out") {
-                    authManager.logout()
+            // Favorites Section
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Image(systemName: "heart.fill")
+                        .foregroundColor(.red)
+                    Text("Favorite Recordings")
+                        .font(JazzTheme.headline())
+                        .foregroundColor(JazzTheme.charcoal)
+
+                    if !favoritesManager.favoriteRecordings.isEmpty {
+                        Text("(\(favoritesManager.favoriteRecordings.count))")
+                            .font(JazzTheme.subheadline())
+                            .foregroundColor(JazzTheme.charcoal.opacity(0.7))
+                    }
+
+                    Spacer()
                 }
-                .foregroundColor(.red)
+                .padding(.horizontal)
+
+                if favoritesManager.isLoading {
+                    HStack {
+                        Spacer()
+                        ProgressView()
+                        Spacer()
+                    }
+                    .padding()
+                } else if favoritesManager.favoriteRecordings.isEmpty {
+                    Text("No favorite recordings yet")
+                        .font(JazzTheme.body())
+                        .foregroundColor(JazzTheme.charcoal.opacity(0.7))
+                        .padding(.horizontal)
+                } else {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 12) {
+                            ForEach(favoritesManager.favoriteRecordings, id: \.id) { recording in
+                                FavoriteRecordingCard(recording: recording)
+                                    .onTapGesture {
+                                        selectedRecordingId = recording.id
+                                    }
+                            }
+                        }
+                        .padding(.horizontal)
+                    }
+                }
+            }
+            .padding(.vertical)
+            .background(JazzTheme.backgroundLight)
+        }
+        .sheet(isPresented: Binding(
+            get: { selectedRecordingId != nil },
+            set: { if !$0 { selectedRecordingId = nil } }
+        )) {
+            if let recordingId = selectedRecordingId {
+                RecordingDetailView(recordingId: recordingId)
+                    .frame(minWidth: 600, minHeight: 500)
             }
         }
-        .formStyle(.grouped)
-        .padding()
+        .task {
+            if favoritesManager.favoriteRecordings.isEmpty {
+                await favoritesManager.loadFavorites()
+            }
+        }
+    }
+}
+
+// MARK: - Favorite Recording Card
+
+struct FavoriteRecordingCard: View {
+    let recording: NetworkManager.FavoriteRecordingResponse
+    @State private var isHovering = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            // Album art
+            AsyncImage(url: URL(string: recording.bestAlbumArtSmall ?? "")) { image in
+                image
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+            } placeholder: {
+                Rectangle()
+                    .fill(JazzTheme.cardBackground)
+                    .overlay {
+                        Image(systemName: "music.note")
+                            .foregroundColor(JazzTheme.smokeGray)
+                    }
+            }
+            .frame(width: 80, height: 80)
+            .cornerRadius(8)
+
+            // Song title
+            Text(recording.songTitle ?? "Unknown")
+                .font(JazzTheme.caption())
+                .foregroundColor(JazzTheme.charcoal)
+                .lineLimit(2)
+                .frame(width: 80, alignment: .leading)
+        }
+        .padding(8)
+        .background(isHovering ? JazzTheme.cardBackground : Color.clear)
+        .cornerRadius(8)
+        .onHover { hovering in
+            isHovering = hovering
+        }
     }
 }
 
@@ -166,4 +272,5 @@ struct GeneralSettingsView: View {
     ContentView()
         .environmentObject(AuthenticationManager())
         .environmentObject(RepertoireManager())
+        .environmentObject(FavoritesManager())
 }

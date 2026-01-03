@@ -11,9 +11,25 @@ struct RecordingDetailView: View {
     let recordingId: String
     @State private var recording: Recording?
     @State private var isLoading = true
+    @State private var localFavoriteCount: Int?
+    @State private var showingLoginAlert = false
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject var authManager: AuthenticationManager
+    @EnvironmentObject var favoritesManager: FavoritesManager
 
     private let networkManager = NetworkManager()
+
+    // MARK: - Favorites Computed Properties
+
+    /// Whether the current user has favorited this recording
+    private var isFavorited: Bool {
+        favoritesManager.isFavorited(recordingId)
+    }
+
+    /// Display count for favorites (uses local count if available, otherwise from recording)
+    private var displayFavoriteCount: Int {
+        localFavoriteCount ?? recording?.favoriteCount ?? 0
+    }
 
     var body: some View {
         ScrollView {
@@ -58,6 +74,27 @@ struct RecordingDetailView: View {
                     dismiss()
                 }
             }
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    handleFavoriteButtonTap()
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: isFavorited ? "heart.fill" : "heart")
+                        if displayFavoriteCount > 0 {
+                            Text("\(displayFavoriteCount)")
+                                .font(JazzTheme.caption())
+                        }
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(isFavorited ? .red : JazzTheme.burgundy)
+                .help(isFavorited ? "Remove from favorites" : "Add to favorites")
+            }
+        }
+        .alert("Sign In Required", isPresented: $showingLoginAlert) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text("Please sign in to favorite recordings.")
         }
         .task(id: recordingId) {
             await loadRecording()
@@ -362,8 +399,26 @@ struct RecordingDetailView: View {
         recording = await networkManager.fetchRecordingDetail(id: recordingId)
         isLoading = false
     }
+
+    // MARK: - Favorites
+
+    /// Handle favorite button tap - toggle favorite or show login prompt
+    private func handleFavoriteButtonTap() {
+        guard authManager.isAuthenticated else {
+            showingLoginAlert = true
+            return
+        }
+
+        Task {
+            if let newCount = await favoritesManager.toggleFavorite(recordingId: recordingId) {
+                localFavoriteCount = newCount
+            }
+        }
+    }
 }
 
 #Preview {
     RecordingDetailView(recordingId: "preview-id")
+        .environmentObject(AuthenticationManager())
+        .environmentObject(FavoritesManager())
 }
