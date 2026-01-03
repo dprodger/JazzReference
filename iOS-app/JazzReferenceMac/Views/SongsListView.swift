@@ -22,18 +22,7 @@ struct SongsListView: View {
             // Song list (left pane)
             VStack(spacing: 0) {
                 // Repertoire selector
-                HStack(spacing: 6) {
-                    Image(systemName: "music.note.list")
-                        .foregroundColor(JazzTheme.burgundy)
-                        .frame(width: 16)
-
-                    Text(repertoireManager.currentRepertoireDisplayName)
-                        .font(JazzTheme.subheadline(weight: .medium))
-                        .foregroundColor(JazzTheme.charcoal)
-                        .lineLimit(1)
-
-                    Spacer(minLength: 4)
-
+                Group {
                     if authManager.isAuthenticated {
                         Menu {
                             ForEach(repertoireManager.repertoires) { repertoire in
@@ -53,19 +42,45 @@ struct SongsListView: View {
                                 Label("Create New Repertoire", systemImage: "plus.circle")
                             }
                         } label: {
-                            Image(systemName: "chevron.down")
-                                .font(.system(size: 10, weight: .bold))
-                                .foregroundColor(JazzTheme.charcoal)
+                            HStack(spacing: 6) {
+                                Image(systemName: "music.note.list")
+                                    .foregroundColor(JazzTheme.burgundy)
+                                    .frame(width: 16)
+
+                                Text(repertoireManager.currentRepertoireDisplayName)
+                                    .font(JazzTheme.subheadline(weight: .medium))
+                                    .foregroundColor(JazzTheme.charcoal)
+                                    .lineLimit(1)
+
+                                Spacer()
+
+                                Image(systemName: "chevron.down")
+                                    .font(.system(size: 10, weight: .bold))
+                                    .foregroundColor(JazzTheme.charcoal)
+                            }
                         }
                         .menuStyle(.borderlessButton)
                         .menuIndicator(.hidden)
                     } else {
-                        Button("Sign In") {
-                            showLoginSheet = true
+                        HStack(spacing: 6) {
+                            Image(systemName: "music.note.list")
+                                .foregroundColor(JazzTheme.burgundy)
+                                .frame(width: 16)
+
+                            Text(repertoireManager.currentRepertoireDisplayName)
+                                .font(JazzTheme.subheadline(weight: .medium))
+                                .foregroundColor(JazzTheme.charcoal)
+                                .lineLimit(1)
+
+                            Spacer()
+
+                            Button("Sign In") {
+                                showLoginSheet = true
+                            }
+                            .font(JazzTheme.caption())
+                            .buttonStyle(.plain)
+                            .foregroundColor(JazzTheme.burgundy)
                         }
-                        .font(JazzTheme.caption())
-                        .buttonStyle(.plain)
-                        .foregroundColor(JazzTheme.burgundy)
                     }
                 }
                 .padding(.horizontal, 12)
