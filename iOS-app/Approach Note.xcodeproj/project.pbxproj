@@ -70,7 +70,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		B41D0F972EE6337400DB427C /* Approach Note Mac.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Approach Note Mac.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		B41D0F972EE6337400DB427C /* Approach Note.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Approach Note.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		B41D0FA22EE633EE00DB427C /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Assets.xcassets; path = JazzReferenceMac/Assets.xcassets; sourceTree = "<group>"; };
 		B41D0FA32EE633EE00DB427C /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ContentView.swift; path = JazzReferenceMac/ContentView.swift; sourceTree = "<group>"; };
 		B41D0FA42EE633EE00DB427C /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = Info.plist; path = JazzReferenceMac/Info.plist; sourceTree = "<group>"; };
@@ -266,7 +266,7 @@
 				B4C1604D2E91B03700EB8D2C /* JazzReferenceTests.xctest */,
 				B4C160572E91B03700EB8D2C /* JazzReferenceUITests.xctest */,
 				B4911D2A2EB316F600326CA7 /* MusicBrainzImporter.appex */,
-				B41D0F972EE6337400DB427C /* Approach Note Mac.app */,
+				B41D0F972EE6337400DB427C /* Approach Note.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -292,7 +292,7 @@
 				B45A16AC2F08802C00259452 /* GoogleSignInSwift */,
 			);
 			productName = "Approach Note";
-			productReference = B41D0F972EE6337400DB427C /* Approach Note Mac.app */;
+			productReference = B41D0F972EE6337400DB427C /* Approach Note.app */;
 			productType = "com.apple.product-type.application";
 		};
 		B4911D292EB316F600326CA7 /* MusicBrainzImporter */ = {
@@ -581,6 +581,7 @@
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = JazzReferenceMac/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Approach Note";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.music";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -633,6 +634,7 @@
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = JazzReferenceMac/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Approach Note";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.music";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
