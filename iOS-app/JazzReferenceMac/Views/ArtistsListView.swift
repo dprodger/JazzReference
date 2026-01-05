@@ -17,19 +17,61 @@ struct ArtistsListView: View {
         HSplitView {
             // Artist list (left pane)
             VStack(spacing: 0) {
+                // Search field
+                HStack {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundColor(JazzTheme.smokeGray)
+                    TextField("Search artists...", text: $searchText)
+                        .textFieldStyle(.plain)
+                        .font(JazzTheme.body())
+                        .foregroundColor(JazzTheme.charcoal)
+                    if !searchText.isEmpty {
+                        Button(action: { searchText = "" }) {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundColor(JazzTheme.smokeGray)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(8)
+                .background(Color.white)
+                .cornerRadius(8)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(JazzTheme.smokeGray.opacity(0.3), lineWidth: 1)
+                )
+                .padding()
+                .background(JazzTheme.cardBackground)
+
                 List(selection: $selectedPerformerId) {
                     ForEach(groupedPerformers, id: \.0) { letter, performers in
-                        Section(header: Text(letter).font(JazzTheme.headline()).foregroundColor(JazzTheme.burgundy)) {
+                        Section(header:
+                            Text(letter)
+                                .font(JazzTheme.headline())
+                                .foregroundColor(JazzTheme.burgundy)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(JazzTheme.amber.opacity(0.3))
+                                .cornerRadius(4)
+                        ) {
                             ForEach(performers) { performer in
-                                ArtistRowView(performer: performer)
+                                ArtistRowView(performer: performer, isSelected: selectedPerformerId == performer.id)
                                     .tag(performer.id)
+                                    .listRowBackground(
+                                        selectedPerformerId == performer.id
+                                            ? JazzTheme.burgundy
+                                            : JazzTheme.backgroundLight
+                                    )
                             }
                         }
                     }
                 }
-                .listStyle(.inset(alternatesRowBackgrounds: true))
+                .listStyle(.plain)
+                .scrollContentBackground(.hidden)
+                .background(JazzTheme.backgroundLight)
             }
             .frame(minWidth: 200, idealWidth: 250, maxWidth: 300)
+            .environment(\.colorScheme, .light)
 
             // Artist detail (right pane)
             if let performerId = selectedPerformerId {
@@ -48,7 +90,6 @@ struct ArtistsListView: View {
                 .background(JazzTheme.backgroundLight)
             }
         }
-        .searchable(text: $searchText, prompt: "Search artists")
         .onChange(of: searchText) { _, newValue in
             searchTask?.cancel()
             searchTask = Task {
@@ -61,7 +102,6 @@ struct ArtistsListView: View {
         .task {
             await networkManager.fetchPerformers()
         }
-        .navigationTitle("Artists (\(networkManager.performers.count.formatted()))")
     }
 
     // MARK: - Helper Methods
@@ -84,19 +124,21 @@ struct ArtistsListView: View {
 
 struct ArtistRowView: View {
     let performer: Performer
+    var isSelected: Bool = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(performer.name)
                 .font(JazzTheme.headline())
-                .foregroundColor(.primary)
+                .foregroundStyle(isSelected ? Color.white : JazzTheme.charcoal)
             if let instrument = performer.instrument {
                 Text(instrument)
                     .font(JazzTheme.subheadline())
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(isSelected ? Color.white.opacity(0.85) : JazzTheme.smokeGray)
             }
         }
         .padding(.vertical, 4)
+        .padding(.horizontal, 8)
     }
 }
 

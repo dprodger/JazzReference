@@ -90,14 +90,15 @@ struct SongsListView: View {
                 // Search bar
                 HStack {
                     Image(systemName: "magnifyingglass")
-                        .foregroundColor(JazzTheme.charcoal.opacity(0.6))
-                    TextField("Search songs", text: $searchText)
+                        .foregroundColor(JazzTheme.smokeGray)
+                    TextField("Search songs...", text: $searchText)
                         .textFieldStyle(.plain)
+                        .font(JazzTheme.body())
                         .foregroundColor(JazzTheme.charcoal)
                     if !searchText.isEmpty {
                         Button(action: { searchText = "" }) {
                             Image(systemName: "xmark.circle.fill")
-                                .foregroundColor(JazzTheme.charcoal.opacity(0.6))
+                                .foregroundColor(JazzTheme.smokeGray)
                         }
                         .buttonStyle(.plain)
                     }
@@ -105,9 +106,12 @@ struct SongsListView: View {
                 .padding(8)
                 .background(Color.white)
                 .cornerRadius(8)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 8)
-                .background(JazzTheme.backgroundLight)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(JazzTheme.smokeGray.opacity(0.3), lineWidth: 1)
+                )
+                .padding()
+                .background(JazzTheme.cardBackground)
 
                 // Song list
                 List(selection: $selectedSongId) {
@@ -123,9 +127,13 @@ struct SongsListView: View {
                                 .listRowInsets(EdgeInsets())
                         ) {
                             ForEach(songs) { song in
-                                SongRowView(song: song)
+                                SongRowView(song: song, isSelected: selectedSongId == song.id)
                                     .tag(song.id)
-                                    .listRowBackground(JazzTheme.backgroundLight)
+                                    .listRowBackground(
+                                        selectedSongId == song.id
+                                            ? JazzTheme.burgundy
+                                            : JazzTheme.backgroundLight
+                                    )
                             }
                         }
                     }
@@ -136,7 +144,6 @@ struct SongsListView: View {
             }
             .frame(minWidth: 200, idealWidth: 250, maxWidth: 300)
             .background(JazzTheme.backgroundLight)
-            .preferredColorScheme(.light)
 
             // Song detail (right pane)
             if let songId = selectedSongId {
@@ -173,7 +180,6 @@ struct SongsListView: View {
             await repertoireManager.loadRepertoires()
             await loadSongs()
         }
-        .navigationTitle("Songs (\(networkManager.songs.count.formatted()))")
         .sheet(isPresented: $showCreateRepertoire) {
             MacCreateRepertoireView(repertoireManager: repertoireManager)
         }
@@ -219,16 +225,17 @@ struct SongsListView: View {
 
 struct SongRowView: View {
     let song: Song
+    var isSelected: Bool = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(song.title)
                 .font(JazzTheme.headline())
-                .foregroundColor(JazzTheme.charcoal)
+                .foregroundStyle(isSelected ? Color.white : JazzTheme.charcoal)
             if let composer = song.composer {
                 Text(composer)
                     .font(JazzTheme.subheadline())
-                    .foregroundColor(JazzTheme.charcoal.opacity(0.7))
+                    .foregroundStyle(isSelected ? Color.white.opacity(0.85) : JazzTheme.smokeGray)
             }
         }
         .padding(.vertical, 4)
