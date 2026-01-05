@@ -99,7 +99,7 @@ struct SongDetailView: View {
     @State private var isRecordingsLoading = true
     @State private var sortOrder: RecordingSortOrder = .year
     @State private var selectedRecordingId: String?
-    @State private var selectedFilter: SongRecordingFilter = .all
+    @State private var selectedFilter: SongRecordingFilter = .playable
     @State private var selectedInstrument: InstrumentFamily? = nil
     @State private var transcriptions: [SoloTranscription] = []
     @State private var backingTracks: [Video] = []
