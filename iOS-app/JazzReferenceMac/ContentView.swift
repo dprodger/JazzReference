@@ -29,53 +29,24 @@ struct ContentView: View {
     @EnvironmentObject var repertoireManager: RepertoireManager
 
     var body: some View {
-        VStack(spacing: 0) {
-            // Custom navigation header
-            HStack {
-                Spacer()
-
-                // Navigation tabs
-                HStack(spacing: 0) {
-                    ForEach(NavigationItem.allCases) { item in
-                        Button(action: { selectedTab = item }) {
-                            Text(item.rawValue)
-                                .font(JazzTheme.subheadline())
-                                .fontWeight(selectedTab == item ? .semibold : .regular)
-                                .foregroundColor(selectedTab == item ? JazzTheme.burgundy : JazzTheme.charcoal)
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 8)
-                                .background(
-                                    selectedTab == item
-                                        ? JazzTheme.burgundy.opacity(0.1)
-                                        : Color.clear
-                                )
-                                .cornerRadius(6)
-                        }
-                        .buttonStyle(.plain)
-                    }
+        TabView(selection: $selectedTab) {
+            SongsListView()
+                .tabItem {
+                    Label("Songs", systemImage: "music.note.list")
                 }
-                .padding(4)
-                .background(JazzTheme.smokeGray.opacity(0.15))
-                .cornerRadius(8)
+                .tag(NavigationItem.songs)
 
-                Spacer()
-            }
-            .padding(.vertical, 8)
-            .background(JazzTheme.cardBackground)
-
-            Divider()
-
-            // Content area
-            Group {
-                switch selectedTab {
-                case .songs:
-                    SongsListView()
-                case .artists:
-                    ArtistsListView()
-                case .recordings:
-                    RecordingsListView()
+            ArtistsListView()
+                .tabItem {
+                    Label("Artists", systemImage: "person.2.fill")
                 }
-            }
+                .tag(NavigationItem.artists)
+
+            RecordingsListView()
+                .tabItem {
+                    Label("Recordings", systemImage: "opticaldisc")
+                }
+                .tag(NavigationItem.recordings)
         }
         .onReceive(NotificationCenter.default.publisher(for: .navigateToSongs)) { _ in
             selectedTab = .songs
