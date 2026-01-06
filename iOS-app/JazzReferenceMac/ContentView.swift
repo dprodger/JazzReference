@@ -252,6 +252,7 @@ struct FavoriteRecordingCard: View {
 
 struct GeneralSettingsView: View {
     @AppStorage("preferredStreamingService") private var preferredStreamingService: String = "spotify"
+    @State private var showingOnboarding = false
 
     var body: some View {
         Form {
@@ -263,9 +264,22 @@ struct GeneralSettingsView: View {
                 }
                 .pickerStyle(.radioGroup)
             }
+
+            Section("Tutorial") {
+                HStack {
+                    Text("Learn about Songs, Recordings, and Releases")
+                    Spacer()
+                    Button("View Tutorial") {
+                        showingOnboarding = true
+                    }
+                }
+            }
         }
         .formStyle(.grouped)
         .padding()
+        .sheet(isPresented: $showingOnboarding) {
+            MacOnboardingView(isPresented: $showingOnboarding)
+        }
     }
 }
 
