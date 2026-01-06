@@ -42,21 +42,29 @@ struct SongsListView: View {
                     RoundedRectangle(cornerRadius: 8)
                         .stroke(JazzTheme.smokeGray.opacity(0.3), lineWidth: 1)
                 )
-                .padding()
+                .padding(.horizontal)
+                .padding(.vertical, 12)
                 .background(JazzTheme.burgundy)
 
                 // Song list
                 List(selection: $selectedSongId) {
                     ForEach(groupedSongs, id: \.0) { letter, songs in
                         Section(header:
-                            Text(letter)
-                                .font(JazzTheme.headline())
-                                .foregroundColor(JazzTheme.burgundy)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
-                                .background(JazzTheme.amber.opacity(0.3))
-                                .cornerRadius(4)
-                                .listRowInsets(EdgeInsets())
+                            HStack {
+                                Text(letter)
+                                    .font(JazzTheme.headline())
+                                    .foregroundColor(.white)
+                                Spacer()
+                            }
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .frame(maxWidth: .infinity)
+                            .background(
+                                JazzTheme.burgundy
+                                    .padding(.horizontal, -20)
+                                    .padding(.vertical, -4)
+                            )
+                            .listRowInsets(EdgeInsets())
                         ) {
                             ForEach(songs) { song in
                                 SongRowView(song: song, isSelected: selectedSongId == song.id)
@@ -73,6 +81,7 @@ struct SongsListView: View {
                 .listStyle(.plain)
                 .scrollContentBackground(.hidden)
                 .background(JazzTheme.backgroundLight)
+                .listSectionSeparator(.hidden)
             }
             .frame(minWidth: 200, idealWidth: 250, maxWidth: 300)
             .background(JazzTheme.backgroundLight)

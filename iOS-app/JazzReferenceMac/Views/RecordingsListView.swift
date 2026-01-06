@@ -220,11 +220,37 @@ struct RecordingsListView: View {
     @ViewBuilder
     private var filterToolbar: some View {
         VStack(spacing: 8) {
+            // Search field row (first, to match Songs/Artists layout)
+            HStack {
+                Image(systemName: "magnifyingglass")
+                    .foregroundColor(JazzTheme.smokeGray)
+                TextField("Search recordings...", text: $searchText)
+                    .textFieldStyle(.plain)
+                    .font(JazzTheme.body())
+                    .foregroundColor(JazzTheme.charcoal)
+                if !searchText.isEmpty {
+                    Button(action: { searchText = "" }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundColor(JazzTheme.smokeGray)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(8)
+            .background(Color.white)
+            .cornerRadius(8)
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(JazzTheme.smokeGray.opacity(0.3), lineWidth: 1)
+            )
+            .padding(.horizontal)
+            .padding(.top, 12)
+
             // Availability row
             HStack(spacing: 12) {
                 Text("Availability:")
                     .font(JazzTheme.subheadline())
-                    .foregroundColor(JazzTheme.charcoal)
+                    .foregroundColor(.white)
 
                 // Availability filter menu
                 Menu {
@@ -267,7 +293,7 @@ struct RecordingsListView: View {
                 if availabilityFilter != .all {
                     Button(action: { availabilityFilter = .all }) {
                         Image(systemName: "xmark.circle.fill")
-                            .foregroundColor(JazzTheme.burgundy)
+                            .foregroundColor(.white)
                             .font(.system(size: 16))
                     }
                     .buttonStyle(.plain)
@@ -277,38 +303,12 @@ struct RecordingsListView: View {
                 Spacer()
             }
             .padding(.horizontal)
-            .padding(.top, 8)
-
-            // Search field row
-            HStack {
-                Image(systemName: "magnifyingglass")
-                    .foregroundColor(JazzTheme.smokeGray)
-                TextField("Search recordings...", text: $searchText)
-                    .textFieldStyle(.plain)
-                    .font(JazzTheme.body())
-                    .foregroundColor(JazzTheme.charcoal)
-                if !searchText.isEmpty {
-                    Button(action: { searchText = "" }) {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundColor(JazzTheme.smokeGray)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            .padding(8)
-            .background(Color.white)
-            .cornerRadius(8)
-            .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(JazzTheme.smokeGray.opacity(0.3), lineWidth: 1)
-            )
-            .padding(.horizontal)
 
             // Search scope picker
             HStack(spacing: 12) {
                 Text("Search in:")
                     .font(JazzTheme.subheadline())
-                    .foregroundColor(JazzTheme.charcoal)
+                    .foregroundColor(.white)
 
                 Picker("", selection: $searchScope) {
                     ForEach(RecordingSearchScope.allCases) { scope in
