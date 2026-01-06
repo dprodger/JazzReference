@@ -26,6 +26,8 @@ enum NavigationItem: String, CaseIterable, Identifiable {
 struct ContentView: View {
     @State private var selectedTab: NavigationItem = .songs
     @State private var showCreateRepertoire = false
+    @State private var showRepertoirePopover = false
+    @State private var showLoginSheet = false
     @EnvironmentObject var authManager: AuthenticationManager
     @EnvironmentObject var repertoireManager: RepertoireManager
 
@@ -76,11 +78,49 @@ struct ContentView: View {
                                 .lineLimit(1)
                         }
                     }
+                } else {
+                    Button(action: { showRepertoirePopover = true }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "text.badge.checkmark")
+                            Text("All Songs")
+                            Image(systemName: "chevron.down")
+                                .font(.system(size: 10))
+                        }
+                    }
+                    .popover(isPresented: $showRepertoirePopover, arrowEdge: .bottom) {
+                        VStack(spacing: 16) {
+                            Text("Create and select repertoires to focus on a subset of songs.")
+                                .font(JazzTheme.body())
+                                .foregroundColor(JazzTheme.charcoal)
+                                .multilineTextAlignment(.center)
+
+                            Button(action: {
+                                showRepertoirePopover = false
+                                showLoginSheet = true
+                            }) {
+                                Text("Sign In")
+                                    .font(JazzTheme.body())
+                                    .foregroundColor(.white)
+                                    .frame(minWidth: 100)
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 8)
+                                    .background(JazzTheme.burgundy)
+                                    .cornerRadius(6)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        .padding()
+                        .frame(width: 260)
+                    }
                 }
             }
         }
         .sheet(isPresented: $showCreateRepertoire) {
             MacCreateRepertoireView(repertoireManager: repertoireManager)
+        }
+        .sheet(isPresented: $showLoginSheet) {
+            MacLoginView()
+                .environmentObject(authManager)
         }
         .onReceive(NotificationCenter.default.publisher(for: .navigateToSongs)) { _ in
             selectedTab = .songs
