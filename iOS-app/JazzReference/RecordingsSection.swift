@@ -98,7 +98,7 @@ struct RecordingsSection: View {
     // Callback when sort order changes (for parent to reload data)
     var onSortOrderChanged: ((RecordingSortOrder) -> Void)?
 
-    @State private var selectedFilter: SongRecordingFilter = .all
+    @State private var selectedFilter: SongRecordingFilter = .playable
     @State private var selectedInstrument: InstrumentFamily? = nil
     @State private var showFilterSheet: Bool = false
     @State private var isSectionExpanded: Bool = true
