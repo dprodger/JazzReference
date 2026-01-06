@@ -41,7 +41,7 @@ struct ArtistsListView: View {
                         .stroke(JazzTheme.smokeGray.opacity(0.3), lineWidth: 1)
                 )
                 .padding()
-                .background(JazzTheme.cardBackground)
+                .background(JazzTheme.amber)
 
                 List(selection: $selectedPerformerId) {
                     ForEach(groupedPerformers, id: \.0) { letter, performers in

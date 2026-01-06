@@ -43,7 +43,7 @@ struct SongsListView: View {
                         .stroke(JazzTheme.smokeGray.opacity(0.3), lineWidth: 1)
                 )
                 .padding()
-                .background(JazzTheme.cardBackground)
+                .background(JazzTheme.burgundy)
 
                 // Song list
                 List(selection: $selectedSongId) {

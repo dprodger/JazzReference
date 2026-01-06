@@ -323,7 +323,7 @@ struct RecordingsListView: View {
             .padding(.horizontal)
             .padding(.bottom, 8)
         }
-        .background(JazzTheme.cardBackground)
+        .background(JazzTheme.brass)
         .environment(\.colorScheme, .light)
     }
 
