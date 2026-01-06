@@ -25,6 +25,7 @@ enum NavigationItem: String, CaseIterable, Identifiable {
 
 struct ContentView: View {
     @State private var selectedTab: NavigationItem = .songs
+    @State private var showCreateRepertoire = false
     @EnvironmentObject var authManager: AuthenticationManager
     @EnvironmentObject var repertoireManager: RepertoireManager
 
@@ -47,6 +48,39 @@ struct ContentView: View {
                     Label("Recordings", systemImage: "opticaldisc")
                 }
                 .tag(NavigationItem.recordings)
+        }
+        .toolbar {
+            ToolbarItem(placement: .automatic) {
+                if authManager.isAuthenticated {
+                    Menu {
+                        ForEach(repertoireManager.repertoires) { repertoire in
+                            Button(action: { repertoireManager.selectRepertoire(repertoire) }) {
+                                HStack {
+                                    Text(repertoire.name)
+                                    if repertoire.id == repertoireManager.selectedRepertoire.id {
+                                        Image(systemName: "checkmark")
+                                    }
+                                }
+                            }
+                        }
+
+                        Divider()
+
+                        Button(action: { showCreateRepertoire = true }) {
+                            Label("Create New Repertoire", systemImage: "plus.circle")
+                        }
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "text.badge.checkmark")
+                            Text(repertoireManager.currentRepertoireDisplayName)
+                                .lineLimit(1)
+                        }
+                    }
+                }
+            }
+        }
+        .sheet(isPresented: $showCreateRepertoire) {
+            MacCreateRepertoireView(repertoireManager: repertoireManager)
         }
         .onReceive(NotificationCenter.default.publisher(for: .navigateToSongs)) { _ in
             selectedTab = .songs

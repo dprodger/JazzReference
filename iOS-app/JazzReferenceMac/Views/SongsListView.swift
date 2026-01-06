@@ -14,79 +14,11 @@ struct SongsListView: View {
     @State private var searchText = ""
     @State private var searchTask: Task<Void, Never>?
     @State private var selectedSongId: String?
-    @State private var showCreateRepertoire = false
-    @State private var showLoginSheet = false
 
     var body: some View {
         HSplitView {
             // Song list (left pane)
             VStack(spacing: 0) {
-                // Repertoire selector
-                Group {
-                    if authManager.isAuthenticated {
-                        Menu {
-                            ForEach(repertoireManager.repertoires) { repertoire in
-                                Button(action: { repertoireManager.selectRepertoire(repertoire) }) {
-                                    HStack {
-                                        Text(repertoire.name)
-                                        if repertoire.id == repertoireManager.selectedRepertoire.id {
-                                            Image(systemName: "checkmark")
-                                        }
-                                    }
-                                }
-                            }
-
-                            Divider()
-
-                            Button(action: { showCreateRepertoire = true }) {
-                                Label("Create New Repertoire", systemImage: "plus.circle")
-                            }
-                        } label: {
-                            HStack(spacing: 6) {
-                                Image(systemName: "music.note.list")
-                                    .foregroundColor(JazzTheme.burgundy)
-                                    .frame(width: 16)
-
-                                Text(repertoireManager.currentRepertoireDisplayName)
-                                    .font(JazzTheme.subheadline(weight: .medium))
-                                    .foregroundColor(JazzTheme.charcoal)
-                                    .lineLimit(1)
-
-                                Spacer()
-
-                                Image(systemName: "chevron.down")
-                                    .font(.system(size: 10, weight: .bold))
-                                    .foregroundColor(JazzTheme.charcoal)
-                            }
-                        }
-                        .menuStyle(.borderlessButton)
-                        .menuIndicator(.hidden)
-                    } else {
-                        HStack(spacing: 6) {
-                            Image(systemName: "music.note.list")
-                                .foregroundColor(JazzTheme.burgundy)
-                                .frame(width: 16)
-
-                            Text(repertoireManager.currentRepertoireDisplayName)
-                                .font(JazzTheme.subheadline(weight: .medium))
-                                .foregroundColor(JazzTheme.charcoal)
-                                .lineLimit(1)
-
-                            Spacer()
-
-                            Button("Sign In") {
-                                showLoginSheet = true
-                            }
-                            .font(JazzTheme.caption())
-                            .buttonStyle(.plain)
-                            .foregroundColor(JazzTheme.burgundy)
-                        }
-                    }
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(JazzTheme.amber.opacity(0.3))
-
                 // Search bar
                 HStack {
                     Image(systemName: "magnifyingglass")
@@ -179,13 +111,6 @@ struct SongsListView: View {
         .task {
             await repertoireManager.loadRepertoires()
             await loadSongs()
-        }
-        .sheet(isPresented: $showCreateRepertoire) {
-            MacCreateRepertoireView(repertoireManager: repertoireManager)
-        }
-        .sheet(isPresented: $showLoginSheet) {
-            MacLoginView()
-                .environmentObject(authManager)
         }
     }
 
