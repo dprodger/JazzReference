@@ -27,6 +27,7 @@
 		B45A16B12F08876C00259452 /* MacCreateRepertoireView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B45A16AF2F08876C00259452 /* MacCreateRepertoireView.swift */; };
 		B4C535842ECE5FFF0030A127 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = B4C535832ECE5FFF0030A127 /* GoogleSignIn */; };
 		B4C535862ECE5FFF0030A127 /* GoogleSignInSwift in Frameworks */ = {isa = PBXBuildFile; productRef = B4C535852ECE5FFF0030A127 /* GoogleSignInSwift */; };
+		B4D3BAB12F0D7983007CB0DD /* MacSearchBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4D3BAB02F0D7983007CB0DD /* MacSearchBar.swift */; };
 		B4EE328C2EB3ED5E00C643D1 /* MusicBrainzImporter.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = B4911D2A2EB316F600326CA7 /* MusicBrainzImporter.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		B4F38C242EC166A800231130 /* YouTubePlayerKit in Frameworks */ = {isa = PBXBuildFile; productRef = B4F38C232EC166A800231130 /* YouTubePlayerKit */; };
 /* End PBXBuildFile section */
@@ -93,6 +94,7 @@
 		B4C160402E91B03600EB8D2C /* Approach Note.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Approach Note.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		B4C1604D2E91B03700EB8D2C /* JazzReferenceTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = JazzReferenceTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		B4C160572E91B03700EB8D2C /* JazzReferenceUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = JazzReferenceUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		B4D3BAB02F0D7983007CB0DD /* MacSearchBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacSearchBar.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -216,6 +218,7 @@
 		B41D0FAD2EE633EE00DB427C /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				B4D3BAB02F0D7983007CB0DD /* MacSearchBar.swift */,
 				B42E87D32F09B5F20012F32C /* MacOnboardingView.swift */,
 				B45A16AE2F08876C00259452 /* MacAddToRepertoireSheet.swift */,
 				B45A16AF2F08876C00259452 /* MacCreateRepertoireView.swift */,
@@ -499,6 +502,7 @@
 				B42E87D42F09B5F20012F32C /* MacOnboardingView.swift in Sources */,
 				B45A16A62F08800600259452 /* MacForgotPasswordView.swift in Sources */,
 				B45A16A72F08800600259452 /* MacLoginView.swift in Sources */,
+				B4D3BAB12F0D7983007CB0DD /* MacSearchBar.swift in Sources */,
 				B45A16A82F08800600259452 /* MacRegisterView.swift in Sources */,
 				B45A16B02F08876C00259452 /* MacAddToRepertoireSheet.swift in Sources */,
 				B45A16B12F08876C00259452 /* MacCreateRepertoireView.swift in Sources */,

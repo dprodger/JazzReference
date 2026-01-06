@@ -220,31 +220,11 @@ struct RecordingsListView: View {
     @ViewBuilder
     private var filterToolbar: some View {
         VStack(spacing: 8) {
-            // Search field row (first, to match Songs/Artists layout)
-            HStack {
-                Image(systemName: "magnifyingglass")
-                    .foregroundColor(JazzTheme.smokeGray)
-                TextField("Search recordings...", text: $searchText)
-                    .textFieldStyle(.plain)
-                    .font(JazzTheme.body())
-                    .foregroundColor(JazzTheme.charcoal)
-                if !searchText.isEmpty {
-                    Button(action: { searchText = "" }) {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundColor(JazzTheme.smokeGray)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            .padding(8)
-            .background(Color.white)
-            .cornerRadius(8)
-            .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(JazzTheme.smokeGray.opacity(0.3), lineWidth: 1)
+            MacSearchBar(
+                text: $searchText,
+                placeholder: "Search recordings...",
+                backgroundColor: JazzTheme.brass
             )
-            .padding(.horizontal)
-            .padding(.top, 12)
 
             // Availability row
             HStack(spacing: 12) {

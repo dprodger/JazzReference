@@ -19,32 +19,11 @@ struct SongsListView: View {
         HSplitView {
             // Song list (left pane)
             VStack(spacing: 0) {
-                // Search bar
-                HStack {
-                    Image(systemName: "magnifyingglass")
-                        .foregroundColor(JazzTheme.smokeGray)
-                    TextField("Search songs...", text: $searchText)
-                        .textFieldStyle(.plain)
-                        .font(JazzTheme.body())
-                        .foregroundColor(JazzTheme.charcoal)
-                    if !searchText.isEmpty {
-                        Button(action: { searchText = "" }) {
-                            Image(systemName: "xmark.circle.fill")
-                                .foregroundColor(JazzTheme.smokeGray)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(8)
-                .background(Color.white)
-                .cornerRadius(8)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(JazzTheme.smokeGray.opacity(0.3), lineWidth: 1)
+                MacSearchBar(
+                    text: $searchText,
+                    placeholder: "Search songs...",
+                    backgroundColor: JazzTheme.burgundy
                 )
-                .padding(.horizontal)
-                .padding(.vertical, 12)
-                .background(JazzTheme.burgundy)
 
                 // Song list
                 List(selection: $selectedSongId) {
