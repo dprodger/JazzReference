@@ -66,18 +66,20 @@ struct ContentView: View {
 struct SettingsView: View {
     @EnvironmentObject var authManager: AuthenticationManager
     @EnvironmentObject var favoritesManager: FavoritesManager
+    @State private var selectedTab = 0
 
     var body: some View {
-        TabView {
-            AccountSettingsView()
-                .tabItem {
-                    Label("Account", systemImage: "person.circle")
-                }
-
+        TabView(selection: $selectedTab) {
             GeneralSettingsView()
                 .tabItem {
                     Label("General", systemImage: "gearshape")
                 }
+                .tag(0)
+            AccountSettingsView()
+                .tabItem {
+                    Label("Account", systemImage: "person.circle")
+                }
+                .tag(1)
         }
         .frame(width: 500, height: authManager.isAuthenticated ? 400 : 550)
         .animation(.easeInOut, value: authManager.isAuthenticated)
@@ -254,6 +256,16 @@ struct GeneralSettingsView: View {
     @AppStorage("preferredStreamingService") private var preferredStreamingService: String = "spotify"
     @State private var showingOnboarding = false
 
+    // Research queue state
+    @State private var queueSize: Int = 0
+    @State private var workerActive: Bool = false
+    @State private var currentSongName: String? = nil
+    @State private var progress: ResearchProgress? = nil
+    @State private var isLoadingQueue: Bool = true
+    @State private var isRefreshing: Bool = false
+
+    private let networkManager = NetworkManager()
+
     var body: some View {
         Form {
             Section("Playback") {
@@ -274,12 +286,103 @@ struct GeneralSettingsView: View {
                     }
                 }
             }
+
+            Section("Research Queue") {
+                if isLoadingQueue {
+                    HStack {
+                        ProgressView()
+                            .scaleEffect(0.7)
+                        Text("Loading...")
+                            .foregroundColor(JazzTheme.smokeGray)
+                    }
+                } else {
+                    HStack {
+                        Image(systemName: workerActive ? "arrow.triangle.2.circlepath" : "clock")
+                            .foregroundColor(workerActive ? JazzTheme.burgundy : JazzTheme.smokeGray)
+
+                        Text("Queue Size: \(queueSize)")
+
+                        Spacer()
+
+                        Button(action: {
+                            Task {
+                                await refreshQueueStatus()
+                            }
+                        }) {
+                            if isRefreshing {
+                                ProgressView()
+                                    .scaleEffect(0.7)
+                            } else {
+                                Image(systemName: "arrow.clockwise")
+                            }
+                        }
+                        .disabled(isRefreshing)
+                    }
+
+                    if workerActive && queueSize > 0 {
+                        if let songName = currentSongName {
+                            HStack {
+                                Text("Processing:")
+                                    .foregroundColor(JazzTheme.smokeGray)
+                                Text(songName)
+                                    .lineLimit(1)
+                                    .truncationMode(.tail)
+                            }
+                        }
+
+                        if let progress = progress {
+                            VStack(alignment: .leading, spacing: 4) {
+                                HStack {
+                                    Text(progress.phaseLabel)
+                                        .font(JazzTheme.caption())
+                                        .foregroundColor(JazzTheme.smokeGray)
+                                    Spacer()
+                                    Text("\(progress.current)/\(progress.total)")
+                                        .font(JazzTheme.caption())
+                                        .foregroundColor(JazzTheme.charcoal)
+                                }
+
+                                ProgressView(value: progress.progressFraction)
+                                    .tint(JazzTheme.burgundy)
+                            }
+                        }
+                    }
+                }
+            }
         }
         .formStyle(.grouped)
         .padding()
         .sheet(isPresented: $showingOnboarding) {
             MacOnboardingView(isPresented: $showingOnboarding)
         }
+        .task {
+            await loadQueueStatus()
+        }
+    }
+
+    private func loadQueueStatus() async {
+        if let status = await networkManager.fetchQueueStatus() {
+            queueSize = status.queueSize
+            workerActive = status.workerActive
+            currentSongName = status.currentSong?.songName
+            progress = status.progress
+        }
+        isLoadingQueue = false
+    }
+
+    private func refreshQueueStatus() async {
+        guard !isRefreshing else { return }
+
+        isRefreshing = true
+
+        if let status = await networkManager.fetchQueueStatus() {
+            queueSize = status.queueSize
+            workerActive = status.workerActive
+            currentSongName = status.currentSong?.songName
+            progress = status.progress
+        }
+
+        isRefreshing = false
     }
 }
 
