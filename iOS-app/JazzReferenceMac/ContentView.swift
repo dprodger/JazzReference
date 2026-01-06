@@ -319,7 +319,7 @@ struct GeneralSettingsView: View {
                         .disabled(isRefreshing)
                     }
 
-                    if workerActive && queueSize > 0 {
+                    if workerActive {
                         if let songName = currentSongName {
                             HStack {
                                 Text("Processing:")

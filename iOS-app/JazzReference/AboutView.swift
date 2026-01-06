@@ -129,7 +129,7 @@ struct AboutView: View {
                             }
                         }
 
-                        if workerActive && queueSize > 0 {
+                        if workerActive {
                             if let songName = currentSongName {
                                 Text("Processing: \(songName)")
                                     .font(JazzTheme.caption())
