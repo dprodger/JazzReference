@@ -110,19 +110,6 @@ struct RecordingsListView: View {
                 // Filter toolbar
                 filterToolbar
 
-                // Info banner
-                if networkManager.recordings.isEmpty && searchText.isEmpty {
-                    HStack {
-                        Image(systemName: "info.circle")
-                            .foregroundColor(JazzTheme.burgundy)
-                        Text("Search to browse \(networkManager.recordingsCount > 0 ? "\(networkManager.recordingsCount) " : "")recordings")
-                            .font(JazzTheme.subheadline())
-                        Spacer()
-                    }
-                    .padding()
-                    .background(JazzTheme.amber.opacity(0.15))
-                }
-
                 // Results count when filtered
                 if !networkManager.recordings.isEmpty && hasActiveFilters {
                     HStack {
@@ -209,9 +196,6 @@ struct RecordingsListView: View {
                     await networkManager.fetchRecordings(searchQuery: newValue)
                 }
             }
-        }
-        .task {
-            await networkManager.fetchRecordingsCount()
         }
     }
 
