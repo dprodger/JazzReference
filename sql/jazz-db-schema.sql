@@ -1724,6 +1724,9 @@ ALTER TABLE performers ADD COLUMN IF NOT EXISTS disambiguation VARCHAR(500);
 -- Add index for sort_name since it will be used for sorting
 CREATE INDEX IF NOT EXISTS idx_performers_sort_name ON performers(sort_name) WHERE sort_name IS NOT NULL;
 
+-- Expression index for sorting by COALESCE(sort_name, name) - used by /performers/index
+CREATE INDEX IF NOT EXISTS idx_performers_sort_order ON performers(COALESCE(sort_name, name));
+
 -- Add comments for documentation
 COMMENT ON COLUMN performers.sort_name IS 'MusicBrainz sort name for sorting (e.g., "Davis, Miles" for "Miles Davis")';
 COMMENT ON COLUMN performers.artist_type IS 'MusicBrainz artist type: Person, Group, Orchestra, Choir, Character, Other';
