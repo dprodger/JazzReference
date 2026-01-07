@@ -738,16 +738,16 @@ struct SongDetailView: View {
 
                         // Horizontal scroll of recordings in this group
                         ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(alignment: .top, spacing: 12) {
+                            HStack(alignment: .top, spacing: 16) {
                                 ForEach(group.recordings) { recording in
                                     RecordingCard(recording: recording, showArtistName: sortOrder == .year || group.groupKey == "More Recordings")
-                                        .frame(width: 300)
                                         .contentShape(Rectangle())
                                         .onTapGesture {
                                             selectedRecordingId = recording.id
                                         }
                                 }
                             }
+                            .padding(.horizontal, 4)
                         }
                     }
                 }
@@ -901,27 +901,61 @@ struct RecordingCard: View {
     var showArtistName: Bool = true
     @State private var isHovering = false
 
-    var body: some View {
-        HStack(spacing: 16) {
-            // Album art
-            AsyncImage(url: URL(string: recording.bestAlbumArtMedium ?? "")) { image in
-                image
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-            } placeholder: {
-                Rectangle()
-                    .fill(JazzTheme.cardBackground)
-                    .overlay {
-                        Image(systemName: "music.note")
-                            .font(.title)
-                            .foregroundColor(JazzTheme.smokeGray)
-                    }
-            }
-            .frame(width: 80, height: 80)
-            .cornerRadius(8)
+    private let artworkSize: CGFloat = 160
 
+    private var artistName: String {
+        if let artistCredit = recording.artistCredit, !artistCredit.isEmpty {
+            return artistCredit
+        }
+        if let performers = recording.performers {
+            if let leader = performers.first(where: { $0.role?.lowercased() == "leader" }) {
+                return leader.name
+            }
+            if let first = performers.first {
+                return first.name
+            }
+        }
+        return "Unknown Artist"
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // Album art with streaming button overlay
+            ZStack(alignment: .bottomTrailing) {
+                AsyncImage(url: URL(string: recording.bestAlbumArtLarge ?? recording.bestAlbumArtMedium ?? "")) { image in
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                } placeholder: {
+                    Rectangle()
+                        .fill(JazzTheme.cardBackground)
+                        .overlay {
+                            Image(systemName: "music.note")
+                                .font(.system(size: 40))
+                                .foregroundColor(JazzTheme.smokeGray)
+                        }
+                }
+                .frame(width: artworkSize, height: artworkSize)
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .shadow(color: .black.opacity(0.15), radius: 6, x: 0, y: 3)
+
+                // Streaming button overlay
+                StreamingButtons(recording: recording)
+                    .padding(8)
+            }
+
+            // Recording info below artwork
             VStack(alignment: .leading, spacing: 4) {
-                HStack {
+                // Artist name
+                if showArtistName {
+                    Text(artistName)
+                        .font(JazzTheme.subheadline(weight: .semibold))
+                        .foregroundColor(JazzTheme.brass)
+                        .lineLimit(1)
+                }
+
+                // Album title with optional canonical star
+                HStack(spacing: 4) {
                     if recording.isCanonical == true {
                         Image(systemName: "star.fill")
                             .foregroundColor(JazzTheme.gold)
@@ -929,53 +963,25 @@ struct RecordingCard: View {
                     }
 
                     Text(recording.albumTitle ?? "Unknown Album")
-                        .font(JazzTheme.headline())
+                        .font(JazzTheme.body(weight: .medium))
                         .foregroundColor(JazzTheme.charcoal)
-                        .lineLimit(1)
+                        .lineLimit(2)
                 }
 
-                // Performers (only show if showArtistName is true)
-                if showArtistName, let performers = recording.performers {
-                    let leaderNames = performers
-                        .filter { $0.role == "leader" }
-                        .map { $0.name }
-                        .joined(separator: ", ")
-
-                    if !leaderNames.isEmpty {
-                        Text(leaderNames)
-                            .font(JazzTheme.subheadline())
-                            .foregroundColor(JazzTheme.smokeGray)
-                            .lineLimit(1)
-                    }
-                }
-
-                HStack(spacing: 8) {
-                    if let year = recording.recordingYear {
-                        Text(String(year))
-                            .font(JazzTheme.caption())
-                            .foregroundColor(JazzTheme.smokeGray)
-                    }
-
-                    if let label = recording.label {
-                        Text("•")
-                            .foregroundColor(JazzTheme.smokeGray)
-                        Text(label)
-                            .font(JazzTheme.caption())
-                            .foregroundColor(JazzTheme.smokeGray)
-                    }
+                // Year
+                if let year = recording.recordingYear {
+                    Text(String(year))
+                        .font(JazzTheme.caption())
+                        .foregroundColor(JazzTheme.smokeGray)
                 }
             }
-
-            Spacer()
-
-            // Streaming buttons
-            StreamingButtons(recording: recording)
+            .frame(width: artworkSize, alignment: .leading)
         }
-        .padding()
-        .background(isHovering ? JazzTheme.cardBackground.opacity(0.7) : JazzTheme.cardBackground)
-        .cornerRadius(10)
+        .padding(12)
+        .background(isHovering ? JazzTheme.backgroundLight : JazzTheme.cardBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
         .overlay(
-            RoundedRectangle(cornerRadius: 10)
+            RoundedRectangle(cornerRadius: 12)
                 .stroke(isHovering ? JazzTheme.burgundy.opacity(0.5) : Color.clear, lineWidth: 2)
         )
         .onHover { hovering in
