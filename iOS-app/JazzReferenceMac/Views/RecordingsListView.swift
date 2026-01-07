@@ -327,17 +327,27 @@ struct RecordingRowView: View {
                     .font(JazzTheme.headline())
                     .foregroundColor(JazzTheme.charcoal)
                     .lineLimit(1)
+                    .help("Album: \(recording.albumTitle ?? "Unknown Album")")
 
                 if let songTitle = recording.songTitle {
                     Text(songTitle)
                         .font(JazzTheme.subheadline())
                         .foregroundColor(JazzTheme.smokeGray)
                         .lineLimit(1)
+                        .help("Song: \(songTitle)")
+                }
+
+                if let artistCredit = recording.artistCredit {
+                    Text(artistCredit)
+                        .font(JazzTheme.caption())
+                        .foregroundColor(JazzTheme.smokeGray)
+                        .lineLimit(1)
+                        .help("Artist: \(artistCredit)")
                 }
 
                 HStack(spacing: 4) {
                     if let year = recording.recordingYear {
-                        Text("\(year)")
+                        Text(String(year))
                             .font(JazzTheme.caption())
                             .foregroundColor(JazzTheme.smokeGray)
                     }

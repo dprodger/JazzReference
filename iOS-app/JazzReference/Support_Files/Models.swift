@@ -110,6 +110,11 @@ struct Recording: Codable, Identifiable {
     let bestCoverArtMedium: String?
     let bestCoverArtLarge: String?
 
+    // Album art (from /recordings search endpoint)
+    let albumArtSmall: String?
+    let albumArtMedium: String?
+    let albumArtLarge: String?
+
     // Back cover art (from Cover Art Archive via release_imagery)
     let backCoverArtSmall: String?
     let backCoverArtMedium: String?
@@ -118,7 +123,10 @@ struct Recording: Codable, Identifiable {
 
     // Best Spotify URL from releases (provided by API via subqueries)
     let bestSpotifyUrlFromRelease: String?
-    
+
+    // Direct Spotify URL (from /recordings search endpoint)
+    let spotifyUrl: String?
+
     let youtubeUrl: String?
     let appleMusicUrl: String?
     let musicbrainzId: String?
@@ -168,11 +176,15 @@ struct Recording: Codable, Identifiable {
         case bestCoverArtSmall = "best_cover_art_small"
         case bestCoverArtMedium = "best_cover_art_medium"
         case bestCoverArtLarge = "best_cover_art_large"
+        case albumArtSmall = "album_art_small"
+        case albumArtMedium = "album_art_medium"
+        case albumArtLarge = "album_art_large"
         case backCoverArtSmall = "back_cover_art_small"
         case backCoverArtMedium = "back_cover_art_medium"
         case backCoverArtLarge = "back_cover_art_large"
         case hasBackCover = "has_back_cover"
         case bestSpotifyUrlFromRelease = "best_spotify_url"
+        case spotifyUrl = "spotify_url"
         case youtubeUrl = "youtube_url"
         case appleMusicUrl = "apple_music_url"
         case isCanonical = "is_canonical"
@@ -247,7 +259,11 @@ struct Recording: Codable, Identifiable {
     
     /// Get the best Spotify track URL - only returns URLs for track-level matches
     var bestSpotifyUrl: String? {
-        // First try API-provided best URL (from song detail endpoint)
+        // First try direct spotify_url (from /recordings search endpoint)
+        if let directUrl = spotifyUrl {
+            return directUrl
+        }
+        // Then try API-provided best URL (from song detail endpoint)
         // This is already track-based (only set when spotify_track_id exists)
         if let apiUrl = bestSpotifyUrlFromRelease {
             return apiUrl
@@ -263,35 +279,45 @@ struct Recording: Codable, Identifiable {
     
     /// Get the best album art - prefer API-provided best, then check releases array
     var bestAlbumArtSmall: String? {
+        // First try direct album_art (from /recordings search endpoint)
+        if let directArt = albumArtSmall {
+            return directArt
+        }
+        // Then try API-provided best URL (from song detail endpoint)
         if let apiArt = bestCoverArtSmall {
             return apiArt
         }
+        // Then try sorted releases array (when viewing recording detail)
         if let release = sortedReleases?.first(where: { $0.spotifyAlbumId != nil && $0.coverArtSmall != nil }) {
             return release.coverArtSmall
         }
         // No album art available
         return nil
     }
-    
+
     var bestAlbumArtMedium: String? {
+        if let directArt = albumArtMedium {
+            return directArt
+        }
         if let apiArt = bestCoverArtMedium {
             return apiArt
         }
         if let release = sortedReleases?.first(where: { $0.spotifyAlbumId != nil && $0.coverArtMedium != nil }) {
             return release.coverArtMedium
         }
-        // No album art available
         return nil
     }
-    
+
     var bestAlbumArtLarge: String? {
+        if let directArt = albumArtLarge {
+            return directArt
+        }
         if let apiArt = bestCoverArtLarge {
             return apiArt
         }
         if let release = sortedReleases?.first(where: { $0.spotifyAlbumId != nil && $0.coverArtLarge != nil }) {
             return release.coverArtLarge
         }
-        // No album art available
         return nil
     }
 
