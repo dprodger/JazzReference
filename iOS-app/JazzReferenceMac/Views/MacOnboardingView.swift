@@ -92,7 +92,7 @@ struct MacOnboardingView: View {
             .padding(.vertical, 16)
             .background(JazzTheme.cardBackground)
         }
-        .frame(width: 600, height: 500)
+        .frame(width: 650, height: 580)
         .background(JazzTheme.backgroundLight)
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
