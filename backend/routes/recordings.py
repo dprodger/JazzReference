@@ -254,7 +254,21 @@ def get_recordings():
                     s.title as song_title,
                     s.composer,
                     -- Favorite count
-                    (SELECT COUNT(*) FROM recording_favorites rf WHERE rf.recording_id = r.id) as favorite_count
+                    (SELECT COUNT(*) FROM recording_favorites rf WHERE rf.recording_id = r.id) as favorite_count,
+                    -- Streaming availability flags
+                    EXISTS(SELECT 1 FROM recording_releases rr2
+                           WHERE rr2.recording_id = r.id AND rr2.spotify_track_id IS NOT NULL
+                    ) as has_spotify,
+                    EXISTS(SELECT 1 FROM recording_releases rr2
+                           JOIN recording_release_streaming_links rrsl ON rrsl.recording_release_id = rr2.id
+                           WHERE rr2.recording_id = r.id AND rrsl.service = 'apple_music'
+                    ) as has_apple_music,
+                    (
+                        EXISTS(SELECT 1 FROM recording_releases rr2
+                               JOIN recording_release_streaming_links rrsl ON rrsl.recording_release_id = rr2.id
+                               WHERE rr2.recording_id = r.id AND rrsl.service = 'youtube')
+                        OR r.youtube_url IS NOT NULL
+                    ) as has_youtube
                 FROM recordings r
                 JOIN songs s ON r.song_id = s.id
                 LEFT JOIN releases def_rel ON r.default_release_id = def_rel.id
@@ -307,7 +321,21 @@ def get_recordings():
                     s.title as song_title,
                     s.composer,
                     -- Favorite count
-                    (SELECT COUNT(*) FROM recording_favorites rf WHERE rf.recording_id = r.id) as favorite_count
+                    (SELECT COUNT(*) FROM recording_favorites rf WHERE rf.recording_id = r.id) as favorite_count,
+                    -- Streaming availability flags
+                    EXISTS(SELECT 1 FROM recording_releases rr2
+                           WHERE rr2.recording_id = r.id AND rr2.spotify_track_id IS NOT NULL
+                    ) as has_spotify,
+                    EXISTS(SELECT 1 FROM recording_releases rr2
+                           JOIN recording_release_streaming_links rrsl ON rrsl.recording_release_id = rr2.id
+                           WHERE rr2.recording_id = r.id AND rrsl.service = 'apple_music'
+                    ) as has_apple_music,
+                    (
+                        EXISTS(SELECT 1 FROM recording_releases rr2
+                               JOIN recording_release_streaming_links rrsl ON rrsl.recording_release_id = rr2.id
+                               WHERE rr2.recording_id = r.id AND rrsl.service = 'youtube')
+                        OR r.youtube_url IS NOT NULL
+                    ) as has_youtube
                 FROM recordings r
                 JOIN songs s ON r.song_id = s.id
                 LEFT JOIN releases def_rel ON r.default_release_id = def_rel.id
