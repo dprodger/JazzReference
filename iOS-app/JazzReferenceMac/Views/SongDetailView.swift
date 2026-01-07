@@ -135,9 +135,9 @@ struct SongDetailView: View {
 
                     Divider()
 
-                    // Recordings
-                    if let recordings = song.recordings, !recordings.isEmpty {
-                        recordingsSection(recordings)
+                    // Recordings - show section while loading or when we have recordings
+                    if isRecordingsLoading || (song.recordings != nil && !song.recordings!.isEmpty) {
+                        recordingsSection(song.recordings ?? [])
                     }
 
                     // Transcriptions
