@@ -18,8 +18,8 @@ struct JazzTheme {
     static let headingFontFamily = "Baskerville"
 
     /// Font family for body text (body, callout, subheadline, footnote, caption)
-    /// Options: "Baskerville", "Georgia", "Palatino", "Didot", "Cochin", "Charter"
-    static let bodyFontFamily = "Futura"
+    /// Options: "Baskerville", "Georgia", "Palatino", "Didot", "Cochin", "Charter", "Avenir", "Futura"
+    static let bodyFontFamily = "Avenir"
 
     // MARK: - Heading Fonts
 
