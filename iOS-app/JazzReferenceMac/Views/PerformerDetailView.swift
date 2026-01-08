@@ -427,7 +427,7 @@ struct PerformerDetailView: View {
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(alignment: .top, spacing: 16) {
                                 ForEach(group.recordings) { recording in
-                                    PerformerRecordingCard(recording: recording, showRole: sortOrder == .year)
+                                    PerformerRecordingCard(recording: recording)
                                         .contentShape(Rectangle())
                                         .onTapGesture {
                                             selectedRecordingId = recording.recordingId
@@ -557,7 +557,6 @@ struct PerformerDetailView: View {
 
 struct PerformerRecordingCard: View {
     let recording: PerformerRecording
-    var showRole: Bool = false
     @State private var isHovering = false
 
     private let artworkSize: CGFloat = 160
@@ -587,28 +586,16 @@ struct PerformerRecordingCard: View {
                 .clipShape(RoundedRectangle(cornerRadius: 10))
                 .shadow(color: .black.opacity(0.15), radius: 6, x: 0, y: 3)
 
-                // Badges
-                VStack(alignment: .trailing, spacing: 4) {
-                    if recording.isCanonical == true {
-                        Image(systemName: "star.fill")
-                            .foregroundColor(.yellow)
-                            .font(JazzTheme.caption())
-                            .padding(6)
-                            .background(Color.black.opacity(0.6))
-                            .clipShape(Circle())
-                    }
-
-                    if showRole, let role = recording.role {
-                        Text(role.capitalized)
-                            .font(.system(size: 9, weight: .semibold))
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 3)
-                            .background(role.lowercased() == "leader" ? JazzTheme.brass : JazzTheme.smokeGray)
-                            .cornerRadius(4)
-                    }
+                // Canonical badge
+                if recording.isCanonical == true {
+                    Image(systemName: "star.fill")
+                        .foregroundColor(.yellow)
+                        .font(JazzTheme.caption())
+                        .padding(6)
+                        .background(Color.black.opacity(0.6))
+                        .clipShape(Circle())
+                        .padding(6)
                 }
-                .padding(6)
             }
 
             // Song title
