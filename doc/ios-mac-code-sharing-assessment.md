@@ -14,7 +14,7 @@ Single Xcode project with multiple targets:
 - `MusicBrainzImporter` (share extension)
 
 ```
-iOS-app/
+apps/
 ├── JazzReference/           # iOS app source + shared files
 │   ├── Support_Files/       # Shared: Models, NetworkManager, JazzTheme
 │   ├── Auth/                # Shared managers, iOS-specific views

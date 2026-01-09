@@ -30,7 +30,7 @@ gunicorn -c gunicorn.conf.py app:app
 
 ### iOS App
 
-Open `iOS-app/JazzReference.xcodeproj` in Xcode. The app targets iOS and uses SwiftUI.
+Open `apps/Approach Note.xcodeproj` in Xcode. The app targets iOS and macOS, using SwiftUI.
 
 ## Architecture
 
@@ -70,7 +70,7 @@ backend/
 ### iOS App Structure
 
 ```
-iOS-app/JazzReference/
+apps/JazzReference/
 ├── JazzReferenceApp.swift    # App entry point, deep link handling
 ├── Support_Files/
 │   ├── NetworkManager.swift  # API client (async/await)

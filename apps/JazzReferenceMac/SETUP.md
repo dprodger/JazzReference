@@ -12,7 +12,7 @@ The macOS app shares code with the iOS app:
 
 ### Step 1: Open the Project in Xcode
 
-Open `iOS-app/JazzReference.xcodeproj` in Xcode.
+Open `apps/Approach Note.xcodeproj` in Xcode.
 
 ### Step 2: Add a New macOS App Target
 
@@ -152,7 +152,7 @@ Common issues and fixes:
 ## File Structure After Setup
 
 ```
-iOS-app/
+apps/
 ├── JazzReference/              # iOS app
 │   ├── Support_Files/          # Shared with macOS
 │   │   ├── Models.swift        # ✓ Both targets
@@ -179,7 +179,7 @@ iOS-app/
 │   ├── Assets.xcassets/
 │   ├── Info.plist
 │   └── JazzReferenceMac.entitlements
-└── JazzReference.xcodeproj
+└── Approach Note.xcodeproj
 ```
 
 ## Troubleshooting
