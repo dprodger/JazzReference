@@ -24,7 +24,6 @@ backend/scripts/cache
 !*.xcworkspace/contents.xcworkspacedata
 /*.gcno
 **/xcshareddata/WorkspaceSettings.xcsettings
-**/xcshareddata/
 
 xcuserdata
 xcuserdata/*

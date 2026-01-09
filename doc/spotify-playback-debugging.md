@@ -83,5 +83,5 @@ WHERE rel.spotify_album_url IS NOT NULL
 ## Related Files
 - `backend/routes/songs.py` - best_spotify_url subquery
 - `backend/spotify_matcher.py` - track matching logic
-- `apps/JazzReference/Support_Files/Models.swift` - bestSpotifyUrl computed property
-- `apps/JazzReference/RecordingDetailView.swift` - play button UI
+- `apps/iOS/Support_Files/Models.swift` - bestSpotifyUrl computed property
+- `apps/iOS/RecordingDetailView.swift` - play button UI

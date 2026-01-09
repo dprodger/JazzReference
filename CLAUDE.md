@@ -70,7 +70,7 @@ backend/
 ### iOS App Structure
 
 ```
-apps/JazzReference/
+apps/iOS/
 ├── JazzReferenceApp.swift    # App entry point, deep link handling
 ├── Support_Files/
 │   ├── NetworkManager.swift  # API client (async/await)

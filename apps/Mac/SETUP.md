@@ -1,6 +1,6 @@
-# JazzReferenceMac - Xcode Setup Instructions
+# Mac App - Xcode Setup Instructions
 
-This document explains how to add the macOS app target to your existing JazzReference Xcode project.
+This document explains how to add the macOS app target to your existing Xcode project.
 
 ## Overview
 
@@ -33,14 +33,14 @@ Open `apps/Approach Note.xcodeproj` in Xcode.
 ### Step 3: Delete Auto-Generated Files
 
 Xcode will create a default `JazzReferenceMac` folder with boilerplate files. Delete these:
-- Delete the auto-generated `JazzReferenceMac` folder from the project
+- Delete the auto-generated folder from the project
 - Keep the target, but we'll use our prepared files instead
 
-### Step 4: Add the Prepared JazzReferenceMac Folder
+### Step 4: Add the Prepared Mac Folder
 
 1. Right-click on the project root in the navigator
-2. Select **Add Files to "JazzReference"...**
-3. Navigate to the `JazzReferenceMac` folder we created
+2. Select **Add Files to "Approach Note"...**
+3. Navigate to the `Mac` folder we created
 4. Make sure:
    - **Copy items if needed** is UNCHECKED
    - **Create groups** is selected
@@ -51,7 +51,7 @@ Xcode will create a default `JazzReferenceMac` folder with boilerplate files. De
 
 These files from the iOS app need to be added to the macOS target:
 
-#### From `JazzReference/Support_Files/`:
+#### From `iOS/Support_Files/`:
 1. Select each file in Xcode's navigator
 2. In the **File Inspector** (right panel), under **Target Membership**
 3. Check the box for `JazzReferenceMac`
@@ -63,10 +63,10 @@ These files from the iOS app need to be added to the macOS target:
 - `HelperViews.swift` ✓
 - `PreviewHelpers.swift` ✓
 
-#### From `JazzReference/`:
+#### From `iOS/`:
 - `RepertoireManager.swift` ✓
 
-#### From `JazzReference/Auth/`:
+#### From `iOS/Auth/`:
 - `KeychainHelper.swift` ✓
 - `AuthenticationManager.swift` ✓ (needs modification - see below)
 - `Models/User.swift` ✓
@@ -119,8 +119,8 @@ Select the `JazzReferenceMac` target and configure:
    - Check **Hardened Runtime** if distributing
 
 3. **Build Settings:**
-   - Search for `INFOPLIST_FILE` and set to: `JazzReferenceMac/Info.plist`
-   - Search for `CODE_SIGN_ENTITLEMENTS` and set to: `JazzReferenceMac/JazzReferenceMac.entitlements`
+   - Search for `INFOPLIST_FILE` and set to: `Mac/Info.plist`
+   - Search for `CODE_SIGN_ENTITLEMENTS` and set to: `Mac/JazzReferenceMac.entitlements`
    - Search for `ASSETCATALOG_COMPILER_APPICON_NAME` and set to: `AppIcon`
 
 ### Step 8: Fix Any Compilation Errors
@@ -135,7 +135,7 @@ Common issues and fixes:
 
 ### Step 9: Add App Icon (Optional)
 
-1. Open `JazzReferenceMac/Assets.xcassets/AppIcon.appiconset`
+1. Open `Mac/Assets.xcassets/AppIcon.appiconset`
 2. Add your app icons at the required sizes:
    - 16x16 @1x and @2x
    - 32x32 @1x and @2x
@@ -153,7 +153,7 @@ Common issues and fixes:
 
 ```
 apps/
-├── JazzReference/              # iOS app
+├── iOS/              # iOS app
 │   ├── Support_Files/          # Shared with macOS
 │   │   ├── Models.swift        # ✓ Both targets
 │   │   ├── NetworkManager.swift # ✓ Both targets
@@ -166,7 +166,7 @@ apps/
 │   │   └── Models/User.swift   # ✓ Both targets
 │   ├── RepertoireManager.swift # ✓ Both targets
 │   └── ... (iOS-specific views)
-├── JazzReferenceMac/           # macOS app
+├── Mac/           # macOS app
 │   ├── JazzReferenceMacApp.swift
 │   ├── ContentView.swift
 │   ├── Views/

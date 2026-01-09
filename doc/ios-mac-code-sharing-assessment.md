@@ -15,11 +15,11 @@ Single Xcode project with multiple targets:
 
 ```
 apps/
-├── JazzReference/           # iOS app source + shared files
+├── iOS/                     # iOS app source + shared files
 │   ├── Support_Files/       # Shared: Models, NetworkManager, JazzTheme
 │   ├── Auth/                # Shared managers, iOS-specific views
 │   └── *.swift              # iOS views and managers
-├── JazzReferenceMac/        # Mac app source
+├── Mac/                     # Mac app source
 │   └── Views/               # Mac-specific views
 ├── Shared/                  # Currently empty (placeholder)
 └── MusicBrainzImporter/     # Share extension
@@ -182,7 +182,7 @@ If pursuing refactoring:
 
 ## File References
 
-**Shared Core (in `JazzReference/`):**
+**Shared Core (in `iOS/`):**
 - `Support_Files/Models.swift`
 - `Support_Files/NetworkManager.swift`
 - `Support_Files/JazzTheme.swift`
@@ -190,12 +190,12 @@ If pursuing refactoring:
 - `RepertoireManager.swift`
 - `FavoritesManager.swift`
 
-**iOS Views (in `JazzReference/`):**
+**iOS Views (in `iOS/`):**
 - `SongDetailView.swift`
 - `RecordingDetailView.swift`
 - `Auth/Views/LoginView.swift` (and other auth views)
 
-**Mac Views (in `JazzReferenceMac/Views/`):**
+**Mac Views (in `Mac/Views/`):**
 - `SongDetailView.swift`
 - `RecordingDetailView.swift`
 - `Auth/MacLoginView.swift` (and other auth views)
