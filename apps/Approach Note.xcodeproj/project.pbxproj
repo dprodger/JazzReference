@@ -105,12 +105,6 @@
 			);
 			target = B4C1603F2E91B03600EB8D2C /* Approach Note */;
 		};
-		B41D0FB92EE6343900DB427C /* Exceptions for "iOS" folder in "Approach Note Mac" target */ = {
-			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
-			membershipExceptions = (
-			);
-			target = B41D0F962EE6337400DB427C /* Approach Note Mac */;
-		};
 		B4911D382EB316F700326CA7 /* Exceptions for "MusicBrainzImporter" folder in "MusicBrainzImporter" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
@@ -144,7 +138,6 @@
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
 				B4147E552EB4FB2C004A16E7 /* Exceptions for "iOS" folder in "Approach Note" target */,
-				B41D0FB92EE6343900DB427C /* Exceptions for "iOS" folder in "Approach Note Mac" target */,
 			);
 			path = iOS;
 			sourceTree = "<group>";
@@ -200,18 +193,6 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		B42A1D802F10B00000DAC930 /* Auth */ = {
-			isa = PBXGroup;
-			children = (
-				B45A16A12F08800600259452 /* MacForgotPasswordView.swift */,
-				B45A16A22F08800600259452 /* MacLoginView.swift */,
-				B45A16A32F08800600259452 /* MacRegisterView.swift */,
-				B45A16A42F08800600259452 /* MacResetPasswordView.swift */,
-			);
-			name = Auth;
-			path = Mac/Auth;
-			sourceTree = "<group>";
-		};
 		B41D0FAD2EE633EE00DB427C /* Views */ = {
 			isa = PBXGroup;
 			children = (
@@ -231,17 +212,6 @@
 			path = Mac/Views;
 			sourceTree = "<group>";
 		};
-		B42A1D902F10D00000DAC930 /* App */ = {
-			isa = PBXGroup;
-			children = (
-				B41D0FA42EE633EE00DB427C /* Info.plist */,
-				B41D0FA52EE633EE00DB427C /* JazzReferenceMac.entitlements */,
-				B41D0FA62EE633EE00DB427C /* JazzReferenceMacApp.swift */,
-			);
-			name = App;
-			path = Mac/App;
-			sourceTree = "<group>";
-		};
 		B42A1D702F10A06C00DAC930 /* Mac */ = {
 			isa = PBXGroup;
 			children = (
@@ -251,6 +221,29 @@
 				B41D0FAD2EE633EE00DB427C /* Views */,
 			);
 			name = Mac;
+			sourceTree = "<group>";
+		};
+		B42A1D802F10B00000DAC930 /* Auth */ = {
+			isa = PBXGroup;
+			children = (
+				B45A16A12F08800600259452 /* MacForgotPasswordView.swift */,
+				B45A16A22F08800600259452 /* MacLoginView.swift */,
+				B45A16A32F08800600259452 /* MacRegisterView.swift */,
+				B45A16A42F08800600259452 /* MacResetPasswordView.swift */,
+			);
+			name = Auth;
+			path = Mac/Auth;
+			sourceTree = "<group>";
+		};
+		B42A1D902F10D00000DAC930 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				B41D0FA42EE633EE00DB427C /* Info.plist */,
+				B41D0FA52EE633EE00DB427C /* JazzReferenceMac.entitlements */,
+				B41D0FA62EE633EE00DB427C /* JazzReferenceMacApp.swift */,
+			);
+			name = App;
+			path = Mac/App;
 			sourceTree = "<group>";
 		};
 		B45A16A92F08802C00259452 /* Frameworks */ = {
