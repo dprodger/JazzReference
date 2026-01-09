@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 JazzReference is a reference application for jazz music study, consisting of:
 - **Backend**: Flask API (Python 3.13) serving data from PostgreSQL
-- **iOS App**: SwiftUI app for browsing jazz standards, performers, and recordings
+- **iOS/Mac Apps**: SwiftUI apps for browsing jazz standards, performers, and recordings
 
 The API is deployed at `https://api.approachnote.com`.
 
@@ -67,30 +67,48 @@ backend/
 - **Background Worker**: `research_queue` runs in-process thread for async data enrichment
 - **JWT Auth**: `auth_utils.py` provides `@token_required` decorator for protected endpoints
 
-### iOS App Structure
+### Apps Structure
+
+The `apps/` directory contains iOS, macOS, and shared code:
 
 ```
-apps/iOS/
-├── JazzReferenceApp.swift    # App entry point, deep link handling
-├── Support_Files/
-│   ├── NetworkManager.swift  # API client (async/await)
-│   ├── Models.swift          # Data models
-│   ├── PreviewHelpers.swift  # SwiftUI preview data (MUST update when Models.swift changes)
-│   └── JazzTheme.swift       # UI theming
-├── Auth/
-│   ├── AuthenticationManager.swift
-│   └── Views/                # Login, Register, ForgotPassword
-├── *ListView.swift           # List views (Songs, Artists, Recordings)
-├── *DetailView.swift         # Detail views
-└── RepertoireManager.swift   # User repertoire state
+apps/
+├── Shared/                      # Code shared between iOS and Mac
+│   ├── Auth/
+│   │   ├── AuthenticationManager.swift
+│   │   ├── KeychainHelper.swift
+│   │   └── Models/User.swift
+│   ├── Managers/
+│   │   ├── FavoritesManager.swift
+│   │   └── RepertoireManager.swift
+│   └── Support/
+│       ├── Models.swift         # Data models
+│       ├── NetworkManager.swift # API client (async/await)
+│       ├── JazzTheme.swift      # UI theming
+│       ├── HelperViews.swift
+│       └── PreviewHelpers.swift # SwiftUI preview data
+├── iOS/                         # iOS-specific code
+│   ├── App/
+│   │   └── JazzReferenceApp.swift
+│   ├── Auth/Views/              # iOS auth views
+│   ├── Components/              # Reusable UI components
+│   ├── Managers/                # iOS-only managers
+│   ├── Support/                 # iOS-only support (CachedAsyncImage, Toast)
+│   └── Views/                   # iOS views
+├── Mac/                         # macOS-specific code
+│   ├── App/
+│   │   └── JazzReferenceMacApp.swift
+│   ├── Auth/                    # Mac auth views
+│   └── Views/                   # Mac views
+└── MusicBrainzImporter/         # Share extension
 ```
 
-### iOS Model Changes Checklist
+### Model Changes Checklist
 
-When adding or modifying fields in `Models.swift`:
+When adding or modifying fields in `Shared/Support/Models.swift`:
 1. Update the struct definition with the new field
 2. Update the `CodingKeys` enum if the API field name differs
-3. **Update `PreviewHelpers.swift`** - add the new field to ALL preview instances of that model (e.g., `Recording.preview1`, `Recording.preview2`, `Recording.previewMinimal`)
+3. **Update `Shared/Support/PreviewHelpers.swift`** - add the new field to ALL preview instances of that model (e.g., `Recording.preview1`, `Recording.preview2`, `Recording.previewMinimal`)
 
 ### Database Schema
 

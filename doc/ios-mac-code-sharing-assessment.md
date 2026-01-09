@@ -1,6 +1,7 @@
 # iOS/Mac Code Sharing Assessment
 
 **Date:** 2026-01-03
+**Updated:** 2026-01-08
 
 This document assesses the current code sharing between the iOS and Mac apps and outlines strategies for potential refactoring.
 
@@ -9,33 +10,51 @@ This document assesses the current code sharing between the iOS and Mac apps and
 ### Project Structure
 
 Single Xcode project with multiple targets:
-- `Approach Note` (iOS app) - 44 Swift files
-- `Approach Note Mac` (macOS app) - 18 Swift files
+- `Approach Note` (iOS app)
+- `Approach Note Mac` (macOS app)
 - `MusicBrainzImporter` (share extension)
 
 ```
 apps/
-├── iOS/                     # iOS app source + shared files
-│   ├── Support_Files/       # Shared: Models, NetworkManager, JazzTheme
-│   ├── Auth/                # Shared managers, iOS-specific views
-│   └── *.swift              # iOS views and managers
-├── Mac/                     # Mac app source
-│   └── Views/               # Mac-specific views
-├── Shared/                  # Currently empty (placeholder)
+├── Shared/                  # Code shared between iOS and Mac
+│   ├── Auth/
+│   │   ├── AuthenticationManager.swift
+│   │   ├── KeychainHelper.swift
+│   │   └── Models/User.swift
+│   ├── Managers/
+│   │   ├── FavoritesManager.swift
+│   │   └── RepertoireManager.swift
+│   └── Support/
+│       ├── Models.swift
+│       ├── NetworkManager.swift
+│       ├── JazzTheme.swift
+│       ├── HelperViews.swift
+│       └── PreviewHelpers.swift
+├── iOS/                     # iOS-specific code
+│   ├── App/
+│   ├── Auth/Views/          # iOS auth views
+│   ├── Components/          # Reusable iOS UI components
+│   ├── Managers/            # iOS-only managers
+│   ├── Support/             # iOS-only (CachedAsyncImage, Toast)
+│   └── Views/
+├── Mac/                     # Mac-specific code
+│   ├── App/
+│   ├── Auth/                # Mac auth views
+│   └── Views/
 └── MusicBrainzImporter/     # Share extension
 ```
 
-### What's Already Shared
+### What's Shared (in `Shared/`)
 
 | File | Purpose |
 |------|---------|
-| `Models.swift` | All data structures (Song, Recording, Artist, etc.) |
-| `NetworkManager.swift` | API client with async/await |
-| `JazzTheme.swift` | Colors, fonts, styling constants |
-| `AuthenticationManager.swift` | JWT auth, login/register logic |
-| `KeychainHelper.swift` | Secure credential storage |
-| `RepertoireManager.swift` | Repertoire state management |
-| `FavoritesManager.swift` | Favorites management |
+| `Support/Models.swift` | All data structures (Song, Recording, Artist, etc.) |
+| `Support/NetworkManager.swift` | API client with async/await |
+| `Support/JazzTheme.swift` | Colors, fonts, styling constants |
+| `Auth/AuthenticationManager.swift` | JWT auth, login/register logic |
+| `Auth/KeychainHelper.swift` | Secure credential storage |
+| `Managers/RepertoireManager.swift` | Repertoire state management |
+| `Managers/FavoritesManager.swift` | Favorites management |
 
 ### What's Duplicated
 
@@ -118,7 +137,9 @@ struct LoginView: View {
 
 **Effort:** Medium | **Value:** High
 
-Populate the empty `Shared/` folder with reusable components:
+**Status:** Partially implemented - `Shared/` now contains core models, managers, and auth logic.
+
+Future candidates for shared components:
 
 - `CoverArtView` - Album art display with placeholder
 - `PerformerRow` - Artist list items
@@ -182,20 +203,24 @@ If pursuing refactoring:
 
 ## File References
 
-**Shared Core (in `iOS/`):**
-- `Support_Files/Models.swift`
-- `Support_Files/NetworkManager.swift`
-- `Support_Files/JazzTheme.swift`
+**Shared Code (in `Shared/`):**
+- `Support/Models.swift`
+- `Support/NetworkManager.swift`
+- `Support/JazzTheme.swift`
+- `Support/HelperViews.swift`
+- `Support/PreviewHelpers.swift`
 - `Auth/AuthenticationManager.swift`
-- `RepertoireManager.swift`
-- `FavoritesManager.swift`
+- `Auth/KeychainHelper.swift`
+- `Auth/Models/User.swift`
+- `Managers/RepertoireManager.swift`
+- `Managers/FavoritesManager.swift`
 
 **iOS Views (in `iOS/`):**
-- `SongDetailView.swift`
-- `RecordingDetailView.swift`
+- `Views/SongDetailView.swift`
+- `Views/RecordingDetailView.swift`
 - `Auth/Views/LoginView.swift` (and other auth views)
 
-**Mac Views (in `Mac/Views/`):**
-- `SongDetailView.swift`
-- `RecordingDetailView.swift`
+**Mac Views (in `Mac/`):**
+- `Views/SongDetailView.swift`
+- `Views/RecordingDetailView.swift`
 - `Auth/MacLoginView.swift` (and other auth views)

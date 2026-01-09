@@ -4,9 +4,9 @@ This document explains how to add the macOS app target to your existing Xcode pr
 
 ## Overview
 
-The macOS app shares code with the iOS app:
-- **Shared files** (add to both targets): Models, NetworkManager, JazzTheme, HelperViews, etc.
-- **macOS-specific files** (macOS target only): JazzReferenceMacApp.swift, ContentView.swift, Views/*
+The macOS app shares code with the iOS app via the `Shared/` directory:
+- **Shared files** (in `Shared/`): Models, NetworkManager, JazzTheme, AuthenticationManager, etc.
+- **macOS-specific files** (in `Mac/`): JazzReferenceMacApp.swift, Views/*, Auth/*
 
 ## Step-by-Step Setup
 
@@ -47,29 +47,21 @@ Xcode will create a default `JazzReferenceMac` folder with boilerplate files. De
    - **Add to targets**: Only check `JazzReferenceMac`
 5. Click **Add**
 
-### Step 5: Configure Shared Files (Critical!)
+### Step 5: Configure Shared Files
 
-These files from the iOS app need to be added to the macOS target:
+Shared files are now in the `Shared/` directory and automatically included in both targets via Xcode's synchronized groups. No manual configuration needed.
 
-#### From `iOS/Support_Files/`:
-1. Select each file in Xcode's navigator
-2. In the **File Inspector** (right panel), under **Target Membership**
-3. Check the box for `JazzReferenceMac`
-
-**Files to share:**
-- `Models.swift` ✓
-- `NetworkManager.swift` ✓
-- `JazzTheme.swift` ✓
-- `HelperViews.swift` ✓
-- `PreviewHelpers.swift` ✓
-
-#### From `iOS/`:
-- `RepertoireManager.swift` ✓
-
-#### From `iOS/Auth/`:
-- `KeychainHelper.swift` ✓
-- `AuthenticationManager.swift` ✓ (needs modification - see below)
-- `Models/User.swift` ✓
+The shared files include:
+- `Shared/Support/Models.swift`
+- `Shared/Support/NetworkManager.swift`
+- `Shared/Support/JazzTheme.swift`
+- `Shared/Support/HelperViews.swift`
+- `Shared/Support/PreviewHelpers.swift`
+- `Shared/Auth/AuthenticationManager.swift`
+- `Shared/Auth/KeychainHelper.swift`
+- `Shared/Auth/Models/User.swift`
+- `Shared/Managers/FavoritesManager.swift`
+- `Shared/Managers/RepertoireManager.swift`
 
 ### Step 6: Handle Platform-Specific Code
 
@@ -119,8 +111,8 @@ Select the `JazzReferenceMac` target and configure:
    - Check **Hardened Runtime** if distributing
 
 3. **Build Settings:**
-   - Search for `INFOPLIST_FILE` and set to: `Mac/Info.plist`
-   - Search for `CODE_SIGN_ENTITLEMENTS` and set to: `Mac/JazzReferenceMac.entitlements`
+   - Search for `INFOPLIST_FILE` and set to: `Mac/App/Info.plist`
+   - Search for `CODE_SIGN_ENTITLEMENTS` and set to: `Mac/App/JazzReferenceMac.entitlements`
    - Search for `ASSETCATALOG_COMPILER_APPICON_NAME` and set to: `AppIcon`
 
 ### Step 8: Fix Any Compilation Errors
@@ -153,32 +145,42 @@ Common issues and fixes:
 
 ```
 apps/
-├── iOS/              # iOS app
-│   ├── Support_Files/          # Shared with macOS
-│   │   ├── Models.swift        # ✓ Both targets
-│   │   ├── NetworkManager.swift # ✓ Both targets
-│   │   ├── JazzTheme.swift     # ✓ Both targets
-│   │   ├── HelperViews.swift   # ✓ Both targets
-│   │   └── CachedAsyncImage.swift # iOS only
+├── Shared/                      # Shared between iOS and Mac
 │   ├── Auth/
-│   │   ├── AuthenticationManager.swift # ✓ Both (with #if)
-│   │   ├── KeychainHelper.swift # ✓ Both targets
-│   │   └── Models/User.swift   # ✓ Both targets
-│   ├── RepertoireManager.swift # ✓ Both targets
-│   └── ... (iOS-specific views)
-├── Mac/           # macOS app
-│   ├── JazzReferenceMacApp.swift
-│   ├── ContentView.swift
-│   ├── Views/
-│   │   ├── SongsListView.swift
-│   │   ├── ArtistsListView.swift
-│   │   ├── RecordingsListView.swift
-│   │   ├── SongDetailView.swift
-│   │   ├── PerformerDetailView.swift
-│   │   └── RecordingDetailView.swift
+│   │   ├── AuthenticationManager.swift
+│   │   ├── KeychainHelper.swift
+│   │   └── Models/User.swift
+│   ├── Managers/
+│   │   ├── FavoritesManager.swift
+│   │   └── RepertoireManager.swift
+│   └── Support/
+│       ├── Models.swift
+│       ├── NetworkManager.swift
+│       ├── JazzTheme.swift
+│       ├── HelperViews.swift
+│       └── PreviewHelpers.swift
+├── iOS/                         # iOS-specific
+│   ├── App/
+│   ├── Auth/Views/
+│   ├── Components/
+│   ├── Managers/
+│   ├── Support/                 # iOS-only (CachedAsyncImage, Toast)
+│   └── Views/
+├── Mac/                         # macOS-specific
+│   ├── App/
+│   │   ├── Info.plist
+│   │   ├── JazzReferenceMac.entitlements
+│   │   └── JazzReferenceMacApp.swift
+│   ├── Auth/                    # Mac auth views
 │   ├── Assets.xcassets/
-│   ├── Info.plist
-│   └── JazzReferenceMac.entitlements
+│   └── Views/
+│       ├── ContentView.swift
+│       ├── SongsListView.swift
+│       ├── ArtistsListView.swift
+│       ├── RecordingsListView.swift
+│       ├── SongDetailView.swift
+│       ├── PerformerDetailView.swift
+│       └── RecordingDetailView.swift
 └── Approach Note.xcodeproj
 ```
 
