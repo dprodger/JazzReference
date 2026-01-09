@@ -667,5 +667,6 @@ struct RecordingPickerView: View {
             onSuccess: { print("Success") },
             onCancel: { print("Cancel") }
         )
+        .environmentObject(AuthenticationManager())
     }
 }

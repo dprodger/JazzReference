@@ -66,4 +66,6 @@ struct ContentView: View {
 #Preview {
     ContentView()
         .environmentObject(AuthenticationManager())
+        .environmentObject(RepertoireManager())
+        .environmentObject(FavoritesManager())
 }

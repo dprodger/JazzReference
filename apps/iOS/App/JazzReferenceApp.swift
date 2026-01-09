@@ -31,7 +31,18 @@ struct JazzReferenceApp: App {
         // Configure navigation bar fonts from JazzTheme
         JazzTheme.configureNavigationBarAppearance()
 
-        // Restore previous Google Sign-In session
+        // Restore previous Google Sign-In session (skip in previews)
+        #if DEBUG
+        if ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] != "1" {
+            GIDSignIn.sharedInstance.restorePreviousSignIn { user, error in
+                if error != nil || user == nil {
+                    // User is not signed in
+                } else {
+                    // User is signed in
+                }
+            }
+        }
+        #else
         GIDSignIn.sharedInstance.restorePreviousSignIn { user, error in
             if error != nil || user == nil {
                 // User is not signed in
@@ -39,6 +50,7 @@ struct JazzReferenceApp: App {
                 // User is signed in
             }
         }
+        #endif
     }
     
     var body: some Scene {
