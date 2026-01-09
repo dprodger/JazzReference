@@ -108,16 +108,6 @@
 		B41D0FB92EE6343900DB427C /* Exceptions for "iOS" folder in "Approach Note Mac" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
-				Auth/AuthenticationManager.swift,
-				Auth/KeychainHelper.swift,
-				Auth/Models/User.swift,
-				Managers/FavoritesManager.swift,
-				Managers/RepertoireManager.swift,
-				Support/HelperViews.swift,
-				Support/JazzTheme.swift,
-				Support/Models.swift,
-				Support/NetworkManager.swift,
-				Support/PreviewHelpers.swift,
 			);
 			target = B41D0F962EE6337400DB427C /* Approach Note Mac */;
 		};
@@ -157,6 +147,11 @@
 				B41D0FB92EE6343900DB427C /* Exceptions for "iOS" folder in "Approach Note Mac" target */,
 			);
 			path = iOS;
+			sourceTree = "<group>";
+		};
+		B4SHARED012F10C00000000001 /* Shared */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Shared;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -213,6 +208,7 @@
 				B45A16A32F08800600259452 /* MacRegisterView.swift */,
 				B45A16A42F08800600259452 /* MacResetPasswordView.swift */,
 			);
+			name = Auth;
 			path = Mac/Auth;
 			sourceTree = "<group>";
 		};
@@ -231,6 +227,7 @@
 				B41D0FAB2EE633EE00DB427C /* SongDetailView.swift */,
 				B41D0FAC2EE633EE00DB427C /* SongsListView.swift */,
 			);
+			name = Views;
 			path = Mac/Views;
 			sourceTree = "<group>";
 		};
@@ -259,6 +256,7 @@
 			children = (
 				B42A1D702F10A06C00DAC930 /* Mac */,
 				B4C160422E91B03600EB8D2C /* iOS */,
+				B4SHARED012F10C00000000001 /* Shared */,
 				B4911D2B2EB316F600326CA7 /* MusicBrainzImporter */,
 				B45A16A92F08802C00259452 /* Frameworks */,
 				B4C160412E91B03600EB8D2C /* Products */,
@@ -291,6 +289,9 @@
 			buildRules = (
 			);
 			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				B4SHARED012F10C00000000001 /* Shared */,
 			);
 			name = "Approach Note Mac";
 			packageProductDependencies = (
@@ -339,6 +340,7 @@
 			);
 			fileSystemSynchronizedGroups = (
 				B4C160422E91B03600EB8D2C /* iOS */,
+				B4SHARED012F10C00000000001 /* Shared */,
 			);
 			name = "Approach Note";
 			packageProductDependencies = (
