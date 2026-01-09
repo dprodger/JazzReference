@@ -73,10 +73,10 @@
 /* Begin PBXFileReference section */
 		B41D0F972EE6337400DB427C /* Approach Note.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Approach Note.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		B41D0FA22EE633EE00DB427C /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Assets.xcassets; path = Mac/Assets.xcassets; sourceTree = "<group>"; };
-		B41D0FA32EE633EE00DB427C /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ContentView.swift; path = Mac/ContentView.swift; sourceTree = "<group>"; };
-		B41D0FA42EE633EE00DB427C /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = Info.plist; path = Mac/Info.plist; sourceTree = "<group>"; };
-		B41D0FA52EE633EE00DB427C /* JazzReferenceMac.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; name = JazzReferenceMac.entitlements; path = Mac/JazzReferenceMac.entitlements; sourceTree = "<group>"; };
-		B41D0FA62EE633EE00DB427C /* JazzReferenceMacApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = JazzReferenceMacApp.swift; path = Mac/JazzReferenceMacApp.swift; sourceTree = "<group>"; };
+		B41D0FA32EE633EE00DB427C /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		B41D0FA42EE633EE00DB427C /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = Info.plist; path = Mac/App/Info.plist; sourceTree = "<group>"; };
+		B41D0FA52EE633EE00DB427C /* JazzReferenceMac.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; name = JazzReferenceMac.entitlements; path = Mac/App/JazzReferenceMac.entitlements; sourceTree = "<group>"; };
+		B41D0FA62EE633EE00DB427C /* JazzReferenceMacApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = JazzReferenceMacApp.swift; path = Mac/App/JazzReferenceMacApp.swift; sourceTree = "<group>"; };
 		B41D0FA72EE633EE00DB427C /* ArtistsListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArtistsListView.swift; sourceTree = "<group>"; };
 		B41D0FA82EE633EE00DB427C /* PerformerDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerformerDetailView.swift; sourceTree = "<group>"; };
 		B41D0FA92EE633EE00DB427C /* RecordingDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingDetailView.swift; sourceTree = "<group>"; };
@@ -205,17 +205,25 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		B41D0FAD2EE633EE00DB427C /* Views */ = {
+		B42A1D802F10B00000DAC930 /* Auth */ = {
 			isa = PBXGroup;
 			children = (
-				B4D3BAB02F0D7983007CB0DD /* MacSearchBar.swift */,
-				B42E87D32F09B5F20012F32C /* MacOnboardingView.swift */,
-				B45A16AE2F08876C00259452 /* MacAddToRepertoireSheet.swift */,
-				B45A16AF2F08876C00259452 /* MacCreateRepertoireView.swift */,
 				B45A16A12F08800600259452 /* MacForgotPasswordView.swift */,
 				B45A16A22F08800600259452 /* MacLoginView.swift */,
 				B45A16A32F08800600259452 /* MacRegisterView.swift */,
 				B45A16A42F08800600259452 /* MacResetPasswordView.swift */,
+			);
+			path = Mac/Auth;
+			sourceTree = "<group>";
+		};
+		B41D0FAD2EE633EE00DB427C /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				B41D0FA32EE633EE00DB427C /* ContentView.swift */,
+				B4D3BAB02F0D7983007CB0DD /* MacSearchBar.swift */,
+				B42E87D32F09B5F20012F32C /* MacOnboardingView.swift */,
+				B45A16AE2F08876C00259452 /* MacAddToRepertoireSheet.swift */,
+				B45A16AF2F08876C00259452 /* MacCreateRepertoireView.swift */,
 				B41D0FA72EE633EE00DB427C /* ArtistsListView.swift */,
 				B41D0FA82EE633EE00DB427C /* PerformerDetailView.swift */,
 				B41D0FA92EE633EE00DB427C /* RecordingDetailView.swift */,
@@ -223,7 +231,6 @@
 				B41D0FAB2EE633EE00DB427C /* SongDetailView.swift */,
 				B41D0FAC2EE633EE00DB427C /* SongsListView.swift */,
 			);
-			name = Views;
 			path = Mac/Views;
 			sourceTree = "<group>";
 		};
@@ -231,7 +238,7 @@
 			isa = PBXGroup;
 			children = (
 				B41D0FA22EE633EE00DB427C /* Assets.xcassets */,
-				B41D0FA32EE633EE00DB427C /* ContentView.swift */,
+				B42A1D802F10B00000DAC930 /* Auth */,
 				B41D0FA42EE633EE00DB427C /* Info.plist */,
 				B41D0FA52EE633EE00DB427C /* JazzReferenceMac.entitlements */,
 				B41D0FA62EE633EE00DB427C /* JazzReferenceMacApp.swift */,
@@ -557,7 +564,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				AUTOMATION_APPLE_EVENTS = NO;
-				CODE_SIGN_ENTITLEMENTS = Mac/JazzReferenceMac.entitlements;
+				CODE_SIGN_ENTITLEMENTS = Mac/App/JazzReferenceMac.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
@@ -574,7 +581,7 @@
 				ENABLE_RESOURCE_ACCESS_PHOTO_LIBRARY = NO;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = Mac/Info.plist;
+				INFOPLIST_FILE = Mac/App/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Approach Note";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.music";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
@@ -610,7 +617,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				AUTOMATION_APPLE_EVENTS = NO;
-				CODE_SIGN_ENTITLEMENTS = Mac/JazzReferenceMac.entitlements;
+				CODE_SIGN_ENTITLEMENTS = Mac/App/JazzReferenceMac.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
@@ -627,7 +634,7 @@
 				ENABLE_RESOURCE_ACCESS_PHOTO_LIBRARY = NO;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = Mac/Info.plist;
+				INFOPLIST_FILE = Mac/App/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Approach Note";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.music";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
