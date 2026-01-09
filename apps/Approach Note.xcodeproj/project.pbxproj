@@ -98,14 +98,14 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		B4147E552EB4FB2C004A16E7 /* Exceptions for "JazzReference" folder in "Approach Note" target */ = {
+		B4147E552EB4FB2C004A16E7 /* Exceptions for "iOS" folder in "Approach Note" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
 			);
 			target = B4C1603F2E91B03600EB8D2C /* Approach Note */;
 		};
-		B41D0FB92EE6343900DB427C /* Exceptions for "JazzReference" folder in "Approach Note Mac" target */ = {
+		B41D0FB92EE6343900DB427C /* Exceptions for "iOS" folder in "Approach Note Mac" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Auth/AuthenticationManager.swift,
@@ -150,23 +150,13 @@
 			path = MusicBrainzImporter;
 			sourceTree = "<group>";
 		};
-		B4C160422E91B03600EB8D2C /* JazzReference */ = {
+		B4C160422E91B03600EB8D2C /* iOS */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				B4147E552EB4FB2C004A16E7 /* Exceptions for "JazzReference" folder in "Approach Note" target */,
-				B41D0FB92EE6343900DB427C /* Exceptions for "JazzReference" folder in "Approach Note Mac" target */,
+				B4147E552EB4FB2C004A16E7 /* Exceptions for "iOS" folder in "Approach Note" target */,
+				B41D0FB92EE6343900DB427C /* Exceptions for "iOS" folder in "Approach Note Mac" target */,
 			);
 			path = iOS;
-			sourceTree = "<group>";
-		};
-		B4C160502E91B03700EB8D2C /* JazzReferenceTests */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = JazzReferenceTests;
-			sourceTree = "<group>";
-		};
-		B4C1605A2E91B03700EB8D2C /* JazzReferenceUITests */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = JazzReferenceUITests;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -253,9 +243,7 @@
 				B41D0FA52EE633EE00DB427C /* JazzReferenceMac.entitlements */,
 				B41D0FA62EE633EE00DB427C /* JazzReferenceMacApp.swift */,
 				B41D0FAD2EE633EE00DB427C /* Views */,
-				B4C160422E91B03600EB8D2C /* JazzReference */,
-				B4C160502E91B03700EB8D2C /* JazzReferenceTests */,
-				B4C1605A2E91B03700EB8D2C /* JazzReferenceUITests */,
+				B4C160422E91B03600EB8D2C /* iOS */,
 				B4911D2B2EB316F600326CA7 /* MusicBrainzImporter */,
 				B45A16A92F08802C00259452 /* Frameworks */,
 				B4C160412E91B03600EB8D2C /* Products */,
@@ -335,7 +323,7 @@
 				B4EE328E2EB3F95000C643D1 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
-				B4C160422E91B03600EB8D2C /* JazzReference */,
+				B4C160422E91B03600EB8D2C /* iOS */,
 			);
 			name = "Approach Note";
 			packageProductDependencies = (
@@ -360,9 +348,6 @@
 			dependencies = (
 				B4C1604F2E91B03700EB8D2C /* PBXTargetDependency */,
 			);
-			fileSystemSynchronizedGroups = (
-				B4C160502E91B03700EB8D2C /* JazzReferenceTests */,
-			);
 			name = JazzReferenceTests;
 			packageProductDependencies = (
 			);
@@ -382,9 +367,6 @@
 			);
 			dependencies = (
 				B4C160592E91B03700EB8D2C /* PBXTargetDependency */,
-			);
-			fileSystemSynchronizedGroups = (
-				B4C1605A2E91B03700EB8D2C /* JazzReferenceUITests */,
 			);
 			name = JazzReferenceUITests;
 			packageProductDependencies = (
