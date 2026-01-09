@@ -227,6 +227,19 @@
 			path = Mac/Views;
 			sourceTree = "<group>";
 		};
+		B42A1D702F10A06C00DAC930 /* Mac */ = {
+			isa = PBXGroup;
+			children = (
+				B41D0FA22EE633EE00DB427C /* Assets.xcassets */,
+				B41D0FA32EE633EE00DB427C /* ContentView.swift */,
+				B41D0FA42EE633EE00DB427C /* Info.plist */,
+				B41D0FA52EE633EE00DB427C /* JazzReferenceMac.entitlements */,
+				B41D0FA62EE633EE00DB427C /* JazzReferenceMacApp.swift */,
+				B41D0FAD2EE633EE00DB427C /* Views */,
+			);
+			name = Mac;
+			sourceTree = "<group>";
+		};
 		B45A16A92F08802C00259452 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
@@ -237,12 +250,7 @@
 		B4C160372E91B03600EB8D2C = {
 			isa = PBXGroup;
 			children = (
-				B41D0FA22EE633EE00DB427C /* Assets.xcassets */,
-				B41D0FA32EE633EE00DB427C /* ContentView.swift */,
-				B41D0FA42EE633EE00DB427C /* Info.plist */,
-				B41D0FA52EE633EE00DB427C /* JazzReferenceMac.entitlements */,
-				B41D0FA62EE633EE00DB427C /* JazzReferenceMacApp.swift */,
-				B41D0FAD2EE633EE00DB427C /* Views */,
+				B42A1D702F10A06C00DAC930 /* Mac */,
 				B4C160422E91B03600EB8D2C /* iOS */,
 				B4911D2B2EB316F600326CA7 /* MusicBrainzImporter */,
 				B45A16A92F08802C00259452 /* Frameworks */,
