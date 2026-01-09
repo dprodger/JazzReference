@@ -74,9 +74,9 @@
 		B41D0F972EE6337400DB427C /* Approach Note.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Approach Note.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		B41D0FA22EE633EE00DB427C /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Assets.xcassets; path = Mac/Assets.xcassets; sourceTree = "<group>"; };
 		B41D0FA32EE633EE00DB427C /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
-		B41D0FA42EE633EE00DB427C /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = Info.plist; path = Mac/App/Info.plist; sourceTree = "<group>"; };
-		B41D0FA52EE633EE00DB427C /* JazzReferenceMac.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; name = JazzReferenceMac.entitlements; path = Mac/App/JazzReferenceMac.entitlements; sourceTree = "<group>"; };
-		B41D0FA62EE633EE00DB427C /* JazzReferenceMacApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = JazzReferenceMacApp.swift; path = Mac/App/JazzReferenceMacApp.swift; sourceTree = "<group>"; };
+		B41D0FA42EE633EE00DB427C /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		B41D0FA52EE633EE00DB427C /* JazzReferenceMac.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = JazzReferenceMac.entitlements; sourceTree = "<group>"; };
+		B41D0FA62EE633EE00DB427C /* JazzReferenceMacApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JazzReferenceMacApp.swift; sourceTree = "<group>"; };
 		B41D0FA72EE633EE00DB427C /* ArtistsListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArtistsListView.swift; sourceTree = "<group>"; };
 		B41D0FA82EE633EE00DB427C /* PerformerDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerformerDetailView.swift; sourceTree = "<group>"; };
 		B41D0FA92EE633EE00DB427C /* RecordingDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingDetailView.swift; sourceTree = "<group>"; };
@@ -231,14 +231,23 @@
 			path = Mac/Views;
 			sourceTree = "<group>";
 		};
-		B42A1D702F10A06C00DAC930 /* Mac */ = {
+		B42A1D902F10D00000DAC930 /* App */ = {
 			isa = PBXGroup;
 			children = (
-				B41D0FA22EE633EE00DB427C /* Assets.xcassets */,
-				B42A1D802F10B00000DAC930 /* Auth */,
 				B41D0FA42EE633EE00DB427C /* Info.plist */,
 				B41D0FA52EE633EE00DB427C /* JazzReferenceMac.entitlements */,
 				B41D0FA62EE633EE00DB427C /* JazzReferenceMacApp.swift */,
+			);
+			name = App;
+			path = Mac/App;
+			sourceTree = "<group>";
+		};
+		B42A1D702F10A06C00DAC930 /* Mac */ = {
+			isa = PBXGroup;
+			children = (
+				B42A1D902F10D00000DAC930 /* App */,
+				B41D0FA22EE633EE00DB427C /* Assets.xcassets */,
+				B42A1D802F10B00000DAC930 /* Auth */,
 				B41D0FAD2EE633EE00DB427C /* Views */,
 			);
 			name = Mac;
