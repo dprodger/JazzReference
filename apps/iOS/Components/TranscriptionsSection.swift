@@ -166,3 +166,21 @@ struct TranscriptionPlayerSheet: View {
         }
     }
 }
+
+// MARK: - Previews
+
+#Preview("Transcriptions Section") {
+    ScrollView {
+        TranscriptionsSection(transcriptions: [.preview1, .preview2])
+    }
+}
+
+#Preview("Empty Section") {
+    ScrollView {
+        TranscriptionsSection(transcriptions: [])
+    }
+}
+
+#Preview("Player Sheet") {
+    TranscriptionPlayerSheet(transcription: .preview1)
+}

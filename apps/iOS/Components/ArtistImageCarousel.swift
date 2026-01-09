@@ -271,7 +271,7 @@ private struct ImageDetailSheet: View {
 private struct InfoRow: View {
     let title: String
     let value: String
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title)
@@ -284,3 +284,39 @@ private struct InfoRow: View {
     }
 }
 
+// MARK: - Previews
+
+#Preview("Image Carousel") {
+    ArtistImageCarousel(images: [
+        ArtistImage(
+            id: "1",
+            url: "https://picsum.photos/id/453/440/599",
+            source: "wikimedia",
+            sourceIdentifier: "Miles_Davis_by_Palumbo.jpg",
+            licenseType: "cc-by-sa",
+            licenseUrl: "https://creativecommons.org/licenses/by-sa/2.0",
+            attribution: "Tom Palumbo, CC BY-SA 2.0",
+            width: 440,
+            height: 599,
+            thumbnailUrl: "https://picsum.photos/id/453/220/300",
+            sourcePageUrl: "https://commons.wikimedia.org/wiki/File:Miles_Davis_by_Palumbo.jpg"
+        ),
+        ArtistImage(
+            id: "2",
+            url: "https://picsum.photos/id/454/440/594",
+            source: "wikimedia",
+            sourceIdentifier: "John_Coltrane_1963.jpg",
+            licenseType: "public-domain",
+            licenseUrl: nil,
+            attribution: "Hugo van Gelderen / Anefo, Public Domain",
+            width: 440,
+            height: 594,
+            thumbnailUrl: "https://picsum.photos/id/454/220/297",
+            sourcePageUrl: "https://commons.wikimedia.org/wiki/File:John_Coltrane_1963.jpg"
+        )
+    ])
+}
+
+#Preview("Empty Carousel") {
+    ArtistImageCarousel(images: [])
+}

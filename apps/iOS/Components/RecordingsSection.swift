@@ -487,3 +487,32 @@ struct FilterChip: View {
         .cornerRadius(16)
     }
 }
+
+// MARK: - Previews
+
+#Preview("Recordings Section") {
+    struct PreviewWrapper: View {
+        @State private var sortOrder: RecordingSortOrder = .year
+
+        var body: some View {
+            NavigationStack {
+                ScrollView {
+                    RecordingsSection(
+                        recordings: [.preview1, .preview2, .previewMinimal],
+                        recordingSortOrder: $sortOrder
+                    )
+                }
+            }
+        }
+    }
+    return PreviewWrapper()
+}
+
+#Preview("Filter Chips") {
+    VStack(spacing: 12) {
+        FilterChip(label: "Playable", icon: "play.circle", iconColor: JazzTheme.burgundy) {}
+        FilterChip(label: "Spotify", icon: "music.note.list", iconColor: .green) {}
+        FilterChip(label: "Piano", icon: nil) {}
+    }
+    .padding()
+}

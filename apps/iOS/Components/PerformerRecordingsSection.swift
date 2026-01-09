@@ -381,3 +381,43 @@ struct PerformerRecordingCardView: View {
         .frame(width: 150)
     }
 }
+
+// MARK: - Previews
+
+#Preview("Performer Recordings") {
+    struct PreviewWrapper: View {
+        @State private var sortOrder: PerformerRecordingSortOrder = .year
+        @State private var filter: RecordingFilter = .all
+
+        var body: some View {
+            NavigationStack {
+                ScrollView {
+                    PerformerRecordingsSection(
+                        recordings: PerformerDetail.preview.recordings ?? [],
+                        performerName: "Miles Davis",
+                        sortOrder: $sortOrder,
+                        selectedFilter: $filter
+                    )
+                }
+            }
+            .environmentObject(FavoritesManager())
+        }
+    }
+    return PreviewWrapper()
+}
+
+#Preview("Recording Card") {
+    PerformerRecordingCardView(
+        recording: (PerformerDetail.preview.recordings ?? [])[0],
+        showRole: true
+    )
+    .padding()
+}
+
+#Preview("Recording Card - No Art") {
+    PerformerRecordingCardView(
+        recording: (PerformerDetail.preview.recordings ?? [])[2],
+        showRole: false
+    )
+    .padding()
+}

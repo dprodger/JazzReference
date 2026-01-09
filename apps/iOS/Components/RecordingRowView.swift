@@ -216,3 +216,35 @@ struct CompactAuthorityBadge: View {
         }
     }
 }
+
+// MARK: - Previews
+
+#Preview("With Album Art") {
+    RecordingRowView(recording: .preview1)
+        .padding()
+}
+
+#Preview("With Artist Name") {
+    RecordingRowView(recording: .preview1, showArtistName: true)
+        .padding()
+}
+
+#Preview("No Back Cover") {
+    RecordingRowView(recording: .preview2)
+        .padding()
+}
+
+#Preview("Minimal") {
+    RecordingRowView(recording: .previewMinimal)
+        .padding()
+}
+
+#Preview("Authority Badge") {
+    VStack(spacing: 12) {
+        CompactAuthorityBadge(text: "JS", source: "jazzstandards.com")
+        CompactAuthorityBadge(text: "AM", source: "allmusic")
+        CompactAuthorityBadge(text: "DC", source: "discogs")
+        CompactAuthorityBadge(text: "??", source: nil)
+    }
+    .padding()
+}

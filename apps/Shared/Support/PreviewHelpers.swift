@@ -69,15 +69,17 @@ extension Recording {
         recordingYear: 1959,
         label: "Columbia Records",
         defaultReleaseId: "blah",
-        bestCoverArtSmall: "https://open.spotify.com/image/foo_small.jpg",
-        bestCoverArtMedium: "https://open.spotify.com/image/foo_medium.jpg",
-        bestCoverArtLarge: "https://open.spotify.com/image/foo_large.jpg",
+        // Placeholder images for previews (picsum.photos)
+        bestCoverArtSmall: "https://picsum.photos/id/145/64/64",
+        bestCoverArtMedium: "https://picsum.photos/id/145/300/300",
+        bestCoverArtLarge: "https://picsum.photos/id/145/640/640",
         albumArtSmall: nil,
         albumArtMedium: nil,
         albumArtLarge: nil,
-        backCoverArtSmall: "https://example.com/back_small.jpg",
-        backCoverArtMedium: "https://example.com/back_medium.jpg",
-        backCoverArtLarge: "https://example.com/back_large.jpg",
+        // Placeholder back cover
+        backCoverArtSmall: "https://picsum.photos/id/146/64/64",
+        backCoverArtMedium: "https://picsum.photos/id/146/300/300",
+        backCoverArtLarge: "https://picsum.photos/id/146/640/640",
         hasBackCover: true,
         bestSpotifyUrlFromRelease: "https://open.spotify.com/track/example",
         spotifyUrl: nil,
@@ -130,9 +132,10 @@ extension Recording {
         recordingYear: 1964,
         label: "Columbia",
         defaultReleaseId: "blah",
-        bestCoverArtSmall: "https://open.spotify.com/image/foo_small.jpg",
-        bestCoverArtMedium: "https://open.spotify.com/image/foo_medium.jpg",
-        bestCoverArtLarge: "https://open.spotify.com/image/foo_large.jpg",
+        // Placeholder images for previews (picsum.photos)
+        bestCoverArtSmall: "https://picsum.photos/id/160/64/64",
+        bestCoverArtMedium: "https://picsum.photos/id/160/300/300",
+        bestCoverArtLarge: "https://picsum.photos/id/160/640/640",
         albumArtSmall: nil,
         albumArtMedium: nil,
         albumArtLarge: nil,
@@ -140,9 +143,9 @@ extension Recording {
         backCoverArtMedium: nil,
         backCoverArtLarge: nil,
         hasBackCover: false,
-        bestSpotifyUrlFromRelease: "https://open.spotify.com/track/example",
+        bestSpotifyUrlFromRelease: "https://open.spotify.com/track/4vLYewWIvqHfKtJDk8c8tq",
         spotifyUrl: nil,
-        youtubeUrl: "https://youtube.com/watch?v=example2",
+        youtubeUrl: "https://youtube.com/watch?v=vmDDOFXSgAs",
         appleMusicUrl: nil,
         musicbrainzId: "mbid",
         isCanonical: false,
@@ -232,9 +235,9 @@ extension Release {
         spotifyAlbumUrl: "https://open.spotify.com/album/0nTTEAhCZsbbeplyDMIFuA",
         spotifyTrackId: "1YQWosTIljIvxAgHWTp7KP",
         spotifyTrackUrl: "https://open.spotify.com/track/1YQWosTIljIvxAgHWTp7KP",
-        coverArtSmall: "https://i.scdn.co/image/ab67616d0000485196384c98ac4f3e7c2440f5b5",
-        coverArtMedium: "https://i.scdn.co/image/ab67616d0000b27396384c98ac4f3e7c2440f5b5",
-        coverArtLarge: "https://i.scdn.co/image/ab67616d000082c196384c98ac4f3e7c2440f5b5",
+        coverArtSmall: "https://picsum.photos/id/145/64/64",
+        coverArtMedium: "https://picsum.photos/id/145/300/300",
+        coverArtLarge: "https://picsum.photos/id/145/640/640",
         discNumber: 1,
         trackNumber: 1,
         totalTracks: 7,
@@ -347,8 +350,9 @@ extension PerformerDetail {
                 recordingYear: 1959,
                 isCanonical: true,
                 role: "leader",
-                bestCoverArtSmall: "https://i.scdn.co/image/ab67616d00004851example",
-                bestCoverArtMedium: "https://i.scdn.co/image/ab67616d00001e02example"
+                // Placeholder images for previews
+                bestCoverArtSmall: "https://picsum.photos/id/250/64/64",
+                bestCoverArtMedium: "https://picsum.photos/id/250/300/300"
             ),
             PerformerRecording(
                 songId: "song-2",
@@ -359,8 +363,9 @@ extension PerformerDetail {
                 recordingYear: 1959,
                 isCanonical: true,
                 role: "leader",
-                bestCoverArtSmall: "https://i.scdn.co/image/ab67616d00004851example",
-                bestCoverArtMedium: "https://i.scdn.co/image/ab67616d00001e02example"
+                // Placeholder images for previews
+                bestCoverArtSmall: "https://picsum.photos/id/251/64/64",
+                bestCoverArtMedium: "https://picsum.photos/id/251/300/300"
             ),
             PerformerRecording(
                 songId: "song-3",
