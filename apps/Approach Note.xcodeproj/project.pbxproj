@@ -101,7 +101,7 @@
 		B4147E552EB4FB2C004A16E7 /* Exceptions for "iOS" folder in "Approach Note" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
-				Info.plist,
+				App/Info.plist,
 			);
 			target = B4C1603F2E91B03600EB8D2C /* Approach Note */;
 		};
@@ -111,13 +111,13 @@
 				Auth/AuthenticationManager.swift,
 				Auth/KeychainHelper.swift,
 				Auth/Models/User.swift,
-				FavoritesManager.swift,
-				RepertoireManager.swift,
-				Support_Files/HelperViews.swift,
-				Support_Files/JazzTheme.swift,
-				Support_Files/Models.swift,
-				Support_Files/NetworkManager.swift,
-				Support_Files/PreviewHelpers.swift,
+				Managers/FavoritesManager.swift,
+				Managers/RepertoireManager.swift,
+				Support/HelperViews.swift,
+				Support/JazzTheme.swift,
+				Support/Models.swift,
+				Support/NetworkManager.swift,
+				Support/PreviewHelpers.swift,
 			);
 			target = B41D0F962EE6337400DB427C /* Approach Note Mac */;
 		};
@@ -841,13 +841,13 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = iOS/JazzReference.entitlements;
+				CODE_SIGN_ENTITLEMENTS = iOS/App/JazzReference.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = FX893D85BJ;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = iOS/Info.plist;
+				INFOPLIST_FILE = iOS/App/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
@@ -876,13 +876,13 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = iOS/JazzReference.entitlements;
+				CODE_SIGN_ENTITLEMENTS = iOS/App/JazzReference.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = FX893D85BJ;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = iOS/Info.plist;
+				INFOPLIST_FILE = iOS/App/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
