@@ -494,7 +494,31 @@ def get_song_recordings(song_id):
                      JOIN recording_release_streaming_links rrsl ON rrsl.recording_release_id = rr2.id
                      WHERE rr2.recording_id = r.id),
                     ARRAY[]::varchar[]
-                ) as streaming_services
+                ) as streaming_services,
+                -- Community-contributed data (consensus values)
+                (SELECT json_build_object(
+                    'consensus', json_build_object(
+                        'performance_key', (
+                            SELECT performance_key FROM recording_contributions
+                            WHERE recording_id = r.id AND performance_key IS NOT NULL
+                            GROUP BY performance_key ORDER BY COUNT(*) DESC, MAX(updated_at) DESC LIMIT 1
+                        ),
+                        'tempo_bpm', (
+                            SELECT ROUND(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY tempo_bpm))::INTEGER
+                            FROM recording_contributions WHERE recording_id = r.id AND tempo_bpm IS NOT NULL
+                        ),
+                        'is_instrumental', (
+                            SELECT is_instrumental FROM recording_contributions
+                            WHERE recording_id = r.id AND is_instrumental IS NOT NULL
+                            GROUP BY is_instrumental ORDER BY COUNT(*) DESC, MAX(updated_at) DESC LIMIT 1
+                        )
+                    ),
+                    'counts', json_build_object(
+                        'key', (SELECT COUNT(*) FROM recording_contributions WHERE recording_id = r.id AND performance_key IS NOT NULL),
+                        'tempo', (SELECT COUNT(*) FROM recording_contributions WHERE recording_id = r.id AND tempo_bpm IS NOT NULL),
+                        'instrumental', (SELECT COUNT(*) FROM recording_contributions WHERE recording_id = r.id AND is_instrumental IS NOT NULL)
+                    )
+                )) as community_data
             FROM recordings r
             LEFT JOIN releases def_rel ON r.default_release_id = def_rel.id
             LEFT JOIN recording_performers rp ON r.id = rp.recording_id
