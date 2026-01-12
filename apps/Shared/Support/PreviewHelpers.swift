@@ -119,7 +119,9 @@ extension Recording {
         favoritedBy: [
             FavoriteUser(id: "user-1", displayName: "John Doe"),
             FavoriteUser(id: "user-2", displayName: "Jane Smith")
-        ]
+        ],
+        communityData: CommunityData.preview,
+        userContribution: UserContribution.preview
     )
 
     static let preview2 = Recording(
@@ -175,7 +177,12 @@ extension Recording {
         isFavorited: false,
         favoritedBy: [
             FavoriteUser(id: "user-3", displayName: "Jazz Fan")
-        ]
+        ],
+        communityData: CommunityData(
+            consensus: CommunityConsensus.previewPartial,
+            counts: ContributionCounts(key: 3, tempo: 0, instrumental: 0)
+        ),
+        userContribution: nil
     )
 
     static let previewMinimal = Recording(
@@ -217,7 +224,64 @@ extension Recording {
         streamingServices: nil,
         favoriteCount: 0,
         isFavorited: nil,
-        favoritedBy: nil
+        favoritedBy: nil,
+        communityData: nil,
+        userContribution: nil
+    )
+}
+
+// MARK: - Community Data Previews
+
+extension CommunityConsensus {
+    static let preview = CommunityConsensus(
+        performanceKey: "Eb",
+        tempoBpm: 174,
+        isInstrumental: true
+    )
+
+    static let previewPartial = CommunityConsensus(
+        performanceKey: "C",
+        tempoBpm: nil,
+        isInstrumental: nil
+    )
+
+    static let previewEmpty = CommunityConsensus(
+        performanceKey: nil,
+        tempoBpm: nil,
+        isInstrumental: nil
+    )
+}
+
+extension ContributionCounts {
+    static let preview = ContributionCounts(key: 8, tempo: 5, instrumental: 12)
+    static let previewEmpty = ContributionCounts(key: 0, tempo: 0, instrumental: 0)
+}
+
+extension CommunityData {
+    static let preview = CommunityData(
+        consensus: .preview,
+        counts: .preview
+    )
+
+    static let previewEmpty = CommunityData(
+        consensus: .previewEmpty,
+        counts: .previewEmpty
+    )
+}
+
+extension UserContribution {
+    static let preview = UserContribution(
+        performanceKey: "Eb",
+        tempoBpm: 172,
+        isInstrumental: true,
+        updatedAt: "2025-01-10T14:30:00Z"
+    )
+
+    static let previewPartial = UserContribution(
+        performanceKey: "Eb",
+        tempoBpm: nil,
+        isInstrumental: nil,
+        updatedAt: "2025-01-08T10:00:00Z"
     )
 }
 

@@ -35,6 +35,7 @@ struct RecordingDetailView: View {
     @State private var showingBackCover = false
     @State private var showingLoginAlert = false
     @State private var localFavoriteCount: Int?
+    @State private var showingContributionEditor = false
     private let maxReleasesToShow = 5
     @Environment(\.openURL) var openURL
     @AppStorage("preferredStreamingService") private var preferredStreamingService: String = StreamingService.spotify.rawValue
@@ -346,6 +347,17 @@ struct RecordingDetailView: View {
                             }
                         }
 
+                        // Community Data Section
+                        CommunityDataSection(
+                            recordingId: recordingId,
+                            communityData: recording.communityData,
+                            userContribution: recording.userContribution,
+                            isAuthenticated: authManager.isAuthenticated,
+                            onEditTapped: {
+                                showingContributionEditor = true
+                            }
+                        )
+
                         // Favorited By Section
                         if let favoritedBy = recording.favoritedBy, !favoritedBy.isEmpty {
                             VStack(alignment: .leading, spacing: 12) {
@@ -469,6 +481,20 @@ struct RecordingDetailView: View {
                 songId: recording?.songId  // ← Add this line
             )
         }
+        .sheet(isPresented: $showingContributionEditor) {
+            RecordingContributionEditView(
+                recordingId: recordingId,
+                recordingTitle: recording?.albumTitle ?? "Recording",
+                currentContribution: recording?.userContribution,
+                onSave: {
+                    // Refresh recording data to get updated community data
+                    Task {
+                        await forceRefreshRecordingData()
+                    }
+                }
+            )
+            .environmentObject(authManager)
+        }
         .alert("Report Submitted", isPresented: $showingSubmissionAlert) {
             Button("OK", role: .cancel) { }
         } message: {
@@ -491,8 +517,9 @@ struct RecordingDetailView: View {
     // MARK: - Data Loading
 
     /// Load recording data from the API
+    /// Uses authenticated request if user is logged in to get user's contribution
     private func loadRecordingData() async {
-        recording = await networkManager.fetchRecordingDetail(id: recordingId)
+        recording = await fetchRecordingWithAuth()
         autoSelectFirstRelease()
         isLoading = false
     }
@@ -501,9 +528,33 @@ struct RecordingDetailView: View {
     /// Note: Does NOT set isLoading=true to avoid replacing content with loading spinner
     /// Only updates data if fetch succeeds - keeps existing data on failure
     private func forceRefreshRecordingData() async {
-        if let fetchedRecording = await networkManager.fetchRecordingDetail(id: recordingId) {
+        if let fetchedRecording = await fetchRecordingWithAuth() {
             recording = fetchedRecording
             autoSelectFirstRelease()
+        }
+    }
+
+    /// Fetch recording detail, using authenticated request if user is logged in
+    /// This ensures the user's contribution is included in the response
+    private func fetchRecordingWithAuth() async -> Recording? {
+        guard let url = URL(string: "\(NetworkManager.baseURL)/recordings/\(recordingId)") else {
+            return nil
+        }
+
+        do {
+            let data: Data
+            if authManager.isAuthenticated {
+                // Use authenticated request to get user's contribution
+                data = try await authManager.makeAuthenticatedRequest(url: url)
+            } else {
+                // Unauthenticated request
+                let (responseData, _) = try await URLSession.shared.data(from: url)
+                data = responseData
+            }
+            return try JSONDecoder().decode(Recording.self, from: data)
+        } catch {
+            print("Error fetching recording detail: \(error)")
+            return nil
         }
     }
 

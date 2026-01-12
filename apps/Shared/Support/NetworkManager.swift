@@ -1417,4 +1417,136 @@ class NetworkManager: ObservableObject {
             return nil
         }
     }
+
+    // MARK: - Recording Contributions API
+
+    /// Response from contribution endpoints
+    struct ContributionResponse: Codable {
+        let consensus: CommunityConsensus
+        let counts: ContributionCounts
+        let userContribution: UserContribution?
+        let message: String?
+
+        enum CodingKeys: String, CodingKey {
+            case consensus, counts, message
+            case userContribution = "user_contribution"
+        }
+    }
+
+    /// Save user's contribution for a recording (creates or updates)
+    /// - Parameters:
+    ///   - recordingId: The recording ID
+    ///   - key: Performance key (e.g., "Eb", "C") or nil to clear
+    ///   - tempo: Tempo in BPM (40-400) or nil to clear
+    ///   - isInstrumental: Whether recording is instrumental, or nil to clear
+    ///   - authToken: The user's auth token
+    /// - Returns: Updated contribution response, or nil on error
+    func saveRecordingContribution(
+        recordingId: String,
+        key: String?,
+        tempo: Int?,
+        isInstrumental: Bool?,
+        authToken: String
+    ) async -> ContributionResponse? {
+        let startTime = Date()
+        guard let url = URL(string: "\(NetworkManager.baseURL)/recordings/\(recordingId)/contribution") else {
+            print("Error: Invalid contribution URL")
+            return nil
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "PUT"
+        request.setValue("Bearer \(authToken)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        // Build request body with only non-nil values
+        var body: [String: Any] = [:]
+        if let key = key { body["performance_key"] = key }
+        if let tempo = tempo { body["tempo_bpm"] = tempo }
+        if let isInstrumental = isInstrumental { body["is_instrumental"] = isInstrumental }
+
+        do {
+            request.httpBody = try JSONSerialization.data(withJSONObject: body)
+            let (data, response) = try await URLSession.shared.data(for: request)
+
+            guard let httpResponse = response as? HTTPURLResponse else {
+                return nil
+            }
+
+            NetworkManager.logRequest("PUT /recordings/\(recordingId)/contribution", startTime: startTime)
+
+            if (200...299).contains(httpResponse.statusCode) {
+                let contributionResponse = try JSONDecoder().decode(ContributionResponse.self, from: data)
+                if NetworkManager.diagnosticsEnabled {
+                    print("   ↳ Saved contribution, key_count: \(contributionResponse.counts.key)")
+                }
+                return contributionResponse
+            } else if httpResponse.statusCode == 401 {
+                print("Error: Unauthorized")
+                return nil
+            } else if httpResponse.statusCode == 400 {
+                if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                   let error = json["error"] as? String {
+                    print("Validation error: \(error)")
+                }
+                return nil
+            } else {
+                print("Error saving contribution: HTTP \(httpResponse.statusCode)")
+                return nil
+            }
+        } catch {
+            print("Error saving contribution: \(error)")
+            return nil
+        }
+    }
+
+    /// Delete user's entire contribution for a recording
+    /// - Parameters:
+    ///   - recordingId: The recording ID
+    ///   - authToken: The user's auth token
+    /// - Returns: Updated consensus data, or nil on error
+    func deleteRecordingContribution(
+        recordingId: String,
+        authToken: String
+    ) async -> ContributionResponse? {
+        let startTime = Date()
+        guard let url = URL(string: "\(NetworkManager.baseURL)/recordings/\(recordingId)/contribution") else {
+            print("Error: Invalid contribution URL")
+            return nil
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "DELETE"
+        request.setValue("Bearer \(authToken)", forHTTPHeaderField: "Authorization")
+
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+
+            guard let httpResponse = response as? HTTPURLResponse else {
+                return nil
+            }
+
+            NetworkManager.logRequest("DELETE /recordings/\(recordingId)/contribution", startTime: startTime)
+
+            if (200...299).contains(httpResponse.statusCode) {
+                let contributionResponse = try JSONDecoder().decode(ContributionResponse.self, from: data)
+                if NetworkManager.diagnosticsEnabled {
+                    print("   ↳ Deleted contribution")
+                }
+                return contributionResponse
+            } else if httpResponse.statusCode == 404 {
+                print("No contribution found to delete")
+                return nil
+            } else if httpResponse.statusCode == 401 {
+                print("Error: Unauthorized")
+                return nil
+            } else {
+                print("Error deleting contribution: HTTP \(httpResponse.statusCode)")
+                return nil
+            }
+        } catch {
+            print("Error deleting contribution: \(error)")
+            return nil
+        }
+    }
 }

@@ -164,6 +164,10 @@ struct Recording: Codable, Identifiable {
     let isFavorited: Bool?
     let favoritedBy: [FavoriteUser]?
 
+    // MARK: - Community-Contributed Metadata
+    let communityData: CommunityData?
+    let userContribution: UserContribution?
+
     enum CodingKeys: String, CodingKey {
         case id, label, notes, composer, performers, releases, transcriptions
         case songId = "song_id"
@@ -201,6 +205,8 @@ struct Recording: Codable, Identifiable {
         case favoriteCount = "favorite_count"
         case isFavorited = "is_favorited"
         case favoritedBy = "favorited_by"
+        case communityData = "community_data"
+        case userContribution = "user_contribution"
     }
     
     // Helper computed properties
@@ -443,6 +449,68 @@ struct StreamingLink: Codable {
     var bestPlaybackUrl: String? {
         trackUrl ?? albumUrl
     }
+}
+
+// MARK: - Community Data Models
+
+/// Consensus values computed from all user contributions
+struct CommunityConsensus: Codable {
+    let performanceKey: String?
+    let tempoBpm: Int?
+    let isInstrumental: Bool?
+
+    enum CodingKeys: String, CodingKey {
+        case performanceKey = "performance_key"
+        case tempoBpm = "tempo_bpm"
+        case isInstrumental = "is_instrumental"
+    }
+}
+
+/// Contribution counts per field
+struct ContributionCounts: Codable {
+    let key: Int
+    let tempo: Int
+    let instrumental: Int
+}
+
+/// Container for all community-contributed data
+struct CommunityData: Codable {
+    let consensus: CommunityConsensus
+    let counts: ContributionCounts
+}
+
+/// User's own contribution for a recording
+struct UserContribution: Codable {
+    let performanceKey: String?
+    let tempoBpm: Int?
+    let isInstrumental: Bool?
+    let updatedAt: String?
+
+    enum CodingKeys: String, CodingKey {
+        case performanceKey = "performance_key"
+        case tempoBpm = "tempo_bpm"
+        case isInstrumental = "is_instrumental"
+        case updatedAt = "updated_at"
+    }
+}
+
+/// Musical key options for contribution form
+enum MusicalKey: String, CaseIterable, Identifiable {
+    case c = "C"
+    case db = "Db"
+    case d = "D"
+    case eb = "Eb"
+    case e = "E"
+    case f = "F"
+    case gb = "Gb"
+    case g = "G"
+    case ab = "Ab"
+    case a = "A"
+    case bb = "Bb"
+    case b = "B"
+
+    var id: String { rawValue }
+    var displayName: String { rawValue }
 }
 
 // MARK: - Favorite User Model
