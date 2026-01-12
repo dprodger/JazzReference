@@ -13,6 +13,7 @@ import Combine
 
 struct RecordingDetailView: View {
     let recordingId: String
+    var onCommunityDataChanged: (() -> Void)? = nil
 
     // Persistent network manager to prevent request cancellation during refresh
     @StateObject private var networkManager = NetworkManager()
@@ -491,6 +492,8 @@ struct RecordingDetailView: View {
                     Task {
                         await forceRefreshRecordingData()
                     }
+                    // Notify parent view that community data changed
+                    onCommunityDataChanged?()
                 }
             )
             .environmentObject(authManager)

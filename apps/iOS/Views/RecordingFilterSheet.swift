@@ -9,6 +9,7 @@ import SwiftUI
 
 struct RecordingFilterSheet: View {
     @Binding var selectedFilter: SongRecordingFilter
+    @Binding var selectedVocalFilter: VocalFilter
     @Binding var selectedInstrument: InstrumentFamily?
     let availableInstruments: [InstrumentFamily]
 
@@ -39,6 +40,33 @@ struct RecordingFilterSheet: View {
                                     isSelected: selectedFilter == filter
                                 ) {
                                     selectedFilter = filter
+                                }
+                            }
+                        }
+                        .background(Color.white)
+                        .cornerRadius(10)
+                    }
+
+                    // MARK: - Vocal/Instrumental Section
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Performance Type")
+                            .font(JazzTheme.headline())
+                            .foregroundColor(JazzTheme.charcoal)
+
+                        VStack(spacing: 0) {
+                            ForEach(Array(VocalFilter.allCases.enumerated()), id: \.element) { index, filter in
+                                if index > 0 {
+                                    Divider()
+                                        .padding(.leading, 44)
+                                }
+                                availabilityRow(
+                                    title: filter.displayName,
+                                    subtitle: filter.subtitle,
+                                    icon: filter.icon,
+                                    iconColor: filter.iconColor,
+                                    isSelected: selectedVocalFilter == filter
+                                ) {
+                                    selectedVocalFilter = filter
                                 }
                             }
                         }
@@ -175,11 +203,12 @@ struct RecordingFilterSheet: View {
     // MARK: - Helpers
 
     private var hasActiveFilters: Bool {
-        selectedFilter != .all || selectedInstrument != nil
+        selectedFilter != .all || selectedVocalFilter != .all || selectedInstrument != nil
     }
 
     private func clearAllFilters() {
-        selectedFilter = .all  // Reset to no filters
+        selectedFilter = .all
+        selectedVocalFilter = .all
         selectedInstrument = nil
     }
 
@@ -206,6 +235,7 @@ struct RecordingFilterSheet: View {
 #Preview {
     RecordingFilterSheet(
         selectedFilter: .constant(.withSpotify),
+        selectedVocalFilter: .constant(.all),
         selectedInstrument: .constant(nil),
         availableInstruments: [.guitar, .saxophone, .trumpet, .piano, .bass, .drums]
     )

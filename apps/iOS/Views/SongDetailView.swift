@@ -50,6 +50,9 @@ struct SongDetailView: View {
     // Two-phase loading: summary loads first (fast), then recordings load in background
     @State private var isRecordingsLoading: Bool = true
 
+    // Flag to track if community data was changed and recordings need refresh
+    @State private var needsRecordingsRefresh: Bool = false
+
     // NEW: Summary Information section expansion state (starts collapsed)
     @State private var isSummaryInfoExpanded = false
 
@@ -296,6 +299,9 @@ struct SongDetailView: View {
                             }
                             isRecordingsReloading = false
                         }
+                    },
+                    onCommunityDataChanged: {
+                        needsRecordingsRefresh = true
                     }
                 )
             // MARK: - TRANSCRIPTIONS SECTION
@@ -407,7 +413,10 @@ struct SongDetailView: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(alignment: .top, spacing: 20) {
                     ForEach(song.featuredRecordings ?? []) { recording in
-                        NavigationLink(destination: RecordingDetailView(recordingId: recording.id)) {
+                        NavigationLink(destination: RecordingDetailView(
+                            recordingId: recording.id,
+                            onCommunityDataChanged: { needsRecordingsRefresh = true }
+                        )) {
                             AuthoritativeRecordingCard(recording: recording)
                         }
                         .buttonStyle(.plain)
@@ -431,6 +440,15 @@ struct SongDetailView: View {
     var body: some View {
         contentView
             .onAppear(perform: loadInitialData)
+            .task(id: needsRecordingsRefresh) {
+                if needsRecordingsRefresh {
+                    // Refresh recordings to get updated community data
+                    if let recordings = await networkManager.fetchSongRecordings(id: currentSongId, sortBy: recordingSortOrder) {
+                        self.song?.recordings = recordings
+                    }
+                    needsRecordingsRefresh = false
+                }
+            }
     }
     
     // MARK: - View Builders

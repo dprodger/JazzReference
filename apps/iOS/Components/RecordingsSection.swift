@@ -49,6 +49,41 @@ enum SongRecordingFilter: String, CaseIterable {
     }
 }
 
+// MARK: - Vocal Filter Enum
+enum VocalFilter: String, CaseIterable {
+    case all = "All"
+    case instrumental = "Instrumental"
+    case vocal = "Vocal"
+
+    var displayName: String {
+        rawValue
+    }
+
+    var subtitle: String {
+        switch self {
+        case .all: return "Show all recordings"
+        case .instrumental: return "Instrumental performances only"
+        case .vocal: return "Vocal performances only"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .all: return "music.note.list"
+        case .instrumental: return "pianokeys"
+        case .vocal: return "mic"
+        }
+    }
+
+    var iconColor: Color {
+        switch self {
+        case .all: return JazzTheme.smokeGray
+        case .instrumental: return JazzTheme.brass
+        case .vocal: return JazzTheme.burgundy
+        }
+    }
+}
+
 // MARK: - Instrument Family Enum
 enum InstrumentFamily: String, CaseIterable, Hashable {
     case guitar = "Guitar"
@@ -98,7 +133,11 @@ struct RecordingsSection: View {
     // Callback when sort order changes (for parent to reload data)
     var onSortOrderChanged: ((RecordingSortOrder) -> Void)?
 
+    // Callback when community data changes (for parent to reload recordings)
+    var onCommunityDataChanged: (() -> Void)?
+
     @State private var selectedFilter: SongRecordingFilter = .playable
+    @State private var selectedVocalFilter: VocalFilter = .all
     @State private var selectedInstrument: InstrumentFamily? = nil
     @State private var showFilterSheet: Bool = false
     @State private var isSectionExpanded: Bool = true
@@ -147,7 +186,10 @@ struct RecordingsSection: View {
                                                                     .padding(.horizontal, 8)
                                                             }
 
-                                                            NavigationLink(destination: RecordingDetailView(recordingId: recording.id)) {
+                                                            NavigationLink(destination: RecordingDetailView(
+                                                                recordingId: recording.id,
+                                                                onCommunityDataChanged: onCommunityDataChanged
+                                                            )) {
                                                                 RecordingRowView(
                                                                     recording: recording,
                                                                     showArtistName: recordingSortOrder == .year || group.groupKey == "More Recordings"
@@ -257,6 +299,7 @@ struct RecordingsSection: View {
         .sheet(isPresented: $showFilterSheet) {
             RecordingFilterSheet(
                 selectedFilter: $selectedFilter,
+                selectedVocalFilter: $selectedVocalFilter,
                 selectedInstrument: $selectedInstrument,
                 availableInstruments: availableInstruments
             )
@@ -275,6 +318,16 @@ struct RecordingsSection: View {
                     icon: selectedFilter.icon,
                     iconColor: selectedFilter.iconColor,
                     onRemove: { selectedFilter = .all }
+                )
+            }
+
+            // Active filter chip for vocal/instrumental
+            if selectedVocalFilter != .all {
+                FilterChip(
+                    label: selectedVocalFilter.displayName,
+                    icon: selectedVocalFilter.icon,
+                    iconColor: selectedVocalFilter.iconColor,
+                    onRemove: { selectedVocalFilter = .all }
                 )
             }
 
@@ -307,7 +360,7 @@ struct RecordingsSection: View {
     }
 
     private var hasActiveFilters: Bool {
-        selectedFilter != .all || selectedInstrument != nil
+        selectedFilter != .all || selectedVocalFilter != .all || selectedInstrument != nil
     }
 
     // MARK: - Computed Properties
@@ -343,7 +396,21 @@ struct RecordingsSection: View {
                 }
             }
         }
-        
+
+        // Apply vocal/instrumental filter
+        switch selectedVocalFilter {
+        case .all:
+            break
+        case .instrumental:
+            result = result.filter { recording in
+                recording.communityData?.consensus.isInstrumental == true
+            }
+        case .vocal:
+            result = result.filter { recording in
+                recording.communityData?.consensus.isInstrumental == false
+            }
+        }
+
         // Then, apply streaming service filter
         switch selectedFilter {
         case .all:
