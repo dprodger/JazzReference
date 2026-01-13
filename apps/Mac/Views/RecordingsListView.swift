@@ -86,27 +86,34 @@ struct RecordingsListView: View {
     @State private var availabilityFilter: RecordingAvailabilityFilter = .all
     @State private var vocalFilter: RecordingVocalFilter = .all
 
+    /// Normalize search text by converting straight apostrophes to smart apostrophes
+    private var normalizedSearchText: String {
+        searchText.replacingOccurrences(of: "'", with: "\u{2019}")
+    }
+
     // Filtered recordings based on scope and availability
     private var filteredRecordings: [Recording] {
         var results = networkManager.recordings
 
         // Apply search scope filter (client-side refinement)
+        // Use normalized search text to match smart apostrophes in data
         if !searchText.isEmpty && searchScope != .all {
+            let normalizedSearch = normalizedSearchText.lowercased()
             switch searchScope {
             case .all:
                 break
             case .artist:
                 results = results.filter { recording in
                     let artistNames = recording.performers?.map { $0.name.lowercased() } ?? []
-                    return artistNames.contains { $0.contains(searchText.lowercased()) }
+                    return artistNames.contains { $0.contains(normalizedSearch) }
                 }
             case .album:
                 results = results.filter { recording in
-                    recording.albumTitle?.lowercased().contains(searchText.lowercased()) ?? false
+                    recording.albumTitle?.lowercased().contains(normalizedSearch) ?? false
                 }
             case .song:
                 results = results.filter { recording in
-                    recording.songTitle?.lowercased().contains(searchText.lowercased()) ?? false
+                    recording.songTitle?.lowercased().contains(normalizedSearch) ?? false
                 }
             }
         }

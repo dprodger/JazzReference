@@ -116,7 +116,16 @@ class NetworkManager: ObservableObject {
         guard diagnosticsEnabled else { return }
         print("📊 Total API calls in this session: \(requestCounter)")
     }
-    
+
+    // MARK: - Search Text Normalization
+
+    /// Normalize search text by converting straight apostrophes to smart apostrophes.
+    /// The database stores song titles with smart apostrophes ('), so we convert
+    /// user input to match (e.g., "We'll" becomes "We'll").
+    private static func normalizeSearchText(_ text: String) -> String {
+        text.replacingOccurrences(of: "'", with: "\u{2019}")
+    }
+
     // MARK: - Network Methods
     
     func fetchSongs(searchQuery: String = "") async {
@@ -128,7 +137,8 @@ class NetworkManager: ObservableObject {
         
         var urlString = "\(NetworkManager.baseURL)/songs"
         if !searchQuery.isEmpty {
-            urlString += "?search=\(searchQuery.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")"
+            let normalizedQuery = Self.normalizeSearchText(searchQuery)
+            urlString += "?search=\(normalizedQuery.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")"
         }
         
         guard let url = URL(string: urlString) else {
@@ -178,7 +188,8 @@ class NetworkManager: ObservableObject {
 
         var urlString = "\(NetworkManager.baseURL)/performers/index"
         if !searchQuery.isEmpty {
-            urlString += "?search=\(searchQuery.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")"
+            let normalizedQuery = Self.normalizeSearchText(searchQuery)
+            urlString += "?search=\(normalizedQuery.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")"
         }
 
         guard let url = URL(string: urlString) else {
@@ -227,7 +238,8 @@ class NetworkManager: ObservableObject {
 
         var urlString = "\(NetworkManager.baseURL)/performers?limit=\(performersPageSize)&offset=0"
         if !searchQuery.isEmpty {
-            urlString += "&search=\(searchQuery.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")"
+            let normalizedQuery = Self.normalizeSearchText(searchQuery)
+            urlString += "&search=\(normalizedQuery.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")"
         }
 
         guard let url = URL(string: urlString) else {
@@ -290,7 +302,8 @@ class NetworkManager: ObservableObject {
 
         var urlString = "\(NetworkManager.baseURL)/performers?limit=\(performersPageSize)&offset=\(currentPerformersOffset)"
         if !searchQuery.isEmpty {
-            urlString += "&search=\(searchQuery.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")"
+            let normalizedQuery = Self.normalizeSearchText(searchQuery)
+            urlString += "&search=\(normalizedQuery.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")"
         }
 
         guard let url = URL(string: urlString) else {
@@ -537,9 +550,10 @@ class NetworkManager: ObservableObject {
         
         // Add search query if present
         if !searchQuery.isEmpty {
-            urlString += "?search=\(searchQuery.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")"
+            let normalizedQuery = Self.normalizeSearchText(searchQuery)
+            urlString += "?search=\(normalizedQuery.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")"
         }
-        
+
         guard let url = URL(string: urlString) else {
             await MainActor.run {
                 errorMessage = "Invalid URL"
@@ -1119,7 +1133,8 @@ class NetworkManager: ObservableObject {
             errorMessage = nil
         }
 
-        let urlString = "\(NetworkManager.baseURL)/recordings?search=\(searchQuery.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")"
+        let normalizedQuery = Self.normalizeSearchText(searchQuery)
+        let urlString = "\(NetworkManager.baseURL)/recordings?search=\(normalizedQuery.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")"
 
         guard let url = URL(string: urlString) else {
             await MainActor.run {
