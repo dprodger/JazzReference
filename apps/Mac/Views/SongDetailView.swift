@@ -1006,18 +1006,39 @@ struct RecordingCard: View {
         VStack(alignment: .leading, spacing: 12) {
             // Album art with streaming button overlay
             ZStack(alignment: .bottomTrailing) {
-                AsyncImage(url: URL(string: recording.bestAlbumArtLarge ?? recording.bestAlbumArtMedium ?? "")) { image in
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                } placeholder: {
-                    Rectangle()
-                        .fill(JazzTheme.cardBackground)
-                        .overlay {
-                            Image(systemName: "music.note")
-                                .font(.system(size: 40))
-                                .foregroundColor(JazzTheme.smokeGray)
+                Group {
+                    if let albumArtUrl = recording.bestAlbumArtLarge ?? recording.bestAlbumArtMedium {
+                        AsyncImage(url: URL(string: albumArtUrl)) { phase in
+                            switch phase {
+                            case .empty:
+                                Rectangle()
+                                    .fill(JazzTheme.cardBackground)
+                                    .overlay { ProgressView() }
+                            case .success(let image):
+                                image
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                            case .failure:
+                                Rectangle()
+                                    .fill(JazzTheme.cardBackground)
+                                    .overlay {
+                                        Image(systemName: "music.note")
+                                            .font(.system(size: 40))
+                                            .foregroundColor(JazzTheme.smokeGray)
+                                    }
+                            @unknown default:
+                                EmptyView()
+                            }
                         }
+                    } else {
+                        Rectangle()
+                            .fill(JazzTheme.cardBackground)
+                            .overlay {
+                                Image(systemName: "music.note")
+                                    .font(.system(size: 40))
+                                    .foregroundColor(JazzTheme.smokeGray)
+                            }
+                    }
                 }
                 .frame(width: artworkSize, height: artworkSize)
                 .clipShape(RoundedRectangle(cornerRadius: 10))
@@ -1099,17 +1120,31 @@ struct FeaturedRecordingCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             // Album Art
-            AsyncImage(url: URL(string: recording.bestAlbumArtLarge ?? recording.bestAlbumArtMedium ?? "")) { phase in
-                switch phase {
-                case .empty:
-                    Rectangle()
-                        .fill(JazzTheme.smokeGray.opacity(0.2))
-                        .overlay { ProgressView() }
-                case .success(let image):
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                case .failure:
+            Group {
+                if let albumArtUrl = recording.bestAlbumArtLarge ?? recording.bestAlbumArtMedium {
+                    AsyncImage(url: URL(string: albumArtUrl)) { phase in
+                        switch phase {
+                        case .empty:
+                            Rectangle()
+                                .fill(JazzTheme.smokeGray.opacity(0.2))
+                                .overlay { ProgressView() }
+                        case .success(let image):
+                            image
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                        case .failure:
+                            Rectangle()
+                                .fill(JazzTheme.smokeGray.opacity(0.2))
+                                .overlay {
+                                    Image(systemName: "music.note")
+                                        .font(.system(size: 40))
+                                        .foregroundColor(JazzTheme.smokeGray)
+                                }
+                        @unknown default:
+                            EmptyView()
+                        }
+                    }
+                } else {
                     Rectangle()
                         .fill(JazzTheme.smokeGray.opacity(0.2))
                         .overlay {
@@ -1117,8 +1152,6 @@ struct FeaturedRecordingCard: View {
                                 .font(.system(size: 40))
                                 .foregroundColor(JazzTheme.smokeGray)
                         }
-                @unknown default:
-                    EmptyView()
                 }
             }
             .frame(width: 180, height: 180)

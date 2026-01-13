@@ -408,17 +408,25 @@ struct RecordingRowView: View {
     var body: some View {
         HStack(spacing: 12) {
             // Album art
-            AsyncImage(url: URL(string: recording.bestAlbumArtSmall ?? "")) { image in
-                image
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-            } placeholder: {
-                Rectangle()
-                    .fill(JazzTheme.cardBackground)
-                    .overlay {
-                        Image(systemName: "music.note")
-                            .foregroundColor(JazzTheme.smokeGray)
+            Group {
+                if let albumArtUrl = recording.bestAlbumArtSmall ?? recording.bestAlbumArtMedium {
+                    AsyncImage(url: URL(string: albumArtUrl)) { image in
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                    } placeholder: {
+                        Rectangle()
+                            .fill(JazzTheme.cardBackground)
+                            .overlay { ProgressView().controlSize(.small) }
                     }
+                } else {
+                    Rectangle()
+                        .fill(JazzTheme.cardBackground)
+                        .overlay {
+                            Image(systemName: "music.note")
+                                .foregroundColor(JazzTheme.smokeGray)
+                        }
+                }
             }
             .frame(width: 50, height: 50)
             .cornerRadius(4)
