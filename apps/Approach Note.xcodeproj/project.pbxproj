@@ -25,6 +25,8 @@
 		B45A16AD2F08802C00259452 /* GoogleSignInSwift in Frameworks */ = {isa = PBXBuildFile; productRef = B45A16AC2F08802C00259452 /* GoogleSignInSwift */; };
 		B45A16B02F08876C00259452 /* MacAddToRepertoireSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = B45A16AE2F08876C00259452 /* MacAddToRepertoireSheet.swift */; };
 		B45A16B12F08876C00259452 /* MacCreateRepertoireView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B45A16AF2F08876C00259452 /* MacCreateRepertoireView.swift */; };
+		B47FCC1F2F16C937006281D7 /* MacCommunityDataSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = B47FCC1C2F16C937006281D7 /* MacCommunityDataSection.swift */; };
+		B47FCC202F16C937006281D7 /* MacRecordingContributionEditView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B47FCC1D2F16C937006281D7 /* MacRecordingContributionEditView.swift */; };
 		B4C535842ECE5FFF0030A127 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = B4C535832ECE5FFF0030A127 /* GoogleSignIn */; };
 		B4C535862ECE5FFF0030A127 /* GoogleSignInSwift in Frameworks */ = {isa = PBXBuildFile; productRef = B4C535852ECE5FFF0030A127 /* GoogleSignInSwift */; };
 		B4D3BAB12F0D7983007CB0DD /* MacSearchBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4D3BAB02F0D7983007CB0DD /* MacSearchBar.swift */; };
@@ -90,6 +92,8 @@
 		B45A16A42F08800600259452 /* MacResetPasswordView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacResetPasswordView.swift; sourceTree = "<group>"; };
 		B45A16AE2F08876C00259452 /* MacAddToRepertoireSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = MacAddToRepertoireSheet.swift; path = Repertoire/MacAddToRepertoireSheet.swift; sourceTree = "<group>"; };
 		B45A16AF2F08876C00259452 /* MacCreateRepertoireView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = MacCreateRepertoireView.swift; path = Repertoire/MacCreateRepertoireView.swift; sourceTree = "<group>"; };
+		B47FCC1C2F16C937006281D7 /* MacCommunityDataSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacCommunityDataSection.swift; sourceTree = "<group>"; };
+		B47FCC1D2F16C937006281D7 /* MacRecordingContributionEditView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacRecordingContributionEditView.swift; sourceTree = "<group>"; };
 		B4911D2A2EB316F600326CA7 /* MusicBrainzImporter.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = MusicBrainzImporter.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		B4C160402E91B03600EB8D2C /* Approach Note.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Approach Note.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		B4C1604D2E91B03700EB8D2C /* JazzReferenceTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = JazzReferenceTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -215,6 +219,7 @@
 		B42A1D702F10A06C00DAC930 /* Mac */ = {
 			isa = PBXGroup;
 			children = (
+				B47FCC1E2F16C937006281D7 /* Components */,
 				B42A1D902F10D00000DAC930 /* App */,
 				B41D0FA22EE633EE00DB427C /* Assets.xcassets */,
 				B42A1D802F10B00000DAC930 /* Auth */,
@@ -251,6 +256,16 @@
 			children = (
 			);
 			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		B47FCC1E2F16C937006281D7 /* Components */ = {
+			isa = PBXGroup;
+			children = (
+				B47FCC1C2F16C937006281D7 /* MacCommunityDataSection.swift */,
+				B47FCC1D2F16C937006281D7 /* MacRecordingContributionEditView.swift */,
+			);
+			name = Components;
+			path = Mac/Components;
 			sourceTree = "<group>";
 		};
 		B4C160372E91B03600EB8D2C = {
@@ -504,6 +519,8 @@
 				B45A16A62F08800600259452 /* MacForgotPasswordView.swift in Sources */,
 				B45A16A72F08800600259452 /* MacLoginView.swift in Sources */,
 				B4D3BAB12F0D7983007CB0DD /* MacSearchBar.swift in Sources */,
+				B47FCC1F2F16C937006281D7 /* MacCommunityDataSection.swift in Sources */,
+				B47FCC202F16C937006281D7 /* MacRecordingContributionEditView.swift in Sources */,
 				B45A16A82F08800600259452 /* MacRegisterView.swift in Sources */,
 				B45A16B02F08876C00259452 /* MacAddToRepertoireSheet.swift in Sources */,
 				B45A16B12F08876C00259452 /* MacCreateRepertoireView.swift in Sources */,

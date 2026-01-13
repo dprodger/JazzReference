@@ -47,6 +47,32 @@ enum RecordingAvailabilityFilter: String, CaseIterable, Identifiable {
     }
 }
 
+// MARK: - Vocal/Instrumental Filter
+
+enum RecordingVocalFilter: String, CaseIterable, Identifiable {
+    case all = "All"
+    case instrumental = "Instrumental"
+    case vocal = "Vocal"
+
+    var id: String { rawValue }
+
+    var icon: String {
+        switch self {
+        case .all: return "music.note.list"
+        case .instrumental: return "pianokeys"
+        case .vocal: return "mic"
+        }
+    }
+
+    var iconColor: Color {
+        switch self {
+        case .all: return JazzTheme.smokeGray
+        case .instrumental: return JazzTheme.brass
+        case .vocal: return JazzTheme.burgundy
+        }
+    }
+}
+
 // MARK: - Main View
 
 struct RecordingsListView: View {
@@ -58,6 +84,7 @@ struct RecordingsListView: View {
     // Filter state
     @State private var searchScope: RecordingSearchScope = .all
     @State private var availabilityFilter: RecordingAvailabilityFilter = .all
+    @State private var vocalFilter: RecordingVocalFilter = .all
 
     // Filtered recordings based on scope and availability
     private var filteredRecordings: [Recording] {
@@ -96,11 +123,25 @@ struct RecordingsListView: View {
             results = results.filter { $0.hasAppleMusicAvailable }
         }
 
+        // Apply vocal/instrumental filter
+        switch vocalFilter {
+        case .all:
+            break
+        case .instrumental:
+            results = results.filter { recording in
+                recording.communityData?.consensus.isInstrumental == true
+            }
+        case .vocal:
+            results = results.filter { recording in
+                recording.communityData?.consensus.isInstrumental == false
+            }
+        }
+
         return results
     }
 
     private var hasActiveFilters: Bool {
-        searchScope != .all || availabilityFilter != .all
+        searchScope != .all || availabilityFilter != .all || vocalFilter != .all
     }
 
     var body: some View {
@@ -265,6 +306,58 @@ struct RecordingsListView: View {
                 }
 
                 Spacer()
+
+                // Vocal/Instrumental filter
+                Text("Type:")
+                    .font(JazzTheme.subheadline())
+                    .foregroundColor(.white)
+
+                Menu {
+                    ForEach(RecordingVocalFilter.allCases) { filter in
+                        Button(action: { vocalFilter = filter }) {
+                            HStack {
+                                Image(systemName: filter.icon)
+                                    .foregroundColor(filter.iconColor)
+                                Text(filter.rawValue)
+                                if vocalFilter == filter {
+                                    Spacer()
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: vocalFilter.icon)
+                            .foregroundColor(vocalFilter == .all ? JazzTheme.charcoal : vocalFilter.iconColor)
+                        Text(vocalFilter.rawValue)
+                            .font(JazzTheme.subheadline())
+                            .foregroundColor(JazzTheme.charcoal)
+                        Image(systemName: "chevron.down")
+                            .font(JazzTheme.caption2())
+                            .foregroundColor(JazzTheme.charcoal)
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(Color.white)
+                    .cornerRadius(8)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(JazzTheme.smokeGray.opacity(0.3), lineWidth: 1)
+                    )
+                }
+                .menuStyle(.borderlessButton)
+
+                // Clear button when vocal filter is active
+                if vocalFilter != .all {
+                    Button(action: { vocalFilter = .all }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundColor(.white)
+                            .font(.system(size: 16))
+                    }
+                    .buttonStyle(.plain)
+                    .help("Clear type filter")
+                }
             }
             .padding(.horizontal)
 
@@ -296,6 +389,7 @@ struct RecordingsListView: View {
     private func clearFilters() {
         searchScope = .all
         availabilityFilter = .all
+        vocalFilter = .all
     }
 }
 

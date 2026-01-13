@@ -92,6 +92,31 @@ enum InstrumentFamily: String, CaseIterable, Hashable, Identifiable {
     }
 }
 
+// MARK: - Vocal/Instrumental Filter
+enum VocalFilter: String, CaseIterable, Identifiable {
+    case all = "All"
+    case instrumental = "Instrumental"
+    case vocal = "Vocal"
+
+    var id: String { rawValue }
+
+    var icon: String {
+        switch self {
+        case .all: return "music.note.list"
+        case .instrumental: return "pianokeys"
+        case .vocal: return "mic"
+        }
+    }
+
+    var iconColor: Color {
+        switch self {
+        case .all: return JazzTheme.smokeGray
+        case .instrumental: return JazzTheme.brass
+        case .vocal: return JazzTheme.burgundy
+        }
+    }
+}
+
 struct SongDetailView: View {
     let songId: String
     @State private var song: Song?
@@ -100,6 +125,7 @@ struct SongDetailView: View {
     @State private var sortOrder: RecordingSortOrder = .year
     @State private var selectedRecordingId: String?
     @State private var selectedFilter: SongRecordingFilter = .playable
+    @State private var selectedVocalFilter: VocalFilter = .all
     @State private var selectedInstrument: InstrumentFamily? = nil
     @State private var transcriptions: [SoloTranscription] = []
     @State private var backingTracks: [Video] = []
@@ -473,6 +499,20 @@ struct SongDetailView: View {
             result = result.filter { $0.hasAppleMusicAvailable }
         }
 
+        // Apply vocal/instrumental filter
+        switch selectedVocalFilter {
+        case .all:
+            break
+        case .instrumental:
+            result = result.filter { recording in
+                recording.communityData?.consensus.isInstrumental == true
+            }
+        case .vocal:
+            result = result.filter { recording in
+                recording.communityData?.consensus.isInstrumental == false
+            }
+        }
+
         return result
     }
 
@@ -613,6 +653,50 @@ struct SongDetailView: View {
                     .cornerRadius(8)
                 }
                 .menuStyle(.borderlessButton)
+
+                // Vocal/Instrumental filter menu
+                Menu {
+                    ForEach(VocalFilter.allCases) { filter in
+                        Button(action: { selectedVocalFilter = filter }) {
+                            HStack {
+                                Image(systemName: filter.icon)
+                                    .foregroundColor(filter.iconColor)
+                                Text(filter.rawValue)
+                                if selectedVocalFilter == filter {
+                                    Spacer()
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: selectedVocalFilter.icon)
+                            .foregroundColor(selectedVocalFilter == .all ? JazzTheme.charcoal : selectedVocalFilter.iconColor)
+                        Text(selectedVocalFilter.rawValue)
+                            .font(JazzTheme.subheadline())
+                            .foregroundColor(JazzTheme.charcoal)
+                        Image(systemName: "chevron.down")
+                            .font(JazzTheme.caption2())
+                            .foregroundColor(JazzTheme.charcoal)
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(selectedVocalFilter == .all ? JazzTheme.cardBackground : selectedVocalFilter.iconColor.opacity(0.15))
+                    .cornerRadius(8)
+                }
+                .menuStyle(.borderlessButton)
+
+                // Clear button when vocal filter is active
+                if selectedVocalFilter != .all {
+                    Button(action: { selectedVocalFilter = .all }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundColor(JazzTheme.burgundy)
+                            .font(.system(size: 16))
+                    }
+                    .buttonStyle(.plain)
+                    .help("Clear type filter")
+                }
 
                 // Instrument filter menu (only show if instruments are available)
                 let instruments = availableInstruments(recordings)

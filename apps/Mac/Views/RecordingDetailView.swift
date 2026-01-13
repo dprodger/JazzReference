@@ -15,6 +15,7 @@ struct RecordingDetailView: View {
     @State private var showingLoginAlert = false
     @State private var selectedReleaseId: String?
     @State private var showingBackCover = false
+    @State private var showingContributionSheet = false
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var authManager: AuthenticationManager
     @EnvironmentObject var favoritesManager: FavoritesManager
@@ -97,6 +98,9 @@ struct RecordingDetailView: View {
                         performersSection(performers)
                     }
 
+                    // Community Data
+                    communityDataSection(recording)
+
                     // Releases
                     if let releases = recording.releases, !releases.isEmpty {
                         releasesSection(releases)
@@ -137,6 +141,21 @@ struct RecordingDetailView: View {
             Button("OK", role: .cancel) { }
         } message: {
             Text("Please sign in to favorite recordings.")
+        }
+        .sheet(isPresented: $showingContributionSheet) {
+            if let recording = recording {
+                MacRecordingContributionEditView(
+                    recordingId: recordingId,
+                    recordingTitle: "\(recording.songTitle ?? "Recording") - \(recording.albumTitle ?? "")",
+                    currentContribution: recording.userContribution,
+                    onSave: {
+                        Task {
+                            await loadRecording()
+                        }
+                    }
+                )
+                .environmentObject(authManager)
+            }
         }
         .task(id: recordingId) {
             await loadRecording()
@@ -434,6 +453,19 @@ struct RecordingDetailView: View {
     }
 
     @ViewBuilder
+    private func communityDataSection(_ recording: Recording) -> some View {
+        MacCommunityDataSection(
+            recordingId: recording.id,
+            communityData: recording.communityData,
+            userContribution: recording.userContribution,
+            isAuthenticated: authManager.isAuthenticated,
+            onEditTapped: {
+                showingContributionSheet = true
+            }
+        )
+    }
+
+    @ViewBuilder
     private func releasesSection(_ releases: [Release]) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
@@ -542,9 +574,33 @@ struct RecordingDetailView: View {
 
     private func loadRecording() async {
         isLoading = true
-        recording = await networkManager.fetchRecordingDetail(id: recordingId)
+        recording = await fetchRecordingWithAuth()
         autoSelectFirstRelease()
         isLoading = false
+    }
+
+    /// Fetch recording detail, using authenticated request if user is logged in
+    /// This ensures the user's contribution is included in the response
+    private func fetchRecordingWithAuth() async -> Recording? {
+        guard let url = URL(string: "\(NetworkManager.baseURL)/recordings/\(recordingId)") else {
+            return nil
+        }
+
+        do {
+            let data: Data
+            if authManager.isAuthenticated {
+                // Use authenticated request to get user's contribution
+                data = try await authManager.makeAuthenticatedRequest(url: url)
+            } else {
+                // Unauthenticated request
+                let (responseData, _) = try await URLSession.shared.data(from: url)
+                data = responseData
+            }
+            return try JSONDecoder().decode(Recording.self, from: data)
+        } catch {
+            print("Error fetching recording detail: \(error)")
+            return nil
+        }
     }
 
     /// Auto-select the default release from the API, falling back to first release with art
