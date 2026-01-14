@@ -503,9 +503,10 @@ def get_song_recordings(song_id):
                             WHERE recording_id = r.id AND performance_key IS NOT NULL
                             GROUP BY performance_key ORDER BY COUNT(*) DESC, MAX(updated_at) DESC LIMIT 1
                         ),
-                        'tempo_bpm', (
-                            SELECT ROUND(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY tempo_bpm))::INTEGER
-                            FROM recording_contributions WHERE recording_id = r.id AND tempo_bpm IS NOT NULL
+                        'tempo_marking', (
+                            SELECT tempo_marking FROM recording_contributions
+                            WHERE recording_id = r.id AND tempo_marking IS NOT NULL
+                            GROUP BY tempo_marking ORDER BY COUNT(*) DESC, MAX(updated_at) DESC LIMIT 1
                         ),
                         'is_instrumental', (
                             SELECT is_instrumental FROM recording_contributions
@@ -515,7 +516,7 @@ def get_song_recordings(song_id):
                     ),
                     'counts', json_build_object(
                         'key', (SELECT COUNT(*) FROM recording_contributions WHERE recording_id = r.id AND performance_key IS NOT NULL),
-                        'tempo', (SELECT COUNT(*) FROM recording_contributions WHERE recording_id = r.id AND tempo_bpm IS NOT NULL),
+                        'tempo', (SELECT COUNT(*) FROM recording_contributions WHERE recording_id = r.id AND tempo_marking IS NOT NULL),
                         'instrumental', (SELECT COUNT(*) FROM recording_contributions WHERE recording_id = r.id AND is_instrumental IS NOT NULL)
                     )
                 )) as community_data

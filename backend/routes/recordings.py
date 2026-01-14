@@ -541,13 +541,14 @@ def get_recording_detail(recording_id):
                     (SELECT performance_key FROM recording_contributions
                      WHERE recording_id = %s AND performance_key IS NOT NULL
                      GROUP BY performance_key ORDER BY COUNT(*) DESC, MAX(updated_at) DESC LIMIT 1) as consensus_key,
-                    (SELECT ROUND(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY tempo_bpm))::INTEGER
-                     FROM recording_contributions WHERE recording_id = %s AND tempo_bpm IS NOT NULL) as consensus_tempo,
+                    (SELECT tempo_marking FROM recording_contributions
+                     WHERE recording_id = %s AND tempo_marking IS NOT NULL
+                     GROUP BY tempo_marking ORDER BY COUNT(*) DESC, MAX(updated_at) DESC LIMIT 1) as consensus_tempo_marking,
                     (SELECT is_instrumental FROM recording_contributions
                      WHERE recording_id = %s AND is_instrumental IS NOT NULL
                      GROUP BY is_instrumental ORDER BY COUNT(*) DESC, MAX(updated_at) DESC LIMIT 1) as consensus_instrumental,
                     (SELECT COUNT(*) FROM recording_contributions WHERE recording_id = %s AND performance_key IS NOT NULL) as key_count,
-                    (SELECT COUNT(*) FROM recording_contributions WHERE recording_id = %s AND tempo_bpm IS NOT NULL) as tempo_count,
+                    (SELECT COUNT(*) FROM recording_contributions WHERE recording_id = %s AND tempo_marking IS NOT NULL) as tempo_count,
                     (SELECT COUNT(*) FROM recording_contributions WHERE recording_id = %s AND is_instrumental IS NOT NULL) as instrumental_count
             )
             SELECT
@@ -626,7 +627,7 @@ def get_recording_detail(recording_id):
         recording_dict['community_data'] = {
             'consensus': {
                 'performance_key': community_consensus.get('consensus_key'),
-                'tempo_bpm': community_consensus.get('consensus_tempo'),
+                'tempo_marking': community_consensus.get('consensus_tempo_marking'),
                 'is_instrumental': community_consensus.get('consensus_instrumental')
             },
             'counts': {
@@ -639,7 +640,7 @@ def get_recording_detail(recording_id):
         # Add user's contribution if authenticated
         if hasattr(g, 'current_user') and g.current_user:
             user_contribution = db_tools.execute_query(
-                """SELECT performance_key, tempo_bpm, is_instrumental, updated_at
+                """SELECT performance_key, tempo_marking, is_instrumental, updated_at
                    FROM recording_contributions
                    WHERE recording_id = %s AND user_id = %s""",
                 (recording_id, g.current_user['id']),
@@ -648,7 +649,7 @@ def get_recording_detail(recording_id):
             if user_contribution:
                 recording_dict['user_contribution'] = {
                     'performance_key': user_contribution['performance_key'],
-                    'tempo_bpm': user_contribution['tempo_bpm'],
+                    'tempo_marking': user_contribution['tempo_marking'],
                     'is_instrumental': user_contribution['is_instrumental'],
                     'updated_at': user_contribution['updated_at'].isoformat() if user_contribution['updated_at'] else None
                 }
