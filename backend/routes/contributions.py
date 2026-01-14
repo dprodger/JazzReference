@@ -18,9 +18,16 @@ logger = logging.getLogger(__name__)
 contributions_bp = Blueprint('contributions', __name__)
 
 # Valid performance keys (using flats for consistency)
-VALID_KEYS = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B']
+# Major keys use root note only, minor keys use 'm' suffix
+VALID_KEYS = [
+    'C', 'Cm', 'Db', 'Dbm', 'D', 'Dm', 'Eb', 'Ebm', 'E', 'Em', 'F', 'Fm',
+    'Gb', 'Gbm', 'G', 'Gm', 'Ab', 'Abm', 'A', 'Am', 'Bb', 'Bbm', 'B', 'Bm'
+]
 
-# Tempo range constraints
+# Valid tempo markings (standard jazz terms)
+VALID_TEMPO_MARKINGS = ['Ballad', 'Slow', 'Medium', 'Medium-Up', 'Up-Tempo', 'Fast', 'Burning']
+
+# Tempo range constraints (kept for backward compatibility)
 MIN_TEMPO = 40
 MAX_TEMPO = 400
 
@@ -29,8 +36,7 @@ def get_consensus_data(recording_id):
     """
     Calculate consensus values for a recording's community-contributed metadata.
 
-    Uses simple majority (mode) for key and instrumental/vocal.
-    Uses median for tempo (more robust to outliers).
+    Uses simple majority (mode) for key, tempo marking, and instrumental/vocal.
     Ties are broken by most recent update.
 
     Returns dict with consensus values and counts.
@@ -45,10 +51,13 @@ def get_consensus_data(recording_id):
              ORDER BY COUNT(*) DESC, MAX(updated_at) DESC
              LIMIT 1) as consensus_key,
 
-            -- Median for tempo (robust to outliers)
-            (SELECT ROUND(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY tempo_bpm))::INTEGER
+            -- Mode for tempo_marking (most common, ties broken by most recent)
+            (SELECT tempo_marking
              FROM recording_contributions
-             WHERE recording_id = %s AND tempo_bpm IS NOT NULL) as consensus_tempo,
+             WHERE recording_id = %s AND tempo_marking IS NOT NULL
+             GROUP BY tempo_marking
+             ORDER BY COUNT(*) DESC, MAX(updated_at) DESC
+             LIMIT 1) as consensus_tempo_marking,
 
             -- Mode for is_instrumental (most common, ties broken by most recent)
             (SELECT is_instrumental
@@ -62,7 +71,7 @@ def get_consensus_data(recording_id):
             (SELECT COUNT(*) FROM recording_contributions
              WHERE recording_id = %s AND performance_key IS NOT NULL) as key_count,
             (SELECT COUNT(*) FROM recording_contributions
-             WHERE recording_id = %s AND tempo_bpm IS NOT NULL) as tempo_count,
+             WHERE recording_id = %s AND tempo_marking IS NOT NULL) as tempo_count,
             (SELECT COUNT(*) FROM recording_contributions
              WHERE recording_id = %s AND is_instrumental IS NOT NULL) as instrumental_count
     """
@@ -77,7 +86,7 @@ def get_consensus_data(recording_id):
         return {
             'consensus': {
                 'performance_key': None,
-                'tempo_bpm': None,
+                'tempo_marking': None,
                 'is_instrumental': None
             },
             'counts': {
@@ -90,7 +99,7 @@ def get_consensus_data(recording_id):
     return {
         'consensus': {
             'performance_key': result['consensus_key'],
-            'tempo_bpm': result['consensus_tempo'],
+            'tempo_marking': result['consensus_tempo_marking'],
             'is_instrumental': result['consensus_instrumental']
         },
         'counts': {
@@ -106,7 +115,7 @@ def get_user_contribution(recording_id, user_id):
     query = """
         SELECT
             performance_key,
-            tempo_bpm,
+            tempo_marking,
             is_instrumental,
             updated_at
         FROM recording_contributions
@@ -129,7 +138,7 @@ def get_community_data(recording_id):
     {
         "consensus": {
             "performance_key": "Eb",
-            "tempo_bpm": 120,
+            "tempo_marking": "Medium-Up",
             "is_instrumental": true
         },
         "counts": {
@@ -139,7 +148,7 @@ def get_community_data(recording_id):
         },
         "user_contribution": {  // Only if authenticated
             "performance_key": "Eb",
-            "tempo_bpm": 118,
+            "tempo_marking": "Medium-Up",
             "is_instrumental": true,
             "updated_at": "2025-01-10T14:30:00Z"
         }
@@ -164,7 +173,7 @@ def get_community_data(recording_id):
             if user_contribution:
                 response['user_contribution'] = {
                     'performance_key': user_contribution['performance_key'],
-                    'tempo_bpm': user_contribution['tempo_bpm'],
+                    'tempo_marking': user_contribution['tempo_marking'],
                     'is_instrumental': user_contribution['is_instrumental'],
                     'updated_at': user_contribution['updated_at'].isoformat() if user_contribution['updated_at'] else None
                 }
@@ -186,9 +195,9 @@ def upsert_contribution(recording_id):
 
     Request body (all fields optional):
     {
-        "performance_key": "Eb",  // Must be valid key or null
-        "tempo_bpm": 120,         // Must be 40-400 or null
-        "is_instrumental": true   // Boolean or null
+        "performance_key": "Eb",      // Must be valid key (with optional 'm' for minor) or null
+        "tempo_marking": "Medium-Up", // Must be valid tempo marking or null
+        "is_instrumental": true       // Boolean or null
     }
 
     Response:
@@ -218,17 +227,12 @@ def upsert_contribution(recording_id):
                 'error': f'Invalid performance_key. Must be one of: {", ".join(VALID_KEYS)}'
             }), 400
 
-        # Validate tempo_bpm
-        tempo_bpm = data.get('tempo_bpm')
-        if tempo_bpm is not None:
-            try:
-                tempo_bpm = int(tempo_bpm)
-                if tempo_bpm < MIN_TEMPO or tempo_bpm > MAX_TEMPO:
-                    return jsonify({
-                        'error': f'tempo_bpm must be between {MIN_TEMPO} and {MAX_TEMPO}'
-                    }), 400
-            except (ValueError, TypeError):
-                return jsonify({'error': 'tempo_bpm must be an integer'}), 400
+        # Validate tempo_marking
+        tempo_marking = data.get('tempo_marking')
+        if tempo_marking is not None and tempo_marking not in VALID_TEMPO_MARKINGS:
+            return jsonify({
+                'error': f'Invalid tempo_marking. Must be one of: {", ".join(VALID_TEMPO_MARKINGS)}'
+            }), 400
 
         # Validate is_instrumental
         is_instrumental = data.get('is_instrumental')
@@ -237,20 +241,20 @@ def upsert_contribution(recording_id):
 
         # Upsert the contribution
         upsert_query = """
-            INSERT INTO recording_contributions (recording_id, user_id, performance_key, tempo_bpm, is_instrumental)
+            INSERT INTO recording_contributions (recording_id, user_id, performance_key, tempo_marking, is_instrumental)
             VALUES (%s, %s, %s, %s, %s)
             ON CONFLICT (user_id, recording_id)
             DO UPDATE SET
                 performance_key = EXCLUDED.performance_key,
-                tempo_bpm = EXCLUDED.tempo_bpm,
+                tempo_marking = EXCLUDED.tempo_marking,
                 is_instrumental = EXCLUDED.is_instrumental,
                 updated_at = CURRENT_TIMESTAMP
-            RETURNING performance_key, tempo_bpm, is_instrumental, updated_at
+            RETURNING performance_key, tempo_marking, is_instrumental, updated_at
         """
 
         result = db_tools.execute_query(
             upsert_query,
-            (recording_id, user_id, performance_key, tempo_bpm, is_instrumental),
+            (recording_id, user_id, performance_key, tempo_marking, is_instrumental),
             fetch_one=True
         )
 
@@ -258,7 +262,7 @@ def upsert_contribution(recording_id):
         response = get_consensus_data(recording_id)
         response['user_contribution'] = {
             'performance_key': result['performance_key'],
-            'tempo_bpm': result['tempo_bpm'],
+            'tempo_marking': result['tempo_marking'],
             'is_instrumental': result['is_instrumental'],
             'updated_at': result['updated_at'].isoformat() if result['updated_at'] else None
         }
@@ -332,7 +336,7 @@ def delete_contribution_field(recording_id, field):
     # Map field names to column names
     field_map = {
         'key': 'performance_key',
-        'tempo': 'tempo_bpm',
+        'tempo': 'tempo_marking',
         'instrumental': 'is_instrumental'
     }
 
@@ -351,7 +355,7 @@ def delete_contribution_field(recording_id, field):
             UPDATE recording_contributions
             SET {column_name} = NULL, updated_at = CURRENT_TIMESTAMP
             WHERE recording_id = %s AND user_id = %s
-            RETURNING performance_key, tempo_bpm, is_instrumental, updated_at
+            RETURNING performance_key, tempo_marking, is_instrumental, updated_at
         """
 
         result = db_tools.execute_query(
@@ -364,7 +368,7 @@ def delete_contribution_field(recording_id, field):
             return jsonify({'error': 'No contribution found'}), 404
 
         # Check if all fields are now NULL - if so, delete the row entirely
-        if result['performance_key'] is None and result['tempo_bpm'] is None and result['is_instrumental'] is None:
+        if result['performance_key'] is None and result['tempo_marking'] is None and result['is_instrumental'] is None:
             db_tools.execute_query(
                 "DELETE FROM recording_contributions WHERE recording_id = %s AND user_id = %s",
                 (recording_id, user_id)
@@ -373,7 +377,7 @@ def delete_contribution_field(recording_id, field):
         else:
             user_contribution = {
                 'performance_key': result['performance_key'],
-                'tempo_bpm': result['tempo_bpm'],
+                'tempo_marking': result['tempo_marking'],
                 'is_instrumental': result['is_instrumental'],
                 'updated_at': result['updated_at'].isoformat() if result['updated_at'] else None
             }
