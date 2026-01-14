@@ -85,3 +85,5 @@ BEGIN
         RAISE EXCEPTION 'FAILED: recording_contributions table not found';
     END IF;
 END $$;
+
+select * from recording_contributions

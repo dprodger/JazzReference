@@ -456,12 +456,12 @@ struct StreamingLink: Codable {
 /// Consensus values computed from all user contributions
 struct CommunityConsensus: Codable {
     let performanceKey: String?
-    let tempoBpm: Int?
+    let tempoMarking: String?
     let isInstrumental: Bool?
 
     enum CodingKeys: String, CodingKey {
         case performanceKey = "performance_key"
-        case tempoBpm = "tempo_bpm"
+        case tempoMarking = "tempo_marking"
         case isInstrumental = "is_instrumental"
     }
 }
@@ -482,20 +482,21 @@ struct CommunityData: Codable {
 /// User's own contribution for a recording
 struct UserContribution: Codable {
     let performanceKey: String?
-    let tempoBpm: Int?
+    let tempoMarking: String?
     let isInstrumental: Bool?
     let updatedAt: String?
 
     enum CodingKeys: String, CodingKey {
         case performanceKey = "performance_key"
-        case tempoBpm = "tempo_bpm"
+        case tempoMarking = "tempo_marking"
         case isInstrumental = "is_instrumental"
         case updatedAt = "updated_at"
     }
 }
 
-/// Musical key options for contribution form
+/// Musical key options for contribution form (major and minor)
 enum MusicalKey: String, CaseIterable, Identifiable {
+    // Major keys
     case c = "C"
     case db = "Db"
     case d = "D"
@@ -508,9 +509,84 @@ enum MusicalKey: String, CaseIterable, Identifiable {
     case a = "A"
     case bb = "Bb"
     case b = "B"
+    // Minor keys
+    case cm = "Cm"
+    case dbm = "Dbm"
+    case dm = "Dm"
+    case ebm = "Ebm"
+    case em = "Em"
+    case fm = "Fm"
+    case gbm = "Gbm"
+    case gm = "Gm"
+    case abm = "Abm"
+    case am = "Am"
+    case bbm = "Bbm"
+    case bm = "Bm"
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .c: return "C Major"
+        case .db: return "D♭ Major"
+        case .d: return "D Major"
+        case .eb: return "E♭ Major"
+        case .e: return "E Major"
+        case .f: return "F Major"
+        case .gb: return "G♭ Major"
+        case .g: return "G Major"
+        case .ab: return "A♭ Major"
+        case .a: return "A Major"
+        case .bb: return "B♭ Major"
+        case .b: return "B Major"
+        case .cm: return "C Minor"
+        case .dbm: return "D♭ Minor"
+        case .dm: return "D Minor"
+        case .ebm: return "E♭ Minor"
+        case .em: return "E Minor"
+        case .fm: return "F Minor"
+        case .gbm: return "G♭ Minor"
+        case .gm: return "G Minor"
+        case .abm: return "A♭ Minor"
+        case .am: return "A Minor"
+        case .bbm: return "B♭ Minor"
+        case .bm: return "B Minor"
+        }
+    }
+
+    var isMinor: Bool {
+        rawValue.hasSuffix("m")
+    }
+
+    /// Short display name (e.g., "C" or "Cm")
+    var shortName: String { rawValue }
+}
+
+/// Tempo marking options for contribution form (standard jazz terms)
+enum TempoMarking: String, CaseIterable, Identifiable {
+    case ballad = "Ballad"
+    case slow = "Slow"
+    case medium = "Medium"
+    case mediumUp = "Medium-Up"
+    case upTempo = "Up-Tempo"
+    case fast = "Fast"
+    case burning = "Burning"
 
     var id: String { rawValue }
     var displayName: String { rawValue }
+
+    /// Approximate BPM range for this tempo marking
+    var bpmRange: String {
+        switch self {
+        case .ballad: return "~50-72"
+        case .slow: return "~72-108"
+        case .medium: return "~108-144"
+        case .mediumUp: return "~144-184"
+        case .upTempo: return "~184-224"
+        case .fast: return "~224-280"
+        case .burning: return "280+"
+        }
+    }
 }
 
 // MARK: - Favorite User Model

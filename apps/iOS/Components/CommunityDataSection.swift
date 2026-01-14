@@ -73,10 +73,11 @@ struct CommunityDataSection: View {
                             CommunityDataRow(
                                 icon: "metronome",
                                 label: "Tempo",
-                                value: data.consensus.tempoBpm.map { "\($0) BPM" } ?? "Not set",
+                                value: data.consensus.tempoMarking ?? "Not set",
                                 count: data.counts.tempo,
-                                userValue: userContribution?.tempoBpm.map { "\($0) BPM" },
-                                isEmpty: data.consensus.tempoBpm == nil
+                                userValue: userContribution?.tempoMarking,
+                                isEmpty: data.consensus.tempoMarking == nil,
+                                subtitleText: data.consensus.tempoMarking.flatMap { TempoMarking(rawValue: $0)?.bpmRange }.map { "\($0) BPM" }
                             )
 
                             // Instrumental/Vocal
@@ -144,6 +145,7 @@ struct CommunityDataRow: View {
     let count: Int
     let userValue: String?
     let isEmpty: Bool
+    var subtitleText: String? = nil
 
     var body: some View {
         HStack(alignment: .center, spacing: 12) {
@@ -163,6 +165,12 @@ struct CommunityDataRow: View {
                     .font(JazzTheme.body())
                     .fontWeight(isEmpty ? .regular : .medium)
                     .foregroundColor(isEmpty ? JazzTheme.smokeGray.opacity(0.5) : JazzTheme.charcoal)
+
+                if let subtitle = subtitleText {
+                    Text(subtitle)
+                        .font(JazzTheme.caption2())
+                        .foregroundColor(JazzTheme.smokeGray)
+                }
 
                 if count > 0 {
                     Text("\(count) \(count == 1 ? "vote" : "votes")")

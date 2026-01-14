@@ -235,19 +235,19 @@ extension Recording {
 extension CommunityConsensus {
     static let preview = CommunityConsensus(
         performanceKey: "Eb",
-        tempoBpm: 174,
+        tempoMarking: "Medium-Up",
         isInstrumental: true
     )
 
     static let previewPartial = CommunityConsensus(
         performanceKey: "C",
-        tempoBpm: nil,
+        tempoMarking: nil,
         isInstrumental: nil
     )
 
     static let previewEmpty = CommunityConsensus(
         performanceKey: nil,
-        tempoBpm: nil,
+        tempoMarking: nil,
         isInstrumental: nil
     )
 }
@@ -272,14 +272,14 @@ extension CommunityData {
 extension UserContribution {
     static let preview = UserContribution(
         performanceKey: "Eb",
-        tempoBpm: 172,
+        tempoMarking: "Medium-Up",
         isInstrumental: true,
         updatedAt: "2025-01-10T14:30:00Z"
     )
 
     static let previewPartial = UserContribution(
         performanceKey: "Eb",
-        tempoBpm: nil,
+        tempoMarking: nil,
         isInstrumental: nil,
         updatedAt: "2025-01-08T10:00:00Z"
     )

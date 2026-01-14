@@ -17,7 +17,7 @@ struct RecordingContributionEditView: View {
     @EnvironmentObject var authManager: AuthenticationManager
 
     @State private var selectedKey: MusicalKey?
-    @State private var tempoText: String = ""
+    @State private var selectedTempo: TempoMarking?
     @State private var isInstrumental: Bool?
     @State private var isSaving = false
     @State private var isDeleting = false
@@ -44,23 +44,16 @@ struct RecordingContributionEditView: View {
 
                 // Tempo Section
                 Section {
-                    HStack {
-                        TextField("BPM", text: $tempoText)
-                            .keyboardType(.numberPad)
-                        if !tempoText.isEmpty {
-                            Button {
-                                tempoText = ""
-                            } label: {
-                                Image(systemName: "xmark.circle.fill")
-                                    .foregroundColor(JazzTheme.smokeGray)
-                            }
-                            .buttonStyle(.plain)
+                    Picker("Tempo", selection: $selectedTempo) {
+                        Text("Not set").tag(nil as TempoMarking?)
+                        ForEach(TempoMarking.allCases) { tempo in
+                            Text("\(tempo.displayName) (\(tempo.bpmRange) BPM)").tag(tempo as TempoMarking?)
                         }
                     }
                 } header: {
                     Text("Tempo")
                 } footer: {
-                    Text("Beats per minute (40-400). Typical jazz: ballad ~60, medium swing ~120, up-tempo ~200+")
+                    Text("Select the general tempo feel of this performance")
                 }
 
                 // Instrumental/Vocal Section
@@ -195,7 +188,7 @@ struct RecordingContributionEditView: View {
 
     private var hasChanges: Bool {
         // Check if any field has a value
-        selectedKey != nil || !tempoText.isEmpty || isInstrumental != nil
+        selectedKey != nil || selectedTempo != nil || isInstrumental != nil
     }
 
     private func loadCurrentValues() {
@@ -203,27 +196,16 @@ struct RecordingContributionEditView: View {
             if let key = contrib.performanceKey {
                 selectedKey = MusicalKey(rawValue: key)
             }
-            if let tempo = contrib.tempoBpm {
-                tempoText = String(tempo)
+            if let tempo = contrib.tempoMarking {
+                selectedTempo = TempoMarking(rawValue: tempo)
             }
             isInstrumental = contrib.isInstrumental
         }
     }
 
     private func saveContribution() {
-        // Validate tempo if provided
-        var tempoBpm: Int? = nil
-        if !tempoText.isEmpty {
-            guard let tempo = Int(tempoText), tempo >= 40 && tempo <= 400 else {
-                errorMessage = "Tempo must be between 40 and 400 BPM"
-                showError = true
-                return
-            }
-            tempoBpm = tempo
-        }
-
         // Check if at least one field has a value
-        if selectedKey == nil && tempoBpm == nil && isInstrumental == nil {
+        if selectedKey == nil && selectedTempo == nil && isInstrumental == nil {
             errorMessage = "Please provide at least one value"
             showError = true
             return
@@ -232,12 +214,11 @@ struct RecordingContributionEditView: View {
         isSaving = true
 
         Task {
-            
             do {
                 // Build request body
                 var body: [String: Any] = [:]
                 if let key = selectedKey?.rawValue { body["performance_key"] = key }
-                if let tempo = tempoBpm { body["tempo_bpm"] = tempo }
+                if let tempo = selectedTempo?.rawValue { body["tempo_marking"] = tempo }
                 if let instrumental = isInstrumental { body["is_instrumental"] = instrumental }
 
                 let bodyData = try JSONSerialization.data(withJSONObject: body)
