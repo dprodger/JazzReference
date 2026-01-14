@@ -87,3 +87,7 @@ BEGIN
 END $$;
 
 select * from recording_contributions
+
+
+
+select * from users

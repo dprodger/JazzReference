@@ -38,6 +38,10 @@ from caa_release_importer import save_release_imagery
 # Module-level logger for helper functions
 _logger = logging.getLogger(__name__)
 
+# JazzBot configuration for auto-generated contributions
+JAZZBOT_EMAIL = "jazzbot@approachnote.com"
+JAZZBOT_DISPLAY_NAME = "JazzBot"
+
 
 def parse_mb_date(date_str: str) -> Tuple[Optional[str], Optional[int], Optional[str]]:
     """
@@ -281,6 +285,9 @@ class MBReleaseImporter:
         self._format_cache = {}
         self._status_cache = {}
         self._packaging_cache = {}
+
+        # Cache for JazzBot user ID (for auto-generated vocal/instrumental contributions)
+        self._jazzbot_user_id = None
 
         self.logger.info(f"MBReleaseImporter initialized (optimized version, force_refresh={force_refresh}, import_cover_art={import_cover_art})")
     
@@ -675,7 +682,10 @@ class MBReleaseImporter:
                 self.stats['performers_added_to_recordings'] += performers_added
                 self.logger.info(f"  Added {performers_added} performers to recording")
                 recordings_with_performers.add(mb_recording_id)
-        
+
+                # STEP 2b: Auto-create vocal/instrumental contribution based on credits
+                self._create_vocal_instrumental_contribution(conn, recording_id)
+
         # STEP 3: Check releases using pre-fetched cache (NO QUERY)
         # Filter existing_releases_all to just this recording's releases
         existing_releases = {
@@ -1400,7 +1410,111 @@ class MBReleaseImporter:
             result = cur.fetchone()
             self._packaging_cache[packaging_name] = result['id']
             return result['id']
-    
+
+    # ========================================================================
+    # JazzBot auto-contribution helpers
+    # ========================================================================
+
+    def _get_jazzbot_user_id(self, conn) -> Optional[str]:
+        """
+        Get the JazzBot user ID, creating the user if needed.
+        Cached for the duration of the import session.
+
+        Returns:
+            JazzBot user ID, or None if in dry-run mode
+        """
+        if self._jazzbot_user_id:
+            return self._jazzbot_user_id
+
+        if self.dry_run:
+            return None
+
+        with conn.cursor() as cur:
+            # Try to find existing bot user
+            cur.execute("SELECT id FROM users WHERE email = %s", (JAZZBOT_EMAIL,))
+            row = cur.fetchone()
+
+            if row:
+                self._jazzbot_user_id = str(row['id'])
+                return self._jazzbot_user_id
+
+            # Create the bot user with a placeholder password hash (can't log in)
+            fake_password_hash = "$2b$12$BOTUSER.CANNOT.LOGIN.PLACEHOLDER"
+            cur.execute("""
+                INSERT INTO users (email, email_verified, display_name, is_active, password_hash)
+                VALUES (%s, true, %s, true, %s)
+                RETURNING id
+            """, (JAZZBOT_EMAIL, JAZZBOT_DISPLAY_NAME, fake_password_hash))
+            self._jazzbot_user_id = str(cur.fetchone()['id'])
+            self.logger.info(f"Created JazzBot user: {JAZZBOT_EMAIL}")
+            return self._jazzbot_user_id
+
+    def _create_vocal_instrumental_contribution(self, conn, recording_id: str) -> bool:
+        """
+        Create a JazzBot contribution for vocal/instrumental based on performer credits.
+
+        Logic:
+        - If recording has multiple performers (band credits)
+        - Check if any performer has "Vocals" as their instrument
+        - If vocals found: is_instrumental = False (vocal)
+        - If no vocals: is_instrumental = True (instrumental)
+
+        Args:
+            conn: Database connection
+            recording_id: Recording ID to check and create contribution for
+
+        Returns:
+            True if contribution was created/updated, False otherwise
+        """
+        if self.dry_run or not recording_id:
+            return False
+
+        with conn.cursor() as cur:
+            # Check if recording has multiple performers (band credits)
+            cur.execute("""
+                SELECT COUNT(DISTINCT performer_id) as performer_count
+                FROM recording_performers
+                WHERE recording_id = %s
+            """, (recording_id,))
+            row = cur.fetchone()
+            performer_count = row['performer_count'] if row else 0
+
+            if performer_count <= 1:
+                # Single performer or no performers - don't auto-set
+                return False
+
+            # Check if any performer has "Vocals" instrument
+            cur.execute("""
+                SELECT EXISTS (
+                    SELECT 1
+                    FROM recording_performers rp
+                    JOIN instruments i ON rp.instrument_id = i.id
+                    WHERE rp.recording_id = %s AND i.name = 'Vocals'
+                ) as has_vocals
+            """, (recording_id,))
+            has_vocals = cur.fetchone()['has_vocals']
+
+            # Get JazzBot user ID
+            jazzbot_id = self._get_jazzbot_user_id(conn)
+            if not jazzbot_id:
+                return False
+
+            # Determine is_instrumental value
+            is_instrumental = not has_vocals
+
+            # Create or update the contribution
+            cur.execute("""
+                INSERT INTO recording_contributions (recording_id, user_id, is_instrumental)
+                VALUES (%s, %s, %s)
+                ON CONFLICT (recording_id, user_id)
+                DO UPDATE SET is_instrumental = EXCLUDED.is_instrumental,
+                              updated_at = CURRENT_TIMESTAMP
+            """, (recording_id, jazzbot_id, is_instrumental))
+
+            label = "Instrumental" if is_instrumental else "Vocal"
+            self.logger.debug(f"  JazzBot: marked as {label} ({performer_count} performers)")
+            return True
+
     # ========================================================================
     # Private methods - Database queries
     # ========================================================================
