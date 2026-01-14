@@ -316,6 +316,18 @@ class AppleMusicMatcher:
 
         self.logger.info(f"    Matched: {apple_album['artist']} - {apple_album['name']}")
 
+        # If matched via local catalog, fetch artwork from iTunes API
+        # (local catalog doesn't include artwork URLs)
+        if apple_album.get('_source') == 'local_catalog' and not apple_album.get('artwork'):
+            self.logger.debug(f"    Fetching artwork from iTunes API for album {album_id}")
+            try:
+                api_album = self.client.lookup_album(album_id)
+                if api_album and api_album.get('artwork'):
+                    apple_album['artwork'] = api_album['artwork']
+                    self.logger.debug(f"    Got artwork from iTunes API")
+            except Exception as e:
+                self.logger.warning(f"    Failed to fetch artwork from iTunes API: {e}")
+
         # Save album link
         upsert_release_streaming_link(
             conn,
