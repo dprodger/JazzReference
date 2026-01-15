@@ -1564,4 +1564,70 @@ class NetworkManager: ObservableObject {
             return nil
         }
     }
+
+    // MARK: - User Contribution Stats API
+
+    /// Response from user contribution stats endpoint
+    struct UserContributionStats: Codable {
+        let transcriptions: Int
+        let backingTracks: Int
+        let tempoMarkings: Int
+        let instrumentalVocal: Int
+        let keys: Int
+
+        enum CodingKeys: String, CodingKey {
+            case transcriptions
+            case backingTracks = "backing_tracks"
+            case tempoMarkings = "tempo_markings"
+            case instrumentalVocal = "instrumental_vocal"
+            case keys
+        }
+
+        /// Total number of contributions across all categories
+        var totalContributions: Int {
+            transcriptions + backingTracks + tempoMarkings + instrumentalVocal + keys
+        }
+    }
+
+    /// Fetch contribution statistics for the current authenticated user
+    /// - Parameter authToken: The user's auth token
+    /// - Returns: User contribution stats, or nil on error
+    func fetchUserContributionStats(authToken: String) async -> UserContributionStats? {
+        let startTime = Date()
+        guard let url = URL(string: "\(NetworkManager.baseURL)/users/me/contribution-stats") else {
+            print("Error: Invalid contribution stats URL")
+            return nil
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("Bearer \(authToken)", forHTTPHeaderField: "Authorization")
+
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+
+            guard let httpResponse = response as? HTTPURLResponse else {
+                return nil
+            }
+
+            NetworkManager.logRequest("GET /users/me/contribution-stats", startTime: startTime)
+
+            if httpResponse.statusCode == 200 {
+                let stats = try JSONDecoder().decode(UserContributionStats.self, from: data)
+                if NetworkManager.diagnosticsEnabled {
+                    print("   ↳ Total contributions: \(stats.totalContributions)")
+                }
+                return stats
+            } else if httpResponse.statusCode == 401 {
+                print("Error: Unauthorized")
+                return nil
+            } else {
+                print("Error fetching contribution stats: HTTP \(httpResponse.statusCode)")
+                return nil
+            }
+        } catch {
+            print("Error fetching contribution stats: \(error)")
+            return nil
+        }
+    }
 }

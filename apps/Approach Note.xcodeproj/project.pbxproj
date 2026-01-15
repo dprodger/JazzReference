@@ -16,6 +16,7 @@
 		B41D0FB52EE633EE00DB427C /* ArtistsListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B41D0FA72EE633EE00DB427C /* ArtistsListView.swift */; };
 		B41D0FB62EE633EE00DB427C /* RecordingsListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B41D0FAA2EE633EE00DB427C /* RecordingsListView.swift */; };
 		B41D0FB72EE633EE00DB427C /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B41D0FA32EE633EE00DB427C /* ContentView.swift */; };
+		B4201ACB2F19551400CEA2CF /* CommunitySettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4201ACA2F19551400CEA2CF /* CommunitySettingsView.swift */; };
 		B42E87D42F09B5F20012F32C /* MacOnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B42E87D32F09B5F20012F32C /* MacOnboardingView.swift */; };
 		B45A16A52F08800600259452 /* MacResetPasswordView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B45A16A42F08800600259452 /* MacResetPasswordView.swift */; };
 		B45A16A62F08800600259452 /* MacForgotPasswordView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B45A16A12F08800600259452 /* MacForgotPasswordView.swift */; };
@@ -85,6 +86,7 @@
 		B41D0FAA2EE633EE00DB427C /* RecordingsListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingsListView.swift; sourceTree = "<group>"; };
 		B41D0FAB2EE633EE00DB427C /* SongDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SongDetailView.swift; sourceTree = "<group>"; };
 		B41D0FAC2EE633EE00DB427C /* SongsListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SongsListView.swift; sourceTree = "<group>"; };
+		B4201ACA2F19551400CEA2CF /* CommunitySettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommunitySettingsView.swift; sourceTree = "<group>"; };
 		B42E87D32F09B5F20012F32C /* MacOnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacOnboardingView.swift; sourceTree = "<group>"; };
 		B45A16A12F08800600259452 /* MacForgotPasswordView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacForgotPasswordView.swift; sourceTree = "<group>"; };
 		B45A16A22F08800600259452 /* MacLoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacLoginView.swift; sourceTree = "<group>"; };
@@ -200,6 +202,7 @@
 		B41D0FAD2EE633EE00DB427C /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				B4201ACA2F19551400CEA2CF /* CommunitySettingsView.swift */,
 				B41D0FA32EE633EE00DB427C /* ContentView.swift */,
 				B4D3BAB02F0D7983007CB0DD /* MacSearchBar.swift */,
 				B42E87D32F09B5F20012F32C /* MacOnboardingView.swift */,
@@ -523,6 +526,7 @@
 				B47FCC202F16C937006281D7 /* MacRecordingContributionEditView.swift in Sources */,
 				B45A16A82F08800600259452 /* MacRegisterView.swift in Sources */,
 				B45A16B02F08876C00259452 /* MacAddToRepertoireSheet.swift in Sources */,
+				B4201ACB2F19551400CEA2CF /* CommunitySettingsView.swift in Sources */,
 				B45A16B12F08876C00259452 /* MacCreateRepertoireView.swift in Sources */,
 				B41D0FB52EE633EE00DB427C /* ArtistsListView.swift in Sources */,
 				B41D0FB62EE633EE00DB427C /* RecordingsListView.swift in Sources */,

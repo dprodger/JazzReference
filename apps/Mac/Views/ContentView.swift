@@ -154,9 +154,23 @@ struct SettingsView: View {
                     Label("Account", systemImage: "person.circle")
                 }
                 .tag(1)
+            CommunitySettingsView()
+                .tabItem {
+                    Label("Community", systemImage: "person.3.fill")
+                }
+                .tag(2)
         }
-        .frame(width: 500, height: authManager.isAuthenticated ? 400 : 550)
+        .frame(width: 500, height: settingsHeight)
         .animation(.easeInOut, value: authManager.isAuthenticated)
+    }
+
+    private var settingsHeight: CGFloat {
+        switch selectedTab {
+        case 0: return 380  // General tab
+        case 1: return authManager.isAuthenticated ? 400 : 550  // Account tab
+        case 2: return authManager.isAuthenticated ? 420 : 350  // Community tab
+        default: return 400
+        }
     }
 }
 
