@@ -317,6 +317,81 @@ def delete_contribution(recording_id):
         return jsonify({'error': 'Failed to delete contribution'}), 500
 
 
+@contributions_bp.route('/users/me/contribution-stats', methods=['GET'])
+@require_auth
+def get_user_contribution_stats():
+    """
+    Get contribution statistics for the current authenticated user.
+
+    Returns counts of all contributions made by the user:
+    - transcriptions: Number of solo transcriptions submitted
+    - backing_tracks: Number of backing track videos submitted
+    - tempo_markings: Number of tempo marking contributions
+    - instrumental_vocal: Number of instrumental/vocal contributions
+    - keys: Number of performance key contributions
+
+    Response:
+    {
+        "transcriptions": 5,
+        "backing_tracks": 3,
+        "tempo_markings": 12,
+        "instrumental_vocal": 15,
+        "keys": 10
+    }
+    """
+    try:
+        user_id = g.current_user['id']
+
+        # Query all contribution counts for this user
+        query = """
+            SELECT
+                -- Transcriptions submitted by this user
+                (SELECT COUNT(*) FROM solo_transcriptions
+                 WHERE created_by = %s) as transcription_count,
+
+                -- Backing tracks submitted by this user
+                (SELECT COUNT(*) FROM videos
+                 WHERE created_by = %s AND video_type = 'backing_track') as backing_track_count,
+
+                -- Recording contribution fields
+                (SELECT COUNT(*) FROM recording_contributions
+                 WHERE user_id = %s AND tempo_marking IS NOT NULL) as tempo_count,
+
+                (SELECT COUNT(*) FROM recording_contributions
+                 WHERE user_id = %s AND is_instrumental IS NOT NULL) as instrumental_count,
+
+                (SELECT COUNT(*) FROM recording_contributions
+                 WHERE user_id = %s AND performance_key IS NOT NULL) as key_count
+        """
+
+        result = db_tools.execute_query(
+            query,
+            (user_id, user_id, user_id, user_id, user_id),
+            fetch_one=True
+        )
+
+        if not result:
+            return jsonify({
+                'transcriptions': 0,
+                'backing_tracks': 0,
+                'tempo_markings': 0,
+                'instrumental_vocal': 0,
+                'keys': 0
+            })
+
+        return jsonify({
+            'transcriptions': result['transcription_count'] or 0,
+            'backing_tracks': result['backing_track_count'] or 0,
+            'tempo_markings': result['tempo_count'] or 0,
+            'instrumental_vocal': result['instrumental_count'] or 0,
+            'keys': result['key_count'] or 0
+        })
+
+    except Exception as e:
+        logger.error(f"Error fetching user contribution stats: {e}", exc_info=True)
+        return jsonify({'error': 'Failed to fetch contribution stats'}), 500
+
+
 @contributions_bp.route('/recordings/<recording_id>/contribution/<field>', methods=['DELETE'])
 @require_auth
 def delete_contribution_field(recording_id, field):
