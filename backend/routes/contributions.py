@@ -343,6 +343,8 @@ def get_user_contribution_stats():
         user_id = g.current_user['id']
 
         # Query all contribution counts for this user
+        # Note: created_by columns are VARCHAR, so we cast user_id to text
+        user_id_str = str(user_id)
         query = """
             SELECT
                 -- Transcriptions submitted by this user
@@ -353,7 +355,7 @@ def get_user_contribution_stats():
                 (SELECT COUNT(*) FROM videos
                  WHERE created_by = %s AND video_type = 'backing_track') as backing_track_count,
 
-                -- Recording contribution fields
+                -- Recording contribution fields (user_id is UUID here)
                 (SELECT COUNT(*) FROM recording_contributions
                  WHERE user_id = %s AND tempo_marking IS NOT NULL) as tempo_count,
 
@@ -366,7 +368,7 @@ def get_user_contribution_stats():
 
         result = db_tools.execute_query(
             query,
-            (user_id, user_id, user_id, user_id, user_id),
+            (user_id_str, user_id_str, user_id, user_id, user_id),
             fetch_one=True
         )
 
