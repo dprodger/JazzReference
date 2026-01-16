@@ -5,8 +5,6 @@ Blueprint registration helper
 
 def register_blueprints(app):
     """Register all application blueprints"""
-    from api_doc import api_docs
-
     from routes.health import health_bp
     from routes.research import research_bp
     from routes.songs import songs_bp

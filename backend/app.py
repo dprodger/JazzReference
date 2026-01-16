@@ -65,7 +65,7 @@ API_HOSTS = ['api.approachnote.com', 'localhost:5001', '127.0.0.1:5001']
 WEB_HOSTS = ['approachnote.com', 'www.approachnote.com']
 
 # Routes that should only be served from the website (not API subdomain)
-WEB_ONLY_PATHS = ['/', '/docs']
+WEB_ONLY_PATHS = ['/']
 
 # Routes that should only be served from the API subdomain
 # (everything except web-only paths and static files)
