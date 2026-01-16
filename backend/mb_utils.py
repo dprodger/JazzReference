@@ -459,11 +459,11 @@ class MusicBrainzSearcher:
             logger.debug(f"    ⚠ Found {len(works)} works but no exact match:")
             for work in works[:3]:
                 logger.debug(f"       - '{work['title']}'")
-            
+
             # Cache the negative result
             self._save_to_cache(cache_path, None)
             return None
-            
+
         except requests.exceptions.Timeout:
             logger.warning(f"    ⚠ MusicBrainz search timed out")
             return None
@@ -473,7 +473,106 @@ class MusicBrainzSearcher:
         except Exception as e:
             logger.error(f"    ✗ Error searching MusicBrainz: {e}")
             return None
-    
+
+    def search_works_multi(self, title, limit=5):
+        """
+        Search MusicBrainz for works by title, returning multiple results.
+
+        Unlike search_musicbrainz_work(), this returns all matching results
+        (not just exact matches) so the user can select the correct one.
+
+        Args:
+            title: Song title to search for
+            limit: Maximum number of results to return (default 5)
+
+        Returns:
+            List of dicts with keys: id, title, composers, score, type, musicbrainz_url
+        """
+        self.last_made_api_call = True
+        self.rate_limit()
+
+        # Search with the title as a phrase
+        query = f'work:"{title}"'
+
+        logger.debug(f"Searching MusicBrainz works (multi): {query}")
+
+        try:
+            response = self.session.get(
+                'https://musicbrainz.org/ws/2/work/',
+                params={
+                    'query': query,
+                    'fmt': 'json',
+                    'limit': limit
+                },
+                timeout=10
+            )
+            response.raise_for_status()
+
+            data = response.json()
+            works = data.get('works', [])
+
+            # If no results with quoted search, try unquoted
+            if not works:
+                logger.debug("No results with quoted search, trying unquoted...")
+                self.rate_limit()
+
+                response = self.session.get(
+                    'https://musicbrainz.org/ws/2/work/',
+                    params={
+                        'query': title,
+                        'fmt': 'json',
+                        'limit': limit
+                    },
+                    timeout=10
+                )
+                response.raise_for_status()
+                data = response.json()
+                works = data.get('works', [])
+
+            if not works:
+                logger.debug("No MusicBrainz works found")
+                return []
+
+            # Transform results into our format
+            results = []
+            for work in works:
+                work_id = work.get('id')
+                work_title = work.get('title', '')
+                work_type = work.get('type')
+                score = work.get('score')
+
+                # Extract composers from artist-relation-list if present
+                composers = []
+                if 'relations' in work:
+                    for rel in work['relations']:
+                        if rel.get('type') in ['composer', 'writer', 'lyricist']:
+                            artist = rel.get('artist', {})
+                            name = artist.get('name')
+                            if name and name not in composers:
+                                composers.append(name)
+
+                results.append({
+                    'id': work_id,
+                    'title': work_title,
+                    'composers': composers if composers else None,
+                    'score': score,
+                    'type': work_type,
+                    'musicbrainz_url': f'https://musicbrainz.org/work/{work_id}'
+                })
+
+            logger.debug(f"Found {len(results)} MusicBrainz works")
+            return results
+
+        except requests.exceptions.Timeout:
+            logger.warning("MusicBrainz search timed out")
+            return []
+        except requests.exceptions.RequestException as e:
+            logger.error(f"MusicBrainz search failed: {e}")
+            return []
+        except Exception as e:
+            logger.error(f"Error searching MusicBrainz: {e}")
+            return []
+
     def _escape_lucene_query(self, text):
         """
         Escape special characters for Lucene query syntax
