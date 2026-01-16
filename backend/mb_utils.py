@@ -491,8 +491,12 @@ class MusicBrainzSearcher:
         self.last_made_api_call = True
         self.rate_limit()
 
+        # Normalize apostrophes - MusicBrainz typically uses curly apostrophe (')
+        # Convert straight apostrophe to curly for better matching
+        normalized_title = title.replace("'", "'")
+
         # Search with the title as a phrase
-        query = f'work:"{title}"'
+        query = f'work:"{normalized_title}"'
 
         logger.debug(f"Searching MusicBrainz works (multi): {query}")
 
@@ -519,7 +523,7 @@ class MusicBrainzSearcher:
                 response = self.session.get(
                     'https://musicbrainz.org/ws/2/work/',
                     params={
-                        'query': title,
+                        'query': normalized_title,
                         'fmt': 'json',
                         'limit': limit
                     },
