@@ -95,6 +95,10 @@ def enforce_host_routing():
     if path.startswith('/admin'):
         return None
 
+    # Allow all routes on localhost (development)
+    if host_normalized in ['localhost', '127.0.0.1']:
+        return None
+
     # Check if this is an API host (check if host contains 'api.')
     is_api_host = 'api.' in host_normalized or host_normalized in ['localhost', '127.0.0.1']
 
