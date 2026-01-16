@@ -1630,4 +1630,102 @@ class NetworkManager: ObservableObject {
             return nil
         }
     }
+
+    // MARK: - MusicBrainz Search and Import
+
+    /// Search MusicBrainz for works (songs) by title
+    /// - Parameter query: The song title to search for
+    /// - Returns: Array of MusicBrainzWork results, or empty array on error
+    func searchMusicBrainzWorks(query: String) async -> [MusicBrainzWork] {
+        let startTime = Date()
+
+        let encodedQuery = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? query
+        guard let url = URL(string: "\(NetworkManager.baseURL)/musicbrainz/works/search?q=\(encodedQuery)") else {
+            print("Error: Invalid MusicBrainz search URL")
+            return []
+        }
+
+        do {
+            let (data, response) = try await URLSession.shared.data(from: url)
+
+            guard let httpResponse = response as? HTTPURLResponse else {
+                return []
+            }
+
+            NetworkManager.logRequest("GET /musicbrainz/works/search", startTime: startTime)
+
+            if httpResponse.statusCode == 200 {
+                let searchResponse = try JSONDecoder().decode(MusicBrainzSearchResponse.self, from: data)
+                if NetworkManager.diagnosticsEnabled {
+                    print("   ↳ Found \(searchResponse.results.count) MusicBrainz works")
+                }
+                return searchResponse.results
+            } else {
+                print("Error searching MusicBrainz: HTTP \(httpResponse.statusCode)")
+                return []
+            }
+        } catch {
+            print("Error searching MusicBrainz: \(error)")
+            return []
+        }
+    }
+
+    /// Import a song from MusicBrainz into the database
+    /// - Parameter work: The MusicBrainzWork to import
+    /// - Returns: The imported song response, or nil on error
+    func importSongFromMusicBrainz(work: MusicBrainzWork) async -> MusicBrainzImportResponse? {
+        let startTime = Date()
+
+        guard let url = URL(string: "\(NetworkManager.baseURL)/musicbrainz/import") else {
+            print("Error: Invalid MusicBrainz import URL")
+            return nil
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        // Build request body
+        var body: [String: Any] = [
+            "musicbrainz_id": work.id,
+            "title": work.title
+        ]
+        if let composers = work.composers, !composers.isEmpty {
+            body["composer"] = composers.joined(separator: ", ")
+        }
+
+        do {
+            request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+            let (data, response) = try await URLSession.shared.data(for: request)
+
+            guard let httpResponse = response as? HTTPURLResponse else {
+                return nil
+            }
+
+            NetworkManager.logRequest("POST /musicbrainz/import", startTime: startTime)
+
+            if httpResponse.statusCode == 201 {
+                let importResponse = try JSONDecoder().decode(MusicBrainzImportResponse.self, from: data)
+                if NetworkManager.diagnosticsEnabled {
+                    print("   ↳ Imported song: \(importResponse.song?.title ?? "unknown")")
+                }
+                return importResponse
+            } else if httpResponse.statusCode == 409 {
+                // Song already exists - decode and return the error response
+                print("Error: Song with this MusicBrainz ID already exists")
+                // Try to decode as import response for error info
+                if let errorResponse = try? JSONDecoder().decode(MusicBrainzImportResponse.self, from: data) {
+                    return errorResponse
+                }
+                return nil
+            } else {
+                print("Error importing from MusicBrainz: HTTP \(httpResponse.statusCode)")
+                return nil
+            }
+        } catch {
+            print("Error importing from MusicBrainz: \(error)")
+            return nil
+        }
+    }
 }

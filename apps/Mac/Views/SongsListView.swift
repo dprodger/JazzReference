@@ -14,73 +14,12 @@ struct SongsListView: View {
     @State private var searchText = ""
     @State private var searchTask: Task<Void, Never>?
     @State private var selectedSongId: String?
+    @State private var showMusicBrainzSearch = false
 
     var body: some View {
         HSplitView {
-            // Song list (left pane)
-            VStack(spacing: 0) {
-                MacSearchBar(
-                    text: $searchText,
-                    placeholder: "Search songs...",
-                    backgroundColor: JazzTheme.burgundy
-                )
-
-                // Song list
-                List(selection: $selectedSongId) {
-                    ForEach(groupedSongs, id: \.0) { letter, songs in
-                        Section(header:
-                            HStack {
-                                Text(letter)
-                                    .font(JazzTheme.headline())
-                                    .foregroundColor(.white)
-                                Spacer()
-                            }
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
-                            .frame(maxWidth: .infinity)
-                            .background(
-                                JazzTheme.burgundy
-                                    .padding(.horizontal, -20)
-                                    .padding(.vertical, -4)
-                            )
-                            .listRowInsets(EdgeInsets())
-                        ) {
-                            ForEach(songs) { song in
-                                SongRowView(song: song, isSelected: selectedSongId == song.id)
-                                    .tag(song.id)
-                                    .listRowBackground(
-                                        selectedSongId == song.id
-                                            ? JazzTheme.burgundy
-                                            : JazzTheme.backgroundLight
-                                    )
-                            }
-                        }
-                    }
-                }
-                .listStyle(.plain)
-                .scrollContentBackground(.hidden)
-                .background(JazzTheme.backgroundLight)
-                .listSectionSeparator(.hidden)
-            }
-            .frame(minWidth: 200, idealWidth: 250, maxWidth: 300)
-            .background(JazzTheme.backgroundLight)
-
-            // Song detail (right pane)
-            if let songId = selectedSongId {
-                SongDetailView(songId: songId)
-                    .frame(minWidth: 400)
-            } else {
-                VStack {
-                    Image(systemName: "music.note")
-                        .font(.system(size: 60))
-                        .foregroundColor(JazzTheme.smokeGray.opacity(0.5))
-                    Text("Select a song")
-                        .font(JazzTheme.title2())
-                        .foregroundColor(JazzTheme.smokeGray)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(JazzTheme.backgroundLight)
-            }
+            leftPane
+            rightPane
         }
         .onChange(of: searchText) { _, newValue in
             searchTask?.cancel()
@@ -99,6 +38,97 @@ struct SongsListView: View {
         .task {
             await repertoireManager.loadRepertoires()
             await loadSongs()
+        }
+    }
+
+    // MARK: - Left Pane (Song List)
+
+    private var leftPane: some View {
+        VStack(spacing: 0) {
+            MacSearchBar(
+                text: $searchText,
+                placeholder: "Search songs...",
+                backgroundColor: JazzTheme.burgundy
+            )
+
+            if networkManager.songs.isEmpty && !searchText.isEmpty {
+                emptySearchResultsView
+            } else {
+                songListView
+            }
+        }
+        .frame(minWidth: 200, idealWidth: 250, maxWidth: 300)
+        .background(JazzTheme.backgroundLight)
+        .sheet(isPresented: $showMusicBrainzSearch) {
+            MusicBrainzSearchSheet(
+                searchQuery: searchText,
+                onSongImported: {
+                    Task {
+                        await loadSongs()
+                    }
+                }
+            )
+        }
+    }
+
+    private var songListView: some View {
+        List(selection: $selectedSongId) {
+            ForEach(groupedSongs, id: \.0) { letter, songs in
+                Section(header: sectionHeader(letter: letter)) {
+                    ForEach(songs) { song in
+                        SongRowView(song: song, isSelected: selectedSongId == song.id)
+                            .tag(song.id)
+                            .listRowBackground(
+                                selectedSongId == song.id
+                                    ? JazzTheme.burgundy
+                                    : JazzTheme.backgroundLight
+                            )
+                    }
+                }
+            }
+        }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
+        .background(JazzTheme.backgroundLight)
+        .listSectionSeparator(.hidden)
+    }
+
+    private func sectionHeader(letter: String) -> some View {
+        HStack {
+            Text(letter)
+                .font(JazzTheme.headline())
+                .foregroundColor(.white)
+            Spacer()
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .frame(maxWidth: .infinity)
+        .background(
+            JazzTheme.burgundy
+                .padding(.horizontal, -20)
+                .padding(.vertical, -4)
+        )
+        .listRowInsets(EdgeInsets())
+    }
+
+    // MARK: - Right Pane (Detail)
+
+    @ViewBuilder
+    private var rightPane: some View {
+        if let songId = selectedSongId {
+            SongDetailView(songId: songId)
+                .frame(minWidth: 400)
+        } else {
+            VStack {
+                Image(systemName: "music.note")
+                    .font(.system(size: 60))
+                    .foregroundColor(JazzTheme.smokeGray.opacity(0.5))
+                Text("Select a song")
+                    .font(JazzTheme.title2())
+                    .foregroundColor(JazzTheme.smokeGray)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(JazzTheme.backgroundLight)
         }
     }
 
@@ -131,6 +161,39 @@ struct SongsListView: View {
                 searchQuery: searchText
             )
         }
+    }
+
+    private var emptySearchResultsView: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 40))
+                .foregroundColor(JazzTheme.smokeGray.opacity(0.5))
+
+            Text("No Results")
+                .font(JazzTheme.headline())
+                .foregroundColor(JazzTheme.charcoal)
+
+            Text("No songs match \"\(searchText)\"")
+                .font(JazzTheme.subheadline())
+                .foregroundColor(JazzTheme.smokeGray)
+                .multilineTextAlignment(.center)
+
+            Button(action: {
+                showMusicBrainzSearch = true
+            }) {
+                HStack(spacing: 4) {
+                    Image(systemName: "waveform")
+                    Text("Search MusicBrainz")
+                }
+                .font(JazzTheme.subheadline())
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(JazzTheme.burgundy)
+            .padding(.top, 4)
+        }
+        .padding()
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(JazzTheme.backgroundLight)
     }
 }
 

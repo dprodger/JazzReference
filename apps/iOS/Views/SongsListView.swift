@@ -16,6 +16,7 @@ struct SongsListView: View {
     @State private var showRepertoirePicker = false
     @State private var showLoginPrompt = false
     @State private var hasPerformedInitialLoad = false
+    @State private var showMusicBrainzSearch = false
     
     // Computed property to group songs by first letter
     private var groupedSongs: [(String, [Song])] {
@@ -120,9 +121,22 @@ struct SongsListView: View {
                 loadingView
             } else if let error = networkManager.errorMessage {
                 errorView(error: error)
+            } else if networkManager.songs.isEmpty && !searchText.isEmpty {
+                emptySearchResultsView
             } else {
                 songsListView
             }
+        }
+        .sheet(isPresented: $showMusicBrainzSearch) {
+            MusicBrainzSearchSheet(
+                searchQuery: searchText,
+                onSongImported: {
+                    // Refresh the song list after import
+                    Task {
+                        await loadSongs()
+                    }
+                }
+            )
         }
     }
     
@@ -197,7 +211,45 @@ struct SongsListView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(JazzTheme.backgroundLight)
     }
-    
+
+    private var emptySearchResultsView: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 60))
+                .foregroundColor(JazzTheme.smokeGray.opacity(0.5))
+
+            Text("No Results")
+                .font(JazzTheme.headline())
+                .foregroundColor(JazzTheme.charcoal)
+
+            Text("No songs match \"\(searchText)\"")
+                .font(JazzTheme.subheadline())
+                .foregroundColor(JazzTheme.smokeGray)
+                .multilineTextAlignment(.center)
+
+            VStack(spacing: 12) {
+                Text("Can't find what you're looking for?")
+                    .font(JazzTheme.caption())
+                    .foregroundColor(JazzTheme.smokeGray)
+
+                Button(action: {
+                    showMusicBrainzSearch = true
+                }) {
+                    HStack {
+                        Image(systemName: "waveform")
+                        Text("Search MusicBrainz")
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(JazzTheme.burgundy)
+            }
+            .padding(.top, 8)
+        }
+        .padding()
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(JazzTheme.backgroundLight)
+    }
+
     private var songsListView: some View {
         ScrollViewReader { proxy in
             List {
