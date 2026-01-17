@@ -7,9 +7,9 @@
 
 import Foundation
 
-#if DEBUG
-
 // MARK: - Mock Data Extensions
+// Note: Preview data is not wrapped in #if DEBUG because #Preview macros
+// are processed even in Release builds. Dead code stripping removes unused data.
 
 extension Song {
     static let preview = Song(
@@ -528,5 +528,3 @@ extension NetworkManager {
         return nil
     }
 }
-
-#endif

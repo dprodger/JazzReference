@@ -946,8 +946,7 @@ struct SoloTranscription: Codable, Identifiable {
     }
     
     // MARK: - Preview Data
-    
-    #if DEBUG
+
     static var preview1: SoloTranscription {
         SoloTranscription(
             id: "preview-transcription-1",
@@ -995,7 +994,6 @@ struct SoloTranscription: Codable, Identifiable {
             label: nil
         )
     }
-    #endif
 }
 
 // MARK: - Video Model (Backing Tracks, Performances, etc.)
@@ -1025,7 +1023,7 @@ struct Video: Codable, Identifiable {
     }
 
     // MARK: - Preview Data
-    #if DEBUG
+
     static var preview1: Video {
         Video(
             id: "preview-video-1",
@@ -1055,7 +1053,6 @@ struct Video: Codable, Identifiable {
             updatedAt: "2024-02-20T14:15:00Z"
         )
     }
-    #endif
 }
 
 // MARK: - Authority Recommendation Model
@@ -1274,7 +1271,7 @@ struct MusicBrainzWork: Codable, Identifiable {
     }
 
     // MARK: - Preview Data
-    #if DEBUG
+
     static var preview1: MusicBrainzWork {
         MusicBrainzWork(
             id: "a74b1b7f-71a5-311f-8151-4c86ebfc8d8e",
@@ -1307,7 +1304,6 @@ struct MusicBrainzWork: Codable, Identifiable {
             musicbrainzUrl: "https://musicbrainz.org/work/c96d3d9f-93c7-533f-a373-6e08gdf0f0f0"
         )
     }
-    #endif
 }
 
 /// Response from /api/musicbrainz/import
