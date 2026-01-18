@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		B400E2022F1D9C69004B7557 /* SharedDataManagers.swift in Sources */ = {isa = PBXBuildFile; fileRef = B400E2002F1D9C69004B7557 /* SharedDataManagers.swift */; };
 		B41D0FAE2EE633EE00DB427C /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B41D0FA22EE633EE00DB427C /* Assets.xcassets */; };
 		B41D0FB02EE633EE00DB427C /* JazzReferenceMacApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B41D0FA62EE633EE00DB427C /* JazzReferenceMacApp.swift */; };
 		B41D0FB12EE633EE00DB427C /* PerformerDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B41D0FA82EE633EE00DB427C /* PerformerDetailView.swift */; };
@@ -28,6 +29,10 @@
 		B45A16B12F08876C00259452 /* MacCreateRepertoireView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B45A16AF2F08876C00259452 /* MacCreateRepertoireView.swift */; };
 		B47FCC1F2F16C937006281D7 /* MacCommunityDataSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = B47FCC1C2F16C937006281D7 /* MacCommunityDataSection.swift */; };
 		B47FCC202F16C937006281D7 /* MacRecordingContributionEditView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B47FCC1D2F16C937006281D7 /* MacRecordingContributionEditView.swift */; };
+		B486B2FE2F1D922B005E6644 /* MusicBrainzImporterMac.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = B486B2F22F1D922B005E6644 /* MusicBrainzImporterMac.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		B486B3152F1D93C4005E6644 /* MacSongCreationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B486B3122F1D93C4005E6644 /* MacSongCreationView.swift */; };
+		B486B3162F1D93C4005E6644 /* MacYouTubeImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B486B3132F1D93C4005E6644 /* MacYouTubeImportView.swift */; };
+		B486B3172F1D93C4005E6644 /* MacArtistCreationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B486B3112F1D93C4005E6644 /* MacArtistCreationView.swift */; };
 		B4B9C4C02F1AEC0100159A28 /* MusicBrainzSearchSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4B9C4BF2F1AEC0100159A28 /* MusicBrainzSearchSheet.swift */; };
 		B4C535842ECE5FFF0030A127 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = B4C535832ECE5FFF0030A127 /* GoogleSignIn */; };
 		B4C535862ECE5FFF0030A127 /* GoogleSignInSwift in Frameworks */ = {isa = PBXBuildFile; productRef = B4C535852ECE5FFF0030A127 /* GoogleSignInSwift */; };
@@ -37,6 +42,13 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		B486B2FC2F1D922B005E6644 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = B4C160382E91B03600EB8D2C /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = B486B2F12F1D922B005E6644;
+			remoteInfo = MusicBrainzImporterMac;
+		};
 		B4C1604E2E91B03700EB8D2C /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = B4C160382E91B03600EB8D2C /* Project object */;
@@ -61,6 +73,17 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
+		B486B2FF2F1D922B005E6644 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				B486B2FE2F1D922B005E6644 /* MusicBrainzImporterMac.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		B4EE328B2EB3ED3700C643D1 /* Embed App Extensions */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 12;
@@ -75,6 +98,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		B400E2002F1D9C69004B7557 /* SharedDataManagers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedDataManagers.swift; sourceTree = "<group>"; };
 		B41D0F972EE6337400DB427C /* Approach Note.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Approach Note.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		B41D0FA22EE633EE00DB427C /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Assets.xcassets; path = Mac/Assets.xcassets; sourceTree = "<group>"; };
 		B41D0FA32EE633EE00DB427C /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -97,6 +121,11 @@
 		B45A16AF2F08876C00259452 /* MacCreateRepertoireView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = MacCreateRepertoireView.swift; path = Repertoire/MacCreateRepertoireView.swift; sourceTree = "<group>"; };
 		B47FCC1C2F16C937006281D7 /* MacCommunityDataSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacCommunityDataSection.swift; sourceTree = "<group>"; };
 		B47FCC1D2F16C937006281D7 /* MacRecordingContributionEditView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacRecordingContributionEditView.swift; sourceTree = "<group>"; };
+		B486B2F22F1D922B005E6644 /* MusicBrainzImporterMac.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = MusicBrainzImporterMac.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		B486B3112F1D93C4005E6644 /* MacArtistCreationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacArtistCreationView.swift; sourceTree = "<group>"; };
+		B486B3122F1D93C4005E6644 /* MacSongCreationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacSongCreationView.swift; sourceTree = "<group>"; };
+		B486B3132F1D93C4005E6644 /* MacYouTubeImportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacYouTubeImportView.swift; sourceTree = "<group>"; };
+		B486B3182F1D9743005E6644 /* Approach Note MacRelease.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "Approach Note MacRelease.entitlements"; sourceTree = "<group>"; };
 		B4911D2A2EB316F600326CA7 /* MusicBrainzImporter.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = MusicBrainzImporter.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		B4B9C4BF2F1AEC0100159A28 /* MusicBrainzSearchSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusicBrainzSearchSheet.swift; sourceTree = "<group>"; };
 		B4C160402E91B03600EB8D2C /* Approach Note.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Approach Note.app"; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -112,6 +141,23 @@
 				App/Info.plist,
 			);
 			target = B4C1603F2E91B03600EB8D2C /* Approach Note */;
+		};
+		B486B3022F1D922B005E6644 /* Exceptions for "MusicBrainzImporterMac" folder in "MusicBrainzImporterMac" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = B486B2F12F1D922B005E6644 /* MusicBrainzImporterMac */;
+		};
+		B486B30A2F1D92E9005E6644 /* Exceptions for "MusicBrainzImporter" folder in "MusicBrainzImporterMac" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				ArtistData.swift,
+				DatabaseServices.swift,
+				ExtractMusicBrainzData.js,
+				SharedDataManagers.swift,
+			);
+			target = B486B2F12F1D922B005E6644 /* MusicBrainzImporterMac */;
 		};
 		B4911D382EB316F700326CA7 /* Exceptions for "MusicBrainzImporter" folder in "MusicBrainzImporter" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
@@ -133,11 +179,20 @@
 /* End PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		B486B2F32F1D922B005E6644 /* MusicBrainzImporterMac */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				B486B3022F1D922B005E6644 /* Exceptions for "MusicBrainzImporterMac" folder in "MusicBrainzImporterMac" target */,
+			);
+			path = MusicBrainzImporterMac;
+			sourceTree = "<group>";
+		};
 		B4911D2B2EB316F600326CA7 /* MusicBrainzImporter */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
 				B4911D382EB316F700326CA7 /* Exceptions for "MusicBrainzImporter" folder in "MusicBrainzImporter" target */,
 				B49E75372EB547640053A338 /* Exceptions for "MusicBrainzImporter" folder in "Compile Sources" phase from "MusicBrainzImporter" target */,
+				B486B30A2F1D92E9005E6644 /* Exceptions for "MusicBrainzImporter" folder in "MusicBrainzImporterMac" target */,
 			);
 			path = MusicBrainzImporter;
 			sourceTree = "<group>";
@@ -164,6 +219,13 @@
 			files = (
 				B45A16AB2F08802C00259452 /* GoogleSignIn in Frameworks */,
 				B45A16AD2F08802C00259452 /* GoogleSignInSwift in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B486B2EF2F1D922B005E6644 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -201,9 +263,19 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		B400E2012F1D9C69004B7557 /* Managers */ = {
+			isa = PBXGroup;
+			children = (
+				B400E2002F1D9C69004B7557 /* SharedDataManagers.swift */,
+			);
+			name = Managers;
+			path = Mac/Managers;
+			sourceTree = "<group>";
+		};
 		B41D0FAD2EE633EE00DB427C /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				B486B3142F1D93C4005E6644 /* Import */,
 				B4B9C4BF2F1AEC0100159A28 /* MusicBrainzSearchSheet.swift */,
 				B4201ACA2F19551400CEA2CF /* CommunitySettingsView.swift */,
 				B41D0FA32EE633EE00DB427C /* ContentView.swift */,
@@ -225,6 +297,7 @@
 		B42A1D702F10A06C00DAC930 /* Mac */ = {
 			isa = PBXGroup;
 			children = (
+				B400E2012F1D9C69004B7557 /* Managers */,
 				B47FCC1E2F16C937006281D7 /* Components */,
 				B42A1D902F10D00000DAC930 /* App */,
 				B41D0FA22EE633EE00DB427C /* Assets.xcassets */,
@@ -274,13 +347,25 @@
 			path = Mac/Components;
 			sourceTree = "<group>";
 		};
+		B486B3142F1D93C4005E6644 /* Import */ = {
+			isa = PBXGroup;
+			children = (
+				B486B3112F1D93C4005E6644 /* MacArtistCreationView.swift */,
+				B486B3122F1D93C4005E6644 /* MacSongCreationView.swift */,
+				B486B3132F1D93C4005E6644 /* MacYouTubeImportView.swift */,
+			);
+			path = Import;
+			sourceTree = "<group>";
+		};
 		B4C160372E91B03600EB8D2C = {
 			isa = PBXGroup;
 			children = (
+				B486B3182F1D9743005E6644 /* Approach Note MacRelease.entitlements */,
 				B42A1D702F10A06C00DAC930 /* Mac */,
 				B4C160422E91B03600EB8D2C /* iOS */,
 				B4SHARED012F10C00000000001 /* Shared */,
 				B4911D2B2EB316F600326CA7 /* MusicBrainzImporter */,
+				B486B2F32F1D922B005E6644 /* MusicBrainzImporterMac */,
 				B45A16A92F08802C00259452 /* Frameworks */,
 				B4C160412E91B03600EB8D2C /* Products */,
 			);
@@ -294,6 +379,7 @@
 				B4C160572E91B03700EB8D2C /* JazzReferenceUITests.xctest */,
 				B4911D2A2EB316F600326CA7 /* MusicBrainzImporter.appex */,
 				B41D0F972EE6337400DB427C /* Approach Note.app */,
+				B486B2F22F1D922B005E6644 /* MusicBrainzImporterMac.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -308,10 +394,12 @@
 				B41D0F932EE6337400DB427C /* Sources */,
 				B41D0F942EE6337400DB427C /* Frameworks */,
 				B41D0F952EE6337400DB427C /* Resources */,
+				B486B2FF2F1D922B005E6644 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				B486B2FD2F1D922B005E6644 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				B4SHARED012F10C00000000001 /* Shared */,
@@ -324,6 +412,28 @@
 			productName = "Approach Note";
 			productReference = B41D0F972EE6337400DB427C /* Approach Note.app */;
 			productType = "com.apple.product-type.application";
+		};
+		B486B2F12F1D922B005E6644 /* MusicBrainzImporterMac */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B486B3032F1D922B005E6644 /* Build configuration list for PBXNativeTarget "MusicBrainzImporterMac" */;
+			buildPhases = (
+				B486B2EE2F1D922B005E6644 /* Sources */,
+				B486B2EF2F1D922B005E6644 /* Frameworks */,
+				B486B2F02F1D922B005E6644 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				B486B2F32F1D922B005E6644 /* MusicBrainzImporterMac */,
+			);
+			name = MusicBrainzImporterMac;
+			packageProductDependencies = (
+			);
+			productName = MusicBrainzImporterMac;
+			productReference = B486B2F22F1D922B005E6644 /* MusicBrainzImporterMac.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 		B4911D292EB316F600326CA7 /* MusicBrainzImporter */ = {
 			isa = PBXNativeTarget;
@@ -422,11 +532,14 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
-				LastSwiftUpdateCheck = 2610;
+				LastSwiftUpdateCheck = 2620;
 				LastUpgradeCheck = 2600;
 				TargetAttributes = {
 					B41D0F962EE6337400DB427C = {
 						CreatedOnToolsVersion = 26.1.1;
+					};
+					B486B2F12F1D922B005E6644 = {
+						CreatedOnToolsVersion = 26.2;
 					};
 					B4911D292EB316F600326CA7 = {
 						CreatedOnToolsVersion = 26.0.1;
@@ -467,6 +580,7 @@
 				B4C160562E91B03700EB8D2C /* JazzReferenceUITests */,
 				B4911D292EB316F600326CA7 /* MusicBrainzImporter */,
 				B41D0F962EE6337400DB427C /* Approach Note Mac */,
+				B486B2F12F1D922B005E6644 /* MusicBrainzImporterMac */,
 			);
 		};
 /* End PBXProject section */
@@ -477,6 +591,13 @@
 			buildActionMask = 2147483647;
 			files = (
 				B41D0FAE2EE633EE00DB427C /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B486B2F02F1D922B005E6644 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -528,13 +649,24 @@
 				B47FCC1F2F16C937006281D7 /* MacCommunityDataSection.swift in Sources */,
 				B47FCC202F16C937006281D7 /* MacRecordingContributionEditView.swift in Sources */,
 				B45A16A82F08800600259452 /* MacRegisterView.swift in Sources */,
+				B400E2022F1D9C69004B7557 /* SharedDataManagers.swift in Sources */,
 				B45A16B02F08876C00259452 /* MacAddToRepertoireSheet.swift in Sources */,
 				B4201ACB2F19551400CEA2CF /* CommunitySettingsView.swift in Sources */,
 				B45A16B12F08876C00259452 /* MacCreateRepertoireView.swift in Sources */,
+				B486B3152F1D93C4005E6644 /* MacSongCreationView.swift in Sources */,
+				B486B3162F1D93C4005E6644 /* MacYouTubeImportView.swift in Sources */,
+				B486B3172F1D93C4005E6644 /* MacArtistCreationView.swift in Sources */,
 				B41D0FB52EE633EE00DB427C /* ArtistsListView.swift in Sources */,
 				B4B9C4C02F1AEC0100159A28 /* MusicBrainzSearchSheet.swift in Sources */,
 				B41D0FB62EE633EE00DB427C /* RecordingsListView.swift in Sources */,
 				B41D0FB72EE633EE00DB427C /* ContentView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B486B2EE2F1D922B005E6644 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -569,6 +701,11 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		B486B2FD2F1D922B005E6644 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = B486B2F12F1D922B005E6644 /* MusicBrainzImporterMac */;
+			targetProxy = B486B2FC2F1D922B005E6644 /* PBXContainerItemProxy */;
+		};
 		B4C1604F2E91B03700EB8D2C /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = B4C1603F2E91B03600EB8D2C /* Approach Note */;
@@ -646,7 +783,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				AUTOMATION_APPLE_EVENTS = NO;
-				CODE_SIGN_ENTITLEMENTS = Mac/App/JazzReferenceMac.entitlements;
+				CODE_SIGN_ENTITLEMENTS = "Approach Note MacRelease.entitlements";
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
@@ -687,6 +824,78 @@
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		B486B3002F1D922B005E6644 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = MusicBrainzImporterMac/MusicBrainzImporterMacRelease.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = FX893D85BJ;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_USER_SELECTED_FILES = readonly;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = MusicBrainzImporterMac/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = MusicBrainzImporterMac;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 15.7;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "me.rodger.david.Jazz-Liner-Notes.MusicBrainzImporterMac";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		B486B3012F1D922B005E6644 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = MusicBrainzImporterMac/MusicBrainzImporterMacRelease.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = FX893D85BJ;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_USER_SELECTED_FILES = readonly;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = MusicBrainzImporterMac/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = MusicBrainzImporterMac;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 15.7;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "me.rodger.david.Jazz-Liner-Notes.MusicBrainzImporterMac";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
@@ -1034,6 +1243,15 @@
 			buildConfigurations = (
 				B41D0F9F2EE6337500DB427C /* Debug */,
 				B41D0FA02EE6337500DB427C /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		B486B3032F1D922B005E6644 /* Build configuration list for PBXNativeTarget "MusicBrainzImporterMac" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B486B3002F1D922B005E6644 /* Debug */,
+				B486B3012F1D922B005E6644 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

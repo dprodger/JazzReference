@@ -5,7 +5,7 @@
 //  Created by Dave Rodger on 11/1/25.
 //
 
-import UIKit
+import Foundation
 
 
 // MARK: - Shared Data Manager

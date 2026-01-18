@@ -24,9 +24,21 @@ struct JazzReferenceMacApp: App {
     @State private var resetPasswordToken: String?
     @State private var showResetPasswordSheet = false
 
+    // Import state from Share Extension
+    @State private var importedArtistData: ImportedArtistData?
+    @State private var importedSongData: ImportedSongData?
+    @State private var importedYouTubeData: ImportedYouTubeData?
+
+    // Deep link navigation state
+    @State private var deepLinkSongId: String?
+    @State private var deepLinkArtistId: String?
+
+    @Environment(\.scenePhase) var scenePhase
+
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .handlesExternalEvents(preferring: ["jazzreference"], allowing: ["*"])
                 .environmentObject(authManager)
                 .environmentObject(repertoireManager)
                 .environmentObject(favoritesManager)
@@ -57,6 +69,16 @@ struct JazzReferenceMacApp: App {
                         }
                     }
                 }
+                .onChange(of: scenePhase) { _, newPhase in
+                    if newPhase == .active {
+                        // Check for pending imports when app becomes active
+                        if deepLinkSongId == nil && deepLinkArtistId == nil {
+                            checkForImportedArtist()
+                            checkForImportedSong()
+                            checkForImportedYouTube()
+                        }
+                    }
+                }
                 .onOpenURL { url in
                     handleDeepLink(url)
                 }
@@ -73,7 +95,43 @@ struct JazzReferenceMacApp: App {
                             hasCompletedOnboarding = true
                         }
                 }
+                // Import sheets
+                .sheet(item: $importedArtistData) { data in
+                    MacArtistCreationView(importedData: data)
+                        .frame(minWidth: 400, minHeight: 300)
+                }
+                .sheet(item: $importedSongData) { data in
+                    MacSongCreationView(importedData: data)
+                        .frame(minWidth: 400, minHeight: 400)
+                }
+                .sheet(item: $importedYouTubeData) { data in
+                    MacYouTubeImportView(youtubeData: data) {
+                        // On successful import, clear the data
+                        SharedYouTubeDataManager.clearSharedData()
+                        importedYouTubeData = nil
+                    } onCancel: {
+                        SharedYouTubeDataManager.clearSharedData()
+                        importedYouTubeData = nil
+                    }
+                    .environmentObject(authManager)
+                    .frame(minWidth: 500, minHeight: 500)
+                }
+                // Deep link navigation sheets
+                .sheet(item: Binding(
+                    get: { deepLinkSongId.map { DeepLinkData(id: $0) } },
+                    set: { deepLinkSongId = $0?.id }
+                )) { data in
+                    MacSongDetailSheet(songId: data.id)
+                        .environmentObject(repertoireManager)
+                }
+                .sheet(item: Binding(
+                    get: { deepLinkArtistId.map { DeepLinkData(id: $0) } },
+                    set: { deepLinkArtistId = $0?.id }
+                )) { data in
+                    MacPerformerDetailSheet(performerId: data.id)
+                }
         }
+        .handlesExternalEvents(matching: ["jazzreference", "*"]) // Route URLs to existing window
         .windowStyle(.automatic)
         .defaultSize(width: 1200, height: 800)
         .commands {
@@ -110,7 +168,7 @@ struct JazzReferenceMacApp: App {
     // MARK: - Deep Link Handling
 
     private func handleDeepLink(_ url: URL) {
-        print("Received deep link: \(url)")
+        NSLog("🔗 Received deep link: %@", url.absoluteString)
 
         // Handle Google Sign-In callback
         #if canImport(GoogleSignIn)
@@ -119,17 +177,148 @@ struct JazzReferenceMacApp: App {
         }
         #endif
 
-        // Handle password reset: jazzreference://auth/reset-password?token=xyz
-        guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
-            return
-        }
+        guard url.scheme == "jazzreference" else { return }
 
-        if components.host == "auth" && components.path == "/reset-password" {
-            if let token = components.queryItems?.first(where: { $0.name == "token" })?.value {
+        // Handle password reset: jazzreference://auth/reset-password?token=xyz
+        if url.host == "auth" && url.path == "/reset-password" {
+            if let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+               let token = components.queryItems?.first(where: { $0.name == "token" })?.value {
                 resetPasswordToken = token
                 showResetPasswordSheet = true
             }
+            return
         }
+
+        // Handle artist import: jazzreference://import-artist
+        if url.host == "import-artist" {
+            NSLog("🎵 Artist import deep link detected")
+            checkForImportedArtist()
+            return
+        }
+
+        // Handle song import: jazzreference://import-song
+        if url.host == "import-song" {
+            NSLog("🎵 Song import deep link detected")
+            checkForImportedSong()
+            return
+        }
+
+        // Handle YouTube import: jazzreference://import-youtube
+        if url.host == "import-youtube" {
+            NSLog("🎬 YouTube import deep link detected")
+            checkForImportedYouTube()
+            return
+        }
+
+        // Handle song view: jazzreference://song/{songId}
+        if url.host == "song" {
+            let songId = url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+            NSLog("🎵 Song deep link detected: %@", songId)
+            if !songId.isEmpty {
+                importedSongData = nil
+                importedArtistData = nil
+                deepLinkSongId = songId
+            }
+            return
+        }
+
+        // Handle artist view: jazzreference://artist/{artistId}
+        if url.host == "artist" {
+            let artistId = url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+            NSLog("🎵 Artist deep link detected: %@", artistId)
+            if !artistId.isEmpty {
+                importedSongData = nil
+                importedArtistData = nil
+                deepLinkArtistId = artistId
+            }
+            return
+        }
+
+        NSLog("❓ Unrecognized deep link format: %@", url.absoluteString)
+    }
+
+    // MARK: - Import Checking
+
+    private func checkForImportedArtist() {
+        NSLog("🔍 Checking for imported artist data...")
+        if let data = SharedArtistDataManager.retrieveSharedData() {
+            NSLog("✅ Imported artist data detected: %@", data.name)
+            importedArtistData = data
+        }
+    }
+
+    private func checkForImportedSong() {
+        NSLog("🔍 Checking for imported song data...")
+        if let data = SharedSongDataManager.retrieveSharedData() {
+            NSLog("✅ Imported song data detected: %@", data.title)
+            importedSongData = data
+        }
+    }
+
+    private func checkForImportedYouTube() {
+        NSLog("🔍 Checking for imported YouTube data...")
+        guard importedYouTubeData == nil else {
+            NSLog("ℹ️ YouTube import already in progress, skipping check")
+            return
+        }
+
+        if let data = SharedYouTubeDataManager.retrieveSharedData() {
+            NSLog("✅ Imported YouTube data detected: %@", data.title)
+            SharedYouTubeDataManager.clearSharedData()
+            importedYouTubeData = data
+            NSLog("✅ Set importedYouTubeData, sheet should show")
+        } else {
+            NSLog("❌ No YouTube data found")
+        }
+    }
+}
+
+// MARK: - Helper Types
+
+struct DeepLinkData: Identifiable {
+    let id: String
+}
+
+// Placeholder views for deep link navigation
+// These should be replaced with actual views or navigate to existing views
+struct MacSongDetailSheet: View {
+    let songId: String
+    @EnvironmentObject var repertoireManager: RepertoireManager
+    @Environment(\.dismiss) var dismiss
+
+    var body: some View {
+        VStack {
+            Text("Song Detail")
+                .font(.headline)
+            Text("Song ID: \(songId)")
+                .font(.caption)
+                .foregroundColor(.secondary)
+            Button("Close") {
+                dismiss()
+            }
+            .padding()
+        }
+        .frame(minWidth: 400, minHeight: 300)
+    }
+}
+
+struct MacPerformerDetailSheet: View {
+    let performerId: String
+    @Environment(\.dismiss) var dismiss
+
+    var body: some View {
+        VStack {
+            Text("Artist Detail")
+                .font(.headline)
+            Text("Artist ID: \(performerId)")
+                .font(.caption)
+                .foregroundColor(.secondary)
+            Button("Close") {
+                dismiss()
+            }
+            .padding()
+        }
+        .frame(minWidth: 400, minHeight: 300)
     }
 }
 
