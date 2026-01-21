@@ -67,6 +67,31 @@ ALBUM_ART_LARGE_SQL = """
          LIMIT 1)
     ) as best_cover_art_large"""
 
+# Source info for front cover (for watermark/attribution)
+ALBUM_ART_SOURCE_SQL = """
+    COALESCE(
+        (SELECT ri.source::text FROM release_imagery ri
+         WHERE ri.release_id = r.default_release_id AND ri.type = 'Front'
+         LIMIT 1),
+        (SELECT ri.source::text
+         FROM recording_releases rr_sub
+         JOIN release_imagery ri ON rr_sub.release_id = ri.release_id
+         WHERE rr_sub.recording_id = r.id AND ri.type = 'Front'
+         LIMIT 1)
+    ) as best_cover_art_source"""
+
+ALBUM_ART_SOURCE_URL_SQL = """
+    COALESCE(
+        (SELECT ri.source_url FROM release_imagery ri
+         WHERE ri.release_id = r.default_release_id AND ri.type = 'Front'
+         LIMIT 1),
+        (SELECT ri.source_url
+         FROM recording_releases rr_sub
+         JOIN release_imagery ri ON rr_sub.release_id = ri.release_id
+         WHERE rr_sub.recording_id = r.id AND ri.type = 'Front'
+         LIMIT 1)
+    ) as best_cover_art_source_url"""
+
 # Back cover art (CAA only - no Spotify fallback)
 BACK_COVER_SMALL_SQL = """
     COALESCE(
@@ -114,6 +139,31 @@ HAS_BACK_COVER_SQL = """
         WHERE rr_sub.recording_id = r.id AND ri.type = 'Back'
     ) as has_back_cover"""
 
+# Source info for back cover (for watermark/attribution)
+BACK_COVER_SOURCE_SQL = """
+    COALESCE(
+        (SELECT ri.source::text FROM release_imagery ri
+         WHERE ri.release_id = r.default_release_id AND ri.type = 'Back'
+         LIMIT 1),
+        (SELECT ri.source::text
+         FROM recording_releases rr_sub
+         JOIN release_imagery ri ON rr_sub.release_id = ri.release_id
+         WHERE rr_sub.recording_id = r.id AND ri.type = 'Back'
+         LIMIT 1)
+    ) as back_cover_source"""
+
+BACK_COVER_SOURCE_URL_SQL = """
+    COALESCE(
+        (SELECT ri.source_url FROM release_imagery ri
+         WHERE ri.release_id = r.default_release_id AND ri.type = 'Back'
+         LIMIT 1),
+        (SELECT ri.source_url
+         FROM recording_releases rr_sub
+         JOIN release_imagery ri ON rr_sub.release_id = ri.release_id
+         WHERE rr_sub.recording_id = r.id AND ri.type = 'Back'
+         LIMIT 1)
+    ) as back_cover_source_url"""
+
 # For authority recommendations - uses 'r' alias for recordings
 AUTHORITY_ALBUM_ART_SQL = """
     COALESCE(
@@ -126,6 +176,18 @@ AUTHORITY_ALBUM_ART_SQL = """
          WHERE rr.recording_id = r.id AND ri.type = 'Front'
          LIMIT 1)
     ) as matched_album_art"""
+
+AUTHORITY_ALBUM_ART_SOURCE_SQL = """
+    COALESCE(
+        (SELECT ri.source::text FROM release_imagery ri
+         WHERE ri.release_id = r.default_release_id AND ri.type = 'Front'
+         LIMIT 1),
+        (SELECT ri.source::text
+         FROM recording_releases rr
+         JOIN release_imagery ri ON rr.release_id = ri.release_id
+         WHERE rr.recording_id = r.id AND ri.type = 'Front'
+         LIMIT 1)
+    ) as matched_album_art_source"""
 
 
 # All song-related endpoints:
@@ -237,6 +299,8 @@ def get_song_summary(song_id):
                     {ALBUM_ART_SMALL_SQL},
                     {ALBUM_ART_MEDIUM_SQL},
                     {ALBUM_ART_LARGE_SQL},
+                    {ALBUM_ART_SOURCE_SQL},
+                    {ALBUM_ART_SOURCE_URL_SQL},
                     r.youtube_url,
                     r.apple_music_url,
                     r.musicbrainz_id,
@@ -392,10 +456,14 @@ def get_song_recordings(song_id):
                 {ALBUM_ART_SMALL_SQL},
                 {ALBUM_ART_MEDIUM_SQL},
                 {ALBUM_ART_LARGE_SQL},
+                {ALBUM_ART_SOURCE_SQL},
+                {ALBUM_ART_SOURCE_URL_SQL},
                 {BACK_COVER_SMALL_SQL},
                 {BACK_COVER_MEDIUM_SQL},
                 {BACK_COVER_LARGE_SQL},
                 {HAS_BACK_COVER_SQL},
+                {BACK_COVER_SOURCE_SQL},
+                {BACK_COVER_SOURCE_URL_SQL},
                 r.youtube_url,
                 r.apple_music_url,
                 r.musicbrainz_id,
@@ -598,11 +666,15 @@ def get_song_detail(song_id):
                     {ALBUM_ART_SMALL_SQL},
                     {ALBUM_ART_MEDIUM_SQL},
                     {ALBUM_ART_LARGE_SQL},
+                    {ALBUM_ART_SOURCE_SQL},
+                    {ALBUM_ART_SOURCE_URL_SQL},
                     -- Back cover art (CAA only)
                     {BACK_COVER_SMALL_SQL},
                     {BACK_COVER_MEDIUM_SQL},
                     {BACK_COVER_LARGE_SQL},
                     {HAS_BACK_COVER_SQL},
+                    {BACK_COVER_SOURCE_SQL},
+                    {BACK_COVER_SOURCE_URL_SQL},
                     r.youtube_url,
                     r.apple_music_url,
                     r.musicbrainz_id,
@@ -978,7 +1050,8 @@ def get_song_authority_recommendations(song_id):
                                 LIMIT 1)
                            ) as matched_spotify_url,
                            -- Album art with release_imagery priority
-                           {AUTHORITY_ALBUM_ART_SQL}
+                           {AUTHORITY_ALBUM_ART_SQL},
+                           {AUTHORITY_ALBUM_ART_SOURCE_SQL}
                     FROM song_authority_recommendations sar
                     LEFT JOIN recordings r ON sar.recording_id = r.id
                     LEFT JOIN releases def_rel ON r.default_release_id = def_rel.id
