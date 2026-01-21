@@ -646,11 +646,8 @@ def get_existing_recordings_for_song(song_id):
                             'spotify_track_id', rr.spotify_track_id,
                             'spotify_track_url', CASE WHEN rr.spotify_track_id IS NOT NULL
                                 THEN 'https://open.spotify.com/track/' || rr.spotify_track_id END,
-                            'album_art_small', COALESCE(
-                                (SELECT ri.image_url_small FROM release_imagery ri
-                                 WHERE ri.release_id = rel.id AND ri.type = 'Front' LIMIT 1),
-                                rel.cover_art_small
-                            )
+                            'album_art_small', (SELECT ri.image_url_small FROM release_imagery ri
+                                 WHERE ri.release_id = rel.id AND ri.type = 'Front' LIMIT 1)
                         ) ORDER BY rel.release_year)
                         FROM recording_releases rr
                         JOIN releases rel ON rr.release_id = rel.id
@@ -1005,11 +1002,8 @@ def get_potential_matches(song_id, rec_id):
                     rel.release_year,
                     rel.musicbrainz_release_id,
                     rel.spotify_album_id,
-                    COALESCE(
-                        (SELECT ri.image_url_small FROM release_imagery ri
-                         WHERE ri.release_id = rel.id AND ri.type = 'Front' LIMIT 1),
-                        rel.cover_art_small
-                    ) AS cover_art,
+                    (SELECT ri.image_url_small FROM release_imagery ri
+                     WHERE ri.release_id = rel.id AND ri.type = 'Front' LIMIT 1) AS cover_art,
                     r.id AS recording_id,
                     def_rel.title AS recording_album
                 FROM releases rel
@@ -1640,11 +1634,8 @@ def apple_matches_review(song_id):
                     rsl.service_url as apple_music_url,
                     rsl.id IS NOT NULL as has_apple_music,
                     -- Get cover art
-                    COALESCE(
-                        (SELECT ri.image_url_small FROM release_imagery ri
-                         WHERE ri.release_id = rel.id AND ri.type = 'Front' LIMIT 1),
-                        rel.cover_art_small
-                    ) as cover_art,
+                    (SELECT ri.image_url_small FROM release_imagery ri
+                     WHERE ri.release_id = rel.id AND ri.type = 'Front' LIMIT 1) as cover_art,
                     -- Get recordings for this release
                     (SELECT json_agg(
                         json_build_object(
@@ -1674,8 +1665,7 @@ def apple_matches_review(song_id):
                 WHERE rec.song_id = %s
                 GROUP BY rel.id, rel.title, rel.artist_credit, rel.release_year,
                          rel.musicbrainz_release_id, rel.apple_music_searched_at,
-                         rsl.service_id, rsl.service_url, rsl.id,
-                         rel.cover_art_small
+                         rsl.service_id, rsl.service_url, rsl.id
                 ORDER BY rel.release_year, rel.title
             """, (song_id, song_id))
             releases = cur.fetchall()

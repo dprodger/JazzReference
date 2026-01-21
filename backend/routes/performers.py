@@ -247,34 +247,20 @@ def get_performer_detail(performer_id):
                    COALESCE(
                        (SELECT ri.image_url_small FROM release_imagery ri
                         WHERE ri.release_id = r.default_release_id AND ri.type = 'Front'),
-                       (SELECT rel_sub.cover_art_small FROM releases rel_sub
-                        WHERE rel_sub.id = r.default_release_id AND rel_sub.cover_art_small IS NOT NULL),
                        (SELECT ri.image_url_small
                         FROM recording_releases rr_sub
                         JOIN release_imagery ri ON rr_sub.release_id = ri.release_id
                         WHERE rr_sub.recording_id = r.id AND ri.type = 'Front'
-                        LIMIT 1),
-                       (SELECT rel_sub.cover_art_small
-                        FROM recording_releases rr_sub
-                        JOIN releases rel_sub ON rr_sub.release_id = rel_sub.id
-                        WHERE rr_sub.recording_id = r.id AND rel_sub.cover_art_small IS NOT NULL
-                        ORDER BY rel_sub.release_year DESC NULLS LAST LIMIT 1)
+                        LIMIT 1)
                    ) as best_cover_art_small,
                    COALESCE(
                        (SELECT ri.image_url_medium FROM release_imagery ri
                         WHERE ri.release_id = r.default_release_id AND ri.type = 'Front'),
-                       (SELECT rel_sub.cover_art_medium FROM releases rel_sub
-                        WHERE rel_sub.id = r.default_release_id AND rel_sub.cover_art_medium IS NOT NULL),
                        (SELECT ri.image_url_medium
                         FROM recording_releases rr_sub
                         JOIN release_imagery ri ON rr_sub.release_id = ri.release_id
                         WHERE rr_sub.recording_id = r.id AND ri.type = 'Front'
-                        LIMIT 1),
-                       (SELECT rel_sub.cover_art_medium
-                        FROM recording_releases rr_sub
-                        JOIN releases rel_sub ON rr_sub.release_id = rel_sub.id
-                        WHERE rr_sub.recording_id = r.id AND rel_sub.cover_art_medium IS NOT NULL
-                        ORDER BY rel_sub.release_year DESC NULLS LAST LIMIT 1)
+                        LIMIT 1)
                    ) as best_cover_art_medium
             FROM recording_performers rp
             JOIN recordings r ON rp.recording_id = r.id
@@ -421,34 +407,20 @@ def get_performer_recordings(performer_id):
                    COALESCE(
                        (SELECT ri.image_url_small FROM release_imagery ri
                         WHERE ri.release_id = r.default_release_id AND ri.type = 'Front'),
-                       (SELECT rel_sub.cover_art_small FROM releases rel_sub
-                        WHERE rel_sub.id = r.default_release_id AND rel_sub.cover_art_small IS NOT NULL),
                        (SELECT ri.image_url_small
                         FROM recording_releases rr_sub
                         JOIN release_imagery ri ON rr_sub.release_id = ri.release_id
                         WHERE rr_sub.recording_id = r.id AND ri.type = 'Front'
-                        LIMIT 1),
-                       (SELECT rel_sub.cover_art_small
-                        FROM recording_releases rr_sub
-                        JOIN releases rel_sub ON rr_sub.release_id = rel_sub.id
-                        WHERE rr_sub.recording_id = r.id AND rel_sub.cover_art_small IS NOT NULL
-                        ORDER BY rel_sub.release_year DESC NULLS LAST LIMIT 1)
+                        LIMIT 1)
                    ) as best_cover_art_small,
                    COALESCE(
                        (SELECT ri.image_url_medium FROM release_imagery ri
                         WHERE ri.release_id = r.default_release_id AND ri.type = 'Front'),
-                       (SELECT rel_sub.cover_art_medium FROM releases rel_sub
-                        WHERE rel_sub.id = r.default_release_id AND rel_sub.cover_art_medium IS NOT NULL),
                        (SELECT ri.image_url_medium
                         FROM recording_releases rr_sub
                         JOIN release_imagery ri ON rr_sub.release_id = ri.release_id
                         WHERE rr_sub.recording_id = r.id AND ri.type = 'Front'
-                        LIMIT 1),
-                       (SELECT rel_sub.cover_art_medium
-                        FROM recording_releases rr_sub
-                        JOIN releases rel_sub ON rr_sub.release_id = rel_sub.id
-                        WHERE rr_sub.recording_id = r.id AND rel_sub.cover_art_medium IS NOT NULL
-                        ORDER BY rel_sub.release_year DESC NULLS LAST LIMIT 1)
+                        LIMIT 1)
                    ) as best_cover_art_medium
             FROM recording_performers rp
             JOIN recordings r ON rp.recording_id = r.id

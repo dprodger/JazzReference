@@ -58,10 +58,7 @@ def get_user_favorites():
                         s.title as song_title,
                         rl.title as album_title,
                         r.recording_year,
-                        COALESCE(
-                            ri.image_url_small,
-                            rl.cover_art_small
-                        ) as best_album_art_small,
+                        ri.image_url_small as best_album_art_small,
                         rf.created_at as favorited_at
                     FROM recording_favorites rf
                     INNER JOIN recordings r ON rf.recording_id = r.id

@@ -203,18 +203,22 @@ def get_releases_for_song(song_id: str, artist_filter: str = None) -> List[dict]
 
 
 def get_releases_without_artwork() -> List[dict]:
-    """Get releases with Spotify ID but no cover artwork"""
+    """Get releases with Spotify ID but no Spotify artwork in release_imagery"""
     with get_db_connection() as conn:
         with conn.cursor() as cur:
             cur.execute("""
-                SELECT id, title,
-                       CASE WHEN spotify_album_id IS NOT NULL
-                            THEN 'https://open.spotify.com/album/' || spotify_album_id END as spotify_album_url,
-                       spotify_album_id
-                FROM releases
-                WHERE spotify_album_id IS NOT NULL
-                  AND cover_art_medium IS NULL
-                ORDER BY title
+                SELECT r.id, r.title,
+                       CASE WHEN r.spotify_album_id IS NOT NULL
+                            THEN 'https://open.spotify.com/album/' || r.spotify_album_id END as spotify_album_url,
+                       r.spotify_album_id
+                FROM releases r
+                WHERE r.spotify_album_id IS NOT NULL
+                  AND NOT EXISTS (
+                      SELECT 1 FROM release_imagery ri
+                      WHERE ri.release_id = r.id
+                        AND ri.source = 'Spotify'
+                  )
+                ORDER BY r.title
             """)
             return cur.fetchall()
 
@@ -265,8 +269,7 @@ def update_release_spotify_data(conn, release_id: str, spotify_data: dict,
     Update release with Spotify album ID and cover artwork.
     (URL is constructed on-demand from ID, not stored)
 
-    Artwork is stored in both legacy columns (for backwards compat)
-    and the normalized release_imagery table.
+    Artwork is stored in the release_imagery table.
 
     Args:
         conn: Database connection
@@ -286,27 +289,18 @@ def update_release_spotify_data(conn, release_id: str, spotify_data: dict,
             log.info(f"    [DRY RUN] Would add cover artwork")
         return
 
-    # Store artwork in normalized release_imagery table
+    # Store artwork in release_imagery table
     if album_art:
         upsert_release_imagery(conn, release_id, album_art, source_id=album_id, log=log)
 
-    # Update releases table (spotify_album_id + legacy artwork columns for backwards compat)
+    # Update releases table with spotify_album_id
     with conn.cursor() as cur:
         cur.execute("""
             UPDATE releases
             SET spotify_album_id = %s,
-                cover_art_small = %s,
-                cover_art_medium = %s,
-                cover_art_large = %s,
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = %s
-        """, (
-            album_id,
-            album_art.get('small'),
-            album_art.get('medium'),
-            album_art.get('large'),
-            release_id
-        ))
+        """, (album_id, release_id))
         # Note: commit is handled by the caller's context manager
 
 
@@ -315,8 +309,7 @@ def update_release_artwork(conn, release_id: str, album_art: dict,
     """
     Update release with cover artwork only.
 
-    This function stores artwork in both legacy columns (for backwards compat)
-    and the normalized release_imagery table.
+    Artwork is stored in the release_imagery table.
     """
     log = log or logger
 
@@ -332,25 +325,8 @@ def update_release_artwork(conn, release_id: str, album_art: dict,
         if row:
             spotify_album_id = row.get('spotify_album_id')
 
-    # Store in normalized release_imagery table
+    # Store in release_imagery table
     upsert_release_imagery(conn, release_id, album_art, source_id=spotify_album_id, log=log)
-
-    # Also update legacy columns for backwards compatibility
-    with conn.cursor() as cur:
-        cur.execute("""
-            UPDATE releases
-            SET cover_art_small = %s,
-                cover_art_medium = %s,
-                cover_art_large = %s,
-                updated_at = CURRENT_TIMESTAMP
-            WHERE id = %s
-        """, (
-            album_art.get('small'),
-            album_art.get('medium'),
-            album_art.get('large'),
-            release_id
-        ))
-        # Note: commit is handled by the caller's context manager
 
 
 def upsert_release_imagery(

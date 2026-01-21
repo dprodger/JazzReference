@@ -9,8 +9,7 @@ UPDATED: Recording-Centric Architecture
 - Album title now comes from default release (releases.title via default_release_id)
 
 UPDATED: Release Imagery Support
-- Album art now checks release_imagery table first (CAA images)
-- Falls back to releases table (Spotify images) if no release_imagery exists
+- Album art comes from release_imagery table (CAA, Spotify, Apple Music)
 
 Provides endpoints for listing, searching, and creating songs.
 """
@@ -27,11 +26,8 @@ songs_bp = Blueprint('songs', __name__)
 # ============================================================================
 # SQL FRAGMENTS FOR ALBUM ART (same as recordings.py)
 # ============================================================================
-# These fragments implement the priority:
-#   1. release_imagery (CAA) for default_release
-#   2. releases table (Spotify) for default_release
-#   3. release_imagery (CAA) for any linked release
-#   4. releases table (Spotify) for any linked release
+# All imagery now comes from release_imagery table (CAA, Spotify, Apple Music)
+# Priority: default_release first, then any linked release
 
 ALBUM_ART_SMALL_SQL = """
     COALESCE(
@@ -39,22 +35,12 @@ ALBUM_ART_SMALL_SQL = """
         (SELECT ri.image_url_small FROM release_imagery ri
          WHERE ri.release_id = r.default_release_id AND ri.type = 'Front'
          LIMIT 1),
-        -- 2. releases table for default release
-        (SELECT rel_sub.cover_art_small FROM releases rel_sub
-         WHERE rel_sub.id = r.default_release_id AND rel_sub.cover_art_small IS NOT NULL
-         LIMIT 1),
-        -- 3. release_imagery (Front) for any linked release
+        -- 2. release_imagery (Front) for any linked release
         (SELECT ri.image_url_small
          FROM recording_releases rr_sub
          JOIN release_imagery ri ON rr_sub.release_id = ri.release_id
          WHERE rr_sub.recording_id = r.id AND ri.type = 'Front'
-         LIMIT 1),
-        -- 4. releases table for any linked release
-        (SELECT rel_sub.cover_art_small
-         FROM recording_releases rr_sub
-         JOIN releases rel_sub ON rr_sub.release_id = rel_sub.id
-         WHERE rr_sub.recording_id = r.id AND rel_sub.cover_art_small IS NOT NULL
-         ORDER BY rel_sub.release_year DESC NULLS LAST LIMIT 1)
+         LIMIT 1)
     ) as best_cover_art_small"""
 
 ALBUM_ART_MEDIUM_SQL = """
@@ -62,19 +48,11 @@ ALBUM_ART_MEDIUM_SQL = """
         (SELECT ri.image_url_medium FROM release_imagery ri
          WHERE ri.release_id = r.default_release_id AND ri.type = 'Front'
          LIMIT 1),
-        (SELECT rel_sub.cover_art_medium FROM releases rel_sub
-         WHERE rel_sub.id = r.default_release_id AND rel_sub.cover_art_medium IS NOT NULL
-         LIMIT 1),
         (SELECT ri.image_url_medium
          FROM recording_releases rr_sub
          JOIN release_imagery ri ON rr_sub.release_id = ri.release_id
          WHERE rr_sub.recording_id = r.id AND ri.type = 'Front'
-         LIMIT 1),
-        (SELECT rel_sub.cover_art_medium
-         FROM recording_releases rr_sub
-         JOIN releases rel_sub ON rr_sub.release_id = rel_sub.id
-         WHERE rr_sub.recording_id = r.id AND rel_sub.cover_art_medium IS NOT NULL
-         ORDER BY rel_sub.release_year DESC NULLS LAST LIMIT 1)
+         LIMIT 1)
     ) as best_cover_art_medium"""
 
 ALBUM_ART_LARGE_SQL = """
@@ -82,19 +60,11 @@ ALBUM_ART_LARGE_SQL = """
         (SELECT ri.image_url_large FROM release_imagery ri
          WHERE ri.release_id = r.default_release_id AND ri.type = 'Front'
          LIMIT 1),
-        (SELECT rel_sub.cover_art_large FROM releases rel_sub
-         WHERE rel_sub.id = r.default_release_id AND rel_sub.cover_art_large IS NOT NULL
-         LIMIT 1),
         (SELECT ri.image_url_large
          FROM recording_releases rr_sub
          JOIN release_imagery ri ON rr_sub.release_id = ri.release_id
          WHERE rr_sub.recording_id = r.id AND ri.type = 'Front'
-         LIMIT 1),
-        (SELECT rel_sub.cover_art_large
-         FROM recording_releases rr_sub
-         JOIN releases rel_sub ON rr_sub.release_id = rel_sub.id
-         WHERE rr_sub.recording_id = r.id AND rel_sub.cover_art_large IS NOT NULL
-         ORDER BY rel_sub.release_year DESC NULLS LAST LIMIT 1)
+         LIMIT 1)
     ) as best_cover_art_large"""
 
 # Back cover art (CAA only - no Spotify fallback)
@@ -150,19 +120,10 @@ AUTHORITY_ALBUM_ART_SQL = """
         (SELECT ri.image_url_large FROM release_imagery ri
          WHERE ri.release_id = r.default_release_id AND ri.type = 'Front'
          LIMIT 1),
-        (SELECT rel.cover_art_large FROM releases rel
-         WHERE rel.id = r.default_release_id AND rel.cover_art_large IS NOT NULL
-         LIMIT 1),
         (SELECT ri.image_url_large
          FROM recording_releases rr
          JOIN release_imagery ri ON rr.release_id = ri.release_id
          WHERE rr.recording_id = r.id AND ri.type = 'Front'
-         LIMIT 1),
-        (SELECT rel.cover_art_large
-         FROM recording_releases rr
-         JOIN releases rel ON rr.release_id = rel.id
-         WHERE rr.recording_id = r.id AND rel.cover_art_large IS NOT NULL
-         ORDER BY rel.release_year DESC NULLS LAST
          LIMIT 1)
     ) as matched_album_art"""
 
