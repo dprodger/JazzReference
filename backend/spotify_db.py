@@ -6,7 +6,7 @@ These functions interact with the Jazz Reference PostgreSQL database.
 """
 
 import logging
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from db_utils import get_db_connection, find_song_by_name as db_find_song_by_name
 
@@ -262,8 +262,11 @@ def get_recordings_for_release(song_id: str, release_id: str, conn=None) -> List
 def update_release_spotify_data(conn, release_id: str, spotify_data: dict,
                                 dry_run: bool = False, log: logging.Logger = None):
     """
-    Update release with Spotify album ID and cover artwork
+    Update release with Spotify album ID and cover artwork.
     (URL is constructed on-demand from ID, not stored)
+
+    Artwork is stored in both legacy columns (for backwards compat)
+    and the normalized release_imagery table.
 
     Args:
         conn: Database connection
@@ -275,15 +278,20 @@ def update_release_spotify_data(conn, release_id: str, spotify_data: dict,
     log = log or logger
 
     album_id = spotify_data.get('id')
+    album_art = spotify_data.get('album_art', {})
+
     if dry_run:
         log.info(f"    [DRY RUN] Would update release with Spotify ID: {album_id}")
-        if spotify_data.get('album_art', {}).get('medium'):
+        if album_art.get('medium'):
             log.info(f"    [DRY RUN] Would add cover artwork")
         return
 
-    with conn.cursor() as cur:
-        album_art = spotify_data.get('album_art', {})
+    # Store artwork in normalized release_imagery table
+    if album_art:
+        upsert_release_imagery(conn, release_id, album_art, source_id=album_id, log=log)
 
+    # Update releases table (spotify_album_id + legacy artwork columns for backwards compat)
+    with conn.cursor() as cur:
         cur.execute("""
             UPDATE releases
             SET spotify_album_id = %s,
@@ -304,13 +312,30 @@ def update_release_spotify_data(conn, release_id: str, spotify_data: dict,
 
 def update_release_artwork(conn, release_id: str, album_art: dict,
                           dry_run: bool = False, log: logging.Logger = None):
-    """Update release with cover artwork only"""
+    """
+    Update release with cover artwork only.
+
+    This function stores artwork in both legacy columns (for backwards compat)
+    and the normalized release_imagery table.
+    """
     log = log or logger
-    
+
     if dry_run:
         log.info(f"    [DRY RUN] Would update with cover artwork")
         return
-    
+
+    # Look up existing spotify_album_id for source_id
+    spotify_album_id = None
+    with conn.cursor() as cur:
+        cur.execute("SELECT spotify_album_id FROM releases WHERE id = %s", (release_id,))
+        row = cur.fetchone()
+        if row:
+            spotify_album_id = row.get('spotify_album_id')
+
+    # Store in normalized release_imagery table
+    upsert_release_imagery(conn, release_id, album_art, source_id=spotify_album_id, log=log)
+
+    # Also update legacy columns for backwards compatibility
     with conn.cursor() as cur:
         cur.execute("""
             UPDATE releases
@@ -326,6 +351,66 @@ def update_release_artwork(conn, release_id: str, album_art: dict,
             release_id
         ))
         # Note: commit is handled by the caller's context manager
+
+
+def upsert_release_imagery(
+    conn,
+    release_id: str,
+    artwork: Dict[str, str],
+    source_id: str = None,
+    dry_run: bool = False,
+    log: logging.Logger = None
+) -> bool:
+    """
+    Insert or update Spotify album artwork in release_imagery table.
+
+    Args:
+        conn: Database connection
+        release_id: Our release ID
+        artwork: Dict with 'small', 'medium', 'large' URLs
+        source_id: Spotify album ID (for reference)
+        dry_run: If True, don't actually update
+        log: Logger instance
+
+    Returns:
+        True if successful
+    """
+    log = log or logger
+
+    if not artwork or not any(artwork.values()):
+        return False
+
+    if dry_run:
+        log.info(f"    [DRY RUN] Would add Spotify artwork to release_imagery")
+        return True
+
+    try:
+        with conn.cursor() as cur:
+            # Insert Front cover from Spotify
+            cur.execute("""
+                INSERT INTO release_imagery (
+                    release_id, source, source_id, type,
+                    image_url_small, image_url_medium, image_url_large
+                )
+                VALUES (%s, 'Spotify', %s, 'Front', %s, %s, %s)
+                ON CONFLICT ON CONSTRAINT release_imagery_unique
+                DO UPDATE SET
+                    image_url_small = EXCLUDED.image_url_small,
+                    image_url_medium = EXCLUDED.image_url_medium,
+                    image_url_large = EXCLUDED.image_url_large,
+                    source_id = EXCLUDED.source_id,
+                    updated_at = CURRENT_TIMESTAMP
+            """, (
+                release_id, source_id,
+                artwork.get('small'),
+                artwork.get('medium'),
+                artwork.get('large')
+            ))
+            # Note: commit is handled by the caller's context manager
+            return True
+    except Exception as e:
+        log.error(f"Failed to upsert Spotify release imagery: {e}")
+        return False
 
 
 def update_recording_release_track_id(conn, recording_id: str, release_id: str,
