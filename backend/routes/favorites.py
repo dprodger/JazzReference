@@ -60,7 +60,7 @@ def get_user_favorites():
                         r.recording_year,
                         (SELECT ri.image_url_small FROM release_imagery ri
                          WHERE ri.release_id = rl.id AND ri.type = 'Front'
-                         ORDER BY CASE WHEN ri.source = 'musicbrainz' THEN 0 ELSE 1 END
+                         ORDER BY CASE WHEN ri.source = 'MusicBrainz' THEN 0 ELSE 1 END
                          LIMIT 1) as best_album_art_small,
                         rf.created_at as favorited_at
                     FROM recording_favorites rf

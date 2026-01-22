@@ -33,14 +33,14 @@ ALBUM_ART_SMALL_SQL = """
         -- 1. release_imagery (Front) for default release, prefer CAA for consistency with back covers
         (SELECT ri.image_url_small FROM release_imagery ri
          WHERE ri.release_id = r.default_release_id AND ri.type = 'Front'
-         ORDER BY CASE WHEN ri.source = 'musicbrainz' THEN 0 ELSE 1 END
+         ORDER BY CASE WHEN ri.source = 'MusicBrainz' THEN 0 ELSE 1 END
          LIMIT 1),
         -- 2. release_imagery (Front) for any linked release
         (SELECT ri.image_url_small
          FROM recording_releases rr
          JOIN release_imagery ri ON rr.release_id = ri.release_id
          WHERE rr.recording_id = r.id AND ri.type = 'Front'
-         ORDER BY CASE WHEN ri.source = 'musicbrainz' THEN 0 ELSE 1 END
+         ORDER BY CASE WHEN ri.source = 'MusicBrainz' THEN 0 ELSE 1 END
          LIMIT 1)
     ) as album_art_small"""
 
@@ -48,13 +48,13 @@ ALBUM_ART_MEDIUM_SQL = """
     COALESCE(
         (SELECT ri.image_url_medium FROM release_imagery ri
          WHERE ri.release_id = r.default_release_id AND ri.type = 'Front'
-         ORDER BY CASE WHEN ri.source = 'musicbrainz' THEN 0 ELSE 1 END
+         ORDER BY CASE WHEN ri.source = 'MusicBrainz' THEN 0 ELSE 1 END
          LIMIT 1),
         (SELECT ri.image_url_medium
          FROM recording_releases rr
          JOIN release_imagery ri ON rr.release_id = ri.release_id
          WHERE rr.recording_id = r.id AND ri.type = 'Front'
-         ORDER BY CASE WHEN ri.source = 'musicbrainz' THEN 0 ELSE 1 END
+         ORDER BY CASE WHEN ri.source = 'MusicBrainz' THEN 0 ELSE 1 END
          LIMIT 1)
     ) as album_art_medium"""
 
@@ -62,13 +62,13 @@ ALBUM_ART_LARGE_SQL = """
     COALESCE(
         (SELECT ri.image_url_large FROM release_imagery ri
          WHERE ri.release_id = r.default_release_id AND ri.type = 'Front'
-         ORDER BY CASE WHEN ri.source = 'musicbrainz' THEN 0 ELSE 1 END
+         ORDER BY CASE WHEN ri.source = 'MusicBrainz' THEN 0 ELSE 1 END
          LIMIT 1),
         (SELECT ri.image_url_large
          FROM recording_releases rr
          JOIN release_imagery ri ON rr.release_id = ri.release_id
          WHERE rr.recording_id = r.id AND ri.type = 'Front'
-         ORDER BY CASE WHEN ri.source = 'musicbrainz' THEN 0 ELSE 1 END
+         ORDER BY CASE WHEN ri.source = 'MusicBrainz' THEN 0 ELSE 1 END
          LIMIT 1)
     ) as album_art_large"""
 
@@ -77,13 +77,13 @@ ALBUM_ART_SOURCE_SQL = """
     COALESCE(
         (SELECT ri.source::text FROM release_imagery ri
          WHERE ri.release_id = r.default_release_id AND ri.type = 'Front'
-         ORDER BY CASE WHEN ri.source = 'musicbrainz' THEN 0 ELSE 1 END
+         ORDER BY CASE WHEN ri.source = 'MusicBrainz' THEN 0 ELSE 1 END
          LIMIT 1),
         (SELECT ri.source::text
          FROM recording_releases rr
          JOIN release_imagery ri ON rr.release_id = ri.release_id
          WHERE rr.recording_id = r.id AND ri.type = 'Front'
-         ORDER BY CASE WHEN ri.source = 'musicbrainz' THEN 0 ELSE 1 END
+         ORDER BY CASE WHEN ri.source = 'MusicBrainz' THEN 0 ELSE 1 END
          LIMIT 1)
     ) as album_art_source"""
 
@@ -91,13 +91,13 @@ ALBUM_ART_SOURCE_URL_SQL = """
     COALESCE(
         (SELECT ri.source_url FROM release_imagery ri
          WHERE ri.release_id = r.default_release_id AND ri.type = 'Front'
-         ORDER BY CASE WHEN ri.source = 'musicbrainz' THEN 0 ELSE 1 END
+         ORDER BY CASE WHEN ri.source = 'MusicBrainz' THEN 0 ELSE 1 END
          LIMIT 1),
         (SELECT ri.source_url
          FROM recording_releases rr
          JOIN release_imagery ri ON rr.release_id = ri.release_id
          WHERE rr.recording_id = r.id AND ri.type = 'Front'
-         ORDER BY CASE WHEN ri.source = 'musicbrainz' THEN 0 ELSE 1 END
+         ORDER BY CASE WHEN ri.source = 'MusicBrainz' THEN 0 ELSE 1 END
          LIMIT 1)
     ) as album_art_source_url"""
 
@@ -187,31 +187,31 @@ FAVORITE_COUNT_SQL = """
 RELEASE_ART_SMALL_SQL = """
     (SELECT ri.image_url_small FROM release_imagery ri
      WHERE ri.release_id = rel.id AND ri.type = 'Front'
-     ORDER BY CASE WHEN ri.source = 'musicbrainz' THEN 0 ELSE 1 END
+     ORDER BY CASE WHEN ri.source = 'MusicBrainz' THEN 0 ELSE 1 END
      LIMIT 1) as cover_art_small"""
 
 RELEASE_ART_MEDIUM_SQL = """
     (SELECT ri.image_url_medium FROM release_imagery ri
      WHERE ri.release_id = rel.id AND ri.type = 'Front'
-     ORDER BY CASE WHEN ri.source = 'musicbrainz' THEN 0 ELSE 1 END
+     ORDER BY CASE WHEN ri.source = 'MusicBrainz' THEN 0 ELSE 1 END
      LIMIT 1) as cover_art_medium"""
 
 RELEASE_ART_LARGE_SQL = """
     (SELECT ri.image_url_large FROM release_imagery ri
      WHERE ri.release_id = rel.id AND ri.type = 'Front'
-     ORDER BY CASE WHEN ri.source = 'musicbrainz' THEN 0 ELSE 1 END
+     ORDER BY CASE WHEN ri.source = 'MusicBrainz' THEN 0 ELSE 1 END
      LIMIT 1) as cover_art_large"""
 
 RELEASE_ART_SOURCE_SQL = """
     (SELECT ri.source::text FROM release_imagery ri
      WHERE ri.release_id = rel.id AND ri.type = 'Front'
-     ORDER BY CASE WHEN ri.source = 'musicbrainz' THEN 0 ELSE 1 END
+     ORDER BY CASE WHEN ri.source = 'MusicBrainz' THEN 0 ELSE 1 END
      LIMIT 1) as cover_art_source"""
 
 RELEASE_ART_SOURCE_URL_SQL = """
     (SELECT ri.source_url FROM release_imagery ri
      WHERE ri.release_id = rel.id AND ri.type = 'Front'
-     ORDER BY CASE WHEN ri.source = 'musicbrainz' THEN 0 ELSE 1 END
+     ORDER BY CASE WHEN ri.source = 'MusicBrainz' THEN 0 ELSE 1 END
      LIMIT 1) as cover_art_source_url"""
 
 
