@@ -49,6 +49,22 @@ struct RecordingDetailView: View {
         recording?.canFlipToBackCover ?? false
     }
 
+    /// Image source for the currently displayed album art (for watermark badge)
+    private var displayAlbumArtSource: String? {
+        if let release = selectedRelease {
+            return release.coverArtSource
+        }
+        return recording?.displayAlbumArtSource
+    }
+
+    /// Source URL for the currently displayed album art (for watermark badge)
+    private var displayAlbumArtSourceUrl: String? {
+        if let release = selectedRelease {
+            return release.coverArtSourceUrl
+        }
+        return recording?.displayAlbumArtSourceUrl
+    }
+
     /// Display title - selected release title or recording album title
     private var displayAlbumTitle: String {
         selectedRelease?.title ?? recording?.albumTitle ?? "Unknown Album"
@@ -238,6 +254,27 @@ struct RecordingDetailView: View {
                     .buttonStyle(.plain)
                     .padding(12)
                     .help(showingBackCover ? "Show front cover" : "Show back cover")
+                }
+
+                // Source badge (shows front or back cover source)
+                VStack {
+                    Spacer()
+                    HStack {
+                        if showingBackCover {
+                            AlbumArtSourceBadge(
+                                source: recording.backCoverSource,
+                                sourceUrl: recording.backCoverSourceUrl
+                            )
+                            .padding(8)
+                        } else {
+                            AlbumArtSourceBadge(
+                                source: displayAlbumArtSource,
+                                sourceUrl: displayAlbumArtSourceUrl
+                            )
+                            .padding(8)
+                        }
+                        Spacer()
+                    }
                 }
             }
 

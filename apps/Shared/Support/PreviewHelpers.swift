@@ -81,6 +81,13 @@ extension Recording {
         backCoverArtMedium: "https://picsum.photos/id/146/300/300",
         backCoverArtLarge: "https://picsum.photos/id/146/640/640",
         hasBackCover: true,
+        // Album art source info
+        albumArtSource: nil,
+        albumArtSourceUrl: nil,
+        bestCoverArtSource: "MusicBrainz",
+        bestCoverArtSourceUrl: "https://coverartarchive.org/release/example",
+        backCoverSource: "MusicBrainz",
+        backCoverSourceUrl: "https://coverartarchive.org/release/example",
         bestSpotifyUrlFromRelease: "https://open.spotify.com/track/example",
         spotifyUrl: nil,
         youtubeUrl: "https://youtube.com/watch?v=example",
@@ -145,6 +152,13 @@ extension Recording {
         backCoverArtMedium: nil,
         backCoverArtLarge: nil,
         hasBackCover: false,
+        // Album art source info
+        albumArtSource: nil,
+        albumArtSourceUrl: nil,
+        bestCoverArtSource: "Spotify",
+        bestCoverArtSourceUrl: "https://open.spotify.com/album/example",
+        backCoverSource: nil,
+        backCoverSourceUrl: nil,
         bestSpotifyUrlFromRelease: "https://open.spotify.com/track/4vLYewWIvqHfKtJDk8c8tq",
         spotifyUrl: nil,
         youtubeUrl: "https://youtube.com/watch?v=vmDDOFXSgAs",
@@ -205,6 +219,13 @@ extension Recording {
         backCoverArtMedium: nil,
         backCoverArtLarge: nil,
         hasBackCover: nil,
+        // Album art source info
+        albumArtSource: nil,
+        albumArtSourceUrl: nil,
+        bestCoverArtSource: nil,
+        bestCoverArtSourceUrl: nil,
+        backCoverSource: nil,
+        backCoverSourceUrl: nil,
         bestSpotifyUrlFromRelease: nil,
         spotifyUrl: nil,
         youtubeUrl: nil,
@@ -302,6 +323,8 @@ extension Release {
         coverArtSmall: "https://picsum.photos/id/145/64/64",
         coverArtMedium: "https://picsum.photos/id/145/300/300",
         coverArtLarge: "https://picsum.photos/id/145/640/640",
+        coverArtSource: "Spotify",
+        coverArtSourceUrl: "https://open.spotify.com/album/0nTTEAhCZsbbeplyDMIFuA",
         discNumber: 1,
         trackNumber: 1,
         totalTracks: 7,
@@ -311,7 +334,7 @@ extension Release {
         performers: nil,
         performerCount: 4
     )
-    
+
     static let previewNoSpotify = Release(
         id: "preview-release-2",
         title: "Time Out (Original Mono)",
@@ -328,6 +351,8 @@ extension Release {
         coverArtSmall: nil,
         coverArtMedium: nil,
         coverArtLarge: nil,
+        coverArtSource: nil,
+        coverArtSourceUrl: nil,
         discNumber: 1,
         trackNumber: 1,
         totalTracks: 7,

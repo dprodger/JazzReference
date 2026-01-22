@@ -145,6 +145,27 @@ struct RecordingRowView: View {
                     }
                 }
                 .padding(6)
+
+                // Source badge (bottom-left, shows front or back cover source)
+                VStack {
+                    Spacer()
+                    HStack {
+                        if showingBackCover {
+                            AlbumArtSourceBadge(
+                                source: recording.backCoverSource,
+                                sourceUrl: recording.backCoverSourceUrl
+                            )
+                            .padding(4)
+                        } else {
+                            AlbumArtSourceBadge(
+                                source: recording.displayAlbumArtSource,
+                                sourceUrl: recording.displayAlbumArtSourceUrl
+                            )
+                            .padding(4)
+                        }
+                        Spacer()
+                    }
+                }
             }
             .cornerRadius(8)
             .frame(width: 150)

@@ -68,7 +68,23 @@ struct RecordingDetailView: View {
     private var canFlipToBackCover: Bool {
         recording?.canFlipToBackCover ?? false
     }
-    
+
+    /// Image source for the currently displayed album art (for watermark badge)
+    private var displayAlbumArtSource: String? {
+        if let release = selectedRelease {
+            return release.coverArtSource
+        }
+        return recording?.displayAlbumArtSource
+    }
+
+    /// Source URL for the currently displayed album art (for watermark badge)
+    private var displayAlbumArtSourceUrl: String? {
+        if let release = selectedRelease {
+            return release.coverArtSourceUrl
+        }
+        return recording?.displayAlbumArtSourceUrl
+    }
+
     /// Spotify URL - uses selected release if user picked one, otherwise uses bestSpotifyUrl
     /// Only returns track URLs for consistency with has_spotify filter
     private var displaySpotifyUrl: String? {
@@ -265,6 +281,27 @@ struct RecordingDetailView: View {
                                     }
                                     .buttonStyle(PlainButtonStyle())
                                     .padding(12)
+                                }
+
+                                // Source badge (shows front or back cover source)
+                                VStack {
+                                    Spacer()
+                                    HStack {
+                                        if showingBackCover {
+                                            AlbumArtSourceBadge(
+                                                source: recording.backCoverSource,
+                                                sourceUrl: recording.backCoverSourceUrl
+                                            )
+                                            .padding(8)
+                                        } else {
+                                            AlbumArtSourceBadge(
+                                                source: displayAlbumArtSource,
+                                                sourceUrl: displayAlbumArtSourceUrl
+                                            )
+                                            .padding(8)
+                                        }
+                                        Spacer()
+                                    }
                                 }
                             }
                             .shadow(radius: 8)

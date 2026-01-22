@@ -1005,7 +1005,7 @@ struct RecordingCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             // Album art with streaming button overlay
-            ZStack(alignment: .bottomTrailing) {
+            ZStack {
                 Group {
                     if let albumArtUrl = recording.bestAlbumArtLarge ?? recording.bestAlbumArtMedium {
                         AsyncImage(url: URL(string: albumArtUrl)) { phase in
@@ -1044,10 +1044,30 @@ struct RecordingCard: View {
                 .clipShape(RoundedRectangle(cornerRadius: 10))
                 .shadow(color: .black.opacity(0.15), radius: 6, x: 0, y: 3)
 
-                // Streaming button overlay
-                StreamingButtons(recording: recording)
-                    .padding(8)
+                // Source badge (bottom-left)
+                VStack {
+                    Spacer()
+                    HStack {
+                        AlbumArtSourceBadge(
+                            source: recording.displayAlbumArtSource,
+                            sourceUrl: recording.displayAlbumArtSourceUrl
+                        )
+                        Spacer()
+                    }
+                }
+                .padding(6)
+
+                // Streaming button overlay (bottom-right)
+                VStack {
+                    Spacer()
+                    HStack {
+                        Spacer()
+                        StreamingButtons(recording: recording)
+                    }
+                }
+                .padding(8)
             }
+            .frame(width: artworkSize, height: artworkSize)
 
             // Recording info below artwork
             VStack(alignment: .leading, spacing: 4) {
@@ -1120,42 +1140,51 @@ struct FeaturedRecordingCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             // Album Art
-            Group {
-                if let albumArtUrl = recording.bestAlbumArtLarge ?? recording.bestAlbumArtMedium {
-                    AsyncImage(url: URL(string: albumArtUrl)) { phase in
-                        switch phase {
-                        case .empty:
-                            Rectangle()
-                                .fill(JazzTheme.smokeGray.opacity(0.2))
-                                .overlay { ProgressView() }
-                        case .success(let image):
-                            image
-                                .resizable()
-                                .aspectRatio(contentMode: .fill)
-                        case .failure:
-                            Rectangle()
-                                .fill(JazzTheme.smokeGray.opacity(0.2))
-                                .overlay {
-                                    Image(systemName: "music.note")
-                                        .font(.system(size: 40))
-                                        .foregroundColor(JazzTheme.smokeGray)
-                                }
-                        @unknown default:
-                            EmptyView()
+            ZStack(alignment: .bottomLeading) {
+                Group {
+                    if let albumArtUrl = recording.bestAlbumArtLarge ?? recording.bestAlbumArtMedium {
+                        AsyncImage(url: URL(string: albumArtUrl)) { phase in
+                            switch phase {
+                            case .empty:
+                                Rectangle()
+                                    .fill(JazzTheme.smokeGray.opacity(0.2))
+                                    .overlay { ProgressView() }
+                            case .success(let image):
+                                image
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                            case .failure:
+                                Rectangle()
+                                    .fill(JazzTheme.smokeGray.opacity(0.2))
+                                    .overlay {
+                                        Image(systemName: "music.note")
+                                            .font(.system(size: 40))
+                                            .foregroundColor(JazzTheme.smokeGray)
+                                    }
+                            @unknown default:
+                                EmptyView()
+                            }
                         }
+                    } else {
+                        Rectangle()
+                            .fill(JazzTheme.smokeGray.opacity(0.2))
+                            .overlay {
+                                Image(systemName: "music.note")
+                                    .font(.system(size: 40))
+                                    .foregroundColor(JazzTheme.smokeGray)
+                            }
                     }
-                } else {
-                    Rectangle()
-                        .fill(JazzTheme.smokeGray.opacity(0.2))
-                        .overlay {
-                            Image(systemName: "music.note")
-                                .font(.system(size: 40))
-                                .foregroundColor(JazzTheme.smokeGray)
-                        }
                 }
+                .frame(width: 180, height: 180)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+
+                // Source badge
+                AlbumArtSourceBadge(
+                    source: recording.displayAlbumArtSource,
+                    sourceUrl: recording.displayAlbumArtSourceUrl
+                )
+                .padding(6)
             }
-            .frame(width: 180, height: 180)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
             .shadow(color: .black.opacity(0.15), radius: 8, x: 0, y: 4)
 
             // Recording Info

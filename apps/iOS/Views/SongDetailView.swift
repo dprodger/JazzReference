@@ -827,45 +827,54 @@ struct AuthoritativeRecordingCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             // Album Art - larger size (use bestAlbumArt which prefers release cover art)
-            Group {
-                if let albumArtUrl = recording.bestAlbumArtLarge ?? recording.bestAlbumArtMedium {
-                    AsyncImage(url: URL(string: albumArtUrl)) { phase in
-                        switch phase {
-                        case .empty:
-                            Rectangle()
-                                .fill(JazzTheme.smokeGray.opacity(0.2))
-                                .overlay {
-                                    ProgressView()
-                                        .tint(JazzTheme.burgundy)
-                                }
-                        case .success(let image):
-                            image
-                                .resizable()
-                                .aspectRatio(contentMode: .fill)
-                        case .failure:
-                            Rectangle()
-                                .fill(JazzTheme.smokeGray.opacity(0.2))
-                                .overlay {
-                                    Image(systemName: "music.note")
-                                        .font(.system(size: 40))
-                                        .foregroundColor(JazzTheme.smokeGray)
-                                }
-                        @unknown default:
-                            EmptyView()
+            ZStack(alignment: .bottomLeading) {
+                Group {
+                    if let albumArtUrl = recording.bestAlbumArtLarge ?? recording.bestAlbumArtMedium {
+                        AsyncImage(url: URL(string: albumArtUrl)) { phase in
+                            switch phase {
+                            case .empty:
+                                Rectangle()
+                                    .fill(JazzTheme.smokeGray.opacity(0.2))
+                                    .overlay {
+                                        ProgressView()
+                                            .tint(JazzTheme.burgundy)
+                                    }
+                            case .success(let image):
+                                image
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                            case .failure:
+                                Rectangle()
+                                    .fill(JazzTheme.smokeGray.opacity(0.2))
+                                    .overlay {
+                                        Image(systemName: "music.note")
+                                            .font(.system(size: 40))
+                                            .foregroundColor(JazzTheme.smokeGray)
+                                    }
+                            @unknown default:
+                                EmptyView()
+                            }
                         }
+                    } else {
+                        Rectangle()
+                            .fill(JazzTheme.smokeGray.opacity(0.2))
+                            .overlay {
+                                Image(systemName: "music.note")
+                                    .font(.system(size: 40))
+                                    .foregroundColor(JazzTheme.smokeGray)
+                            }
                     }
-                } else {
-                    Rectangle()
-                        .fill(JazzTheme.smokeGray.opacity(0.2))
-                        .overlay {
-                            Image(systemName: "music.note")
-                                .font(.system(size: 40))
-                                .foregroundColor(JazzTheme.smokeGray)
-                        }
                 }
+                .frame(width: 180, height: 180)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+
+                // Source badge
+                AlbumArtSourceBadge(
+                    source: recording.displayAlbumArtSource,
+                    sourceUrl: recording.displayAlbumArtSourceUrl
+                )
+                .padding(6)
             }
-            .frame(width: 180, height: 180)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
             .shadow(color: .black.opacity(0.15), radius: 8, x: 0, y: 4)
             
             // Recording Info - fixed height for consistent card sizing

@@ -121,6 +121,17 @@ struct Recording: Codable, Identifiable {
     let backCoverArtLarge: String?
     let hasBackCover: Bool?
 
+    // Album art source info (for watermark/attribution)
+    // From recordings endpoint (album_art_source)
+    let albumArtSource: String?       // "Spotify", "MusicBrainz", "Apple", etc.
+    let albumArtSourceUrl: String?    // Canonical URL at the source
+    // From songs endpoint (best_cover_art_source)
+    let bestCoverArtSource: String?
+    let bestCoverArtSourceUrl: String?
+    // Back cover source
+    let backCoverSource: String?
+    let backCoverSourceUrl: String?
+
     // Best Spotify URL from releases (provided by API via subqueries)
     let bestSpotifyUrlFromRelease: String?
 
@@ -187,6 +198,12 @@ struct Recording: Codable, Identifiable {
         case backCoverArtMedium = "back_cover_art_medium"
         case backCoverArtLarge = "back_cover_art_large"
         case hasBackCover = "has_back_cover"
+        case albumArtSource = "album_art_source"
+        case albumArtSourceUrl = "album_art_source_url"
+        case bestCoverArtSource = "best_cover_art_source"
+        case bestCoverArtSourceUrl = "best_cover_art_source_url"
+        case backCoverSource = "back_cover_source"
+        case backCoverSourceUrl = "back_cover_source_url"
         case bestSpotifyUrlFromRelease = "best_spotify_url"
         case spotifyUrl = "spotify_url"
         case youtubeUrl = "youtube_url"
@@ -325,6 +342,47 @@ struct Recording: Codable, Identifiable {
             return release.coverArtLarge
         }
         return nil
+    }
+
+    /// Get the source of the album art (for watermark attribution)
+    var displayAlbumArtSource: String? {
+        // First try direct source (from /recordings endpoint)
+        if let source = albumArtSource {
+            return source
+        }
+        // Then try API-provided best source (from songs endpoint)
+        if let source = bestCoverArtSource {
+            return source
+        }
+        // Then check releases array for source
+        if let release = sortedReleases?.first(where: { $0.coverArtSource != nil }) {
+            return release.coverArtSource
+        }
+        return nil
+    }
+
+    /// Get the source URL for album art (for attribution links)
+    var displayAlbumArtSourceUrl: String? {
+        if let url = albumArtSourceUrl {
+            return url
+        }
+        if let url = bestCoverArtSourceUrl {
+            return url
+        }
+        if let release = sortedReleases?.first(where: { $0.coverArtSourceUrl != nil }) {
+            return release.coverArtSourceUrl
+        }
+        return nil
+    }
+
+    /// Get the source of the back cover (for watermark attribution)
+    var displayBackCoverSource: String? {
+        backCoverSource
+    }
+
+    /// Get the source URL for back cover (for attribution links)
+    var displayBackCoverSourceUrl: String? {
+        backCoverSourceUrl
     }
 
     /// Whether this recording has a back cover available for flipping
@@ -672,7 +730,11 @@ struct Release: Identifiable, Codable {
     let coverArtSmall: String?
     let coverArtMedium: String?
     let coverArtLarge: String?
-    
+
+    // Cover art source (for watermark/attribution)
+    let coverArtSource: String?        // "Spotify", "MusicBrainz", "Apple", etc.
+    let coverArtSourceUrl: String?     // Canonical URL at source
+
     // Track position on release
     let discNumber: Int?
     let trackNumber: Int?
@@ -702,6 +764,8 @@ struct Release: Identifiable, Codable {
         case coverArtSmall = "cover_art_small"
         case coverArtMedium = "cover_art_medium"
         case coverArtLarge = "cover_art_large"
+        case coverArtSource = "cover_art_source"
+        case coverArtSourceUrl = "cover_art_source_url"
         case discNumber = "disc_number"
         case trackNumber = "track_number"
         case totalTracks = "total_tracks"
