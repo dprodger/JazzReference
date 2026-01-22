@@ -246,20 +246,26 @@ def get_performer_detail(performer_id):
                    r.is_canonical, rp.role,
                    COALESCE(
                        (SELECT ri.image_url_small FROM release_imagery ri
-                        WHERE ri.release_id = r.default_release_id AND ri.type = 'Front'),
+                        WHERE ri.release_id = r.default_release_id AND ri.type = 'Front'
+                        ORDER BY CASE WHEN ri.source = 'musicbrainz' THEN 0 ELSE 1 END
+                        LIMIT 1),
                        (SELECT ri.image_url_small
                         FROM recording_releases rr_sub
                         JOIN release_imagery ri ON rr_sub.release_id = ri.release_id
                         WHERE rr_sub.recording_id = r.id AND ri.type = 'Front'
+                        ORDER BY CASE WHEN ri.source = 'musicbrainz' THEN 0 ELSE 1 END
                         LIMIT 1)
                    ) as best_cover_art_small,
                    COALESCE(
                        (SELECT ri.image_url_medium FROM release_imagery ri
-                        WHERE ri.release_id = r.default_release_id AND ri.type = 'Front'),
+                        WHERE ri.release_id = r.default_release_id AND ri.type = 'Front'
+                        ORDER BY CASE WHEN ri.source = 'musicbrainz' THEN 0 ELSE 1 END
+                        LIMIT 1),
                        (SELECT ri.image_url_medium
                         FROM recording_releases rr_sub
                         JOIN release_imagery ri ON rr_sub.release_id = ri.release_id
                         WHERE rr_sub.recording_id = r.id AND ri.type = 'Front'
+                        ORDER BY CASE WHEN ri.source = 'musicbrainz' THEN 0 ELSE 1 END
                         LIMIT 1)
                    ) as best_cover_art_medium
             FROM recording_performers rp
@@ -406,20 +412,26 @@ def get_performer_recordings(performer_id):
                    r.is_canonical, rp.role,
                    COALESCE(
                        (SELECT ri.image_url_small FROM release_imagery ri
-                        WHERE ri.release_id = r.default_release_id AND ri.type = 'Front'),
+                        WHERE ri.release_id = r.default_release_id AND ri.type = 'Front'
+                        ORDER BY CASE WHEN ri.source = 'musicbrainz' THEN 0 ELSE 1 END
+                        LIMIT 1),
                        (SELECT ri.image_url_small
                         FROM recording_releases rr_sub
                         JOIN release_imagery ri ON rr_sub.release_id = ri.release_id
                         WHERE rr_sub.recording_id = r.id AND ri.type = 'Front'
+                        ORDER BY CASE WHEN ri.source = 'musicbrainz' THEN 0 ELSE 1 END
                         LIMIT 1)
                    ) as best_cover_art_small,
                    COALESCE(
                        (SELECT ri.image_url_medium FROM release_imagery ri
-                        WHERE ri.release_id = r.default_release_id AND ri.type = 'Front'),
+                        WHERE ri.release_id = r.default_release_id AND ri.type = 'Front'
+                        ORDER BY CASE WHEN ri.source = 'musicbrainz' THEN 0 ELSE 1 END
+                        LIMIT 1),
                        (SELECT ri.image_url_medium
                         FROM recording_releases rr_sub
                         JOIN release_imagery ri ON rr_sub.release_id = ri.release_id
                         WHERE rr_sub.recording_id = r.id AND ri.type = 'Front'
+                        ORDER BY CASE WHEN ri.source = 'musicbrainz' THEN 0 ELSE 1 END
                         LIMIT 1)
                    ) as best_cover_art_medium
             FROM recording_performers rp

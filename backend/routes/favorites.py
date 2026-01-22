@@ -58,13 +58,15 @@ def get_user_favorites():
                         s.title as song_title,
                         rl.title as album_title,
                         r.recording_year,
-                        ri.image_url_small as best_album_art_small,
+                        (SELECT ri.image_url_small FROM release_imagery ri
+                         WHERE ri.release_id = rl.id AND ri.type = 'Front'
+                         ORDER BY CASE WHEN ri.source = 'musicbrainz' THEN 0 ELSE 1 END
+                         LIMIT 1) as best_album_art_small,
                         rf.created_at as favorited_at
                     FROM recording_favorites rf
                     INNER JOIN recordings r ON rf.recording_id = r.id
                     LEFT JOIN songs s ON r.song_id = s.id
                     LEFT JOIN releases rl ON r.default_release_id = rl.id
-                    LEFT JOIN release_imagery ri ON rl.id = ri.release_id AND ri.type = 'Front'
                     WHERE rf.user_id = %s
                     ORDER BY rf.created_at DESC
                 """, (user_id,))
