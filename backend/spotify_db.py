@@ -361,23 +361,27 @@ def upsert_release_imagery(
         return True
 
     try:
+        # Generate Spotify album URL for attribution
+        source_url = f"https://open.spotify.com/album/{source_id}" if source_id else None
+
         with conn.cursor() as cur:
             # Insert Front cover from Spotify
             cur.execute("""
                 INSERT INTO release_imagery (
-                    release_id, source, source_id, type,
+                    release_id, source, source_id, source_url, type,
                     image_url_small, image_url_medium, image_url_large
                 )
-                VALUES (%s, 'Spotify', %s, 'Front', %s, %s, %s)
+                VALUES (%s, 'Spotify', %s, %s, 'Front', %s, %s, %s)
                 ON CONFLICT ON CONSTRAINT release_imagery_unique
                 DO UPDATE SET
                     image_url_small = EXCLUDED.image_url_small,
                     image_url_medium = EXCLUDED.image_url_medium,
                     image_url_large = EXCLUDED.image_url_large,
                     source_id = EXCLUDED.source_id,
+                    source_url = EXCLUDED.source_url,
                     updated_at = CURRENT_TIMESTAMP
             """, (
-                release_id, source_id,
+                release_id, source_id, source_url,
                 artwork.get('small'),
                 artwork.get('medium'),
                 artwork.get('large')
