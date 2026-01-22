@@ -104,79 +104,40 @@ ALBUM_ART_SOURCE_URL_SQL = """
 # ============================================================================
 # SQL FRAGMENTS FOR BACK COVER ART
 # ============================================================================
-# Back covers only come from release_imagery (CAA) - no Spotify fallback
-# Priority: default_release first, then any linked release
+# Back covers ONLY from the default release - ensures consistency with front cover
+# (No fallback to linked releases to avoid showing mismatched front/back from different releases)
 
 BACK_COVER_SMALL_SQL = """
-    COALESCE(
-        (SELECT ri.image_url_small FROM release_imagery ri
-         WHERE ri.release_id = r.default_release_id AND ri.type = 'Back'
-         LIMIT 1),
-        (SELECT ri.image_url_small
-         FROM recording_releases rr
-         JOIN release_imagery ri ON rr.release_id = ri.release_id
-         WHERE rr.recording_id = r.id AND ri.type = 'Back'
-         LIMIT 1)
-    ) as back_cover_art_small"""
+    (SELECT ri.image_url_small FROM release_imagery ri
+     WHERE ri.release_id = r.default_release_id AND ri.type = 'Back'
+     LIMIT 1) as back_cover_art_small"""
 
 BACK_COVER_MEDIUM_SQL = """
-    COALESCE(
-        (SELECT ri.image_url_medium FROM release_imagery ri
-         WHERE ri.release_id = r.default_release_id AND ri.type = 'Back'
-         LIMIT 1),
-        (SELECT ri.image_url_medium
-         FROM recording_releases rr
-         JOIN release_imagery ri ON rr.release_id = ri.release_id
-         WHERE rr.recording_id = r.id AND ri.type = 'Back'
-         LIMIT 1)
-    ) as back_cover_art_medium"""
+    (SELECT ri.image_url_medium FROM release_imagery ri
+     WHERE ri.release_id = r.default_release_id AND ri.type = 'Back'
+     LIMIT 1) as back_cover_art_medium"""
 
 BACK_COVER_LARGE_SQL = """
-    COALESCE(
-        (SELECT ri.image_url_large FROM release_imagery ri
-         WHERE ri.release_id = r.default_release_id AND ri.type = 'Back'
-         LIMIT 1),
-        (SELECT ri.image_url_large
-         FROM recording_releases rr
-         JOIN release_imagery ri ON rr.release_id = ri.release_id
-         WHERE rr.recording_id = r.id AND ri.type = 'Back'
-         LIMIT 1)
-    ) as back_cover_art_large"""
+    (SELECT ri.image_url_large FROM release_imagery ri
+     WHERE ri.release_id = r.default_release_id AND ri.type = 'Back'
+     LIMIT 1) as back_cover_art_large"""
 
 HAS_BACK_COVER_SQL = """
     EXISTS(
         SELECT 1 FROM release_imagery ri
         WHERE ri.release_id = r.default_release_id AND ri.type = 'Back'
-    ) OR EXISTS(
-        SELECT 1 FROM recording_releases rr
-        JOIN release_imagery ri ON rr.release_id = ri.release_id
-        WHERE rr.recording_id = r.id AND ri.type = 'Back'
     ) as has_back_cover"""
 
 # Source info for back cover (for watermark/attribution)
 BACK_COVER_SOURCE_SQL = """
-    COALESCE(
-        (SELECT ri.source::text FROM release_imagery ri
-         WHERE ri.release_id = r.default_release_id AND ri.type = 'Back'
-         LIMIT 1),
-        (SELECT ri.source::text
-         FROM recording_releases rr
-         JOIN release_imagery ri ON rr.release_id = ri.release_id
-         WHERE rr.recording_id = r.id AND ri.type = 'Back'
-         LIMIT 1)
-    ) as back_cover_source"""
+    (SELECT ri.source::text FROM release_imagery ri
+     WHERE ri.release_id = r.default_release_id AND ri.type = 'Back'
+     LIMIT 1) as back_cover_source"""
 
 BACK_COVER_SOURCE_URL_SQL = """
-    COALESCE(
-        (SELECT ri.source_url FROM release_imagery ri
-         WHERE ri.release_id = r.default_release_id AND ri.type = 'Back'
-         LIMIT 1),
-        (SELECT ri.source_url
-         FROM recording_releases rr
-         JOIN release_imagery ri ON rr.release_id = ri.release_id
-         WHERE rr.recording_id = r.id AND ri.type = 'Back'
-         LIMIT 1)
-    ) as back_cover_source_url"""
+    (SELECT ri.source_url FROM release_imagery ri
+     WHERE ri.release_id = r.default_release_id AND ri.type = 'Back'
+     LIMIT 1) as back_cover_source_url"""
 
 # SQL fragment for favorite count (subquery)
 FAVORITE_COUNT_SQL = """
@@ -213,6 +174,42 @@ RELEASE_ART_SOURCE_URL_SQL = """
      WHERE ri.release_id = rel.id AND ri.type = 'Front'
      ORDER BY CASE WHEN ri.source = 'MusicBrainz' THEN 0 ELSE 1 END
      LIMIT 1) as cover_art_source_url"""
+
+# ============================================================================
+# SQL FRAGMENTS FOR RELEASE-LEVEL BACK COVER ART
+# ============================================================================
+# Back covers for specific releases (used in releases array)
+
+RELEASE_BACK_ART_SMALL_SQL = """
+    (SELECT ri.image_url_small FROM release_imagery ri
+     WHERE ri.release_id = rel.id AND ri.type = 'Back'
+     LIMIT 1) as back_cover_art_small"""
+
+RELEASE_BACK_ART_MEDIUM_SQL = """
+    (SELECT ri.image_url_medium FROM release_imagery ri
+     WHERE ri.release_id = rel.id AND ri.type = 'Back'
+     LIMIT 1) as back_cover_art_medium"""
+
+RELEASE_BACK_ART_LARGE_SQL = """
+    (SELECT ri.image_url_large FROM release_imagery ri
+     WHERE ri.release_id = rel.id AND ri.type = 'Back'
+     LIMIT 1) as back_cover_art_large"""
+
+RELEASE_HAS_BACK_COVER_SQL = """
+    EXISTS(
+        SELECT 1 FROM release_imagery ri
+        WHERE ri.release_id = rel.id AND ri.type = 'Back'
+    ) as has_back_cover"""
+
+RELEASE_BACK_ART_SOURCE_SQL = """
+    (SELECT ri.source::text FROM release_imagery ri
+     WHERE ri.release_id = rel.id AND ri.type = 'Back'
+     LIMIT 1) as back_cover_source"""
+
+RELEASE_BACK_ART_SOURCE_URL_SQL = """
+    (SELECT ri.source_url FROM release_imagery ri
+     WHERE ri.release_id = rel.id AND ri.type = 'Back'
+     LIMIT 1) as back_cover_source_url"""
 
 
 @recordings_bp.route('/recordings/count', methods=['GET'])
@@ -491,6 +488,13 @@ def get_recording_detail(recording_id):
                     {RELEASE_ART_LARGE_SQL},
                     {RELEASE_ART_SOURCE_SQL},
                     {RELEASE_ART_SOURCE_URL_SQL},
+                    -- Release-level back cover art
+                    {RELEASE_BACK_ART_SMALL_SQL},
+                    {RELEASE_BACK_ART_MEDIUM_SQL},
+                    {RELEASE_BACK_ART_LARGE_SQL},
+                    {RELEASE_HAS_BACK_COVER_SQL},
+                    {RELEASE_BACK_ART_SOURCE_SQL},
+                    {RELEASE_BACK_ART_SOURCE_URL_SQL},
                     rel.total_tracks,
                     rel.musicbrainz_release_id,
                     rr.disc_number,
@@ -750,6 +754,13 @@ def get_recording_releases(recording_id):
                 {RELEASE_ART_LARGE_SQL},
                 {RELEASE_ART_SOURCE_SQL},
                 {RELEASE_ART_SOURCE_URL_SQL},
+                -- Back cover art
+                {RELEASE_BACK_ART_SMALL_SQL},
+                {RELEASE_BACK_ART_MEDIUM_SQL},
+                {RELEASE_BACK_ART_LARGE_SQL},
+                {RELEASE_HAS_BACK_COVER_SQL},
+                {RELEASE_BACK_ART_SOURCE_SQL},
+                {RELEASE_BACK_ART_SOURCE_URL_SQL},
                 rel.total_tracks,
                 rel.musicbrainz_release_id,
                 rr.disc_number,

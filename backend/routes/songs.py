@@ -102,77 +102,39 @@ ALBUM_ART_SOURCE_URL_SQL = """
          LIMIT 1)
     ) as best_cover_art_source_url"""
 
-# Back cover art (CAA only - no Spotify fallback)
+# Back cover art - ONLY from the default release for consistency with front cover
+# (No fallback to linked releases to avoid showing mismatched front/back from different releases)
 BACK_COVER_SMALL_SQL = """
-    COALESCE(
-        (SELECT ri.image_url_small FROM release_imagery ri
-         WHERE ri.release_id = r.default_release_id AND ri.type = 'Back'
-         LIMIT 1),
-        (SELECT ri.image_url_small
-         FROM recording_releases rr_sub
-         JOIN release_imagery ri ON rr_sub.release_id = ri.release_id
-         WHERE rr_sub.recording_id = r.id AND ri.type = 'Back'
-         LIMIT 1)
-    ) as back_cover_art_small"""
+    (SELECT ri.image_url_small FROM release_imagery ri
+     WHERE ri.release_id = r.default_release_id AND ri.type = 'Back'
+     LIMIT 1) as back_cover_art_small"""
 
 BACK_COVER_MEDIUM_SQL = """
-    COALESCE(
-        (SELECT ri.image_url_medium FROM release_imagery ri
-         WHERE ri.release_id = r.default_release_id AND ri.type = 'Back'
-         LIMIT 1),
-        (SELECT ri.image_url_medium
-         FROM recording_releases rr_sub
-         JOIN release_imagery ri ON rr_sub.release_id = ri.release_id
-         WHERE rr_sub.recording_id = r.id AND ri.type = 'Back'
-         LIMIT 1)
-    ) as back_cover_art_medium"""
+    (SELECT ri.image_url_medium FROM release_imagery ri
+     WHERE ri.release_id = r.default_release_id AND ri.type = 'Back'
+     LIMIT 1) as back_cover_art_medium"""
 
 BACK_COVER_LARGE_SQL = """
-    COALESCE(
-        (SELECT ri.image_url_large FROM release_imagery ri
-         WHERE ri.release_id = r.default_release_id AND ri.type = 'Back'
-         LIMIT 1),
-        (SELECT ri.image_url_large
-         FROM recording_releases rr_sub
-         JOIN release_imagery ri ON rr_sub.release_id = ri.release_id
-         WHERE rr_sub.recording_id = r.id AND ri.type = 'Back'
-         LIMIT 1)
-    ) as back_cover_art_large"""
+    (SELECT ri.image_url_large FROM release_imagery ri
+     WHERE ri.release_id = r.default_release_id AND ri.type = 'Back'
+     LIMIT 1) as back_cover_art_large"""
 
 HAS_BACK_COVER_SQL = """
     EXISTS(
         SELECT 1 FROM release_imagery ri
         WHERE ri.release_id = r.default_release_id AND ri.type = 'Back'
-    ) OR EXISTS(
-        SELECT 1 FROM recording_releases rr_sub
-        JOIN release_imagery ri ON rr_sub.release_id = ri.release_id
-        WHERE rr_sub.recording_id = r.id AND ri.type = 'Back'
     ) as has_back_cover"""
 
 # Source info for back cover (for watermark/attribution)
 BACK_COVER_SOURCE_SQL = """
-    COALESCE(
-        (SELECT ri.source::text FROM release_imagery ri
-         WHERE ri.release_id = r.default_release_id AND ri.type = 'Back'
-         LIMIT 1),
-        (SELECT ri.source::text
-         FROM recording_releases rr_sub
-         JOIN release_imagery ri ON rr_sub.release_id = ri.release_id
-         WHERE rr_sub.recording_id = r.id AND ri.type = 'Back'
-         LIMIT 1)
-    ) as back_cover_source"""
+    (SELECT ri.source::text FROM release_imagery ri
+     WHERE ri.release_id = r.default_release_id AND ri.type = 'Back'
+     LIMIT 1) as back_cover_source"""
 
 BACK_COVER_SOURCE_URL_SQL = """
-    COALESCE(
-        (SELECT ri.source_url FROM release_imagery ri
-         WHERE ri.release_id = r.default_release_id AND ri.type = 'Back'
-         LIMIT 1),
-        (SELECT ri.source_url
-         FROM recording_releases rr_sub
-         JOIN release_imagery ri ON rr_sub.release_id = ri.release_id
-         WHERE rr_sub.recording_id = r.id AND ri.type = 'Back'
-         LIMIT 1)
-    ) as back_cover_source_url"""
+    (SELECT ri.source_url FROM release_imagery ri
+     WHERE ri.release_id = r.default_release_id AND ri.type = 'Back'
+     LIMIT 1) as back_cover_source_url"""
 
 # For authority recommendations - uses 'r' alias for recordings
 AUTHORITY_ALBUM_ART_SQL = """
