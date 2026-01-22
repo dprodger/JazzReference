@@ -100,7 +100,7 @@ private struct AlbumArtSourceSheet: View {
     }
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             VStack(alignment: .leading, spacing: 20) {
                 // Source name
                 VStack(alignment: .leading, spacing: 4) {
@@ -138,7 +138,8 @@ private struct AlbumArtSourceSheet: View {
                 Spacer()
             }
             .padding()
-            .navigationTitle("Image Source")
+            .frame(minWidth: 300)
+            .navigationTitle("Cover Art Attribution")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif

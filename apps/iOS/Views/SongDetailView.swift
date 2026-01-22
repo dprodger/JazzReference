@@ -803,6 +803,9 @@ struct SongDetailView: View {
 // MARK: - Authoritative Recording Card
 struct AuthoritativeRecordingCard: View {
     let recording: Recording
+    @State private var showingBackCover = false
+
+    private let artworkSize: CGFloat = 180
 
     // Get artist name - prefer artist_credit from default release, fall back to performers
     private var artistName: String {
@@ -823,14 +826,68 @@ struct AuthoritativeRecordingCard: View {
         }
         return "Various Artists"
     }
-    
+
+    // Front cover URL
+    private var frontCoverUrl: String? {
+        recording.bestAlbumArtLarge ?? recording.bestAlbumArtMedium
+    }
+
+    // Back cover URL
+    private var backCoverUrl: String? {
+        recording.backCoverArtLarge ?? recording.backCoverArtMedium
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            // Album Art - larger size (use bestAlbumArt which prefers release cover art)
-            ZStack(alignment: .bottomLeading) {
-                Group {
-                    if let albumArtUrl = recording.bestAlbumArtLarge ?? recording.bestAlbumArtMedium {
-                        AsyncImage(url: URL(string: albumArtUrl)) { phase in
+            // Album Art with flip support
+            ZStack(alignment: .topTrailing) {
+                // Album art with card-flip animation
+                ZStack {
+                    // Front cover
+                    Group {
+                        if let frontUrl = frontCoverUrl {
+                            AsyncImage(url: URL(string: frontUrl)) { phase in
+                                switch phase {
+                                case .empty:
+                                    Rectangle()
+                                        .fill(JazzTheme.smokeGray.opacity(0.2))
+                                        .overlay {
+                                            ProgressView()
+                                                .tint(JazzTheme.burgundy)
+                                        }
+                                case .success(let image):
+                                    image
+                                        .resizable()
+                                        .aspectRatio(contentMode: .fill)
+                                case .failure:
+                                    Rectangle()
+                                        .fill(JazzTheme.smokeGray.opacity(0.2))
+                                        .overlay {
+                                            Image(systemName: "music.note")
+                                                .font(.system(size: 40))
+                                                .foregroundColor(JazzTheme.smokeGray)
+                                        }
+                                @unknown default:
+                                    EmptyView()
+                                }
+                            }
+                        } else {
+                            Rectangle()
+                                .fill(JazzTheme.smokeGray.opacity(0.2))
+                                .overlay {
+                                    Image(systemName: "music.note")
+                                        .font(.system(size: 40))
+                                        .foregroundColor(JazzTheme.smokeGray)
+                                }
+                        }
+                    }
+                    .frame(width: artworkSize, height: artworkSize)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .opacity(showingBackCover ? 0 : 1)
+
+                    // Back cover (pre-rotated so it appears correct after flip)
+                    if let backUrl = backCoverUrl {
+                        AsyncImage(url: URL(string: backUrl)) { phase in
                             switch phase {
                             case .empty:
                                 Rectangle()
@@ -846,37 +903,62 @@ struct AuthoritativeRecordingCard: View {
                             case .failure:
                                 Rectangle()
                                     .fill(JazzTheme.smokeGray.opacity(0.2))
-                                    .overlay {
-                                        Image(systemName: "music.note")
-                                            .font(.system(size: 40))
-                                            .foregroundColor(JazzTheme.smokeGray)
-                                    }
                             @unknown default:
                                 EmptyView()
                             }
                         }
-                    } else {
-                        Rectangle()
-                            .fill(JazzTheme.smokeGray.opacity(0.2))
-                            .overlay {
-                                Image(systemName: "music.note")
-                                    .font(.system(size: 40))
-                                    .foregroundColor(JazzTheme.smokeGray)
-                            }
+                        .frame(width: artworkSize, height: artworkSize)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .rotation3DEffect(.degrees(180), axis: (x: 0, y: 1, z: 0))
+                        .opacity(showingBackCover ? 1 : 0)
                     }
                 }
-                .frame(width: 180, height: 180)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-
-                // Source badge
-                AlbumArtSourceBadge(
-                    source: recording.displayAlbumArtSource,
-                    sourceUrl: recording.displayAlbumArtSourceUrl
+                .rotation3DEffect(
+                    .degrees(showingBackCover ? 180 : 0),
+                    axis: (x: 0, y: 1, z: 0)
                 )
+
+                // Flip badge (shown when back cover available)
+                if recording.canFlipToBackCover {
+                    Button(action: {
+                        withAnimation(.easeInOut(duration: 0.4)) {
+                            showingBackCover.toggle()
+                        }
+                    }) {
+                        Image(systemName: showingBackCover ? "arrow.uturn.backward" : "arrow.trianglehead.2.clockwise.rotate.90")
+                            .foregroundColor(.white)
+                            .font(.system(size: 10, weight: .semibold))
+                            .padding(6)
+                            .background(Color.black.opacity(0.6))
+                            .clipShape(Circle())
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    .padding(6)
+                }
+
+                // Source badge (bottom-left, shows front or back cover source)
+                VStack {
+                    Spacer()
+                    HStack {
+                        if showingBackCover {
+                            AlbumArtSourceBadge(
+                                source: recording.backCoverSource,
+                                sourceUrl: recording.backCoverSourceUrl
+                            )
+                        } else {
+                            AlbumArtSourceBadge(
+                                source: recording.displayAlbumArtSource,
+                                sourceUrl: recording.displayAlbumArtSourceUrl
+                            )
+                        }
+                        Spacer()
+                    }
+                }
                 .padding(6)
             }
+            .frame(width: artworkSize, height: artworkSize)
             .shadow(color: .black.opacity(0.15), radius: 8, x: 0, y: 4)
-            
+
             // Recording Info - fixed height for consistent card sizing
             VStack(alignment: .leading, spacing: 4) {
                 // Artist Name
@@ -885,20 +967,20 @@ struct AuthoritativeRecordingCard: View {
                     .fontWeight(.semibold)
                     .foregroundColor(JazzTheme.brass)
                     .lineLimit(1)
-                
+
                 // Album Title
                 Text(recording.albumTitle ?? "Unknown Album")
                     .font(JazzTheme.body())
                     .fontWeight(.medium)
                     .foregroundColor(JazzTheme.charcoal)
                     .lineLimit(2)
-                
+
                 // Year (always reserve space)
                 Text(recording.recordingYear.map { String($0) } ?? " ")
                     .font(JazzTheme.caption())
                     .foregroundColor(JazzTheme.smokeGray)
             }
-            .frame(width: 180, height: 75, alignment: .topLeading)
+            .frame(width: artworkSize, height: 75, alignment: .topLeading)
         }
         .padding(12)
         .background(JazzTheme.cardBackground)

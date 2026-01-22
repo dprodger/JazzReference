@@ -59,14 +59,36 @@ struct RecordingDetailView: View {
         return recording?.bestAlbumArtLarge ?? recording?.bestAlbumArtMedium
     }
 
-    /// Back cover art URL - uses recording's back cover fields
+    /// Back cover art URL - uses selected release if user picked one, otherwise uses recording defaults
     private var displayBackCoverArtLarge: String? {
+        if let release = selectedRelease {
+            return release.backCoverArtLarge ?? release.backCoverArtMedium
+        }
         return recording?.backCoverArtLarge ?? recording?.backCoverArtMedium
     }
 
-    /// Whether the recording has a back cover available for flipping
+    /// Whether a back cover is available for flipping (from selected release or recording)
     private var canFlipToBackCover: Bool {
-        recording?.canFlipToBackCover ?? false
+        if let release = selectedRelease {
+            return release.canFlipToBackCover
+        }
+        return recording?.canFlipToBackCover ?? false
+    }
+
+    /// Back cover source for attribution (from selected release or recording)
+    private var displayBackCoverSource: String? {
+        if let release = selectedRelease {
+            return release.backCoverSource
+        }
+        return recording?.backCoverSource
+    }
+
+    /// Back cover source URL for attribution (from selected release or recording)
+    private var displayBackCoverSourceUrl: String? {
+        if let release = selectedRelease {
+            return release.backCoverSourceUrl
+        }
+        return recording?.backCoverSourceUrl
     }
 
     /// Image source for the currently displayed album art (for watermark badge)
@@ -289,8 +311,8 @@ struct RecordingDetailView: View {
                                     HStack {
                                         if showingBackCover {
                                             AlbumArtSourceBadge(
-                                                source: recording.backCoverSource,
-                                                sourceUrl: recording.backCoverSourceUrl
+                                                source: displayBackCoverSource,
+                                                sourceUrl: displayBackCoverSourceUrl
                                             )
                                             .padding(8)
                                         } else {
@@ -678,6 +700,8 @@ struct RecordingDetailView: View {
                         } else {
                             selectedReleaseId = release.id
                         }
+                        // Reset back cover view when changing releases
+                        showingBackCover = false
                     }
                 } label: {
                     releaseRow(release, isSelected: selectedReleaseId == release.id)

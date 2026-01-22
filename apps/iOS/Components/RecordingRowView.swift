@@ -166,6 +166,7 @@ struct RecordingRowView: View {
                         Spacer()
                     }
                 }
+                .frame(width: 150, height: 150)
             }
             .cornerRadius(8)
             .frame(width: 150)

@@ -735,6 +735,14 @@ struct Release: Identifiable, Codable {
     let coverArtSource: String?        // "Spotify", "MusicBrainz", "Apple", etc.
     let coverArtSourceUrl: String?     // Canonical URL at source
 
+    // Back cover art (from Cover Art Archive)
+    let backCoverArtSmall: String?
+    let backCoverArtMedium: String?
+    let backCoverArtLarge: String?
+    let hasBackCover: Bool?
+    let backCoverSource: String?
+    let backCoverSourceUrl: String?
+
     // Track position on release
     let discNumber: Int?
     let trackNumber: Int?
@@ -766,6 +774,12 @@ struct Release: Identifiable, Codable {
         case coverArtLarge = "cover_art_large"
         case coverArtSource = "cover_art_source"
         case coverArtSourceUrl = "cover_art_source_url"
+        case backCoverArtSmall = "back_cover_art_small"
+        case backCoverArtMedium = "back_cover_art_medium"
+        case backCoverArtLarge = "back_cover_art_large"
+        case hasBackCover = "has_back_cover"
+        case backCoverSource = "back_cover_source"
+        case backCoverSourceUrl = "back_cover_source_url"
         case discNumber = "disc_number"
         case trackNumber = "track_number"
         case totalTracks = "total_tracks"
@@ -802,6 +816,11 @@ struct Release: Identifiable, Codable {
     /// Format display with fallback
     var formatDisplay: String {
         formatName ?? "Unknown format"
+    }
+
+    /// Whether this release has a back cover available for flipping
+    var canFlipToBackCover: Bool {
+        hasBackCover == true && backCoverArtMedium != nil
     }
 }
 
