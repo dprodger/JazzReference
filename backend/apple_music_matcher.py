@@ -283,9 +283,17 @@ class AppleMusicMatcher:
 
         # Check if already matched
         if release.get('has_apple_music') and not self.rematch:
-            self.logger.debug(f"  {progress}Skipping (already has Apple Music): {release_title}")
+            self.logger.debug(f"  {progress}Skipping album search (already has Apple Music): {release_title}")
             self.stats['releases_skipped'] += 1
             self.stats['releases_with_apple_music'] += 1
+
+            # Still try to match tracks if album link exists but tracks might be missing
+            apple_album_id = release.get('apple_music_album_id')
+            if apple_album_id:
+                self._match_track_on_release(
+                    conn, song_id, song_title, release_id, apple_album_id,
+                    from_local_catalog=True  # Assume local catalog to avoid API calls
+                )
             return
 
         # Check if already searched with no match (cached negative result)
