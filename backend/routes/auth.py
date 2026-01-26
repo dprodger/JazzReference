@@ -457,28 +457,37 @@ def google_login():
                 if user:
                     # User exists
                     user_id = user['id']
-                    
+
                     # Update Google ID if not set (linking existing email account)
                     if not user.get('google_id'):
                         logger.info(f"🔗 Linking Google account to existing user: {email}")
                         cur.execute("""
                             UPDATE users
-                            SET google_id = %s, 
+                            SET google_id = %s,
                                 email_verified = true,
                                 profile_image_url = %s,
+                                last_login_at = NOW(),
                                 updated_at = CURRENT_TIMESTAMP
                             WHERE id = %s
                         """, (google_id, profile_image, user_id))
+                        conn.commit()
+                    else:
+                        # Existing Google user - just update last_login_at
+                        cur.execute("""
+                            UPDATE users
+                            SET last_login_at = NOW()
+                            WHERE id = %s
+                        """, (user_id,))
                         conn.commit()
                 else:
                     # Create new user
                     logger.info(f"✨ Creating new user via Google: {email}")
                     cur.execute("""
                         INSERT INTO users (
-                            email, google_id, display_name, 
-                            profile_image_url, email_verified
+                            email, google_id, display_name,
+                            profile_image_url, email_verified, last_login_at
                         )
-                        VALUES (%s, %s, %s, %s, true)
+                        VALUES (%s, %s, %s, %s, true, NOW())
                         RETURNING id
                     """, (email, google_id, display_name, profile_image))
                     
