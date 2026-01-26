@@ -396,6 +396,7 @@ def upsert_release_imagery(
 def update_recording_release_track_id(conn, recording_id: str, release_id: str,
                                       track_id: str, track_url: str = None,
                                       disc_number: int = None, track_number: int = None,
+                                      track_title: str = None,
                                       dry_run: bool = False, log: logging.Logger = None):
     """
     Update the recording_releases junction table with Spotify track ID and position
@@ -408,6 +409,7 @@ def update_recording_release_track_id(conn, recording_id: str, release_id: str,
         track_url: Deprecated - ignored (URL constructed from ID)
         disc_number: Disc number from Spotify (updates existing value)
         track_number: Track number from Spotify (updates existing value)
+        track_title: Track title from Spotify (stored in track_title column)
         dry_run: If True, don't actually update
         log: Logger instance
     """
@@ -422,9 +424,10 @@ def update_recording_release_track_id(conn, recording_id: str, release_id: str,
             UPDATE recording_releases
             SET spotify_track_id = %s,
                 disc_number = COALESCE(%s, disc_number),
-                track_number = COALESCE(%s, track_number)
+                track_number = COALESCE(%s, track_number),
+                track_title = COALESCE(%s, track_title)
             WHERE recording_id = %s AND release_id = %s
-        """, (track_id, disc_number, track_number, recording_id, release_id))
+        """, (track_id, disc_number, track_number, track_title, recording_id, release_id))
         # Note: commit is handled by the caller's context manager
 
 

@@ -394,6 +394,54 @@ def upsert_track_streaming_link(
         return False
 
 
+def update_recording_release_track_title(
+    conn,
+    recording_release_id: str,
+    track_title: str,
+    dry_run: bool = False,
+    log: logging.Logger = None
+) -> bool:
+    """
+    Update the track_title column in recording_releases table.
+
+    This stores the track title as it appears on the streaming service,
+    which may differ from the canonical song title.
+
+    Args:
+        conn: Database connection
+        recording_release_id: ID from the recording_releases junction table
+        track_title: Track title from Apple Music
+        dry_run: If True, don't actually update
+        log: Logger instance
+
+    Returns:
+        True if successful
+    """
+    log = log or logger
+
+    if not track_title:
+        return False
+
+    if dry_run:
+        log.debug(f"      [DRY RUN] Would update track_title: {track_title}")
+        return True
+
+    try:
+        with conn.cursor() as cur:
+            # Only update if track_title is not already set (don't overwrite Spotify data)
+            cur.execute("""
+                UPDATE recording_releases
+                SET track_title = COALESCE(track_title, %s)
+                WHERE id = %s
+            """, (track_title, recording_release_id))
+            conn.commit()
+            return True
+    except Exception as e:
+        log.error(f"Failed to update track_title: {e}")
+        conn.rollback()
+        return False
+
+
 def upsert_release_imagery(
     conn,
     release_id: str,

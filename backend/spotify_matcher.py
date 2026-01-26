@@ -368,10 +368,12 @@ class SpotifyMatcher:
     
     def update_recording_release_track_id(self, conn, recording_id: str, release_id: str,
                                           track_id: str, track_url: str,
-                                          disc_number: int = None, track_number: int = None):
+                                          disc_number: int = None, track_number: int = None,
+                                          track_title: str = None):
         """Update the recording_releases junction table with Spotify track info"""
         update_recording_release_track_id(conn, recording_id, release_id, track_id, track_url,
                                          disc_number=disc_number, track_number=track_number,
+                                         track_title=track_title,
                                          dry_run=self.dry_run, log=self.logger)
     
     def update_recording_default_release(self, conn, song_id: str, release_id: str):
@@ -1477,7 +1479,8 @@ class SpotifyMatcher:
                     matched_track['id'],
                     matched_track['url'],
                     disc_number=matched_track.get('disc_number'),
-                    track_number=matched_track.get('track_number')
+                    track_number=matched_track.get('track_number'),
+                    track_title=matched_track.get('name')
                 )
                 self.stats['tracks_matched'] += 1
                 any_matched = True

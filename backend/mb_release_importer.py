@@ -648,7 +648,8 @@ class MBReleaseImporter:
             # Recording doesn't exist - need to create it
             recording_id = self._create_recording(
                 conn, song_id, mb_recording_id, date_info,
-                source_mb_work_id=source_mb_work_id
+                source_mb_work_id=source_mb_work_id,
+                title=mb_recording.get('title')
             )
             if recording_id:
                 # Add to cache for future reference
@@ -715,7 +716,8 @@ class MBReleaseImporter:
     
     def _create_recording(self, conn, song_id: str, mb_recording_id: str,
                            date_info: Dict[str, Any],
-                           source_mb_work_id: Optional[str] = None) -> Optional[str]:
+                           source_mb_work_id: Optional[str] = None,
+                           title: Optional[str] = None) -> Optional[str]:
         """
         Create a new recording in the database.
 
@@ -730,6 +732,7 @@ class MBReleaseImporter:
                 - recording_date_source: 'mb_performer_relation' or 'mb_first_release'
                 - mb_first_release_date: Raw MB first-release-date
             source_mb_work_id: MusicBrainz work ID this recording was imported from
+            title: MusicBrainz recording title (may differ from song title)
 
         Returns:
             Recording ID if created, None otherwise
@@ -737,8 +740,9 @@ class MBReleaseImporter:
         if self.dry_run:
             source = date_info.get('recording_date_source', 'unknown')
             year = date_info.get('recording_year')
+            title_info = f", title='{title}'" if title else ""
             self.logger.info(f"  [DRY RUN] Would create recording: MB:{mb_recording_id} "
-                           f"(year={year}, source={source})")
+                           f"(year={year}, source={source}{title_info})")
             return None
 
         with conn.cursor() as cur:
@@ -746,9 +750,9 @@ class MBReleaseImporter:
                 INSERT INTO recordings (
                     song_id, recording_year, recording_date,
                     recording_date_source, recording_date_precision, mb_first_release_date,
-                    is_canonical, musicbrainz_id, source_mb_work_id
+                    is_canonical, musicbrainz_id, source_mb_work_id, title
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING id
             """, (
                 song_id,
@@ -759,7 +763,8 @@ class MBReleaseImporter:
                 date_info.get('mb_first_release_date'),
                 False,
                 mb_recording_id,
-                source_mb_work_id
+                source_mb_work_id,
+                title
             ))
 
             recording_id = cur.fetchone()['id']

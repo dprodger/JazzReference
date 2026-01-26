@@ -400,3 +400,69 @@ class SpotifyClient:
         except requests.exceptions.RequestException as e:
             self.logger.error(f"Failed to authenticate with Spotify: {e}")
             return None
+
+    # ========================================================================
+    # BATCH API METHODS
+    # ========================================================================
+
+    def get_tracks_batch(self, track_ids: list[str]) -> Optional[dict[str, dict]]:
+        """
+        Fetch up to 50 tracks in a single API call.
+
+        Uses Spotify's batch endpoint: GET /v1/tracks?ids=id1,id2,...
+
+        Args:
+            track_ids: List of Spotify track IDs (max 50)
+
+        Returns:
+            Dict mapping track_id -> track data, or None if request failed.
+            Tracks that don't exist will be omitted from the result.
+        """
+        if not track_ids:
+            return {}
+
+        if len(track_ids) > 50:
+            self.logger.warning(f"get_tracks_batch called with {len(track_ids)} IDs, truncating to 50")
+            track_ids = track_ids[:50]
+
+        token = self.get_spotify_auth_token()
+        if not token:
+            return None
+
+        try:
+            # Join IDs with comma for batch request
+            ids_param = ','.join(track_ids)
+
+            response = self._make_api_request(
+                'get',
+                'https://api.spotify.com/v1/tracks',
+                headers={'Authorization': f'Bearer {token}'},
+                params={'ids': ids_param},
+                timeout=30
+            )
+
+            response.raise_for_status()
+            data = response.json()
+
+            # Track API call
+            self.stats['api_calls'] = self.stats.get('api_calls', 0) + 1
+            self.last_made_api_call = True
+
+            # Build result dict mapping track_id -> track data
+            result = {}
+            for track in data.get('tracks', []):
+                if track:  # null entries for non-existent tracks
+                    result[track['id']] = track
+
+            self.logger.debug(f"Batch fetched {len(result)} tracks out of {len(track_ids)} requested")
+            return result
+
+        except SpotifyRateLimitError as e:
+            self.logger.error(f"Rate limit exceeded in batch tracks request: {e}")
+            return None
+        except requests.exceptions.HTTPError as e:
+            self.logger.error(f"Spotify batch tracks API error: {e}")
+            return None
+        except requests.exceptions.RequestException as e:
+            self.logger.error(f"Failed to fetch batch tracks: {e}")
+            return None
