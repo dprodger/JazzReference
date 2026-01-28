@@ -252,6 +252,7 @@ def get_song_summary(song_id):
             featured_recordings AS (
                 SELECT
                     r.id,
+                    r.title,
                     def_rel.title as album_title,
                     def_rel.artist_credit as artist_credit,
                     r.recording_date,
@@ -415,6 +416,7 @@ def get_song_recordings(song_id):
         recordings_query = f"""
             SELECT
                 r.id,
+                r.title,
                 def_rel.title as album_title,
                 def_rel.artist_credit as artist_credit,
                 r.recording_date,
@@ -623,6 +625,7 @@ def get_song_detail(song_id):
             recordings_with_performers AS (
                 SELECT
                     r.id,
+                    r.title,
                     def_rel.title as album_title,
                     def_rel.artist_credit as artist_credit,
                     r.recording_date,

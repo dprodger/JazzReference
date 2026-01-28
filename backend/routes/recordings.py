@@ -250,6 +250,7 @@ def get_recordings():
             query = f"""
                 SELECT DISTINCT ON (r.id)
                     r.id,
+                    r.title,
                     r.song_id,
                     def_rel.title as album_title,
                     def_rel.artist_credit,
@@ -331,6 +332,7 @@ def get_recordings():
             query = """
                 SELECT
                     r.id,
+                    r.title,
                     r.song_id,
                     def_rel.title as album_title,
                     def_rel.artist_credit,
@@ -424,6 +426,7 @@ def get_recording_detail(recording_id):
             WITH recording_data AS (
                 SELECT
                     r.id,
+                    r.title,
                     r.song_id,
                     def_rel.title as album_title,
                     r.recording_date,
