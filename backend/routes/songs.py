@@ -184,10 +184,12 @@ def get_songs():
                 SELECT id, title, composer, composed_year, composed_key, structure, musicbrainz_id, wikipedia_url, song_reference, external_references,
                        created_at, updated_at
                 FROM songs
-                WHERE title ILIKE %s OR composer ILIKE %s
+                WHERE title ILIKE %s
+                   OR composer ILIKE %s
+                   OR EXISTS (SELECT 1 FROM unnest(alt_titles) AS alt WHERE alt ILIKE %s)
                 ORDER BY title
             """
-            params = (f'%{search_query}%', f'%{search_query}%')
+            params = (f'%{search_query}%', f'%{search_query}%', f'%{search_query}%')
         else:
             query = """
                 SELECT id, title, composer, composed_year, composed_key, structure, musicbrainz_id, wikipedia_url, song_reference, external_references,
@@ -877,14 +879,17 @@ def search_songs():
         query = """
             SELECT id, title, composer, musicbrainz_id
             FROM songs
-            WHERE title ILIKE %s OR composer ILIKE %s
-            ORDER BY 
+            WHERE title ILIKE %s
+               OR composer ILIKE %s
+               OR EXISTS (SELECT 1 FROM unnest(alt_titles) AS alt WHERE alt ILIKE %s)
+            ORDER BY
                 CASE WHEN title ILIKE %s THEN 0 ELSE 1 END,
                 title
             LIMIT 20
         """
         params = (
-            f'%{search_query}%', 
+            f'%{search_query}%',
+            f'%{search_query}%',
             f'%{search_query}%',
             f'{search_query}%'  # Exact prefix match ranked higher
         )
@@ -1119,10 +1124,12 @@ def get_songs_index():
             query = """
                 SELECT id, title, composer, composed_year
                 FROM songs
-                WHERE title ILIKE %s OR composer ILIKE %s
+                WHERE title ILIKE %s
+                   OR composer ILIKE %s
+                   OR EXISTS (SELECT 1 FROM unnest(alt_titles) AS alt WHERE alt ILIKE %s)
                 ORDER BY title
             """
-            params = (f'%{search_query}%', f'%{search_query}%')
+            params = (f'%{search_query}%', f'%{search_query}%', f'%{search_query}%')
         else:
             query = """
                 SELECT id, title, composer, composed_year
