@@ -61,6 +61,7 @@ extension Song {
 extension Recording {
     static let preview1 = Recording(
         id: "preview-recording-1",
+        title: "Take Five",  // Same as song title
         songId: "preview-song-1",
         songTitle: "Take Five",
         albumTitle: "Time Out",
@@ -133,6 +134,7 @@ extension Recording {
 
     static let preview2 = Recording(
         id: "preview-recording-2",
+        title: "Take Five (live)",  // Different from song title - will show
         songId: "preview-song-1",
         songTitle: "Take Five",
         albumTitle: "Jazz Impressions of Japan",
@@ -201,6 +203,7 @@ extension Recording {
 
     static let previewMinimal = Recording(
         id: "preview-recording-3",
+        title: nil,  // No recording title
         songId: nil,
         songTitle: "Blue Rondo à la Turk",
         albumTitle: "Time Out",

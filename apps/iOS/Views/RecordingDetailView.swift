@@ -345,6 +345,14 @@ struct RecordingDetailView: View {
                                 }
                             }
 
+                            // Recording title (when different from song title)
+                            if let recordingTitle = recording.displayTitle {
+                                Text("as \"\(recordingTitle)\"")
+                                    .font(JazzTheme.subheadline())
+                                    .italic()
+                                    .foregroundColor(JazzTheme.brass)
+                            }
+
                             // Release Name
                             Text(displayAlbumTitle)
                                 .font(JazzTheme.title2())

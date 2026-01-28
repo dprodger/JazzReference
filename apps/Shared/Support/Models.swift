@@ -94,6 +94,7 @@ struct SongRecordingsResponse: Codable {
 
 struct Recording: Codable, Identifiable {
     let id: String
+    let title: String?  // MusicBrainz recording title (may differ from song title)
     let songId: String?
     let songTitle: String?
     let albumTitle: String?
@@ -180,7 +181,7 @@ struct Recording: Codable, Identifiable {
     let userContribution: UserContribution?
 
     enum CodingKeys: String, CodingKey {
-        case id, label, notes, composer, performers, releases, transcriptions
+        case id, title, label, notes, composer, performers, releases, transcriptions
         case songId = "song_id"
         case songTitle = "song_title"
         case albumTitle = "album_title"
@@ -227,6 +228,24 @@ struct Recording: Codable, Identifiable {
     }
     
     // Helper computed properties
+
+    /// The recording title to display - use recording-specific title if it differs meaningfully from song title
+    var displayTitle: String? {
+        guard let recordingTitle = title else { return nil }
+        // Don't show if it's essentially the same as the song title
+        guard let songTitle = songTitle else { return recordingTitle }
+        // Case-insensitive comparison, ignoring minor differences
+        if recordingTitle.lowercased() == songTitle.lowercased() {
+            return nil
+        }
+        return recordingTitle
+    }
+
+    /// Whether the recording has a distinct title worth showing
+    var hasDistinctTitle: Bool {
+        displayTitle != nil
+    }
+
     var hasAuthority: Bool {
         guard let count = authorityCount else { return false }
         return count > 0

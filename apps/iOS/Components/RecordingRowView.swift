@@ -189,6 +189,16 @@ struct RecordingRowView: View {
                 .lineLimit(2)
                 .frame(width: 150, alignment: .leading)
 
+            // Recording title (when different from song title)
+            if let recordingTitle = recording.displayTitle {
+                Text("(\(recordingTitle))")
+                    .font(JazzTheme.caption())
+                    .italic()
+                    .foregroundColor(JazzTheme.brass)
+                    .lineLimit(1)
+                    .frame(width: 150, alignment: .leading)
+            }
+
             // Year
             if let year = recording.recordingYear {
                 Text(String(format: "%d", year))

@@ -1164,6 +1164,15 @@ struct RecordingCard: View {
                         .lineLimit(2)
                 }
 
+                // Recording title (when different from song title)
+                if let recordingTitle = recording.displayTitle {
+                    Text("(\(recordingTitle))")
+                        .font(JazzTheme.caption())
+                        .italic()
+                        .foregroundColor(JazzTheme.brass)
+                        .lineLimit(1)
+                }
+
                 // Year
                 if let year = recording.recordingYear {
                     Text(String(year))
@@ -1349,6 +1358,15 @@ struct FeaturedRecordingCard: View {
                     .font(JazzTheme.body(weight: .medium))
                     .foregroundColor(JazzTheme.charcoal)
                     .lineLimit(2)
+
+                // Recording title (when different from song title)
+                if let recordingTitle = recording.displayTitle {
+                    Text("(\(recordingTitle))")
+                        .font(JazzTheme.caption())
+                        .italic()
+                        .foregroundColor(JazzTheme.brass)
+                        .lineLimit(1)
+                }
 
                 if let year = recording.recordingYear {
                     Text(String(year))

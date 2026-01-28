@@ -975,12 +975,21 @@ struct AuthoritativeRecordingCard: View {
                     .foregroundColor(JazzTheme.charcoal)
                     .lineLimit(2)
 
+                // Recording title (when different from song title)
+                if let recordingTitle = recording.displayTitle {
+                    Text("(\(recordingTitle))")
+                        .font(JazzTheme.caption())
+                        .italic()
+                        .foregroundColor(JazzTheme.brass)
+                        .lineLimit(1)
+                }
+
                 // Year (always reserve space)
                 Text(recording.recordingYear.map { String($0) } ?? " ")
                     .font(JazzTheme.caption())
                     .foregroundColor(JazzTheme.smokeGray)
             }
-            .frame(width: artworkSize, height: 75, alignment: .topLeading)
+            .frame(width: artworkSize, alignment: .topLeading)
         }
         .padding(12)
         .background(JazzTheme.cardBackground)
