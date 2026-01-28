@@ -375,7 +375,7 @@ def get_repertoire_songs(repertoire_id):
             with conn.cursor() as cur:
                 if search_query:
                     cur.execute("""
-                        SELECT 
+                        SELECT
                             s.id,
                             s.title,
                             s.composer,
@@ -385,9 +385,11 @@ def get_repertoire_songs(repertoire_id):
                         FROM songs s
                         INNER JOIN repertoire_songs rs ON s.id = rs.song_id
                         WHERE rs.repertoire_id = %s
-                          AND (s.title ILIKE %s OR s.composer ILIKE %s)
+                          AND (s.title ILIKE %s
+                               OR s.composer ILIKE %s
+                               OR EXISTS (SELECT 1 FROM unnest(s.alt_titles) AS alt WHERE alt ILIKE %s))
                         ORDER BY s.title
-                    """, (repertoire_id, f'%{search_query}%', f'%{search_query}%'))
+                    """, (repertoire_id, f'%{search_query}%', f'%{search_query}%', f'%{search_query}%'))
                 else:
                     cur.execute("""
                         SELECT 
