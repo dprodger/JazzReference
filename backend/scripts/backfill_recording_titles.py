@@ -14,7 +14,7 @@ Usage:
     python backfill_recording_titles.py --debug
 
 Rate Limiting:
-    Respects MusicBrainz rate limit of 1 request per second.
+    Respects MusicBrainz rate limit (~200 requests per minute).
 """
 
 from script_base import ScriptBase, run_script
@@ -78,6 +78,7 @@ Examples:
 
     # Initialize MusicBrainz API client (handles rate limiting internally)
     mb_searcher = MusicBrainzSearcher()
+    script.logger.info(f"MusicBrainz rate limit: {mb_searcher.min_request_interval}s between requests")
 
     # Process each recording
     for i, recording in enumerate(recordings, 1):
