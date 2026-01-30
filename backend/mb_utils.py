@@ -54,13 +54,13 @@ class MusicBrainzSearcher:
         """
         self.session = requests.Session()
         self.session.headers.update({
-            'User-Agent': 'JazzReference/1.0 (https://github.com/yourusername/jazzreference)',
+            'User-Agent': 'ApproachNote/1.0 (https://github.com/dprodger/JazzReference)',
             'Accept': 'application/json'
         })
         
         # Rate limiting
         self.last_request_time = 0
-        self.min_request_interval = 1.0  # MusicBrainz requires 1 second between requests
+        self.min_request_interval = 0.6  # ~150 requests/minute with proper User-Agent
         
         # Cache configuration
         self.cache_days = cache_days
