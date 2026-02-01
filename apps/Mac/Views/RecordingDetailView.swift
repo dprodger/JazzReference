@@ -158,6 +158,15 @@ struct RecordingDetailView: View {
                     dismiss()
                 }
             }
+            ToolbarItem(placement: .automatic) {
+                Button {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(recordingId, forType: .string)
+                } label: {
+                    Label("Copy Recording ID", systemImage: "doc.on.doc")
+                }
+                .help("Copy Recording ID to clipboard")
+            }
             ToolbarItem(placement: .primaryAction) {
                 Button {
                     handleFavoriteButtonTap()
