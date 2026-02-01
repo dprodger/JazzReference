@@ -46,57 +46,86 @@ def find_song_by_id(song_id: str) -> Optional[dict]:
 def get_recordings_for_song(song_id: str, artist_filter: str = None) -> List[dict]:
     """
     Get all recordings for a song, optionally filtered by artist
-    
+
     UPDATED: Recording-Centric Architecture
     - Spotify URL now comes from the best release (via default_release_id or subquery)
     - Performers come from recording_performers table
-    
+
+    UPDATED: Normalized Streaming Links
+    - Spotify track URLs now come from recording_release_streaming_links table
+    - Falls back to legacy spotify_track_id column for backwards compatibility
+
     Returns:
         List of recording dicts with 'id', 'album_title', 'recording_year',
         'spotify_url' (from best release), 'performers' (list with 'name' and 'role')
     """
     with get_db_connection() as conn:
         with conn.cursor() as cur:
-            # Base query - get Spotify URL from default release or best available (constructed from IDs)
+            # Base query - get Spotify URL from default release or best available
+            # Check both normalized streaming_links table and legacy spotify_track_id column
             query = """
                 SELECT
                     r.id,
                     def_rel.title as album_title,
                     r.recording_year,
-                    -- Get Spotify URL from default release, or best available release (constructed from IDs)
+                    -- Get Spotify URL from default release, or best available release
+                    -- Check normalized streaming_links first, then legacy column
                     COALESCE(
-                        (SELECT CASE WHEN rr.spotify_track_id IS NOT NULL
-                                     THEN 'https://open.spotify.com/track/' || rr.spotify_track_id
-                                     WHEN rel.spotify_album_id IS NOT NULL
-                                     THEN 'https://open.spotify.com/album/' || rel.spotify_album_id END
-                         FROM releases rel
-                         LEFT JOIN recording_releases rr ON rr.release_id = rel.id AND rr.recording_id = r.id
-                         WHERE rel.id = r.default_release_id
-                           AND (rel.spotify_album_id IS NOT NULL OR rr.spotify_track_id IS NOT NULL)
+                        -- Default release: check streaming links table first
+                        (SELECT rrsl.service_url
+                         FROM recording_releases rr
+                         JOIN recording_release_streaming_links rrsl
+                             ON rrsl.recording_release_id = rr.id AND rrsl.service = 'spotify'
+                         WHERE rr.release_id = r.default_release_id AND rr.recording_id = r.id
                         ),
-                        (SELECT CASE WHEN rr.spotify_track_id IS NOT NULL
-                                     THEN 'https://open.spotify.com/track/' || rr.spotify_track_id
-                                     WHEN rel.spotify_album_id IS NOT NULL
-                                     THEN 'https://open.spotify.com/album/' || rel.spotify_album_id END
+                        -- Default release: fall back to legacy column
+                        (SELECT 'https://open.spotify.com/track/' || rr.spotify_track_id
+                         FROM recording_releases rr
+                         WHERE rr.release_id = r.default_release_id
+                           AND rr.recording_id = r.id
+                           AND rr.spotify_track_id IS NOT NULL
+                        ),
+                        -- Default release: album-level fallback
+                        (SELECT 'https://open.spotify.com/album/' || rel.spotify_album_id
+                         FROM releases rel
+                         WHERE rel.id = r.default_release_id
+                           AND rel.spotify_album_id IS NOT NULL
+                        ),
+                        -- Any release: check streaming links table first
+                        (SELECT rrsl.service_url
+                         FROM recording_releases rr
+                         JOIN recording_release_streaming_links rrsl
+                             ON rrsl.recording_release_id = rr.id AND rrsl.service = 'spotify'
+                         WHERE rr.recording_id = r.id
+                         LIMIT 1
+                        ),
+                        -- Any release: fall back to legacy column
+                        (SELECT 'https://open.spotify.com/track/' || rr.spotify_track_id
+                         FROM recording_releases rr
+                         WHERE rr.recording_id = r.id
+                           AND rr.spotify_track_id IS NOT NULL
+                         LIMIT 1
+                        ),
+                        -- Any release: album-level fallback
+                        (SELECT 'https://open.spotify.com/album/' || rel.spotify_album_id
                          FROM recording_releases rr
                          JOIN releases rel ON rr.release_id = rel.id
                          WHERE rr.recording_id = r.id
-                           AND (rr.spotify_track_id IS NOT NULL OR rel.spotify_album_id IS NOT NULL)
-                         ORDER BY
-                           CASE WHEN rr.spotify_track_id IS NOT NULL THEN 0 ELSE 1 END,
-                           rel.release_year DESC NULLS LAST
-                         LIMIT 1)
+                           AND rel.spotify_album_id IS NOT NULL
+                         ORDER BY rel.release_year DESC NULLS LAST
+                         LIMIT 1
+                        )
                     ) as spotify_url,
                     json_agg(
                         json_build_object(
                             'name', p.name,
                             'role', rp.role,
                             'instrument', i.name
-                        ) ORDER BY 
-                            CASE rp.role 
-                                WHEN 'leader' THEN 1 
-                                WHEN 'sideman' THEN 2 
-                                ELSE 3 
+                        ) ORDER BY
+                            CASE rp.role
+                                WHEN 'leader' THEN 1
+                                WHEN 'sideman' THEN 2
+                                ELSE 3
                             END,
                             p.name
                     ) FILTER (WHERE p.id IS NOT NULL) as performers
@@ -240,16 +269,20 @@ def get_recordings_for_release(song_id: str, release_id: str, conn=None) -> List
     """
     def _execute(c):
         with c.cursor() as cur:
+            # Check both the legacy spotify_track_id column and the normalized
+            # streaming links table for Spotify track IDs
             cur.execute("""
                 SELECT
                     rr.recording_id,
                     s.title as song_title,
                     rr.disc_number,
                     rr.track_number,
-                    rr.spotify_track_id
+                    COALESCE(rrsl.service_id, rr.spotify_track_id) as spotify_track_id
                 FROM recording_releases rr
                 JOIN recordings rec ON rr.recording_id = rec.id
                 JOIN songs s ON rec.song_id = s.id
+                LEFT JOIN recording_release_streaming_links rrsl
+                    ON rrsl.recording_release_id = rr.id AND rrsl.service = 'spotify'
                 WHERE rr.release_id = %s
                   AND rec.song_id = %s
                 ORDER BY rr.disc_number, rr.track_number
@@ -399,7 +432,11 @@ def update_recording_release_track_id(conn, recording_id: str, release_id: str,
                                       track_title: str = None,
                                       dry_run: bool = False, log: logging.Logger = None):
     """
-    Update the recording_releases junction table with Spotify track ID and position
+    Update recording_releases with Spotify track info and insert into streaming links table.
+
+    UPDATED: Now also inserts into recording_release_streaming_links table.
+    The old spotify_track_id column on recording_releases is kept for backwards
+    compatibility during the migration period.
 
     Args:
         conn: Database connection
@@ -420,6 +457,18 @@ def update_recording_release_track_id(conn, recording_id: str, release_id: str,
         return
 
     with conn.cursor() as cur:
+        # Get the recording_release_id first
+        cur.execute("""
+            SELECT id FROM recording_releases
+            WHERE recording_id = %s AND release_id = %s
+        """, (recording_id, release_id))
+        row = cur.fetchone()
+        if not row:
+            log.warning(f"      No recording_releases row found for recording {recording_id}, release {release_id}")
+            return
+        recording_release_id = row['id']
+
+        # Update the legacy spotify_track_id column (for backwards compatibility)
         cur.execute("""
             UPDATE recording_releases
             SET spotify_track_id = %s,
@@ -428,6 +477,22 @@ def update_recording_release_track_id(conn, recording_id: str, release_id: str,
                 track_title = COALESCE(%s, track_title)
             WHERE recording_id = %s AND release_id = %s
         """, (track_id, disc_number, track_number, track_title, recording_id, release_id))
+
+        # Insert/update the normalized streaming links table
+        service_url = f'https://open.spotify.com/track/{track_id}'
+        cur.execute("""
+            INSERT INTO recording_release_streaming_links (
+                recording_release_id, service, service_id, service_url,
+                matched_at
+            )
+            VALUES (%s, 'spotify', %s, %s, CURRENT_TIMESTAMP)
+            ON CONFLICT (recording_release_id, service)
+            DO UPDATE SET
+                service_id = EXCLUDED.service_id,
+                service_url = EXCLUDED.service_url,
+                matched_at = CURRENT_TIMESTAMP,
+                updated_at = CURRENT_TIMESTAMP
+        """, (recording_release_id, track_id, service_url))
         # Note: commit is handled by the caller's context manager
 
 

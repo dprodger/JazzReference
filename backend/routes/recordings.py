@@ -211,6 +211,59 @@ RELEASE_BACK_ART_SOURCE_URL_SQL = """
      WHERE ri.release_id = rel.id AND ri.type = 'Back'
      LIMIT 1) as back_cover_source_url"""
 
+# ============================================================================
+# SQL FRAGMENTS FOR SPOTIFY URLS (Normalized Streaming Links)
+# ============================================================================
+# Spotify track URLs now come from recording_release_streaming_links table
+# with fallback to legacy spotify_track_id column for backwards compatibility
+
+SPOTIFY_URL_FROM_DEFAULT_RELEASE_SQL = """
+    COALESCE(
+        -- Check normalized streaming_links table first (default release)
+        (SELECT rrsl.service_url
+         FROM recording_releases rr
+         JOIN recording_release_streaming_links rrsl
+             ON rrsl.recording_release_id = rr.id AND rrsl.service = 'spotify'
+         WHERE rr.release_id = r.default_release_id AND rr.recording_id = r.id
+        ),
+        -- Fall back to legacy column (default release)
+        (SELECT 'https://open.spotify.com/track/' || rr.spotify_track_id
+         FROM recording_releases rr
+         WHERE rr.release_id = r.default_release_id
+           AND rr.recording_id = r.id
+           AND rr.spotify_track_id IS NOT NULL
+        )
+    )"""
+
+SPOTIFY_URL_FROM_ANY_RELEASE_SQL = """
+    COALESCE(
+        -- Check normalized streaming_links table first
+        (SELECT rrsl.service_url
+         FROM recording_releases rr
+         JOIN recording_release_streaming_links rrsl
+             ON rrsl.recording_release_id = rr.id AND rrsl.service = 'spotify'
+         WHERE rr.recording_id = r.id
+         LIMIT 1
+        ),
+        -- Fall back to legacy column
+        (SELECT 'https://open.spotify.com/track/' || rr.spotify_track_id
+         FROM recording_releases rr
+         WHERE rr.recording_id = r.id
+           AND rr.spotify_track_id IS NOT NULL
+         LIMIT 1
+        )
+    )"""
+
+# For has_spotify availability check
+HAS_SPOTIFY_SQL = """
+    (
+        EXISTS(SELECT 1 FROM recording_releases rr2
+               JOIN recording_release_streaming_links rrsl ON rrsl.recording_release_id = rr2.id
+               WHERE rr2.recording_id = r.id AND rrsl.service = 'spotify')
+        OR EXISTS(SELECT 1 FROM recording_releases rr2
+               WHERE rr2.recording_id = r.id AND rr2.spotify_track_id IS NOT NULL)
+    )"""
+
 
 @recordings_bp.route('/recordings/count', methods=['GET'])
 def get_recordings_count():
@@ -260,17 +313,8 @@ def get_recordings():
                     r.default_release_id,
                     -- Get Spotify track URL from default release or best available
                     COALESCE(
-                        (SELECT 'https://open.spotify.com/track/' || rr.spotify_track_id
-                         FROM recording_releases rr
-                         WHERE rr.release_id = r.default_release_id
-                           AND rr.recording_id = r.id
-                           AND rr.spotify_track_id IS NOT NULL
-                        ),
-                        (SELECT 'https://open.spotify.com/track/' || rr.spotify_track_id
-                         FROM recording_releases rr
-                         WHERE rr.recording_id = r.id
-                           AND rr.spotify_track_id IS NOT NULL
-                         LIMIT 1)
+                        {SPOTIFY_URL_FROM_DEFAULT_RELEASE_SQL},
+                        {SPOTIFY_URL_FROM_ANY_RELEASE_SQL}
                     ) as spotify_url,
                     -- Album art with release_imagery priority
                     {ALBUM_ART_SMALL_SQL},
@@ -295,9 +339,7 @@ def get_recordings():
                     -- Favorite count
                     (SELECT COUNT(*) FROM recording_favorites rf WHERE rf.recording_id = r.id) as favorite_count,
                     -- Streaming availability flags
-                    EXISTS(SELECT 1 FROM recording_releases rr2
-                           WHERE rr2.recording_id = r.id AND rr2.spotify_track_id IS NOT NULL
-                    ) as has_spotify,
+                    {HAS_SPOTIFY_SQL} as has_spotify,
                     EXISTS(SELECT 1 FROM recording_releases rr2
                            JOIN recording_release_streaming_links rrsl ON rrsl.recording_release_id = rr2.id
                            WHERE rr2.recording_id = r.id AND rrsl.service = 'apple_music'
@@ -329,7 +371,7 @@ def get_recordings():
         else:
             # Efficient query using JOINs with default release instead of correlated subqueries
             # Album art and Spotify URL come from default release only (no fallback scanning)
-            query = """
+            query = f"""
                 SELECT
                     r.id,
                     r.title,
@@ -340,10 +382,13 @@ def get_recordings():
                     r.recording_year,
                     r.label,
                     r.default_release_id,
-                    -- Spotify URL: only return if we have an actual track match
-                    CASE WHEN def_rr.spotify_track_id IS NOT NULL
-                         THEN 'https://open.spotify.com/track/' || def_rr.spotify_track_id
-                    END as spotify_url,
+                    -- Spotify URL: check streaming links table first, then legacy column
+                    COALESCE(
+                        def_rrsl.service_url,
+                        CASE WHEN def_rr.spotify_track_id IS NOT NULL
+                             THEN 'https://open.spotify.com/track/' || def_rr.spotify_track_id
+                        END
+                    ) as spotify_url,
                     -- Album art from release_imagery table
                     def_ri.image_url_small as album_art_small,
                     def_ri.image_url_medium as album_art_medium,
@@ -367,9 +412,7 @@ def get_recordings():
                     -- Favorite count
                     (SELECT COUNT(*) FROM recording_favorites rf WHERE rf.recording_id = r.id) as favorite_count,
                     -- Streaming availability flags
-                    EXISTS(SELECT 1 FROM recording_releases rr2
-                           WHERE rr2.recording_id = r.id AND rr2.spotify_track_id IS NOT NULL
-                    ) as has_spotify,
+                    {HAS_SPOTIFY_SQL} as has_spotify,
                     EXISTS(SELECT 1 FROM recording_releases rr2
                            JOIN recording_release_streaming_links rrsl ON rrsl.recording_release_id = rr2.id
                            WHERE rr2.recording_id = r.id AND rrsl.service = 'apple_music'
@@ -384,6 +427,8 @@ def get_recordings():
                 JOIN songs s ON r.song_id = s.id
                 LEFT JOIN releases def_rel ON r.default_release_id = def_rel.id
                 LEFT JOIN recording_releases def_rr ON def_rr.release_id = def_rel.id AND def_rr.recording_id = r.id
+                LEFT JOIN recording_release_streaming_links def_rrsl
+                    ON def_rrsl.recording_release_id = def_rr.id AND def_rrsl.service = 'spotify'
                 LEFT JOIN release_imagery def_ri ON def_ri.release_id = def_rel.id AND def_ri.type = 'Front'
                 LEFT JOIN release_imagery back_ri ON back_ri.release_id = def_rel.id AND back_ri.type = 'Back'
                 ORDER BY r.recording_year DESC NULLS LAST
@@ -434,18 +479,10 @@ def get_recording_detail(recording_id):
                     r.label,
                     r.default_release_id,
                     -- Get Spotify track URL from default release or best available
+                    -- Check normalized streaming_links first, then legacy column
                     COALESCE(
-                        (SELECT 'https://open.spotify.com/track/' || rr_sub.spotify_track_id
-                         FROM recording_releases rr_sub
-                         WHERE rr_sub.release_id = r.default_release_id
-                           AND rr_sub.recording_id = r.id
-                           AND rr_sub.spotify_track_id IS NOT NULL
-                        ),
-                        (SELECT 'https://open.spotify.com/track/' || rr_sub.spotify_track_id
-                         FROM recording_releases rr_sub
-                         WHERE rr_sub.recording_id = r.id
-                           AND rr_sub.spotify_track_id IS NOT NULL
-                         LIMIT 1)
+                        {SPOTIFY_URL_FROM_DEFAULT_RELEASE_SQL},
+                        {SPOTIFY_URL_FROM_ANY_RELEASE_SQL}
                     ) as spotify_url,
                     -- Album art with release_imagery priority
                     {ALBUM_ART_SMALL_SQL},
@@ -502,13 +539,18 @@ def get_recording_detail(recording_id):
                     rel.musicbrainz_release_id,
                     rr.disc_number,
                     rr.track_number,
-                    rr.spotify_track_id,
-                    CASE WHEN rr.spotify_track_id IS NOT NULL THEN 'https://open.spotify.com/track/' || rr.spotify_track_id END as spotify_track_url,
+                    COALESCE(rrsl.service_id, rr.spotify_track_id) as spotify_track_id,
+                    COALESCE(rrsl.service_url,
+                        CASE WHEN rr.spotify_track_id IS NOT NULL
+                             THEN 'https://open.spotify.com/track/' || rr.spotify_track_id END
+                    ) as spotify_track_url,
                     rf.name as format_name,
                     rs.name as status_name,
-                    CASE WHEN rr.spotify_track_id IS NOT NULL THEN 1 ELSE 0 END as has_spotify
+                    CASE WHEN rrsl.service_id IS NOT NULL OR rr.spotify_track_id IS NOT NULL THEN 1 ELSE 0 END as has_spotify
                 FROM recording_releases rr
                 JOIN releases rel ON rr.release_id = rel.id
+                LEFT JOIN recording_release_streaming_links rrsl
+                    ON rrsl.recording_release_id = rr.id AND rrsl.service = 'spotify'
                 LEFT JOIN release_formats rf ON rel.format_id = rf.id
                 LEFT JOIN release_statuses rs ON rel.status_id = rs.id
                 WHERE rr.recording_id = %s
@@ -768,8 +810,11 @@ def get_recording_releases(recording_id):
                 rel.musicbrainz_release_id,
                 rr.disc_number,
                 rr.track_number,
-                rr.spotify_track_id,
-                CASE WHEN rr.spotify_track_id IS NOT NULL THEN 'https://open.spotify.com/track/' || rr.spotify_track_id END as spotify_track_url,
+                COALESCE(rrsl.service_id, rr.spotify_track_id) as spotify_track_id,
+                COALESCE(rrsl.service_url,
+                    CASE WHEN rr.spotify_track_id IS NOT NULL
+                         THEN 'https://open.spotify.com/track/' || rr.spotify_track_id END
+                ) as spotify_track_url,
                 rf.name as format_name,
                 rs.name as status_name,
                 -- Performers from recording_performers (not release_performers)
@@ -814,11 +859,13 @@ def get_recording_releases(recording_id):
                 ) as release_credits
             FROM recording_releases rr
             JOIN releases rel ON rr.release_id = rel.id
+            LEFT JOIN recording_release_streaming_links rrsl
+                ON rrsl.recording_release_id = rr.id AND rrsl.service = 'spotify'
             LEFT JOIN release_formats rf ON rel.format_id = rf.id
             LEFT JOIN release_statuses rs ON rel.status_id = rs.id
             WHERE rr.recording_id = %s
-            ORDER BY 
-                CASE WHEN rel.spotify_album_id IS NOT NULL THEN 0 ELSE 1 END,
+            ORDER BY
+                CASE WHEN rrsl.service_id IS NOT NULL OR rr.spotify_track_id IS NOT NULL THEN 0 ELSE 1 END,
                 rel.release_year ASC NULLS LAST
         """
         

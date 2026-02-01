@@ -165,6 +165,55 @@ AUTHORITY_ALBUM_ART_SOURCE_SQL = """
          LIMIT 1)
     ) as matched_album_art_source"""
 
+# ============================================================================
+# SQL FRAGMENTS FOR SPOTIFY URLS (Normalized Streaming Links)
+# ============================================================================
+# Spotify track URLs now come from recording_release_streaming_links table
+# with fallback to legacy spotify_track_id column for backwards compatibility
+
+SPOTIFY_URL_FROM_DEFAULT_RELEASE_SQL = """
+    (SELECT rrsl.service_url
+     FROM recording_releases rr_sub
+     JOIN recording_release_streaming_links rrsl
+         ON rrsl.recording_release_id = rr_sub.id AND rrsl.service = 'spotify'
+     WHERE rr_sub.release_id = r.default_release_id AND rr_sub.recording_id = r.id
+    )"""
+
+SPOTIFY_URL_FROM_DEFAULT_RELEASE_LEGACY_SQL = """
+    (SELECT 'https://open.spotify.com/track/' || rr_sub.spotify_track_id
+     FROM recording_releases rr_sub
+     WHERE rr_sub.release_id = r.default_release_id
+       AND rr_sub.recording_id = r.id
+       AND rr_sub.spotify_track_id IS NOT NULL
+    )"""
+
+SPOTIFY_URL_FROM_ANY_RELEASE_SQL = """
+    (SELECT rrsl.service_url
+     FROM recording_releases rr_sub
+     JOIN recording_release_streaming_links rrsl
+         ON rrsl.recording_release_id = rr_sub.id AND rrsl.service = 'spotify'
+     WHERE rr_sub.recording_id = r.id
+     LIMIT 1
+    )"""
+
+SPOTIFY_URL_FROM_ANY_RELEASE_LEGACY_SQL = """
+    (SELECT 'https://open.spotify.com/track/' || rr_sub.spotify_track_id
+     FROM recording_releases rr_sub
+     WHERE rr_sub.recording_id = r.id
+       AND rr_sub.spotify_track_id IS NOT NULL
+     LIMIT 1
+    )"""
+
+# For has_spotify availability check - checks both normalized table and legacy column
+HAS_SPOTIFY_SQL = """
+    (
+        EXISTS(SELECT 1 FROM recording_releases rr2
+               JOIN recording_release_streaming_links rrsl ON rrsl.recording_release_id = rr2.id
+               WHERE rr2.recording_id = r.id AND rrsl.service = 'spotify')
+        OR EXISTS(SELECT 1 FROM recording_releases rr2
+               WHERE rr2.recording_id = r.id AND rr2.spotify_track_id IS NOT NULL)
+    )"""
+
 
 # All song-related endpoints:
 # - GET /api/songs
@@ -261,19 +310,12 @@ def get_song_summary(song_id):
                     r.recording_year,
                     r.label,
                     r.default_release_id,
-                    -- Spotify track URL (only if we have an actual track match)
+                    -- Spotify track URL: check normalized streaming_links first, then legacy column
                     COALESCE(
-                        (SELECT 'https://open.spotify.com/track/' || rr_sub.spotify_track_id
-                         FROM recording_releases rr_sub
-                         WHERE rr_sub.release_id = r.default_release_id
-                           AND rr_sub.recording_id = r.id
-                           AND rr_sub.spotify_track_id IS NOT NULL
-                        ),
-                        (SELECT 'https://open.spotify.com/track/' || rr_sub.spotify_track_id
-                         FROM recording_releases rr_sub
-                         WHERE rr_sub.recording_id = r.id
-                           AND rr_sub.spotify_track_id IS NOT NULL
-                         LIMIT 1)
+                        {SPOTIFY_URL_FROM_DEFAULT_RELEASE_SQL},
+                        {SPOTIFY_URL_FROM_DEFAULT_RELEASE_LEGACY_SQL},
+                        {SPOTIFY_URL_FROM_ANY_RELEASE_SQL},
+                        {SPOTIFY_URL_FROM_ANY_RELEASE_LEGACY_SQL}
                     ) as best_spotify_url,
                     {ALBUM_ART_SMALL_SQL},
                     {ALBUM_ART_MEDIUM_SQL},
@@ -425,19 +467,12 @@ def get_song_recordings(song_id):
                 r.recording_year,
                 r.label,
                 r.default_release_id,
-                -- Spotify track URL (only if we have an actual track match)
+                -- Spotify track URL: check normalized streaming_links first, then legacy column
                 COALESCE(
-                    (SELECT 'https://open.spotify.com/track/' || rr_sub.spotify_track_id
-                     FROM recording_releases rr_sub
-                     WHERE rr_sub.release_id = r.default_release_id
-                       AND rr_sub.recording_id = r.id
-                       AND rr_sub.spotify_track_id IS NOT NULL
-                    ),
-                    (SELECT 'https://open.spotify.com/track/' || rr_sub.spotify_track_id
-                     FROM recording_releases rr_sub
-                     WHERE rr_sub.recording_id = r.id
-                       AND rr_sub.spotify_track_id IS NOT NULL
-                     LIMIT 1)
+                    {SPOTIFY_URL_FROM_DEFAULT_RELEASE_SQL},
+                    {SPOTIFY_URL_FROM_DEFAULT_RELEASE_LEGACY_SQL},
+                    {SPOTIFY_URL_FROM_ANY_RELEASE_SQL},
+                    {SPOTIFY_URL_FROM_ANY_RELEASE_LEGACY_SQL}
                 ) as best_spotify_url,
                 {ALBUM_ART_SMALL_SQL},
                 {ALBUM_ART_MEDIUM_SQL},
@@ -489,9 +524,7 @@ def get_song_recordings(song_id):
                               WHERE rr2.recording_id = r.id AND rel2.spotify_album_id IS NOT NULL)
                 ) as has_streaming,
                 -- Per-service availability (track-level matches only)
-                EXISTS(SELECT 1 FROM recording_releases rr2
-                       WHERE rr2.recording_id = r.id AND rr2.spotify_track_id IS NOT NULL
-                ) as has_spotify,
+                {HAS_SPOTIFY_SQL} as has_spotify,
                 EXISTS(SELECT 1 FROM recording_releases rr2
                        JOIN recording_release_streaming_links rrsl ON rrsl.recording_release_id = rr2.id
                        WHERE rr2.recording_id = r.id AND rrsl.service = 'apple_music'
@@ -634,20 +667,12 @@ def get_song_detail(song_id):
                     r.recording_year,
                     r.label,
                     r.default_release_id,
-                    -- Spotify URL from default release or best available
-                    -- Spotify track URL (only if we have an actual track match)
+                    -- Spotify track URL: check normalized streaming_links first, then legacy column
                     COALESCE(
-                        (SELECT 'https://open.spotify.com/track/' || rr_sub.spotify_track_id
-                         FROM recording_releases rr_sub
-                         WHERE rr_sub.release_id = r.default_release_id
-                           AND rr_sub.recording_id = r.id
-                           AND rr_sub.spotify_track_id IS NOT NULL
-                        ),
-                        (SELECT 'https://open.spotify.com/track/' || rr_sub.spotify_track_id
-                         FROM recording_releases rr_sub
-                         WHERE rr_sub.recording_id = r.id
-                           AND rr_sub.spotify_track_id IS NOT NULL
-                         LIMIT 1)
+                        {SPOTIFY_URL_FROM_DEFAULT_RELEASE_SQL},
+                        {SPOTIFY_URL_FROM_DEFAULT_RELEASE_LEGACY_SQL},
+                        {SPOTIFY_URL_FROM_ANY_RELEASE_SQL},
+                        {SPOTIFY_URL_FROM_ANY_RELEASE_LEGACY_SQL}
                     ) as best_spotify_url,
                     -- Album art with release_imagery priority
                     {ALBUM_ART_SMALL_SQL},
@@ -1025,13 +1050,27 @@ def get_song_authority_recommendations(song_id):
                            sar.recording_id,
                            def_rel.title as matched_album_title,
                            r.recording_year as matched_year,
-                           -- Spotify track URL (only if we have an actual track match)
+                           -- Spotify track URL: check normalized streaming_links first, then legacy column
                            COALESCE(
+                               (SELECT rrsl.service_url
+                                FROM recording_releases rr
+                                JOIN recording_release_streaming_links rrsl
+                                    ON rrsl.recording_release_id = rr.id AND rrsl.service = 'spotify'
+                                WHERE rr.release_id = r.default_release_id
+                                  AND rr.recording_id = r.id
+                               ),
                                (SELECT 'https://open.spotify.com/track/' || rr.spotify_track_id
                                 FROM recording_releases rr
                                 WHERE rr.release_id = r.default_release_id
                                   AND rr.recording_id = r.id
                                   AND rr.spotify_track_id IS NOT NULL
+                               ),
+                               (SELECT rrsl.service_url
+                                FROM recording_releases rr
+                                JOIN recording_release_streaming_links rrsl
+                                    ON rrsl.recording_release_id = rr.id AND rrsl.service = 'spotify'
+                                WHERE rr.recording_id = r.id
+                                LIMIT 1
                                ),
                                (SELECT 'https://open.spotify.com/track/' || rr.spotify_track_id
                                 FROM recording_releases rr
@@ -1046,7 +1085,7 @@ def get_song_authority_recommendations(song_id):
                     LEFT JOIN recordings r ON sar.recording_id = r.id
                     LEFT JOIN releases def_rel ON r.default_release_id = def_rel.id
                     WHERE sar.song_id = %s
-                    ORDER BY 
+                    ORDER BY
                         CASE WHEN sar.recording_id IS NOT NULL THEN 0 ELSE 1 END,
                         sar.source,
                         sar.artist_name

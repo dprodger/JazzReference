@@ -2033,11 +2033,9 @@ def streaming_availability():
             # We need to count recordings that have track-level streaming links
             #
             # DATA MODELS:
-            # - Spotify (legacy): spotify_track_id column on recording_releases table
-            # - Apple Music (new): recording_release_streaming_links with service='apple_music'
+            # - Both Spotify and Apple Music use recording_release_streaming_links
+            # - Spotify also has legacy spotify_track_id column (checked for backwards compatibility)
             #
-            # TODO: Once Spotify is migrated to recording_release_streaming_links,
-            #       update this query to use the new model for both services.
             # First aggregate streaming availability at the recording level,
             # then count recordings per song. This avoids double-counting when
             # a recording has multiple releases with different streaming status.
@@ -2047,12 +2045,15 @@ def streaming_availability():
                     SELECT
                         r.id as recording_id,
                         r.song_id,
-                        -- Has Spotify if ANY release has spotify_track_id
-                        BOOL_OR(rr.spotify_track_id IS NOT NULL) as has_spotify,
+                        -- Has Spotify: check streaming_links table OR legacy column
+                        BOOL_OR(rrsl_spotify.id IS NOT NULL OR rr.spotify_track_id IS NOT NULL) as has_spotify,
                         -- Has Apple if ANY release has apple music link
                         BOOL_OR(rrsl_apple.id IS NOT NULL) as has_apple
                     FROM recordings r
                     LEFT JOIN recording_releases rr ON rr.recording_id = r.id
+                    LEFT JOIN recording_release_streaming_links rrsl_spotify
+                        ON rrsl_spotify.recording_release_id = rr.id
+                        AND rrsl_spotify.service = 'spotify'
                     LEFT JOIN recording_release_streaming_links rrsl_apple
                         ON rrsl_apple.recording_release_id = rr.id
                         AND rrsl_apple.service = 'apple_music'
@@ -2207,9 +2208,14 @@ def streaming_diagnostics(song_id):
                     def_rel.musicbrainz_release_id as default_release_mb_id,
                     -- Count releases
                     (SELECT COUNT(*) FROM recording_releases rr WHERE rr.recording_id = r.id) as release_count,
-                    -- Spotify: has track if ANY release has spotify_track_id
-                    EXISTS(SELECT 1 FROM recording_releases rr
-                           WHERE rr.recording_id = r.id AND rr.spotify_track_id IS NOT NULL) as has_spotify,
+                    -- Spotify: has track if ANY release has spotify link (normalized or legacy)
+                    (
+                        EXISTS(SELECT 1 FROM recording_releases rr
+                               JOIN recording_release_streaming_links rrsl ON rrsl.recording_release_id = rr.id
+                               WHERE rr.recording_id = r.id AND rrsl.service = 'spotify')
+                        OR EXISTS(SELECT 1 FROM recording_releases rr
+                               WHERE rr.recording_id = r.id AND rr.spotify_track_id IS NOT NULL)
+                    ) as has_spotify,
                     -- Apple: has track if ANY release has apple music link
                     EXISTS(SELECT 1 FROM recording_releases rr
                            JOIN recording_release_streaming_links rrsl ON rrsl.recording_release_id = rr.id
@@ -2246,8 +2252,12 @@ def streaming_diagnostics(song_id):
                         rel.musicbrainz_release_id as release_mb_id,
                         -- Spotify album (on release)
                         rel.spotify_album_id,
-                        -- Spotify track (on recording_release)
-                        rr.spotify_track_id,
+                        -- Spotify track: prefer normalized table, fall back to legacy column
+                        COALESCE(rrsl_spotify.service_id, rr.spotify_track_id) as spotify_track_id,
+                        COALESCE(rrsl_spotify.service_url,
+                            CASE WHEN rr.spotify_track_id IS NOT NULL
+                                 THEN 'https://open.spotify.com/track/' || rr.spotify_track_id END
+                        ) as spotify_track_url,
                         rr.disc_number,
                         rr.track_number,
                         CASE WHEN rel.id = %s THEN true ELSE false END as is_default,
@@ -2259,6 +2269,8 @@ def streaming_diagnostics(song_id):
                         rrsl_apple.service_url as apple_track_url
                     FROM recording_releases rr
                     JOIN releases rel ON rr.release_id = rel.id
+                    LEFT JOIN recording_release_streaming_links rrsl_spotify
+                        ON rrsl_spotify.recording_release_id = rr.id AND rrsl_spotify.service = 'spotify'
                     LEFT JOIN release_streaming_links rsl_apple
                         ON rsl_apple.release_id = rel.id AND rsl_apple.service = 'apple_music'
                     LEFT JOIN recording_release_streaming_links rrsl_apple
