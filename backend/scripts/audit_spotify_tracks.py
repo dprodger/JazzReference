@@ -75,6 +75,8 @@ def get_existing_spotify_data(song_id: str) -> list:
     """
     Get all recordings for a song that have existing Spotify track IDs,
     along with release and performer info.
+
+    Checks both the normalized streaming_links table and legacy spotify_track_id column.
     """
     with get_db_connection() as conn:
         with conn.cursor() as cur:
@@ -84,11 +86,15 @@ def get_existing_spotify_data(song_id: str) -> list:
                     def_rel.title as album_title,
                     r.recording_year,
                     rr.release_id,
-                    rr.spotify_track_id,
-                    rr.spotify_track_url,
+                    COALESCE(rrsl.service_id, rr.spotify_track_id) as spotify_track_id,
+                    COALESCE(rrsl.service_url,
+                        CASE WHEN rr.spotify_track_id IS NOT NULL
+                             THEN 'https://open.spotify.com/track/' || rr.spotify_track_id END
+                    ) as spotify_track_url,
                     rel.title as release_title,
                     rel.spotify_album_id,
-                    rel.spotify_album_url,
+                    CASE WHEN rel.spotify_album_id IS NOT NULL
+                         THEN 'https://open.spotify.com/album/' || rel.spotify_album_id END as spotify_album_url,
                     rel.artist_credit,
                     -- Get leader/primary performer
                     (
@@ -102,8 +108,10 @@ def get_existing_spotify_data(song_id: str) -> list:
                 LEFT JOIN releases def_rel ON r.default_release_id = def_rel.id
                 JOIN recording_releases rr ON r.id = rr.recording_id
                 JOIN releases rel ON rr.release_id = rel.id
+                LEFT JOIN recording_release_streaming_links rrsl
+                    ON rrsl.recording_release_id = rr.id AND rrsl.service = 'spotify'
                 WHERE r.song_id = %s
-                  AND rr.spotify_track_id IS NOT NULL
+                  AND (rrsl.service_id IS NOT NULL OR rr.spotify_track_id IS NOT NULL)
                 ORDER BY r.recording_year DESC NULLS LAST, rel.title
             """, (song_id,))
             return cur.fetchall()
@@ -535,6 +543,8 @@ def get_tracks_with_albums(song_id: str) -> list:
     """
     Get all recording_releases that have both a spotify_track_id
     and an associated release with a spotify_album_id.
+
+    Checks both the normalized streaming_links table and legacy spotify_track_id column.
     """
     with get_db_connection() as conn:
         with conn.cursor() as cur:
@@ -544,12 +554,16 @@ def get_tracks_with_albums(song_id: str) -> list:
                     def_rel.title as album_title,
                     r.recording_year,
                     rr.release_id,
-                    rr.spotify_track_id,
-                    rr.spotify_track_url,
+                    COALESCE(rrsl.service_id, rr.spotify_track_id) as spotify_track_id,
+                    COALESCE(rrsl.service_url,
+                        CASE WHEN rr.spotify_track_id IS NOT NULL
+                             THEN 'https://open.spotify.com/track/' || rr.spotify_track_id END
+                    ) as spotify_track_url,
                     rel.title as release_title,
                     rel.release_year,
                     rel.spotify_album_id,
-                    rel.spotify_album_url,
+                    CASE WHEN rel.spotify_album_id IS NOT NULL
+                         THEN 'https://open.spotify.com/album/' || rel.spotify_album_id END as spotify_album_url,
                     rel.artist_credit,
                     (
                         SELECT p.name
@@ -562,8 +576,10 @@ def get_tracks_with_albums(song_id: str) -> list:
                 LEFT JOIN releases def_rel ON r.default_release_id = def_rel.id
                 JOIN recording_releases rr ON r.id = rr.recording_id
                 JOIN releases rel ON rr.release_id = rel.id
+                LEFT JOIN recording_release_streaming_links rrsl
+                    ON rrsl.recording_release_id = rr.id AND rrsl.service = 'spotify'
                 WHERE r.song_id = %s
-                  AND rr.spotify_track_id IS NOT NULL
+                  AND (rrsl.service_id IS NOT NULL OR rr.spotify_track_id IS NOT NULL)
                   AND rel.spotify_album_id IS NOT NULL
                 ORDER BY rel.release_year DESC NULLS LAST, rel.title
             """, (song_id,))
@@ -723,6 +739,8 @@ def get_orphaned_albums(song_id: str) -> list:
     """
     Get releases that have a spotify_album_id but where the associated
     recording_releases have no spotify_track_id.
+
+    Checks both the normalized streaming_links table and legacy spotify_track_id column.
     """
     with get_db_connection() as conn:
         with conn.cursor() as cur:
@@ -733,7 +751,8 @@ def get_orphaned_albums(song_id: str) -> list:
                     rel.release_year,
                     rel.musicbrainz_release_id,
                     rel.spotify_album_id,
-                    rel.spotify_album_url,
+                    CASE WHEN rel.spotify_album_id IS NOT NULL
+                         THEN 'https://open.spotify.com/album/' || rel.spotify_album_id END as spotify_album_url,
                     rel.artist_credit,
                     (
                         SELECT p.name
@@ -749,8 +768,11 @@ def get_orphaned_albums(song_id: str) -> list:
                 FROM releases rel
                 JOIN recording_releases rr ON rel.id = rr.release_id
                 JOIN recordings r ON rr.recording_id = r.id
+                LEFT JOIN recording_release_streaming_links rrsl
+                    ON rrsl.recording_release_id = rr.id AND rrsl.service = 'spotify'
                 WHERE r.song_id = %s
                   AND rel.spotify_album_id IS NOT NULL
+                  AND rrsl.service_id IS NULL
                   AND (rr.spotify_track_id IS NULL OR rr.spotify_track_id = '')
                 ORDER BY rel.release_year DESC NULLS LAST, rel.title
             """, (song_id, song_id))

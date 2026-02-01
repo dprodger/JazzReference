@@ -54,16 +54,21 @@ Examples:
     }
 
     # Query recording_releases that have spotify_track_id but no track_title
+    # Check both normalized streaming_links table and legacy column
     script.logger.info("Finding recording_releases without track_titles...")
 
     with get_db_connection() as conn:
         with conn.cursor() as cur:
             cur.execute("""
-                SELECT id, spotify_track_id
-                FROM recording_releases
-                WHERE spotify_track_id IS NOT NULL
-                  AND track_title IS NULL
-                ORDER BY created_at DESC
+                SELECT
+                    rr.id,
+                    COALESCE(rrsl.service_id, rr.spotify_track_id) as spotify_track_id
+                FROM recording_releases rr
+                LEFT JOIN recording_release_streaming_links rrsl
+                    ON rrsl.recording_release_id = rr.id AND rrsl.service = 'spotify'
+                WHERE (rrsl.service_id IS NOT NULL OR rr.spotify_track_id IS NOT NULL)
+                  AND rr.track_title IS NULL
+                ORDER BY rr.created_at DESC
                 LIMIT %s
             """, (args.limit,))
 

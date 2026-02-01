@@ -37,30 +37,39 @@ def get_recordings_with_spotify_tracks(song_id: str) -> list:
     """
     Get all recordings for a song that have Spotify track IDs.
 
+    Checks both the normalized streaming_links table and legacy spotify_track_id column.
+
     Returns list of dicts with recording info and spotify track details.
     """
     with get_db_connection() as conn:
         with conn.cursor() as cur:
             # First get distinct recording/track combinations
+            # COALESCE prefers normalized streaming_links over legacy column
             cur.execute("""
                 WITH recording_tracks AS (
-                    SELECT DISTINCT ON (rr.spotify_track_id)
+                    SELECT DISTINCT ON (COALESCE(rrsl.service_id, rr.spotify_track_id))
                         r.id as recording_id,
                         def_rel.title as album_title,
                         r.recording_year,
                         r.musicbrainz_id,
-                        rr.spotify_track_id,
-                        rr.spotify_track_url,
+                        COALESCE(rrsl.service_id, rr.spotify_track_id) as spotify_track_id,
+                        COALESCE(rrsl.service_url,
+                            CASE WHEN rr.spotify_track_id IS NOT NULL
+                                 THEN 'https://open.spotify.com/track/' || rr.spotify_track_id END
+                        ) as spotify_track_url,
                         rel.title as release_title,
                         rel.spotify_album_id,
-                        rel.spotify_album_url
+                        CASE WHEN rel.spotify_album_id IS NOT NULL
+                             THEN 'https://open.spotify.com/album/' || rel.spotify_album_id END as spotify_album_url
                     FROM recordings r
                     LEFT JOIN releases def_rel ON r.default_release_id = def_rel.id
                     JOIN recording_releases rr ON r.id = rr.recording_id
                     JOIN releases rel ON rr.release_id = rel.id
+                    LEFT JOIN recording_release_streaming_links rrsl
+                        ON rrsl.recording_release_id = rr.id AND rrsl.service = 'spotify'
                     WHERE r.song_id = %s
-                      AND rr.spotify_track_id IS NOT NULL
-                    ORDER BY rr.spotify_track_id, r.recording_year DESC NULLS LAST
+                      AND (rrsl.service_id IS NOT NULL OR rr.spotify_track_id IS NOT NULL)
+                    ORDER BY COALESCE(rrsl.service_id, rr.spotify_track_id), r.recording_year DESC NULLS LAST
                 )
                 SELECT
                     rt.*,

@@ -718,12 +718,16 @@ class TrackListMatcher:
 
             # Update recording_releases with individual track Spotify URLs
             # First, get the recording_releases for this release with their track positions
+            # Check both normalized streaming_links table and legacy column
             tracks_updated = 0
             with conn.cursor() as cur:
                 cur.execute("""
                     SELECT rr.recording_id, rr.disc_number, rr.track_number
                     FROM recording_releases rr
+                    LEFT JOIN recording_release_streaming_links rrsl
+                        ON rrsl.recording_release_id = rr.id AND rrsl.service = 'spotify'
                     WHERE rr.release_id = %s
+                      AND rrsl.service_id IS NULL
                       AND rr.spotify_track_id IS NULL
                 """, (release['id'],))
                 recording_releases = cur.fetchall()
