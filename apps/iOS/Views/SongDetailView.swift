@@ -552,12 +552,17 @@ struct SongDetailView: View {
     
     private var notFoundView: some View {
         VStack(spacing: 16) {
-            Image(systemName: "music.note.slash")
-                .font(.system(size: 60))
-                .foregroundColor(JazzTheme.smokeGray)
-            Text("Song not found")
+            Image(systemName: "exclamationmark.triangle")
+                .font(.system(size: 50))
+                .foregroundColor(JazzTheme.amber)
+            Text("Unable to load song")
                 .font(JazzTheme.headline())
                 .foregroundColor(JazzTheme.charcoal)
+            Text("There was a problem loading the song details.")
+                .font(JazzTheme.subheadline())
+                .foregroundColor(JazzTheme.smokeGray)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal)
         }
         .frame(maxWidth: .infinity, minHeight: 300)
     }

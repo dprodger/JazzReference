@@ -178,9 +178,19 @@ struct SongDetailView: View {
                 }
                 .padding()
             } else {
-                Text("Song not found")
-                    .foregroundColor(.secondary)
-                    .padding(.top, 100)
+                VStack(spacing: 16) {
+                    Image(systemName: "exclamationmark.triangle")
+                        .font(.system(size: 50))
+                        .foregroundColor(JazzTheme.amber)
+                    Text("Unable to load song")
+                        .font(JazzTheme.headline())
+                        .foregroundColor(JazzTheme.charcoal)
+                    Text("There was a problem loading the song details.")
+                        .font(JazzTheme.subheadline())
+                        .foregroundColor(JazzTheme.smokeGray)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .padding(.top, 100)
             }
         }
         .background(JazzTheme.backgroundLight)
