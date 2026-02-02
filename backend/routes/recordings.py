@@ -846,6 +846,95 @@ def get_recording_releases(recording_id):
 # MANUAL STREAMING LINK MANAGEMENT
 # ============================================================================
 
+def fetch_artwork_for_track(service: str, track_id: str) -> dict:
+    """
+    Fetch album artwork for a track from Spotify or Apple Music.
+
+    Args:
+        service: 'spotify' or 'apple_music'
+        track_id: The track ID on the service
+
+    Returns:
+        dict with 'small', 'medium', 'large' URLs, or empty dict on failure
+    """
+    try:
+        if service == 'spotify':
+            from spotify_matcher import SpotifyMatcher
+            matcher = SpotifyMatcher()
+            track_details = matcher.get_track_details(track_id)
+            if track_details and 'album' in track_details:
+                images = track_details['album'].get('images', [])
+                artwork = {}
+                for image in images:
+                    height = image.get('height', 0)
+                    if height >= 600:
+                        artwork['large'] = image['url']
+                    elif height >= 300:
+                        artwork['medium'] = image['url']
+                    elif height >= 64:
+                        artwork['small'] = image['url']
+                return artwork
+        else:  # apple_music
+            from apple_music_client import AppleMusicClient
+            client = AppleMusicClient()
+            track_details = client.lookup_track(track_id)
+            if track_details and 'artwork' in track_details:
+                return track_details['artwork']
+    except Exception as e:
+        logger.warning(f"Failed to fetch artwork for {service} track {track_id}: {e}")
+    return {}
+
+
+def save_artwork_to_release(conn, release_id: str, artwork: dict, service: str, source_id: str):
+    """
+    Save artwork to the release_imagery table.
+
+    Args:
+        conn: Database connection
+        release_id: Our release ID
+        artwork: dict with 'small', 'medium', 'large' URLs
+        service: 'spotify' or 'apple_music' (for source attribution)
+        source_id: The track/album ID (for reference)
+    """
+    if not artwork or not any(artwork.values()):
+        return False
+
+    try:
+        # Determine source name for release_imagery
+        if service == 'spotify':
+            source_name = 'Spotify'
+            source_url = f'https://open.spotify.com/track/{source_id}'
+        else:
+            source_name = 'Apple'
+            source_url = f'https://music.apple.com/us/song/{source_id}'
+
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO release_imagery (
+                    release_id, source, source_id, source_url, type,
+                    image_url_small, image_url_medium, image_url_large
+                )
+                VALUES (%s, %s, %s, %s, 'Front', %s, %s, %s)
+                ON CONFLICT ON CONSTRAINT release_imagery_unique
+                DO UPDATE SET
+                    image_url_small = COALESCE(EXCLUDED.image_url_small, release_imagery.image_url_small),
+                    image_url_medium = COALESCE(EXCLUDED.image_url_medium, release_imagery.image_url_medium),
+                    image_url_large = COALESCE(EXCLUDED.image_url_large, release_imagery.image_url_large),
+                    source_id = EXCLUDED.source_id,
+                    source_url = EXCLUDED.source_url,
+                    updated_at = CURRENT_TIMESTAMP
+            """, (
+                release_id, source_name, source_id, source_url,
+                artwork.get('small'),
+                artwork.get('medium'),
+                artwork.get('large')
+            ))
+            return True
+    except Exception as e:
+        logger.warning(f"Failed to save artwork for release {release_id}: {e}")
+        return False
+
+
 def parse_streaming_url(url_or_id: str) -> dict:
     """
     Parse a streaming service URL or ID and extract the service and track ID.
@@ -986,16 +1075,31 @@ def add_manual_streaming_link(recording_id, release_id):
                 """, (recording_release_id, service, track_id, track_url, user_id, notes or None))
 
                 result = cur.fetchone()
-                conn.commit()
+                streaming_link_id = result['id']
 
                 logger.info(f"User {user_id} added manual {service} link for recording {recording_id} on release {release_id}: {track_id}")
+
+                # Fetch and save album artwork from the streaming service
+                artwork_added = False
+                try:
+                    artwork = fetch_artwork_for_track(service, track_id)
+                    if artwork:
+                        artwork_added = save_artwork_to_release(conn, release_id, artwork, service, track_id)
+                        if artwork_added:
+                            logger.info(f"  Also added {service} artwork for release {release_id}")
+                        conn.commit()
+                except Exception as art_err:
+                    logger.warning(f"Failed to fetch/save artwork: {art_err}")
+                    # Don't fail the whole request if artwork fails
+                    conn.commit()
 
                 return jsonify({
                     'success': True,
                     'service': service,
                     'track_id': track_id,
                     'track_url': track_url,
-                    'streaming_link_id': result['id']
+                    'streaming_link_id': streaming_link_id,
+                    'artwork_added': artwork_added
                 })
 
     except Exception as e:
