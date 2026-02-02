@@ -1728,4 +1728,85 @@ class NetworkManager: ObservableObject {
             return nil
         }
     }
+
+    // MARK: - Manual Streaming Link Management
+
+    /// Response from adding a manual streaming link
+    struct ManualStreamingLinkResponse: Codable {
+        let success: Bool
+        let service: String?
+        let trackId: String?
+        let trackUrl: String?
+        let error: String?
+
+        enum CodingKeys: String, CodingKey {
+            case success
+            case service
+            case trackId = "track_id"
+            case trackUrl = "track_url"
+            case error
+        }
+    }
+
+    /// Add a manual streaming link for a recording on a specific release
+    /// - Parameters:
+    ///   - recordingId: The recording ID
+    ///   - releaseId: The release ID
+    ///   - url: The Spotify or Apple Music URL/ID
+    ///   - notes: Optional notes about why this link was added
+    ///   - authToken: The user's auth token
+    /// - Returns: Response with success status and parsed track info
+    func addManualStreamingLink(
+        recordingId: String,
+        releaseId: String,
+        url: String,
+        notes: String? = nil,
+        authToken: String
+    ) async -> ManualStreamingLinkResponse? {
+        let startTime = Date()
+        guard let apiUrl = URL(string: "\(NetworkManager.baseURL)/recordings/\(recordingId)/releases/\(releaseId)/streaming-link") else {
+            print("Error: Invalid streaming link URL")
+            return nil
+        }
+
+        var request = URLRequest(url: apiUrl)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(authToken)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        var body: [String: Any] = ["url": url]
+        if let notes = notes, !notes.isEmpty {
+            body["notes"] = notes
+        }
+
+        do {
+            request.httpBody = try JSONSerialization.data(withJSONObject: body)
+            let (data, response) = try await URLSession.shared.data(for: request)
+
+            guard let httpResponse = response as? HTTPURLResponse else {
+                return nil
+            }
+
+            NetworkManager.logRequest("POST /recordings/\(recordingId)/releases/\(releaseId)/streaming-link", startTime: startTime)
+
+            if (200...299).contains(httpResponse.statusCode) {
+                let linkResponse = try JSONDecoder().decode(ManualStreamingLinkResponse.self, from: data)
+                if NetworkManager.diagnosticsEnabled {
+                    print("   ↳ Added \(linkResponse.service ?? "unknown") link: \(linkResponse.trackId ?? "?")")
+                }
+                return linkResponse
+            } else {
+                // Try to decode error message
+                if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                   let error = json["error"] as? String {
+                    return ManualStreamingLinkResponse(success: false, service: nil, trackId: nil, trackUrl: nil, error: error)
+                }
+                print("Error adding streaming link: HTTP \(httpResponse.statusCode)")
+                return ManualStreamingLinkResponse(success: false, service: nil, trackId: nil, trackUrl: nil, error: "HTTP \(httpResponse.statusCode)")
+            }
+        } catch {
+            print("Error adding streaming link: \(error)")
+            return ManualStreamingLinkResponse(success: false, service: nil, trackId: nil, trackUrl: nil, error: error.localizedDescription)
+        }
+    }
 }

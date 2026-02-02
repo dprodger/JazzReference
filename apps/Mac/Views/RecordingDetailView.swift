@@ -16,6 +16,9 @@ struct RecordingDetailView: View {
     @State private var selectedReleaseId: String?
     @State private var showingBackCover = false
     @State private var showingContributionSheet = false
+    @State private var showingStreamingLinkSheet = false
+    @State private var streamingLinkReleaseId: String?
+    @State private var streamingLinkReleaseTitle: String?
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var authManager: AuthenticationManager
     @EnvironmentObject var favoritesManager: FavoritesManager
@@ -196,6 +199,22 @@ struct RecordingDetailView: View {
                     recordingTitle: "\(recording.songTitle ?? "Recording") - \(recording.albumTitle ?? "")",
                     currentContribution: recording.userContribution,
                     onSave: {
+                        Task {
+                            await loadRecording()
+                        }
+                    }
+                )
+                .environmentObject(authManager)
+            }
+        }
+        .sheet(isPresented: $showingStreamingLinkSheet) {
+            if let releaseId = streamingLinkReleaseId,
+               let releaseTitle = streamingLinkReleaseTitle {
+                MacAddStreamingLinkSheet(
+                    recordingId: recordingId,
+                    releaseId: releaseId,
+                    releaseTitle: releaseTitle,
+                    onSuccess: {
                         Task {
                             await loadRecording()
                         }
@@ -629,11 +648,27 @@ struct RecordingDetailView: View {
 
                         Spacer()
 
-                        // Spotify indicator
-                        if release.hasSpotify {
-                            Image(systemName: "music.note")
-                                .foregroundColor(.green)
-                                .help("Available on Spotify")
+                        // Streaming indicators
+                        HStack(spacing: 4) {
+                            if release.hasSpotify {
+                                Image(systemName: "music.note")
+                                    .foregroundColor(.green)
+                                    .help("Available on Spotify")
+                            }
+
+                            // Add streaming link button (only for authenticated users)
+                            if authManager.isAuthenticated {
+                                Button {
+                                    streamingLinkReleaseId = release.id
+                                    streamingLinkReleaseTitle = release.title
+                                    showingStreamingLinkSheet = true
+                                } label: {
+                                    Image(systemName: "plus.circle")
+                                        .foregroundColor(JazzTheme.brass)
+                                }
+                                .buttonStyle(.plain)
+                                .help("Add Spotify or Apple Music link")
+                            }
                         }
                     }
                     .padding(10)
@@ -642,6 +677,24 @@ struct RecordingDetailView: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .contextMenu {
+                    if authManager.isAuthenticated {
+                        Button {
+                            streamingLinkReleaseId = release.id
+                            streamingLinkReleaseTitle = release.title
+                            showingStreamingLinkSheet = true
+                        } label: {
+                            Label("Add Streaming Link", systemImage: "link.badge.plus")
+                        }
+                    }
+
+                    Button {
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(release.id, forType: .string)
+                    } label: {
+                        Label("Copy Release ID", systemImage: "doc.on.doc")
+                    }
+                }
             }
         }
     }
