@@ -15,8 +15,9 @@ Provides endpoints for listing and searching recordings, including releases.
 """
 from flask import Blueprint, jsonify, request, g
 import logging
+import re
 import db_utils as db_tools
-from middleware.auth_middleware import optional_auth
+from middleware.auth_middleware import optional_auth, require_auth
 
 logger = logging.getLogger(__name__)
 recordings_bp = Blueprint('recordings', __name__)
@@ -835,7 +836,223 @@ def get_recording_releases(recording_id):
         
         releases = db_tools.execute_query(query, (recording_id,))
         return jsonify(releases if releases else [])
-        
+
     except Exception as e:
         logger.error(f"Error fetching recording releases: {e}", exc_info=True)
         return jsonify({'error': 'Failed to fetch releases', 'detail': str(e)}), 500
+
+
+# ============================================================================
+# MANUAL STREAMING LINK MANAGEMENT
+# ============================================================================
+
+def parse_streaming_url(url_or_id: str) -> dict:
+    """
+    Parse a streaming service URL or ID and extract the service and track ID.
+
+    Supports:
+    - Spotify URLs: https://open.spotify.com/track/xxx or spotify:track:xxx
+    - Apple Music URLs: https://music.apple.com/*/song/*/xxx or just the ID
+
+    Returns:
+        dict with 'service', 'track_id', 'error' keys
+    """
+    url_or_id = url_or_id.strip()
+
+    # Spotify URL patterns
+    # https://open.spotify.com/track/4iV5W9uYEdYUVa79Axb7Rh
+    # https://open.spotify.com/track/4iV5W9uYEdYUVa79Axb7Rh?si=xxx
+    # spotify:track:4iV5W9uYEdYUVa79Axb7Rh
+    spotify_url_match = re.match(
+        r'https?://open\.spotify\.com/track/([a-zA-Z0-9]+)',
+        url_or_id
+    )
+    if spotify_url_match:
+        return {'service': 'spotify', 'track_id': spotify_url_match.group(1), 'error': None}
+
+    spotify_uri_match = re.match(r'spotify:track:([a-zA-Z0-9]+)', url_or_id)
+    if spotify_uri_match:
+        return {'service': 'spotify', 'track_id': spotify_uri_match.group(1), 'error': None}
+
+    # Apple Music URL patterns
+    # https://music.apple.com/us/song/autumn-leaves/1440833098
+    # https://music.apple.com/us/album/autumn-leaves/1440833054?i=1440833098
+    apple_song_match = re.match(
+        r'https?://music\.apple\.com/[^/]+/song/[^/]+/(\d+)',
+        url_or_id
+    )
+    if apple_song_match:
+        return {'service': 'apple_music', 'track_id': apple_song_match.group(1), 'error': None}
+
+    apple_album_track_match = re.match(
+        r'https?://music\.apple\.com/[^/]+/album/[^/]+/\d+\?i=(\d+)',
+        url_or_id
+    )
+    if apple_album_track_match:
+        return {'service': 'apple_music', 'track_id': apple_album_track_match.group(1), 'error': None}
+
+    # Check if it looks like a raw Spotify ID (22 alphanumeric chars)
+    if re.match(r'^[a-zA-Z0-9]{22}$', url_or_id):
+        return {'service': 'spotify', 'track_id': url_or_id, 'error': None}
+
+    # Check if it looks like a raw Apple Music ID (numeric)
+    if re.match(r'^\d{9,12}$', url_or_id):
+        return {'service': 'apple_music', 'track_id': url_or_id, 'error': None}
+
+    return {
+        'service': None,
+        'track_id': None,
+        'error': 'Could not parse URL. Please provide a Spotify or Apple Music track URL.'
+    }
+
+
+@recordings_bp.route('/recordings/<recording_id>/releases/<release_id>/streaming-link', methods=['POST'])
+@require_auth
+def add_manual_streaming_link(recording_id, release_id):
+    """
+    Add a manual streaming link for a specific recording on a specific release.
+
+    This creates a manual override that will be preserved during bulk re-matching.
+
+    Request body:
+        {
+            "url": "https://open.spotify.com/track/xxx" or "https://music.apple.com/..."
+        }
+
+    Returns:
+        {
+            "success": true,
+            "service": "spotify",
+            "track_id": "xxx",
+            "track_url": "https://..."
+        }
+    """
+    try:
+        data = request.get_json()
+        if not data or 'url' not in data:
+            return jsonify({'error': 'URL is required'}), 400
+
+        user_id = g.current_user['id']
+        url_input = data['url']
+        notes = data.get('notes', '')
+
+        # Parse the URL
+        parsed = parse_streaming_url(url_input)
+        if parsed['error']:
+            return jsonify({'error': parsed['error']}), 400
+
+        service = parsed['service']
+        track_id = parsed['track_id']
+
+        # Build the canonical URL
+        if service == 'spotify':
+            track_url = f'https://open.spotify.com/track/{track_id}'
+        else:  # apple_music
+            track_url = f'https://music.apple.com/us/song/{track_id}'
+
+        # Find the recording_release_id
+        with db_tools.get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT id FROM recording_releases
+                    WHERE recording_id = %s AND release_id = %s
+                """, (recording_id, release_id))
+                row = cur.fetchone()
+
+                if not row:
+                    return jsonify({'error': 'Recording-release combination not found'}), 404
+
+                recording_release_id = row['id']
+
+                # Insert/update the streaming link with match_method='manual'
+                cur.execute("""
+                    INSERT INTO recording_release_streaming_links (
+                        recording_release_id, service, service_id, service_url,
+                        match_method, match_confidence, added_by_user_id, notes,
+                        matched_at
+                    )
+                    VALUES (%s, %s, %s, %s, 'manual', 1.0, %s, %s, CURRENT_TIMESTAMP)
+                    ON CONFLICT (recording_release_id, service)
+                    DO UPDATE SET
+                        service_id = EXCLUDED.service_id,
+                        service_url = EXCLUDED.service_url,
+                        match_method = EXCLUDED.match_method,
+                        match_confidence = EXCLUDED.match_confidence,
+                        added_by_user_id = EXCLUDED.added_by_user_id,
+                        notes = EXCLUDED.notes,
+                        matched_at = CURRENT_TIMESTAMP,
+                        updated_at = CURRENT_TIMESTAMP
+                    RETURNING id
+                """, (recording_release_id, service, track_id, track_url, user_id, notes or None))
+
+                result = cur.fetchone()
+                conn.commit()
+
+                logger.info(f"User {user_id} added manual {service} link for recording {recording_id} on release {release_id}: {track_id}")
+
+                return jsonify({
+                    'success': True,
+                    'service': service,
+                    'track_id': track_id,
+                    'track_url': track_url,
+                    'streaming_link_id': result['id']
+                })
+
+    except Exception as e:
+        logger.error(f"Error adding manual streaming link: {e}", exc_info=True)
+        return jsonify({'error': 'Failed to add streaming link', 'detail': str(e)}), 500
+
+
+@recordings_bp.route('/recordings/<recording_id>/releases/<release_id>/streaming-link/<service>', methods=['DELETE'])
+@require_auth
+def delete_manual_streaming_link(recording_id, release_id, service):
+    """
+    Delete a manual streaming link for a specific recording on a specific release.
+
+    Only allows deletion of manual overrides (match_method='manual').
+
+    Returns:
+        {"success": true}
+    """
+    try:
+        user_id = g.current_user['id']
+
+        if service not in ('spotify', 'apple_music'):
+            return jsonify({'error': 'Invalid service. Must be spotify or apple_music'}), 400
+
+        with db_tools.get_db_connection() as conn:
+            with conn.cursor() as cur:
+                # Find the recording_release_id
+                cur.execute("""
+                    SELECT id FROM recording_releases
+                    WHERE recording_id = %s AND release_id = %s
+                """, (recording_id, release_id))
+                row = cur.fetchone()
+
+                if not row:
+                    return jsonify({'error': 'Recording-release combination not found'}), 404
+
+                recording_release_id = row['id']
+
+                # Only delete if it's a manual override
+                cur.execute("""
+                    DELETE FROM recording_release_streaming_links
+                    WHERE recording_release_id = %s
+                      AND service = %s
+                      AND match_method = 'manual'
+                    RETURNING id
+                """, (recording_release_id, service))
+
+                deleted = cur.fetchone()
+                conn.commit()
+
+                if not deleted:
+                    return jsonify({'error': 'No manual override found for this service'}), 404
+
+                logger.info(f"User {user_id} deleted manual {service} link for recording {recording_id} on release {release_id}")
+
+                return jsonify({'success': True})
+
+    except Exception as e:
+        logger.error(f"Error deleting manual streaming link: {e}", exc_info=True)
+        return jsonify({'error': 'Failed to delete streaming link', 'detail': str(e)}), 500

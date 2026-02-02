@@ -259,6 +259,52 @@ def mark_release_searched(
         conn.commit()
 
 
+def is_album_manual_override(conn, release_id: str, service: str = SERVICE_NAME) -> bool:
+    """
+    Check if an existing album link is a manual override that should be preserved.
+
+    Args:
+        conn: Database connection
+        release_id: Our release ID
+        service: Streaming service name (default: apple_music)
+
+    Returns:
+        True if this album has a manual override, False otherwise
+    """
+    with conn.cursor() as cur:
+        cur.execute("""
+            SELECT match_method FROM release_streaming_links
+            WHERE release_id = %s AND service = %s
+        """, (release_id, service))
+        row = cur.fetchone()
+        if row and row.get('match_method') == 'manual':
+            return True
+        return False
+
+
+def is_track_manual_override(conn, recording_release_id: str, service: str = SERVICE_NAME) -> bool:
+    """
+    Check if an existing track link is a manual override that should be preserved.
+
+    Args:
+        conn: Database connection
+        recording_release_id: ID from recording_releases junction table
+        service: Streaming service name (default: apple_music)
+
+    Returns:
+        True if this track has a manual override, False otherwise
+    """
+    with conn.cursor() as cur:
+        cur.execute("""
+            SELECT match_method FROM recording_release_streaming_links
+            WHERE recording_release_id = %s AND service = %s
+        """, (recording_release_id, service))
+        row = cur.fetchone()
+        if row and row.get('match_method') == 'manual':
+            return True
+        return False
+
+
 def upsert_release_streaming_link(
     conn,
     release_id: str,
@@ -273,6 +319,7 @@ def upsert_release_streaming_link(
     Insert or update an Apple Music album link for a release.
 
     Uses the normalized release_streaming_links table.
+    Skips update if there's a manual override (match_method='manual').
 
     Args:
         conn: Database connection
@@ -293,6 +340,11 @@ def upsert_release_streaming_link(
         log.info(f"    [DRY RUN] Would add Apple Music link: {service_id}")
         return True
 
+    # Check for manual override - don't overwrite manually added links
+    if is_album_manual_override(conn, release_id, SERVICE_NAME):
+        log.debug(f"    Skipping album update - manual override exists for release {release_id}")
+        return False
+
     try:
         with conn.cursor() as cur:
             cur.execute("""
@@ -309,6 +361,8 @@ def upsert_release_streaming_link(
                     match_method = EXCLUDED.match_method,
                     matched_at = CURRENT_TIMESTAMP,
                     updated_at = CURRENT_TIMESTAMP
+                WHERE release_streaming_links.match_method != 'manual'
+                   OR release_streaming_links.match_method IS NULL
             """, (
                 release_id, SERVICE_NAME, service_id, service_url,
                 match_confidence, match_method
@@ -338,6 +392,7 @@ def upsert_track_streaming_link(
     Insert or update an Apple Music track link.
 
     Uses the normalized recording_release_streaming_links table.
+    Skips update if there's a manual override (match_method='manual').
 
     Args:
         conn: Database connection
@@ -361,6 +416,11 @@ def upsert_track_streaming_link(
         log.debug(f"      [DRY RUN] Would add Apple Music track: {service_id}")
         return True
 
+    # Check for manual override - don't overwrite manually added links
+    if is_track_manual_override(conn, recording_release_id, SERVICE_NAME):
+        log.debug(f"      Skipping track update - manual override exists for recording_release {recording_release_id}")
+        return False
+
     try:
         with conn.cursor() as cur:
             cur.execute("""
@@ -381,6 +441,8 @@ def upsert_track_streaming_link(
                     match_method = EXCLUDED.match_method,
                     matched_at = CURRENT_TIMESTAMP,
                     updated_at = CURRENT_TIMESTAMP
+                WHERE recording_release_streaming_links.match_method != 'manual'
+                   OR recording_release_streaming_links.match_method IS NULL
             """, (
                 recording_release_id, SERVICE_NAME, service_id, service_url,
                 duration_ms, preview_url, isrc,

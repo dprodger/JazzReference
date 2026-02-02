@@ -285,6 +285,7 @@ def update_release_spotify_data(conn, release_id: str, spotify_data: dict,
     (URL is constructed on-demand from ID, not stored)
 
     Artwork is stored in the release_imagery table.
+    Skips update if there's a manual override (match_method='manual').
 
     Args:
         conn: Database connection
@@ -304,6 +305,11 @@ def update_release_spotify_data(conn, release_id: str, spotify_data: dict,
             log.info(f"    [DRY RUN] Would add cover artwork")
         return
 
+    # Check for manual override - don't overwrite manually added links
+    if is_album_manual_override(conn, release_id, 'spotify'):
+        log.debug(f"    Skipping album update - manual override exists for release {release_id}")
+        return
+
     # Store artwork in release_imagery table
     if album_art:
         upsert_release_imagery(conn, release_id, album_art, source_id=album_id, log=log)
@@ -316,6 +322,25 @@ def update_release_spotify_data(conn, release_id: str, spotify_data: dict,
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = %s
         """, (album_id, release_id))
+
+        # Also insert into normalized streaming links table
+        service_url = f'https://open.spotify.com/album/{album_id}'
+        cur.execute("""
+            INSERT INTO release_streaming_links (
+                release_id, service, service_id, service_url,
+                match_method, matched_at
+            )
+            VALUES (%s, 'spotify', %s, %s, 'fuzzy_search', CURRENT_TIMESTAMP)
+            ON CONFLICT (release_id, service)
+            DO UPDATE SET
+                service_id = EXCLUDED.service_id,
+                service_url = EXCLUDED.service_url,
+                match_method = EXCLUDED.match_method,
+                matched_at = CURRENT_TIMESTAMP,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE release_streaming_links.match_method != 'manual'
+               OR release_streaming_links.match_method IS NULL
+        """, (release_id, album_id, service_url))
         # Note: commit is handled by the caller's context manager
 
 
@@ -408,6 +433,52 @@ def upsert_release_imagery(
         return False
 
 
+def is_track_manual_override(conn, recording_release_id: str, service: str = 'spotify') -> bool:
+    """
+    Check if an existing track link is a manual override that should be preserved.
+
+    Args:
+        conn: Database connection
+        recording_release_id: ID from recording_releases junction table
+        service: Streaming service name (default: 'spotify')
+
+    Returns:
+        True if this track has a manual override, False otherwise
+    """
+    with conn.cursor() as cur:
+        cur.execute("""
+            SELECT match_method FROM recording_release_streaming_links
+            WHERE recording_release_id = %s AND service = %s
+        """, (recording_release_id, service))
+        row = cur.fetchone()
+        if row and row.get('match_method') == 'manual':
+            return True
+        return False
+
+
+def is_album_manual_override(conn, release_id: str, service: str = 'spotify') -> bool:
+    """
+    Check if an existing album link is a manual override that should be preserved.
+
+    Args:
+        conn: Database connection
+        release_id: Our release ID
+        service: Streaming service name (default: 'spotify')
+
+    Returns:
+        True if this album has a manual override, False otherwise
+    """
+    with conn.cursor() as cur:
+        cur.execute("""
+            SELECT match_method FROM release_streaming_links
+            WHERE release_id = %s AND service = %s
+        """, (release_id, service))
+        row = cur.fetchone()
+        if row and row.get('match_method') == 'manual':
+            return True
+        return False
+
+
 def update_recording_release_track_id(conn, recording_id: str, release_id: str,
                                       track_id: str, track_url: str = None,
                                       disc_number: int = None, track_number: int = None,
@@ -417,6 +488,7 @@ def update_recording_release_track_id(conn, recording_id: str, release_id: str,
     Update recording_releases with Spotify track info and insert into streaming links table.
 
     Inserts into recording_release_streaming_links table for track-level Spotify data.
+    Skips update if there's a manual override (match_method='manual').
 
     Args:
         conn: Database connection
@@ -448,6 +520,11 @@ def update_recording_release_track_id(conn, recording_id: str, release_id: str,
             return
         recording_release_id = row['id']
 
+        # Check for manual override - don't overwrite manually added links
+        if is_track_manual_override(conn, recording_release_id, 'spotify'):
+            log.debug(f"      Skipping track update - manual override exists for recording_release {recording_release_id}")
+            return
+
         # Update disc/track info on recording_releases
         cur.execute("""
             UPDATE recording_releases
@@ -457,20 +534,23 @@ def update_recording_release_track_id(conn, recording_id: str, release_id: str,
             WHERE recording_id = %s AND release_id = %s
         """, (disc_number, track_number, track_title, recording_id, release_id))
 
-        # Insert/update the streaming links table
+        # Insert/update the streaming links table (only if not a manual override)
         service_url = f'https://open.spotify.com/track/{track_id}'
         cur.execute("""
             INSERT INTO recording_release_streaming_links (
                 recording_release_id, service, service_id, service_url,
-                matched_at
+                match_method, matched_at
             )
-            VALUES (%s, 'spotify', %s, %s, CURRENT_TIMESTAMP)
+            VALUES (%s, 'spotify', %s, %s, 'fuzzy_search', CURRENT_TIMESTAMP)
             ON CONFLICT (recording_release_id, service)
             DO UPDATE SET
                 service_id = EXCLUDED.service_id,
                 service_url = EXCLUDED.service_url,
+                match_method = EXCLUDED.match_method,
                 matched_at = CURRENT_TIMESTAMP,
                 updated_at = CURRENT_TIMESTAMP
+            WHERE recording_release_streaming_links.match_method != 'manual'
+               OR recording_release_streaming_links.match_method IS NULL
         """, (recording_release_id, track_id, service_url))
         # Note: commit is handled by the caller's context manager
 

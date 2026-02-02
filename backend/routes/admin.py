@@ -20,6 +20,7 @@ from db_utils import get_db_connection
 from mb_release_importer import MBReleaseImporter
 from mb_performer_importer import PerformerImporter
 from mb_utils import MusicBrainzSearcher
+from spotify_db import is_track_manual_override
 
 logger = logging.getLogger(__name__)
 
@@ -433,20 +434,28 @@ def _import_single_orphan(db, song, orphan):
                 """, (recording_id, release_id))
                 rr_row = cur.fetchone()
                 if rr_row:
-                    service_url = f'https://open.spotify.com/track/{spotify_track_id}'
-                    cur.execute("""
-                        INSERT INTO recording_release_streaming_links (
-                            recording_release_id, service, service_id, service_url, matched_at
-                        )
-                        VALUES (%s, 'spotify', %s, %s, CURRENT_TIMESTAMP)
-                        ON CONFLICT (recording_release_id, service) DO UPDATE
-                        SET service_id = EXCLUDED.service_id,
-                            service_url = EXCLUDED.service_url,
-                            matched_at = CURRENT_TIMESTAMP,
-                            updated_at = CURRENT_TIMESTAMP
-                    """, (rr_row['id'], spotify_track_id, service_url))
-                logger.info(f"Linked recording to release with Spotify: {spotify_track_id}"
-                           f"{' (new release with CAA)' if is_new else ''}")
+                    # Check for manual override - don't overwrite manually added links
+                    if is_track_manual_override(db, rr_row['id'], 'spotify'):
+                        logger.info(f"Skipping Spotify update - manual override exists for recording_release {rr_row['id']}")
+                    else:
+                        service_url = f'https://open.spotify.com/track/{spotify_track_id}'
+                        cur.execute("""
+                            INSERT INTO recording_release_streaming_links (
+                                recording_release_id, service, service_id, service_url,
+                                match_method, matched_at
+                            )
+                            VALUES (%s, 'spotify', %s, %s, 'orphan_import', CURRENT_TIMESTAMP)
+                            ON CONFLICT (recording_release_id, service) DO UPDATE
+                            SET service_id = EXCLUDED.service_id,
+                                service_url = EXCLUDED.service_url,
+                                match_method = EXCLUDED.match_method,
+                                matched_at = CURRENT_TIMESTAMP,
+                                updated_at = CURRENT_TIMESTAMP
+                            WHERE recording_release_streaming_links.match_method != 'manual'
+                               OR recording_release_streaming_links.match_method IS NULL
+                        """, (rr_row['id'], spotify_track_id, service_url))
+                        logger.info(f"Linked recording to release with Spotify: {spotify_track_id}"
+                                   f"{' (new release with CAA)' if is_new else ''}")
             else:
                 logger.info(f"Linked recording to release (no Spotify): {mb_release_id}"
                            f"{' (new release with CAA)' if is_new else ''}")
@@ -788,18 +797,26 @@ def link_orphan_to_existing_recording(orphan_id):
                         """, (recording_id, release_id))
                         rr_result = cur.fetchone()
                     if rr_result:
-                        service_url = f'https://open.spotify.com/track/{spotify_track_id}'
-                        cur.execute("""
-                            INSERT INTO recording_release_streaming_links (
-                                recording_release_id, service, service_id, service_url, matched_at
-                            )
-                            VALUES (%s, 'spotify', %s, %s, CURRENT_TIMESTAMP)
-                            ON CONFLICT (recording_release_id, service) DO UPDATE
-                            SET service_id = EXCLUDED.service_id,
-                                service_url = EXCLUDED.service_url,
-                                matched_at = CURRENT_TIMESTAMP,
-                                updated_at = CURRENT_TIMESTAMP
-                        """, (rr_result['id'], spotify_track_id, service_url))
+                        # Check for manual override - don't overwrite manually added links
+                        if is_track_manual_override(db, rr_result['id'], 'spotify'):
+                            logger.debug(f"Skipping Spotify update - manual override exists")
+                        else:
+                            service_url = f'https://open.spotify.com/track/{spotify_track_id}'
+                            cur.execute("""
+                                INSERT INTO recording_release_streaming_links (
+                                    recording_release_id, service, service_id, service_url,
+                                    match_method, matched_at
+                                )
+                                VALUES (%s, 'spotify', %s, %s, 'orphan_import', CURRENT_TIMESTAMP)
+                                ON CONFLICT (recording_release_id, service) DO UPDATE
+                                SET service_id = EXCLUDED.service_id,
+                                    service_url = EXCLUDED.service_url,
+                                    match_method = EXCLUDED.match_method,
+                                    matched_at = CURRENT_TIMESTAMP,
+                                    updated_at = CURRENT_TIMESTAMP
+                                WHERE recording_release_streaming_links.match_method != 'manual'
+                                   OR recording_release_streaming_links.match_method IS NULL
+                            """, (rr_result['id'], spotify_track_id, service_url))
 
                 # Set default_release_id if recording doesn't have one, or if this release
                 # has Spotify data and the current default doesn't
