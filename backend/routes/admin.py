@@ -410,23 +410,41 @@ def _import_single_orphan(db, song, orphan):
         release_id, is_new = _find_or_create_release_with_caa(db, mb_release_id, orphan)
 
         if release_id:
-            # Create recording_releases entry (with Spotify track ID if available)
+            # Create recording_releases entry
             cur.execute("""
                 INSERT INTO recording_releases (
-                    recording_id, release_id, track_title, track_artist_credit,
-                    spotify_track_id
+                    recording_id, release_id, track_title, track_artist_credit
                 )
-                VALUES (%s, %s, %s, %s, %s)
-                ON CONFLICT (recording_id, release_id) DO UPDATE
-                SET spotify_track_id = COALESCE(EXCLUDED.spotify_track_id, recording_releases.spotify_track_id)
+                VALUES (%s, %s, %s, %s)
+                ON CONFLICT (recording_id, release_id) DO NOTHING
             """, (
                 recording_id,
                 release_id,
                 orphan.get('mb_recording_title'),
-                orphan.get('mb_artist_credit'),
-                spotify_track_id if spotify_track_id else None
+                orphan.get('mb_artist_credit')
             ))
+
+            # If we have a Spotify track ID, add it to the streaming links table
             if spotify_track_id:
+                # Get the recording_release_id
+                cur.execute("""
+                    SELECT id FROM recording_releases
+                    WHERE recording_id = %s AND release_id = %s
+                """, (recording_id, release_id))
+                rr_row = cur.fetchone()
+                if rr_row:
+                    service_url = f'https://open.spotify.com/track/{spotify_track_id}'
+                    cur.execute("""
+                        INSERT INTO recording_release_streaming_links (
+                            recording_release_id, service, service_id, service_url, matched_at
+                        )
+                        VALUES (%s, 'spotify', %s, %s, CURRENT_TIMESTAMP)
+                        ON CONFLICT (recording_release_id, service) DO UPDATE
+                        SET service_id = EXCLUDED.service_id,
+                            service_url = EXCLUDED.service_url,
+                            matched_at = CURRENT_TIMESTAMP,
+                            updated_at = CURRENT_TIMESTAMP
+                    """, (rr_row['id'], spotify_track_id, service_url))
                 logger.info(f"Linked recording to release with Spotify: {spotify_track_id}"
                            f"{' (new release with CAA)' if is_new else ''}")
             else:
@@ -643,14 +661,15 @@ def get_existing_recordings_for_song(song_id):
                             'spotify_album_id', rel.spotify_album_id,
                             'spotify_album_url', CASE WHEN rel.spotify_album_id IS NOT NULL
                                 THEN 'https://open.spotify.com/album/' || rel.spotify_album_id END,
-                            'spotify_track_id', rr.spotify_track_id,
-                            'spotify_track_url', CASE WHEN rr.spotify_track_id IS NOT NULL
-                                THEN 'https://open.spotify.com/track/' || rr.spotify_track_id END,
+                            'spotify_track_id', rrsl.service_id,
+                            'spotify_track_url', rrsl.service_url,
                             'album_art_small', (SELECT ri.image_url_small FROM release_imagery ri
                                  WHERE ri.release_id = rel.id AND ri.type = 'Front' LIMIT 1)
                         ) ORDER BY rel.release_year)
                         FROM recording_releases rr
                         JOIN releases rel ON rr.release_id = rel.id
+                        LEFT JOIN recording_release_streaming_links rrsl
+                            ON rrsl.recording_release_id = rr.id AND rrsl.service = 'spotify'
                         WHERE rr.recording_id = rec.id
                     ) as releases
                 FROM recordings rec
@@ -745,21 +764,42 @@ def link_orphan_to_existing_recording(orphan_id):
                 # Create recording_releases entry linking existing recording to this release
                 cur.execute("""
                     INSERT INTO recording_releases (
-                        recording_id, release_id, track_title, track_artist_credit,
-                        spotify_track_id
+                        recording_id, release_id, track_title, track_artist_credit
                     )
-                    VALUES (%s, %s, %s, %s, %s)
-                    ON CONFLICT (recording_id, release_id) DO UPDATE
-                    SET spotify_track_id = COALESCE(EXCLUDED.spotify_track_id, recording_releases.spotify_track_id)
+                    VALUES (%s, %s, %s, %s)
+                    ON CONFLICT (recording_id, release_id) DO NOTHING
                     RETURNING id
                 """, (
                     recording_id,
                     release_id,
                     orphan.get('mb_recording_title'),
-                    orphan.get('mb_artist_credit'),
-                    orphan.get('spotify_track_id')
+                    orphan.get('mb_artist_credit')
                 ))
                 rr_result = cur.fetchone()
+
+                # If we have a Spotify track ID, add it to the streaming links table
+                spotify_track_id = orphan.get('spotify_track_id')
+                if spotify_track_id:
+                    # Get the recording_release_id (might not have been returned if it already existed)
+                    if not rr_result:
+                        cur.execute("""
+                            SELECT id FROM recording_releases
+                            WHERE recording_id = %s AND release_id = %s
+                        """, (recording_id, release_id))
+                        rr_result = cur.fetchone()
+                    if rr_result:
+                        service_url = f'https://open.spotify.com/track/{spotify_track_id}'
+                        cur.execute("""
+                            INSERT INTO recording_release_streaming_links (
+                                recording_release_id, service, service_id, service_url, matched_at
+                            )
+                            VALUES (%s, 'spotify', %s, %s, CURRENT_TIMESTAMP)
+                            ON CONFLICT (recording_release_id, service) DO UPDATE
+                            SET service_id = EXCLUDED.service_id,
+                                service_url = EXCLUDED.service_url,
+                                matched_at = CURRENT_TIMESTAMP,
+                                updated_at = CURRENT_TIMESTAMP
+                        """, (rr_result['id'], spotify_track_id, service_url))
 
                 # Set default_release_id if recording doesn't have one, or if this release
                 # has Spotify data and the current default doesn't
@@ -2045,8 +2085,8 @@ def streaming_availability():
                     SELECT
                         r.id as recording_id,
                         r.song_id,
-                        -- Has Spotify: check streaming_links table OR legacy column
-                        BOOL_OR(rrsl_spotify.id IS NOT NULL OR rr.spotify_track_id IS NOT NULL) as has_spotify,
+                        -- Has Spotify: check streaming_links table
+                        BOOL_OR(rrsl_spotify.id IS NOT NULL) as has_spotify,
                         -- Has Apple if ANY release has apple music link
                         BOOL_OR(rrsl_apple.id IS NOT NULL) as has_apple
                     FROM recordings r
@@ -2208,14 +2248,10 @@ def streaming_diagnostics(song_id):
                     def_rel.musicbrainz_release_id as default_release_mb_id,
                     -- Count releases
                     (SELECT COUNT(*) FROM recording_releases rr WHERE rr.recording_id = r.id) as release_count,
-                    -- Spotify: has track if ANY release has spotify link (normalized or legacy)
-                    (
-                        EXISTS(SELECT 1 FROM recording_releases rr
-                               JOIN recording_release_streaming_links rrsl ON rrsl.recording_release_id = rr.id
-                               WHERE rr.recording_id = r.id AND rrsl.service = 'spotify')
-                        OR EXISTS(SELECT 1 FROM recording_releases rr
-                               WHERE rr.recording_id = r.id AND rr.spotify_track_id IS NOT NULL)
-                    ) as has_spotify,
+                    -- Spotify: has track if ANY release has spotify link
+                    EXISTS(SELECT 1 FROM recording_releases rr
+                           JOIN recording_release_streaming_links rrsl ON rrsl.recording_release_id = rr.id
+                           WHERE rr.recording_id = r.id AND rrsl.service = 'spotify') as has_spotify,
                     -- Apple: has track if ANY release has apple music link
                     EXISTS(SELECT 1 FROM recording_releases rr
                            JOIN recording_release_streaming_links rrsl ON rrsl.recording_release_id = rr.id
@@ -2252,12 +2288,9 @@ def streaming_diagnostics(song_id):
                         rel.musicbrainz_release_id as release_mb_id,
                         -- Spotify album (on release)
                         rel.spotify_album_id,
-                        -- Spotify track: prefer normalized table, fall back to legacy column
-                        COALESCE(rrsl_spotify.service_id, rr.spotify_track_id) as spotify_track_id,
-                        COALESCE(rrsl_spotify.service_url,
-                            CASE WHEN rr.spotify_track_id IS NOT NULL
-                                 THEN 'https://open.spotify.com/track/' || rr.spotify_track_id END
-                        ) as spotify_track_url,
+                        -- Spotify track from streaming links table
+                        rrsl_spotify.service_id as spotify_track_id,
+                        rrsl_spotify.service_url as spotify_track_url,
                         rr.disc_number,
                         rr.track_number,
                         CASE WHEN rel.id = %s THEN true ELSE false END as is_default,

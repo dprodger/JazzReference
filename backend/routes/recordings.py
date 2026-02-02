@@ -214,55 +214,30 @@ RELEASE_BACK_ART_SOURCE_URL_SQL = """
 # ============================================================================
 # SQL FRAGMENTS FOR SPOTIFY URLS (Normalized Streaming Links)
 # ============================================================================
-# Spotify track URLs now come from recording_release_streaming_links table
-# with fallback to legacy spotify_track_id column for backwards compatibility
+# Spotify track URLs come from recording_release_streaming_links table
 
 SPOTIFY_URL_FROM_DEFAULT_RELEASE_SQL = """
-    COALESCE(
-        -- Check normalized streaming_links table first (default release)
-        (SELECT rrsl.service_url
-         FROM recording_releases rr
-         JOIN recording_release_streaming_links rrsl
-             ON rrsl.recording_release_id = rr.id AND rrsl.service = 'spotify'
-         WHERE rr.release_id = r.default_release_id AND rr.recording_id = r.id
-        ),
-        -- Fall back to legacy column (default release)
-        (SELECT 'https://open.spotify.com/track/' || rr.spotify_track_id
-         FROM recording_releases rr
-         WHERE rr.release_id = r.default_release_id
-           AND rr.recording_id = r.id
-           AND rr.spotify_track_id IS NOT NULL
-        )
+    (SELECT rrsl.service_url
+     FROM recording_releases rr
+     JOIN recording_release_streaming_links rrsl
+         ON rrsl.recording_release_id = rr.id AND rrsl.service = 'spotify'
+     WHERE rr.release_id = r.default_release_id AND rr.recording_id = r.id
     )"""
 
 SPOTIFY_URL_FROM_ANY_RELEASE_SQL = """
-    COALESCE(
-        -- Check normalized streaming_links table first
-        (SELECT rrsl.service_url
-         FROM recording_releases rr
-         JOIN recording_release_streaming_links rrsl
-             ON rrsl.recording_release_id = rr.id AND rrsl.service = 'spotify'
-         WHERE rr.recording_id = r.id
-         LIMIT 1
-        ),
-        -- Fall back to legacy column
-        (SELECT 'https://open.spotify.com/track/' || rr.spotify_track_id
-         FROM recording_releases rr
-         WHERE rr.recording_id = r.id
-           AND rr.spotify_track_id IS NOT NULL
-         LIMIT 1
-        )
+    (SELECT rrsl.service_url
+     FROM recording_releases rr
+     JOIN recording_release_streaming_links rrsl
+         ON rrsl.recording_release_id = rr.id AND rrsl.service = 'spotify'
+     WHERE rr.recording_id = r.id
+     LIMIT 1
     )"""
 
 # For has_spotify availability check
 HAS_SPOTIFY_SQL = """
-    (
-        EXISTS(SELECT 1 FROM recording_releases rr2
-               JOIN recording_release_streaming_links rrsl ON rrsl.recording_release_id = rr2.id
-               WHERE rr2.recording_id = r.id AND rrsl.service = 'spotify')
-        OR EXISTS(SELECT 1 FROM recording_releases rr2
-               WHERE rr2.recording_id = r.id AND rr2.spotify_track_id IS NOT NULL)
-    )"""
+    EXISTS(SELECT 1 FROM recording_releases rr2
+           JOIN recording_release_streaming_links rrsl ON rrsl.recording_release_id = rr2.id
+           WHERE rr2.recording_id = r.id AND rrsl.service = 'spotify')"""
 
 
 @recordings_bp.route('/recordings/count', methods=['GET'])
@@ -382,13 +357,8 @@ def get_recordings():
                     r.recording_year,
                     r.label,
                     r.default_release_id,
-                    -- Spotify URL: check streaming links table first, then legacy column
-                    COALESCE(
-                        def_rrsl.service_url,
-                        CASE WHEN def_rr.spotify_track_id IS NOT NULL
-                             THEN 'https://open.spotify.com/track/' || def_rr.spotify_track_id
-                        END
-                    ) as spotify_url,
+                    -- Spotify URL from streaming links table
+                    def_rrsl.service_url as spotify_url,
                     -- Album art from release_imagery table
                     def_ri.image_url_small as album_art_small,
                     def_ri.image_url_medium as album_art_medium,
@@ -539,14 +509,11 @@ def get_recording_detail(recording_id):
                     rel.musicbrainz_release_id,
                     rr.disc_number,
                     rr.track_number,
-                    COALESCE(rrsl.service_id, rr.spotify_track_id) as spotify_track_id,
-                    COALESCE(rrsl.service_url,
-                        CASE WHEN rr.spotify_track_id IS NOT NULL
-                             THEN 'https://open.spotify.com/track/' || rr.spotify_track_id END
-                    ) as spotify_track_url,
+                    rrsl.service_id as spotify_track_id,
+                    rrsl.service_url as spotify_track_url,
                     rf.name as format_name,
                     rs.name as status_name,
-                    CASE WHEN rrsl.service_id IS NOT NULL OR rr.spotify_track_id IS NOT NULL THEN 1 ELSE 0 END as has_spotify
+                    CASE WHEN rrsl.service_id IS NOT NULL THEN 1 ELSE 0 END as has_spotify
                 FROM recording_releases rr
                 JOIN releases rel ON rr.release_id = rel.id
                 LEFT JOIN recording_release_streaming_links rrsl
@@ -810,11 +777,8 @@ def get_recording_releases(recording_id):
                 rel.musicbrainz_release_id,
                 rr.disc_number,
                 rr.track_number,
-                COALESCE(rrsl.service_id, rr.spotify_track_id) as spotify_track_id,
-                COALESCE(rrsl.service_url,
-                    CASE WHEN rr.spotify_track_id IS NOT NULL
-                         THEN 'https://open.spotify.com/track/' || rr.spotify_track_id END
-                ) as spotify_track_url,
+                rrsl.service_id as spotify_track_id,
+                rrsl.service_url as spotify_track_url,
                 rf.name as format_name,
                 rs.name as status_name,
                 -- Performers from recording_performers (not release_performers)
@@ -865,7 +829,7 @@ def get_recording_releases(recording_id):
             LEFT JOIN release_statuses rs ON rel.status_id = rs.id
             WHERE rr.recording_id = %s
             ORDER BY
-                CASE WHEN rrsl.service_id IS NOT NULL OR rr.spotify_track_id IS NOT NULL THEN 0 ELSE 1 END,
+                CASE WHEN rrsl.service_id IS NOT NULL THEN 0 ELSE 1 END,
                 rel.release_year ASC NULLS LAST
         """
         
