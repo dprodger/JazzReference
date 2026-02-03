@@ -3,11 +3,12 @@
 MusicBrainz API routes for searching and importing works
 """
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, g
 import logging
 import db_utils as db_tools
 import research_queue
 from mb_utils import MusicBrainzSearcher
+from middleware.auth_middleware import require_auth
 
 logger = logging.getLogger(__name__)
 musicbrainz_bp = Blueprint('musicbrainz', __name__)
@@ -73,9 +74,11 @@ def search_musicbrainz_works():
 
 
 @musicbrainz_bp.route('/musicbrainz/import', methods=['POST'])
+@require_auth
 def import_from_musicbrainz():
     """
     Import a song from MusicBrainz into the database and queue for research.
+    Requires authentication.
 
     Request Body (JSON):
         musicbrainz_id (str, required): MusicBrainz work UUID
@@ -94,6 +97,9 @@ def import_from_musicbrainz():
         musicbrainz_id = data.get('musicbrainz_id', '').strip()
         title = data.get('title', '').strip()
         composer = data.get('composer', '').strip() if data.get('composer') else None
+
+        # Set created_by to the authenticated user's ID
+        created_by = str(g.current_user['id'])
 
         if not musicbrainz_id:
             return jsonify({'error': 'musicbrainz_id is required'}), 400
@@ -124,16 +130,21 @@ def import_from_musicbrainz():
             values.append(composer)
             placeholders.append('%s')
 
+        if created_by:
+            fields.append('created_by')
+            values.append(created_by)
+            placeholders.append('%s')
+
         query = f"""
             INSERT INTO songs ({', '.join(fields)})
             VALUES ({', '.join(placeholders)})
-            RETURNING id, title, composer, musicbrainz_id, created_at, updated_at
+            RETURNING id, title, composer, musicbrainz_id, created_at, updated_at, created_by
         """
 
         result = db_tools.execute_query(query, values, fetch_one=True)
         song_id = str(result['id'])
 
-        logger.info(f"Created song from MusicBrainz: {title} (ID: {song_id}, MB: {musicbrainz_id})")
+        logger.info(f"Created song from MusicBrainz: {title} (ID: {song_id}, MB: {musicbrainz_id}, created_by: {created_by})")
 
         # Queue for background research
         queued = research_queue.add_song_to_queue(song_id, title)
@@ -147,7 +158,8 @@ def import_from_musicbrainz():
                 'composer': result['composer'],
                 'musicbrainz_id': result['musicbrainz_id'],
                 'created_at': result['created_at'].isoformat() if result['created_at'] else None,
-                'updated_at': result['updated_at'].isoformat() if result['updated_at'] else None
+                'updated_at': result['updated_at'].isoformat() if result['updated_at'] else None,
+                'created_by': result['created_by']
             },
             'research_queued': queued,
             'queue_size': research_queue.get_queue_size()

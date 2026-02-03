@@ -13,11 +13,12 @@ UPDATED: Release Imagery Support
 
 Provides endpoints for listing, searching, and creating songs.
 """
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, g
 import logging
 import json
 import db_utils as db_tools
 from utils.helpers import safe_strip
+from middleware.auth_middleware import require_auth
 
 logger = logging.getLogger(__name__)
 songs_bp = Blueprint('songs', __name__)
@@ -773,14 +774,15 @@ def get_song_detail(song_id):
 
 
 @songs_bp.route('/songs', methods=['POST'])
+@require_auth
 def create_song():
-    """Create a new song"""
+    """Create a new song (requires authentication)"""
     try:
         data = request.get_json()
-        
+
         if not data:
             return jsonify({'error': 'No data provided'}), 400
-        
+
         title = safe_strip(data.get('title'))
         composer = safe_strip(data.get('composer'))
         composed_year = data.get('composed_year')
@@ -790,6 +792,9 @@ def create_song():
         musicbrainz_id = safe_strip(data.get('musicbrainz_id'))
         wikipedia_url = safe_strip(data.get('wikipedia_url'))
         external_references = data.get('external_references')
+
+        # Set created_by to the authenticated user's ID
+        created_by = str(g.current_user['id'])
 
         if not title:
             return jsonify({'error': 'Title is required'}), 400
@@ -841,18 +846,23 @@ def create_song():
             else:
                 values.append(external_references)
             placeholders.append('%s')
-        
+
+        if created_by:
+            fields.append('created_by')
+            values.append(created_by)
+            placeholders.append('%s')
+
         query = f"""
             INSERT INTO songs ({', '.join(fields)})
             VALUES ({', '.join(placeholders)})
             RETURNING id, title, composer, composed_year, composed_key, structure,
                       musicbrainz_id, wikipedia_url, song_reference, external_references,
-                      created_at, updated_at
+                      created_at, updated_at, created_by
         """
         
         result = db_tools.execute_query(query, values, fetch_one=True)
-        
-        logger.info(f"Created new song: {title} (ID: {result['id']})")
+
+        logger.info(f"Created new song: {title} (ID: {result['id']}, created_by: {created_by})")
         
         return jsonify({
             'success': True,
