@@ -139,20 +139,24 @@ struct SongDetailView: View {
     }
     
     // MARK: - Song Refresh
-    
-    private func refreshSongData() {
+
+    /// Queue song for background research
+    /// - Parameter forceRefresh: If true, bypass cache and re-fetch all data.
+    ///                          If false, use cached data where available (faster).
+    private func refreshSongData(forceRefresh: Bool) {
         isRefreshing = true
+        let refreshType = forceRefresh ? "full" : "quick"
 
         Task {
-            let success = await networkManager.refreshSongData(songId: currentSongId)
-            
+            let success = await networkManager.refreshSongData(songId: currentSongId, forceRefresh: forceRefresh)
+
             await MainActor.run {
                 isRefreshing = false
                 if success {
-                    // Show success toast
+                    // Show success toast with refresh type
                     toast = ToastItem(
                         type: .success,
-                        message: "Song queued for research. Data will be updated in the background."
+                        message: "Song queued for \(refreshType) refresh. Data will be updated in the background."
                     )
                 } else {
                     // Show error toast
@@ -510,13 +514,20 @@ struct SongDetailView: View {
             } message: {
                 Text(alertMessage)
             }
-            .alert("Queue Song for Research?", isPresented: $showRefreshConfirmation) {
-                Button("Cancel", role: .cancel) { }
-                Button("Refresh", role: .destructive) {
-                    refreshSongData()
+            .confirmationDialog(
+                "Refresh Song Data",
+                isPresented: $showRefreshConfirmation,
+                titleVisibility: .visible
+            ) {
+                Button("Quick Refresh") {
+                    refreshSongData(forceRefresh: false)
                 }
+                Button("Full Refresh") {
+                    refreshSongData(forceRefresh: true)
+                }
+                Button("Cancel", role: .cancel) { }
             } message: {
-                Text("This will queue \"\(song?.title ?? "this song")\" for background research to update its information from external sources.")
+                Text("Quick refresh uses cached data for faster results. Full refresh re-fetches everything from external sources.")
             }
             .toast($toast)
             .overlay(alignment: .bottom) {

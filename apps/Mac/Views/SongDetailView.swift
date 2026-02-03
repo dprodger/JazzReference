@@ -133,10 +133,34 @@ struct SongDetailView: View {
     @State private var showAddToRepertoire = false
     @State private var successMessage: String?
     @State private var errorMessage: String?
+    @State private var isRefreshing = false
     @EnvironmentObject var repertoireManager: RepertoireManager
     @EnvironmentObject var authManager: AuthenticationManager
 
     @StateObject private var networkManager = NetworkManager()
+
+    // MARK: - Song Refresh
+
+    /// Queue song for background research
+    /// - Parameter forceRefresh: If true, bypass cache and re-fetch all data.
+    ///                          If false, use cached data where available (faster).
+    private func refreshSongData(forceRefresh: Bool) {
+        isRefreshing = true
+        let refreshType = forceRefresh ? "full" : "quick"
+
+        Task {
+            let success = await networkManager.refreshSongData(songId: songId, forceRefresh: forceRefresh)
+
+            await MainActor.run {
+                isRefreshing = false
+                if success {
+                    successMessage = "Song queued for \(refreshType) refresh"
+                } else {
+                    errorMessage = "Failed to queue song for refresh"
+                }
+            }
+        }
+    }
 
     var body: some View {
         ScrollView {
@@ -253,6 +277,22 @@ struct SongDetailView: View {
                 }
 
                 Spacer()
+
+                // Refresh menu button
+                Menu {
+                    Button(action: { refreshSongData(forceRefresh: false) }) {
+                        Label("Quick Refresh", systemImage: "arrow.clockwise")
+                    }
+                    Button(action: { refreshSongData(forceRefresh: true) }) {
+                        Label("Full Refresh", systemImage: "arrow.clockwise.circle")
+                    }
+                } label: {
+                    Label("Refresh", systemImage: isRefreshing ? "arrow.triangle.2.circlepath" : "arrow.clockwise")
+                        .padding(.vertical, 4)
+                }
+                .menuStyle(.borderlessButton)
+                .help("Quick: uses cached data (faster). Full: re-fetches everything.")
+                .disabled(isRefreshing)
 
                 // Add to Repertoire button
                 Button(action: { showAddToRepertoire = true }) {

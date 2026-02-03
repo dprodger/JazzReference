@@ -685,8 +685,15 @@ class NetworkManager: ObservableObject {
         }
     }
         
-    func refreshSongData(songId: String) async -> Bool {
-        guard let url = URL(string: "\(NetworkManager.baseURL)/songs/\(songId)/refresh") else {
+    /// Queue a song for background research to update its data from external sources
+    /// - Parameters:
+    ///   - songId: The UUID of the song to refresh
+    ///   - forceRefresh: If true (default), bypass cache and re-fetch all data ("deep refresh").
+    ///                   If false, use cached data where available ("quick refresh").
+    /// - Returns: True if successfully queued, false otherwise
+    func refreshSongData(songId: String, forceRefresh: Bool = true) async -> Bool {
+        let forceRefreshParam = forceRefresh ? "true" : "false"
+        guard let url = URL(string: "\(NetworkManager.baseURL)/songs/\(songId)/refresh?force_refresh=\(forceRefreshParam)") else {
             print("Error: Invalid refresh URL")
             return false
         }
@@ -707,8 +714,9 @@ class NetworkManager: ObservableObject {
             if httpResponse.statusCode == 202 {
                 // Optionally parse the response to get queue info
                 if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                    let refreshType = forceRefresh ? "deep" : "quick"
                     if let queueSize = json["queue_size"] as? Int {
-                        print("✓ Song queued for research (queue size: \(queueSize))")
+                        print("✓ Song queued for \(refreshType) refresh (queue size: \(queueSize))")
                     }
                 }
                 return true
