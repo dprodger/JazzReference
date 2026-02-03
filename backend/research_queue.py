@@ -32,14 +32,16 @@ _current_progress: Optional[dict] = None
 _progress_lock = threading.Lock()
 
 
-def add_song_to_queue(song_id: str, song_name: str) -> bool:
+def add_song_to_queue(song_id: str, song_name: str, force_refresh: bool = True) -> bool:
     """
     Add a song to the research queue
-    
+
     Args:
         song_id: UUID of the song
         song_name: Name of the song
-        
+        force_refresh: If True, bypass cache and re-fetch all data (default).
+                      If False, use cached data where available ("simple refresh").
+
     Returns:
         True if successfully queued, False otherwise
     """
@@ -47,9 +49,11 @@ def add_song_to_queue(song_id: str, song_name: str) -> bool:
     try:
         research_queue.put({
             'song_id': song_id,
-            'song_name': song_name
+            'song_name': song_name,
+            'force_refresh': force_refresh
         })
-        logger.info(f"Queued song for research: {song_id} / {song_name}")
+        refresh_mode = "deep" if force_refresh else "simple"
+        logger.info(f"Queued song for research ({refresh_mode} refresh): {song_id} / {song_name}")
         logger.info(f"  Queue size after add: {research_queue.qsize()}")
         logger.info(f"  Process ID: {os.getpid()}")
         logger.info(f"  Worker running flag: {_worker_running}")
@@ -205,21 +209,24 @@ def _worker_loop(research_function):
                 
                 song_id = song_data['song_id']
                 song_name = song_data['song_name']
-                
+                force_refresh = song_data.get('force_refresh', True)  # Default to deep refresh
+
                 # Set current song
                 with _current_song_lock:
                     global _current_song
                     _current_song = {
                         'song_id': song_id,
-                        'song_name': song_name
+                        'song_name': song_name,
+                        'force_refresh': force_refresh
                     }
-                
-                logger.info(f"Processing queued song: {song_id} / {song_name}")
-                
+
+                refresh_mode = "deep" if force_refresh else "simple"
+                logger.info(f"Processing queued song ({refresh_mode} refresh): {song_id} / {song_name}")
+
                 # Call the research function
                 try:
-                    logger.info(f"Calling research_function({song_id}, {song_name})")
-                    research_function(song_id, song_name)
+                    logger.info(f"Calling research_function({song_id}, {song_name}, force_refresh={force_refresh})")
+                    research_function(song_id, song_name, force_refresh=force_refresh)
                     logger.info(f"Successfully completed research for {song_id}")
                 except Exception as e:
                     logger.error(f"Error researching song {song_id}: {e}", exc_info=True)

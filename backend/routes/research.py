@@ -11,29 +11,37 @@ research_bp = Blueprint('research', __name__)
 def refresh_song_data(song_id):
     """
     Queue a song for background research and data refresh
-    
+
     This endpoint accepts a song ID and adds it to the background processing
     queue. The actual research happens asynchronously in a worker thread.
-    
+
     Args:
         song_id: UUID of the song to research
-        
+
+    Query Parameters:
+        force_refresh: If true (default), bypass cache and re-fetch all data.
+                      If false, use cached data where available ("simple refresh").
+
     Returns:
         JSON response with queue status
     """
     try:
+        # Parse force_refresh parameter (default: true for "deep refresh")
+        force_refresh_param = request.args.get('force_refresh', 'true').lower()
+        force_refresh = force_refresh_param in ('true', '1', 'yes')
+
         # First verify the song exists and get its name
         query = "SELECT id, title FROM songs WHERE id = %s"
         song = db_tools.execute_query(query, (song_id,), fetch_one=True)
-        
+
         if not song:
             return jsonify({
                 'error': 'Song not found',
                 'song_id': song_id
             }), 404
-        
+
         # Add to research queue
-        success = research_queue.add_song_to_queue(song['id'], song['title'])
+        success = research_queue.add_song_to_queue(song['id'], song['title'], force_refresh=force_refresh)
         
         if success:
             return jsonify({
@@ -41,6 +49,7 @@ def refresh_song_data(song_id):
                 'message': 'Song queued for research',
                 'song_id': song['id'],
                 'song_title': song['title'],
+                'force_refresh': force_refresh,
                 'queue_size': research_queue.get_queue_size()
             }), 202  # 202 Accepted - processing will happen asynchronously
         else:
@@ -103,14 +112,18 @@ def get_queue_items():
 def queue_all_songs_for_research():
     """
     Admin endpoint to queue songs for research
-    
+
     Query Parameters:
         batch_size (int, optional): Limit number of songs to queue
         repertoire_id (uuid, optional): Only queue songs from this repertoire
+        force_refresh (bool, optional): If true (default), bypass cache ("deep refresh").
+                                       If false, use cached data ("simple refresh").
     """
     try:
         batch_size = request.args.get('batch_size', type=int)
         repertoire_id = request.args.get('repertoire_id')
+        force_refresh_param = request.args.get('force_refresh', 'true').lower()
+        force_refresh = force_refresh_param in ('true', '1', 'yes')
         
         # Build query based on parameters
         if repertoire_id:
@@ -142,9 +155,9 @@ def queue_all_songs_for_research():
         # Queue each song for research
         queued_count = 0
         failed_songs = []
-        
+
         for song in songs:
-            success = research_queue.add_song_to_queue(song['id'], song['title'])
+            success = research_queue.add_song_to_queue(song['id'], song['title'], force_refresh=force_refresh)
             if success:
                 queued_count += 1
             else:
@@ -160,6 +173,7 @@ def queue_all_songs_for_research():
             'total_songs': len(songs),
             'songs_queued': queued_count,
             'songs_failed': len(failed_songs),
+            'force_refresh': force_refresh,
             'queue_size': research_queue.get_queue_size()
         }
         

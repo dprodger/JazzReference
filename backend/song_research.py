@@ -26,25 +26,27 @@ logger = logging.getLogger(__name__)
 APPLE_MUSIC_MATCHING_ENABLED = True
 
 
-def research_song(song_id: str, song_name: str) -> Dict[str, Any]:
+def research_song(song_id: str, song_name: str, force_refresh: bool = True) -> Dict[str, Any]:
     """
     Research a song and update its data
-    
+
     This is the main entry point called by the background worker thread.
     It imports MusicBrainz releases and performer credits, then matches
     Spotify tracks for the song's recordings.
-    
+
     The function is designed to be fault-tolerant and will not raise exceptions
     to the caller - all errors are logged and returned in the result dict.
-    
-    Note: This function uses caching for both MusicBrainz and Spotify API calls.
-    By default, cache expires after 30 days. This helps minimize API rate limiting
-    and speeds up repeated research operations.
-    
+
+    Cache behavior is controlled by the force_refresh parameter:
+    - force_refresh=True (default): "Deep refresh" - bypass all caches
+    - force_refresh=False: "Simple refresh" - use cached data (30-day expiration)
+
     Args:
         song_id: UUID of the song to research
         song_name: Name of the song (for logging)
-        
+        force_refresh: If True (default), bypass cache and re-fetch all data.
+                      If False, use cached data where available.
+
     Returns:
         dict: {
             'success': bool,
@@ -54,7 +56,8 @@ def research_song(song_id: str, song_name: str) -> Dict[str, Any]:
             'error': str (if failed)
         }
     """
-    logger.info(f"Starting research for song {song_id} / {song_name}")
+    refresh_mode = "deep" if force_refresh else "simple"
+    logger.info(f"Starting research for song {song_id} / {song_name} ({refresh_mode} refresh)")
     
     # Create a progress callback that updates the research_queue progress state
     def progress_callback(phase: str, current: int, total: int):
@@ -64,7 +67,8 @@ def research_song(song_id: str, song_name: str) -> Dict[str, Any]:
         # Step 1: Import MusicBrainz releases
         # MBReleaseImporter uses MusicBrainzSearcher internally which has caching
         importer = MBReleaseImporter(
-            dry_run=False, 
+            dry_run=False,
+            force_refresh=force_refresh,
             logger=logger,
             progress_callback=progress_callback
         )
@@ -118,11 +122,11 @@ def research_song(song_id: str, song_name: str) -> Dict[str, Any]:
             logger.debug("Composed year not updated (already set or not found)")
 
         # Step 2: Match Spotify releases and tracks
-        # SpotifyMatcher uses default cache settings: 30 days expiration, no force_refresh
-        # This minimizes API calls and speeds up repeated research operations
+        # Cache behavior controlled by force_refresh parameter
         matcher = SpotifyMatcher(
-            dry_run=False, 
-            strict_mode=True, 
+            dry_run=False,
+            strict_mode=True,
+            force_refresh=force_refresh,
             logger=logger,
             progress_callback=progress_callback
         )
@@ -156,6 +160,7 @@ def research_song(song_id: str, song_name: str) -> Dict[str, Any]:
             apple_matcher = AppleMusicMatcher(
                 dry_run=False,
                 strict_mode=True,
+                force_refresh=force_refresh,
                 logger=logger,
                 progress_callback=progress_callback,
                 local_catalog_only=True,  # Use MotherDuck only, no iTunes API fallback
