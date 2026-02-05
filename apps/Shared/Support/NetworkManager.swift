@@ -65,13 +65,33 @@ struct QueueStatus: Codable {
     let workerActive: Bool
     let currentSong: CurrentSong?
     let progress: ResearchProgress?
-    
+
     enum CodingKeys: String, CodingKey {
         case queueSize = "queue_size"
         case workerActive = "worker_active"
         case currentSong = "current_song"
         case progress
     }
+}
+
+/// Represents a song waiting in the research queue
+struct QueuedSong: Codable, Identifiable {
+    let songId: String
+    let songName: String
+
+    var id: String { songId }
+
+    enum CodingKeys: String, CodingKey {
+        case songId = "song_id"
+        case songName = "song_name"
+    }
+}
+
+/// Research status for a specific song
+enum SongResearchStatus {
+    case notInQueue
+    case inQueue(position: Int)
+    case currentlyResearching(progress: ResearchProgress?)
 }
 
 // MARK: - Network Manager
@@ -762,6 +782,54 @@ class NetworkManager: ObservableObject {
         }
     }
     
+    /// Fetch the list of songs currently in the research queue
+    func fetchQueuedSongs() async -> [QueuedSong] {
+        let startTime = Date()
+        guard let url = URL(string: "\(NetworkManager.baseURL)/research/queue/items") else {
+            print("Error: Invalid queued songs URL")
+            return []
+        }
+
+        do {
+            let (data, _) = try await URLSession.shared.data(from: url)
+            let queuedSongs = try JSONDecoder().decode([QueuedSong].self, from: data)
+
+            NetworkManager.logRequest("GET /research/queue/items", startTime: startTime)
+
+            if NetworkManager.diagnosticsEnabled {
+                print("   ↳ Queued songs: \(queuedSongs.count)")
+            }
+
+            return queuedSongs
+        } catch {
+            print("Error fetching queued songs: \(error.localizedDescription)")
+            return []
+        }
+    }
+
+    /// Check the research status for a specific song
+    /// - Parameter songId: The song ID to check
+    /// - Returns: The research status (not in queue, in queue with position, or currently researching)
+    func checkSongResearchStatus(songId: String) async -> SongResearchStatus {
+        // Fetch both queue status and queued items in parallel
+        async let queueStatusTask = fetchQueueStatus()
+        async let queuedSongsTask = fetchQueuedSongs()
+
+        let (queueStatus, queuedSongs) = await (queueStatusTask, queuedSongsTask)
+
+        // Check if this song is currently being researched
+        if let current = queueStatus?.currentSong, current.songId == songId {
+            return .currentlyResearching(progress: queueStatus?.progress)
+        }
+
+        // Check if this song is in the queue
+        if let position = queuedSongs.firstIndex(where: { $0.songId == songId }) {
+            return .inQueue(position: position + 1) // 1-indexed position
+        }
+
+        return .notInQueue
+    }
+
     func fetchAuthorityRecommendations(songId: String) async -> AuthorityRecommendationsResponse? {
         guard let url = URL(string: "\(Self.baseURL)/songs/\(songId)/authority_recommendations") else {
             return nil

@@ -40,7 +40,11 @@ struct SongDetailView: View {
     // Song refresh management
     @State private var showRefreshConfirmation = false
     @State private var isRefreshing = false
-    
+
+    // Research queue status
+    @State private var researchStatus: SongResearchStatus = .notInQueue
+    @State private var isCheckingResearchStatus = false
+
     // NEW: Toast notification
     @State private var toast: ToastItem?
     
@@ -109,6 +113,8 @@ struct SongDetailView: View {
                 song = fetchedSong
                 transcriptions = fetchedSong?.transcriptions ?? []
                 isLoading = false
+                // Check if this song is in the research queue
+                checkResearchStatus()
             }
 
             // Load backing tracks
@@ -153,6 +159,8 @@ struct SongDetailView: View {
             await MainActor.run {
                 isRefreshing = false
                 if success {
+                    // Update research status to show it's now in queue
+                    checkResearchStatus()
                     // Show success toast with refresh type
                     toast = ToastItem(
                         type: .success,
@@ -167,6 +175,60 @@ struct SongDetailView: View {
                 }
             }
         }
+    }
+
+    // MARK: - Research Status
+
+    /// Check if this song is currently being researched or in the queue
+    private func checkResearchStatus() {
+        Task {
+            let status = await networkManager.checkSongResearchStatus(songId: currentSongId)
+            await MainActor.run {
+                researchStatus = status
+            }
+        }
+    }
+
+    /// Whether the song can be queued for refresh (not already in queue or being researched)
+    private var canQueueForRefresh: Bool {
+        if case .notInQueue = researchStatus {
+            return true
+        }
+        return false
+    }
+
+    /// Visual indicator showing research queue status
+    @ViewBuilder
+    private var researchStatusIndicator: some View {
+        switch researchStatus {
+        case .currentlyResearching(let progress):
+            ResearchStatusBanner(
+                icon: "waveform.circle.fill",
+                iconColor: JazzTheme.burgundy,
+                title: "Researching Now",
+                message: researchingMessage(progress: progress),
+                helperText: "We're scouring the internet to learn more about this song... Check back in a while to see what we've found.",
+                isAnimating: true
+            )
+        case .inQueue(let position):
+            ResearchStatusBanner(
+                icon: "clock.fill",
+                iconColor: JazzTheme.amber,
+                title: "In Research Queue",
+                message: "Position \(position) in queue",
+                helperText: "This song is in the queue to get researched... Check back in a while to see what we've found.",
+                isAnimating: false
+            )
+        case .notInQueue:
+            EmptyView()
+        }
+    }
+
+    private func researchingMessage(progress: ResearchProgress?) -> String {
+        guard let progress = progress else {
+            return "Processing..."
+        }
+        return "\(progress.phaseDescription) (\(progress.current)/\(progress.total))"
     }
     
     // MARK: - Check if Summary Information has content
@@ -248,7 +310,9 @@ struct SongDetailView: View {
                     }
                 }
                 .onLongPressGesture {
-                    showRefreshConfirmation = true
+                    if canQueueForRefresh {
+                        showRefreshConfirmation = true
+                    }
                 }
 
                 if let composer = song.composer {
@@ -274,7 +338,10 @@ struct SongDetailView: View {
                     }
                     .padding(.top, 4)
                 }
-                
+
+                // MARK: - Research Status Indicator
+                researchStatusIndicator
+
                 // MARK: - Summary Information Section (Collapsible)
                 if hasSummaryContent(for: song) {
                     summaryInfoSection(for: song)

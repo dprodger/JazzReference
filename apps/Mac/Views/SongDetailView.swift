@@ -134,6 +134,7 @@ struct SongDetailView: View {
     @State private var successMessage: String?
     @State private var errorMessage: String?
     @State private var isRefreshing = false
+    @State private var researchStatus: SongResearchStatus = .notInQueue
     @EnvironmentObject var repertoireManager: RepertoireManager
     @EnvironmentObject var authManager: AuthenticationManager
 
@@ -154,12 +155,53 @@ struct SongDetailView: View {
             await MainActor.run {
                 isRefreshing = false
                 if success {
+                    // Update research status to show it's now in queue
+                    checkResearchStatus()
                     successMessage = "Song queued for \(refreshType) refresh"
                 } else {
                     errorMessage = "Failed to queue song for refresh"
                 }
             }
         }
+    }
+
+    // MARK: - Research Status
+
+    /// Check if this song is currently being researched or in the queue
+    private func checkResearchStatus() {
+        Task {
+            let status = await networkManager.checkSongResearchStatus(songId: songId)
+            await MainActor.run {
+                researchStatus = status
+            }
+        }
+    }
+
+    /// Whether the song can be queued for refresh (not already in queue or being researched)
+    private var canQueueForRefresh: Bool {
+        if case .notInQueue = researchStatus {
+            return true
+        }
+        return false
+    }
+
+    /// Helper text for the research status
+    private var researchStatusHelperText: String {
+        switch researchStatus {
+        case .currentlyResearching:
+            return "We're scouring the internet to learn more about this song... Check back in a while to see what we've found."
+        case .inQueue:
+            return "This song is in the queue to get researched... Check back in a while to see what we've found."
+        case .notInQueue:
+            return ""
+        }
+    }
+
+    private func researchingMessage(progress: ResearchProgress?) -> String {
+        guard let progress = progress else {
+            return "Processing..."
+        }
+        return "\(progress.phaseDescription) (\(progress.current)/\(progress.total))"
     }
 
     var body: some View {
@@ -291,8 +333,8 @@ struct SongDetailView: View {
                         .padding(.vertical, 4)
                 }
                 .menuStyle(.borderlessButton)
-                .help("Quick: uses cached data (faster). Full: re-fetches everything.")
-                .disabled(isRefreshing)
+                .help(canQueueForRefresh ? "Quick: uses cached data (faster). Full: re-fetches everything." : researchStatusHelperText)
+                .disabled(isRefreshing || !canQueueForRefresh)
 
                 // Add to Repertoire button
                 Button(action: { showAddToRepertoire = true }) {
@@ -351,6 +393,36 @@ struct SongDetailView: View {
                 .font(JazzTheme.subheadline())
                 .padding(.vertical, 4)
             }
+
+            // Research status indicator
+            researchStatusIndicator
+        }
+    }
+
+    /// Visual indicator showing research queue status
+    @ViewBuilder
+    private var researchStatusIndicator: some View {
+        switch researchStatus {
+        case .currentlyResearching(let progress):
+            MacResearchStatusBanner(
+                icon: "waveform.circle.fill",
+                iconColor: JazzTheme.burgundy,
+                title: "Researching Now",
+                message: researchingMessage(progress: progress),
+                helperText: researchStatusHelperText,
+                isAnimating: true
+            )
+        case .inQueue(let position):
+            MacResearchStatusBanner(
+                icon: "clock.fill",
+                iconColor: JazzTheme.amber,
+                title: "In Research Queue",
+                message: "Position \(position) in queue",
+                helperText: researchStatusHelperText,
+                isAnimating: false
+            )
+        case .notInQueue:
+            EmptyView()
         }
     }
 
@@ -1003,6 +1075,9 @@ struct SongDetailView: View {
         song = fetchedSong
         transcriptions = fetchedSong?.transcriptions ?? []
         isLoading = false
+
+        // Check if this song is in the research queue
+        checkResearchStatus()
 
         // Load backing tracks
         do {
