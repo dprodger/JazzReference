@@ -43,7 +43,7 @@ struct SongDetailView: View {
 
     // Research queue status
     @State private var researchStatus: SongResearchStatus = .notInQueue
-    @State private var isCheckingResearchStatus = false
+    @State private var researchStatusTimer: Timer?
 
     // NEW: Toast notification
     @State private var toast: ToastItem?
@@ -185,7 +185,33 @@ struct SongDetailView: View {
             let status = await networkManager.checkSongResearchStatus(songId: currentSongId)
             await MainActor.run {
                 researchStatus = status
+                // Start or stop polling based on status
+                updateResearchStatusPolling()
             }
+        }
+    }
+
+    /// Start polling for research status updates every 10 seconds
+    private func startResearchStatusPolling() {
+        guard researchStatusTimer == nil else { return }
+        researchStatusTimer = Timer.scheduledTimer(withTimeInterval: 10.0, repeats: true) { _ in
+            checkResearchStatus()
+        }
+    }
+
+    /// Stop polling for research status updates
+    private func stopResearchStatusPolling() {
+        researchStatusTimer?.invalidate()
+        researchStatusTimer = nil
+    }
+
+    /// Update polling state based on current research status
+    private func updateResearchStatusPolling() {
+        switch researchStatus {
+        case .notInQueue:
+            stopResearchStatusPolling()
+        case .inQueue, .currentlyResearching:
+            startResearchStatusPolling()
         }
     }
 
@@ -597,6 +623,9 @@ struct SongDetailView: View {
                 Text("Quick refresh uses cached data for faster results. Full refresh re-fetches everything from external sources.")
             }
             .toast($toast)
+            .onDisappear {
+                stopResearchStatusPolling()
+            }
             .overlay(alignment: .bottom) {
                 pageIndicatorView
             }

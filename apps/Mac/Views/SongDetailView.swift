@@ -135,6 +135,7 @@ struct SongDetailView: View {
     @State private var errorMessage: String?
     @State private var isRefreshing = false
     @State private var researchStatus: SongResearchStatus = .notInQueue
+    @State private var researchStatusTimer: Timer?
     @EnvironmentObject var repertoireManager: RepertoireManager
     @EnvironmentObject var authManager: AuthenticationManager
 
@@ -173,7 +174,33 @@ struct SongDetailView: View {
             let status = await networkManager.checkSongResearchStatus(songId: songId)
             await MainActor.run {
                 researchStatus = status
+                // Start or stop polling based on status
+                updateResearchStatusPolling()
             }
+        }
+    }
+
+    /// Start polling for research status updates every 10 seconds
+    private func startResearchStatusPolling() {
+        guard researchStatusTimer == nil else { return }
+        researchStatusTimer = Timer.scheduledTimer(withTimeInterval: 10.0, repeats: true) { _ in
+            checkResearchStatus()
+        }
+    }
+
+    /// Stop polling for research status updates
+    private func stopResearchStatusPolling() {
+        researchStatusTimer?.invalidate()
+        researchStatusTimer = nil
+    }
+
+    /// Update polling state based on current research status
+    private func updateResearchStatusPolling() {
+        switch researchStatus {
+        case .notInQueue:
+            stopResearchStatusPolling()
+        case .inQueue, .currentlyResearching:
+            startResearchStatusPolling()
         }
     }
 
@@ -296,6 +323,9 @@ struct SongDetailView: View {
             Task {
                 await reloadRecordings()
             }
+        }
+        .onDisappear {
+            stopResearchStatusPolling()
         }
     }
 
