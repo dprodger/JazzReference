@@ -159,6 +159,13 @@ struct SongDetailView: View {
                     // Update research status to show it's now in queue
                     checkResearchStatus()
                     successMessage = "Song queued for \(refreshType) refresh"
+                    // Auto-dismiss success message after 3 seconds
+                    Task {
+                        try? await Task.sleep(nanoseconds: 3_000_000_000)
+                        await MainActor.run {
+                            successMessage = nil
+                        }
+                    }
                 } else {
                     errorMessage = "Failed to queue song for refresh"
                 }
@@ -1099,6 +1106,12 @@ struct SongDetailView: View {
     private func loadSong() async {
         isLoading = true
         isRecordingsLoading = true
+
+        // Clear any previous messages and reset research status
+        successMessage = nil
+        errorMessage = nil
+        researchStatus = .notInQueue
+        stopResearchStatusPolling()
 
         // Phase 1: Load summary (fast) - includes song metadata, featured recordings, transcriptions
         let fetchedSong = await networkManager.fetchSongSummary(id: songId)

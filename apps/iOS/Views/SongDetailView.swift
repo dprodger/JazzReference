@@ -106,6 +106,12 @@ struct SongDetailView: View {
         print("📺 [loadCurrentSong] Called for song: \(currentSongId)")
         isLoading = true
         isRecordingsLoading = true
+
+        // Clear any previous state when switching songs
+        toast = nil
+        researchStatus = .notInQueue
+        stopResearchStatusPolling()
+
         Task {
             // Phase 1: Load summary (fast) - includes song metadata, transcriptions, featured recordings
             let fetchedSong = await networkManager.fetchSongSummary(id: currentSongId)
