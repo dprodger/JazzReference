@@ -1679,9 +1679,11 @@ class NetworkManager: ObservableObject {
     }
 
     /// Import a song from MusicBrainz into the database
-    /// - Parameter work: The MusicBrainzWork to import
+    /// - Parameters:
+    ///   - work: The MusicBrainzWork to import
+    ///   - authToken: The user's auth token (required for authentication)
     /// - Returns: The imported song response, or nil on error
-    func importSongFromMusicBrainz(work: MusicBrainzWork) async -> MusicBrainzImportResponse? {
+    func importSongFromMusicBrainz(work: MusicBrainzWork, authToken: String) async -> MusicBrainzImportResponse? {
         let startTime = Date()
 
         guard let url = URL(string: "\(NetworkManager.baseURL)/musicbrainz/import") else {
@@ -1691,6 +1693,7 @@ class NetworkManager: ObservableObject {
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
+        request.setValue("Bearer \(authToken)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
         // Build request body

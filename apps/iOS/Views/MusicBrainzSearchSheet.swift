@@ -12,6 +12,7 @@ struct MusicBrainzSearchSheet: View {
     let onSongImported: () -> Void
 
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject var authManager: AuthenticationManager
     @StateObject private var networkManager = NetworkManager()
 
     @State private var searchResults: [MusicBrainzWork] = []
@@ -224,7 +225,13 @@ struct MusicBrainzSearchSheet: View {
         isImporting = true
         selectedWork = nil
 
-        if let response = await networkManager.importSongFromMusicBrainz(work: work) {
+        guard let token = authManager.getAccessToken() else {
+            importError = "You must be logged in to import songs."
+            isImporting = false
+            return
+        }
+
+        if let response = await networkManager.importSongFromMusicBrainz(work: work, authToken: token) {
             if response.success {
                 importSuccess = true
             } else {
@@ -243,4 +250,5 @@ struct MusicBrainzSearchSheet: View {
         searchQuery: "Autumn Leaves",
         onSongImported: {}
     )
+    .environmentObject(AuthenticationManager())
 }
