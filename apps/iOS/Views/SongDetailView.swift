@@ -844,6 +844,10 @@ struct SongDetailView: View {
             return
         }
 
+        // Reset research status when loading a new song
+        researchStatus = .notInQueue
+        stopResearchStatusPolling()
+
         #if DEBUG
         if ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1" {
             song = networkManager.fetchSongDetailSync(id: currentSongId)
@@ -860,6 +864,8 @@ struct SongDetailView: View {
             song = fetchedSong
             transcriptions = fetchedSong?.transcriptions ?? []
             isLoading = false
+            // Check if this song is in the research queue
+            checkResearchStatus()
         }
 
         // Load backing tracks
