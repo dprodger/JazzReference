@@ -533,6 +533,13 @@
             padding: 12px 24px;
             font-size: 16px;
         }
+        .btn-mb-edit {
+            background: #ba478f;
+            color: #fff;
+        }
+        .btn-mb-edit:hover {
+            background: #9b4dca;
+        }
 
         /* Issue Type */
         .issue-badge {
@@ -1150,6 +1157,13 @@
                                 {% if orphan.status == 'rejected' %}disabled{% endif %}>
                             Reject
                         </button>
+                        {% if song.musicbrainz_id and orphan.issue_type == 'no_work_link' %}
+                        <button class="btn btn-mb-edit"
+                                onclick="openMusicBrainzEdit('{{ orphan.mb_recording_id }}', '{{ song.musicbrainz_id }}', '{{ song.title|e }}')"
+                                title="Open MusicBrainz to add recording-work relationship">
+                            Link in MB
+                        </button>
+                        {% endif %}
                         {% if orphan.status != 'pending' %}
                         <button class="btn btn-reset" onclick="updateStatus('{{ orphan.id }}', 'pending')">
                             Reset
@@ -1295,6 +1309,37 @@
                 btn.textContent = originalText;
                 btn.disabled = false;
             }
+        }
+
+        // Open MusicBrainz relationship editor with seeded recording-work link
+        function openMusicBrainzEdit(recordingId, workId, songTitle) {
+            // Create a form to POST to MusicBrainz relationship editor
+            // This seeds the form with a recording -> work "performance" relationship
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = 'https://musicbrainz.org/relationship-editor';
+            form.target = '_blank';
+
+            // Link type 278 = "performance" (recording of work)
+            const params = {
+                'rel-editor.rels.0.action': 'add',
+                'rel-editor.rels.0.link_type': '278',
+                'rel-editor.rels.0.entity.0.gid': recordingId,
+                'rel-editor.rels.0.entity.1.gid': workId,
+                'rel-editor.edit_note': `Adding recording-work relationship for "${songTitle}" - via JazzReference admin`
+            };
+
+            for (const [key, value] of Object.entries(params)) {
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = key;
+                input.value = value;
+                form.appendChild(input);
+            }
+
+            document.body.appendChild(form);
+            form.submit();
+            document.body.removeChild(form);
         }
 
         // Link to Existing Recording Modal
