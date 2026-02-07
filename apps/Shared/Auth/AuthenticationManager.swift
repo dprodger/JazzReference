@@ -284,26 +284,37 @@ class AuthenticationManager: ObservableObject {
     /// Fetch current user info to validate token
     private func fetchCurrentUser() async {
         guard let token = accessToken else { return }
-        
+
         let url = URL(string: "\(NetworkManager.baseURL)/auth/me")!
         var request = URLRequest(url: url)
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        
+
         do {
             let (data, response) = try await URLSession.shared.data(for: request)
-            
+
             guard let httpResponse = response as? HTTPURLResponse else {
                 throw URLError(.badServerResponse)
             }
-            
+
             if httpResponse.statusCode == 200 {
                 let user = try JSONDecoder().decode(User.self, from: data)
                 currentUser = user
                 isAuthenticated = true
                 print("✅ Token valid, user authenticated: \(user.email)")
+            } else if httpResponse.statusCode == 401 {
+                // Access token expired — try refreshing before giving up
+                print("⚠️ Access token expired, attempting refresh")
+                let refreshed = await refreshAccessToken()
+                if refreshed {
+                    // Retry with the new access token
+                    await fetchCurrentUser()
+                } else {
+                    print("❌ Token refresh failed, clearing authentication")
+                    clearTokens()
+                    isAuthenticated = false
+                }
             } else {
-                // Token is invalid, clear it
-                print("⚠️ Token invalid, clearing authentication")
+                print("⚠️ Unexpected status \(httpResponse.statusCode), clearing authentication")
                 clearTokens()
                 isAuthenticated = false
             }
