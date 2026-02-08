@@ -35,6 +35,7 @@
 		B486B3162F1D93C4005E6644 /* MacYouTubeImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B486B3132F1D93C4005E6644 /* MacYouTubeImportView.swift */; };
 		B486B3172F1D93C4005E6644 /* MacArtistCreationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B486B3112F1D93C4005E6644 /* MacArtistCreationView.swift */; };
 		B4B9C4C02F1AEC0100159A28 /* MusicBrainzSearchSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4B9C4BF2F1AEC0100159A28 /* MusicBrainzSearchSheet.swift */; };
+		B4BE01012F3600000000BE01 /* SongBulkEditRecordingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4BE01002F3600000000BE01 /* SongBulkEditRecordingsView.swift */; };
 		B4C4EF572F3133D7000B5EF8 /* MacAddStreamingLinkSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4C4EF562F3133D7000B5EF8 /* MacAddStreamingLinkSheet.swift */; };
 		B4C535842ECE5FFF0030A127 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = B4C535832ECE5FFF0030A127 /* GoogleSignIn */; };
 		B4C535862ECE5FFF0030A127 /* GoogleSignInSwift in Frameworks */ = {isa = PBXBuildFile; productRef = B4C535852ECE5FFF0030A127 /* GoogleSignInSwift */; };
@@ -131,6 +132,7 @@
 		B486B3182F1D9743005E6644 /* Approach Note MacRelease.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "Approach Note MacRelease.entitlements"; sourceTree = "<group>"; };
 		B4911D2A2EB316F600326CA7 /* MusicBrainzImporter.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = MusicBrainzImporter.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		B4B9C4BF2F1AEC0100159A28 /* MusicBrainzSearchSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusicBrainzSearchSheet.swift; sourceTree = "<group>"; };
+		B4BE01002F3600000000BE01 /* SongBulkEditRecordingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SongBulkEditRecordingsView.swift; sourceTree = "<group>"; };
 		B4C160402E91B03600EB8D2C /* Approach Note.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Approach Note.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		B4C1604D2E91B03700EB8D2C /* JazzReferenceTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = JazzReferenceTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		B4C160572E91B03700EB8D2C /* JazzReferenceUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = JazzReferenceUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -293,6 +295,7 @@
 				B41D0FA92EE633EE00DB427C /* RecordingDetailView.swift */,
 				B41D0FAA2EE633EE00DB427C /* RecordingsListView.swift */,
 				B41D0FAB2EE633EE00DB427C /* SongDetailView.swift */,
+				B4BE01002F3600000000BE01 /* SongBulkEditRecordingsView.swift */,
 				B41D0FAC2EE633EE00DB427C /* SongsListView.swift */,
 			);
 			name = Views;
@@ -637,6 +640,7 @@
 				B41D0FB02EE633EE00DB427C /* JazzReferenceMacApp.swift in Sources */,
 				B41D0FB12EE633EE00DB427C /* PerformerDetailView.swift in Sources */,
 				B41D0FB22EE633EE00DB427C /* SongDetailView.swift in Sources */,
+				B4BE01012F3600000000BE01 /* SongBulkEditRecordingsView.swift in Sources */,
 				B41D0FB32EE633EE00DB427C /* RecordingDetailView.swift in Sources */,
 				B41D0FB42EE633EE00DB427C /* SongsListView.swift in Sources */,
 				B45A16A52F08800600259452 /* MacResetPasswordView.swift in Sources */,

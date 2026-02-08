@@ -87,6 +87,15 @@ struct QueuedSong: Codable, Identifiable {
     }
 }
 
+/// Response wrapper for /research/queue/items endpoint
+private struct QueuedSongsResponse: Codable {
+    let queuedSongs: [QueuedSong]
+
+    enum CodingKeys: String, CodingKey {
+        case queuedSongs = "queued_songs"
+    }
+}
+
 /// Research status for a specific song
 enum SongResearchStatus {
     case notInQueue
@@ -792,15 +801,15 @@ class NetworkManager: ObservableObject {
 
         do {
             let (data, _) = try await URLSession.shared.data(from: url)
-            let queuedSongs = try JSONDecoder().decode([QueuedSong].self, from: data)
+            let response = try JSONDecoder().decode(QueuedSongsResponse.self, from: data)
 
             NetworkManager.logRequest("GET /research/queue/items", startTime: startTime)
 
             if NetworkManager.diagnosticsEnabled {
-                print("   ↳ Queued songs: \(queuedSongs.count)")
+                print("   ↳ Queued songs: \(response.queuedSongs.count)")
             }
 
-            return queuedSongs
+            return response.queuedSongs
         } catch {
             print("Error fetching queued songs: \(error.localizedDescription)")
             return []

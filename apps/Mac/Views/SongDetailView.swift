@@ -373,6 +373,26 @@ struct SongDetailView: View {
                 .help(canQueueForRefresh ? "Quick: uses cached data (faster). Full: re-fetches everything." : researchStatusHelperText)
                 .disabled(isRefreshing || !canQueueForRefresh)
 
+                // Bulk Edit button (auth-gated)
+                if authManager.isAuthenticated {
+                    Button(action: {
+                        SongBulkEditRecordingsView.openInWindow(
+                            songTitle: song.title,
+                            recordings: song.recordings ?? [],
+                            authManager: authManager,
+                            onDismiss: {
+                                Task { await reloadRecordings() }
+                            }
+                        )
+                    }) {
+                        Label("Bulk Edit", systemImage: "tablecells")
+                            .padding(.vertical, 4)
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(song.recordings == nil || song.recordings?.isEmpty == true || isRecordingsLoading)
+                    .help("Edit key, tempo, and type for all recordings at once")
+                }
+
                 // Add to Repertoire button
                 Button(action: { showAddToRepertoire = true }) {
                     Label("Add to Repertoire", systemImage: "plus.circle")
