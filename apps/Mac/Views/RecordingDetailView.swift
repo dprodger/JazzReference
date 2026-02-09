@@ -19,6 +19,7 @@ struct RecordingDetailView: View {
     @State private var showingStreamingLinkSheet = false
     @State private var streamingLinkReleaseId: String?
     @State private var streamingLinkReleaseTitle: String?
+    @State private var isRecordingDetailsExpanded = false
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var authManager: AuthenticationManager
     @EnvironmentObject var favoritesManager: FavoritesManager
@@ -396,21 +397,104 @@ struct RecordingDetailView: View {
 
     @ViewBuilder
     private func recordingInfo(_ recording: Recording) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            if let notes = recording.notes, !notes.isEmpty {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Notes")
-                        .font(JazzTheme.headline())
-                        .foregroundColor(JazzTheme.charcoal)
-                    Text(notes)
-                        .font(JazzTheme.body())
-                        .foregroundColor(JazzTheme.charcoal)
+        let hasContent = recording.recordingYear != nil ||
+                         recording.recordingDate != nil ||
+                         recording.label != nil ||
+                         recording.notes != nil ||
+                         recording.musicbrainzId != nil
+
+        if hasContent {
+            VStack(alignment: .leading, spacing: 0) {
+                // Collapsible header
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        isRecordingDetailsExpanded.toggle()
+                    }
+                } label: {
+                    HStack {
+                        Text("Recording Details")
+                            .font(JazzTheme.headline())
+                            .foregroundColor(JazzTheme.charcoal)
+
+                        Spacer()
+
+                        Image(systemName: isRecordingDetailsExpanded ? "chevron.up" : "chevron.down")
+                            .font(JazzTheme.subheadline())
+                            .foregroundColor(JazzTheme.brass)
+                    }
+                    .padding(12)
+                    .background(JazzTheme.cardBackground)
+                }
+                .buttonStyle(.plain)
+
+                // Expandable content
+                if isRecordingDetailsExpanded {
+                    VStack(alignment: .leading, spacing: 12) {
+                        if let year = recording.recordingYear {
+                            DetailRow(icon: "calendar", label: "Year", value: String(year))
+                        }
+
+                        if let date = recording.recordingDate {
+                            DetailRow(icon: "calendar.badge.clock", label: "Recorded", value: date)
+                        }
+
+                        if let label = recording.label {
+                            DetailRow(icon: "music.note.house", label: "Label", value: label)
+                        }
+
+                        if let notes = recording.notes, !notes.isEmpty {
+                            VStack(alignment: .leading, spacing: 4) {
+                                HStack {
+                                    Image(systemName: "note.text")
+                                        .foregroundColor(JazzTheme.brass)
+                                        .frame(width: 24)
+                                    Text("Notes")
+                                        .font(JazzTheme.subheadline())
+                                        .foregroundColor(JazzTheme.smokeGray)
+                                }
+                                Text(notes)
+                                    .font(JazzTheme.body())
+                                    .foregroundColor(JazzTheme.charcoal)
+                                    .padding(.leading, 32)
+                            }
+                        }
+
+                        // MusicBrainz link
+                        if let mbId = recording.musicbrainzId,
+                           let url = URL(string: "https://musicbrainz.org/recording/\(mbId)") {
+                            Divider()
+                                .padding(.vertical, 4)
+
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Learn More")
+                                    .font(JazzTheme.headline())
+                                    .foregroundColor(JazzTheme.charcoal)
+
+                                Link(destination: url) {
+                                    HStack {
+                                        Image(systemName: "waveform.circle.fill")
+                                            .foregroundColor(JazzTheme.charcoal)
+                                        Text("MusicBrainz")
+                                            .font(JazzTheme.caption())
+                                            .foregroundColor(JazzTheme.smokeGray)
+                                        Spacer()
+                                        Image(systemName: "arrow.up.right")
+                                            .font(JazzTheme.caption())
+                                            .foregroundColor(JazzTheme.smokeGray)
+                                    }
+                                    .padding(10)
+                                    .background(JazzTheme.backgroundLight)
+                                    .cornerRadius(8)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+                    .padding(12)
+                    .background(JazzTheme.cardBackground)
                 }
             }
-
-            if let date = recording.recordingDate {
-                DetailRow(icon: "calendar", label: "Recording Date", value: date)
-            }
+            .cornerRadius(8)
         }
     }
 
