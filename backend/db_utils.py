@@ -54,7 +54,7 @@ DB_CONFIG = {
     'host': os.environ.get('DB_HOST', 'aws-1-us-east-2.pooler.supabase.com'),
     'dbname': os.environ.get('DB_NAME', 'postgres'),
     'user': os.environ.get('DB_USER', 'postgres.wxinjyotnrqxrwqrtvkp'),
-    'password': os.environ.get('DB_PASSWORD', 'jovpeW-pukgu0-nifron'),
+    'password': os.environ.get('DB_PASSWORD', ''),
     'port': os.environ.get('DB_PORT', '6543')
 }
 
