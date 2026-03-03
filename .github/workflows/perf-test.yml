@@ -5,10 +5,12 @@ on:
     branches: [main]
     paths:
       - 'backend/**'
+      - '.github/workflows/perf-test.yml'
   pull_request:
     branches: [main]
     paths:
       - 'backend/**'
+      - '.github/workflows/perf-test.yml'
 
 jobs:
   perf-test:
