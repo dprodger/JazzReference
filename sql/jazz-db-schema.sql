@@ -116,6 +116,8 @@ CREATE TABLE videos (
     description TEXT,
     video_type VARCHAR(50) NOT NULL, -- 'performance', 'transcription', 'educational'
     duration_seconds INTEGER,
+    tempo INTEGER,
+    key_signature VARCHAR(20),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
 	created_by VARCHAR(100) NOT NULL;
