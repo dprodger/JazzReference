@@ -22,6 +22,8 @@ def create_video():
         video_type = data.get('video_type')
         title = data.get('title')
         description = data.get('description')
+        tempo = data.get('tempo')  # Optional - BPM as integer
+        key_signature = data.get('key_signature')  # Optional - e.g. "C Major", "E♭ Minor"
         created_by = data.get('created_by')  # Optional - user ID
 
         if not youtube_url:
@@ -74,10 +76,10 @@ def create_video():
         with db_tools.get_db_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute("""
-                    INSERT INTO videos (song_id, recording_id, youtube_url, video_type, title, description, created_by)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s)
-                    RETURNING id, song_id, recording_id, youtube_url, video_type, title, description, created_at, created_by
-                """, (song_id, recording_id, youtube_url, video_type, title, description, created_by))
+                    INSERT INTO videos (song_id, recording_id, youtube_url, video_type, title, description, tempo, key_signature, created_by)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    RETURNING id, song_id, recording_id, youtube_url, video_type, title, description, tempo, key_signature, created_at, created_by
+                """, (song_id, recording_id, youtube_url, video_type, title, description, tempo, key_signature, created_by))
 
                 result = cur.fetchone()
                 conn.commit()
@@ -113,6 +115,8 @@ def get_song_videos(song_id):
                 v.description,
                 v.video_type,
                 v.duration_seconds,
+                v.tempo,
+                v.key_signature,
                 v.created_at,
                 v.updated_at
             FROM videos v
