@@ -1692,14 +1692,38 @@ struct BackingTrackRow: View {
                         .foregroundColor(JazzTheme.charcoal)
                         .lineLimit(2)
 
-                    if let duration = video.durationSeconds {
-                        HStack(spacing: 4) {
-                            Image(systemName: "clock")
-                                .foregroundColor(JazzTheme.brass)
-                                .font(JazzTheme.caption())
-                            Text(formatDuration(duration))
-                                .font(JazzTheme.subheadline())
-                                .foregroundColor(JazzTheme.smokeGray)
+                    HStack(spacing: 8) {
+                        if let duration = video.durationSeconds {
+                            HStack(spacing: 4) {
+                                Image(systemName: "clock")
+                                    .foregroundColor(JazzTheme.brass)
+                                    .font(JazzTheme.caption())
+                                Text(formatDuration(duration))
+                                    .font(JazzTheme.subheadline())
+                                    .foregroundColor(JazzTheme.smokeGray)
+                            }
+                        }
+
+                        if let tempo = video.tempo {
+                            HStack(spacing: 4) {
+                                Image(systemName: "metronome")
+                                    .foregroundColor(JazzTheme.brass)
+                                    .font(JazzTheme.caption())
+                                Text("\(tempo) BPM")
+                                    .font(JazzTheme.subheadline())
+                                    .foregroundColor(JazzTheme.smokeGray)
+                            }
+                        }
+
+                        if let key = video.keySignature {
+                            HStack(spacing: 4) {
+                                Image(systemName: "music.note")
+                                    .foregroundColor(JazzTheme.brass)
+                                    .font(JazzTheme.caption())
+                                Text(key)
+                                    .font(JazzTheme.subheadline())
+                                    .foregroundColor(JazzTheme.smokeGray)
+                            }
                         }
                     }
                 }

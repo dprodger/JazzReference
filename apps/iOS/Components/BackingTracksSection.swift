@@ -103,15 +103,39 @@ struct VideoRowView: View {
                         .lineLimit(2)
                         .multilineTextAlignment(.leading)
 
-                    // Duration if available
-                    if let duration = video.durationSeconds {
-                        HStack(spacing: 4) {
-                            Image(systemName: "clock")
-                                .foregroundColor(JazzTheme.brass)
-                                .font(JazzTheme.caption())
-                            Text(formatDuration(duration))
-                                .font(JazzTheme.subheadline())
-                                .foregroundColor(JazzTheme.smokeGray)
+                    // Metadata badges
+                    HStack(spacing: 8) {
+                        if let duration = video.durationSeconds {
+                            HStack(spacing: 4) {
+                                Image(systemName: "clock")
+                                    .foregroundColor(JazzTheme.brass)
+                                    .font(JazzTheme.caption())
+                                Text(formatDuration(duration))
+                                    .font(JazzTheme.subheadline())
+                                    .foregroundColor(JazzTheme.smokeGray)
+                            }
+                        }
+
+                        if let tempo = video.tempo {
+                            HStack(spacing: 4) {
+                                Image(systemName: "metronome")
+                                    .foregroundColor(JazzTheme.brass)
+                                    .font(JazzTheme.caption())
+                                Text("\(tempo) BPM")
+                                    .font(JazzTheme.subheadline())
+                                    .foregroundColor(JazzTheme.smokeGray)
+                            }
+                        }
+
+                        if let key = video.keySignature {
+                            HStack(spacing: 4) {
+                                Image(systemName: "music.note")
+                                    .foregroundColor(JazzTheme.brass)
+                                    .font(JazzTheme.caption())
+                                Text(key)
+                                    .font(JazzTheme.subheadline())
+                                    .foregroundColor(JazzTheme.smokeGray)
+                            }
                         }
                     }
                 }
@@ -196,6 +220,26 @@ struct VideoPlayerSheet: View {
                                 .foregroundColor(JazzTheme.smokeGray)
                         }
                     }
+
+                    if let tempo = video.tempo {
+                        HStack(spacing: 4) {
+                            Image(systemName: "metronome")
+                                .foregroundColor(JazzTheme.brass)
+                            Text("Tempo: \(tempo) BPM")
+                                .font(JazzTheme.subheadline())
+                                .foregroundColor(JazzTheme.smokeGray)
+                        }
+                    }
+
+                    if let key = video.keySignature {
+                        HStack(spacing: 4) {
+                            Image(systemName: "music.note")
+                                .foregroundColor(JazzTheme.brass)
+                            Text("Key: \(key)")
+                                .font(JazzTheme.subheadline())
+                                .foregroundColor(JazzTheme.smokeGray)
+                        }
+                    }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding()
@@ -236,6 +280,8 @@ struct VideoPlayerSheet: View {
                 description: "Professional backing track for practice",
                 videoType: "backing_track",
                 durationSeconds: 300,
+                tempo: 130,
+                keySignature: "C Major",
                 createdAt: nil,
                 updatedAt: nil
             ),
@@ -248,6 +294,8 @@ struct VideoPlayerSheet: View {
                 description: nil,
                 videoType: "backing_track",
                 durationSeconds: 360,
+                tempo: 100,
+                keySignature: nil,
                 createdAt: nil,
                 updatedAt: nil
             )

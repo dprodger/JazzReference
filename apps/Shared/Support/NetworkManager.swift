@@ -1112,7 +1112,7 @@ class NetworkManager: ObservableObject {
 
     // MARK: - Create Video
 
-    func createVideo(songId: String, youtubeUrl: String, videoType: String, title: String, userId: String? = nil) async throws {
+    func createVideo(songId: String, youtubeUrl: String, videoType: String, title: String, tempo: Int? = nil, keySignature: String? = nil, userId: String? = nil) async throws {
         guard let url = URL(string: "\(NetworkManager.baseURL)/videos") else {
             throw URLError(.badURL)
         }
@@ -1127,6 +1127,12 @@ class NetworkManager: ObservableObject {
             "video_type": videoType,
             "title": title
         ]
+        if let tempo = tempo {
+            body["tempo"] = tempo
+        }
+        if let keySignature = keySignature {
+            body["key_signature"] = keySignature
+        }
         if let userId = userId {
             body["created_by"] = userId
         }

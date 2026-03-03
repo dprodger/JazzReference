@@ -1109,6 +1109,8 @@ struct Video: Codable, Identifiable {
     let description: String?
     let videoType: String
     let durationSeconds: Int?
+    let tempo: Int?
+    let keySignature: String?
     let createdAt: String?
     let updatedAt: String?
 
@@ -1120,6 +1122,8 @@ struct Video: Codable, Identifiable {
         case title, description
         case videoType = "video_type"
         case durationSeconds = "duration_seconds"
+        case tempo
+        case keySignature = "key_signature"
         case createdAt = "created_at"
         case updatedAt = "updated_at"
     }
@@ -1136,6 +1140,8 @@ struct Video: Codable, Identifiable {
             description: "Professional backing track for practice",
             videoType: "backing_track",
             durationSeconds: 300,
+            tempo: 130,
+            keySignature: "C Major",
             createdAt: "2024-01-15T10:30:00Z",
             updatedAt: "2024-01-15T10:30:00Z"
         )
@@ -1151,6 +1157,8 @@ struct Video: Codable, Identifiable {
             description: nil,
             videoType: "backing_track",
             durationSeconds: 360,
+            tempo: 100,
+            keySignature: nil,
             createdAt: "2024-02-20T14:15:00Z",
             updatedAt: "2024-02-20T14:15:00Z"
         )
