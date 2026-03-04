@@ -704,7 +704,18 @@ def validate_album_match(spotify_album: dict, expected_album: str,
             # Artist validation failed - try track verification fallback
             # This handles "Various Artists" compilations where artist matching is meaningless
             # Only attempt if album similarity is high (>=80%) and we have a song title
-            if song_title and album_similarity >= 80 and verify_track_callback:
+            #
+            # IMPORTANT: Skip this fallback when the album title is essentially the song title
+            # (common for singles). In that case, the track will trivially be found on ANY
+            # album with that name, regardless of artist, leading to false positive matches.
+            album_is_song_title = (
+                song_title and
+                calculate_similarity(expected_album, song_title) >= 85
+            )
+            if album_is_song_title:
+                logger.debug(f"      Track verification skipped (album title matches song title - likely a single)")
+
+            if song_title and album_similarity >= 80 and verify_track_callback and not album_is_song_title:
                 # For compilation artists (Various Artists, etc.), allow lenient track verification
                 # For real artists, require at least 40% artist similarity to use track verification
                 # This prevents matching "Illinois Jacquet" to "Charles Bradley" just because
