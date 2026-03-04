@@ -13,6 +13,7 @@ Usage:
 
 import sys
 import argparse
+import json
 import logging
 import time
 from pathlib import Path
@@ -98,95 +99,102 @@ class OrphanManager:
                 cur.execute(query, params)
                 return [dict(row) for row in cur.fetchall()]
 
-    def search_mb_recordings(self, title: str) -> List[Dict]:
-        """Search MusicBrainz for recordings with matching title"""
-        self.mb.rate_limit()
+    def _mb_request_with_retry(self, url: str, params: dict, max_retries: int = 3) -> Optional[dict]:
+        """
+        Make a MusicBrainz API request with retry on transient errors.
 
-        try:
-            escaped_title = self.mb._escape_lucene_query(title)
-            url = "https://musicbrainz.org/ws/2/recording/"
-            params = {
-                'query': f'recording:"{escaped_title}"',
-                'fmt': 'json',
-                'limit': self.recording_limit
-            }
+        Returns parsed JSON on success, None on persistent failure.
+        Retries on 503 (rate limit), 429 (too many requests), and timeouts.
+        """
+        for attempt in range(max_retries):
+            self.mb.rate_limit()
+            try:
+                response = self.mb.session.get(url, params=params, timeout=15)
+                if response.status_code == 200:
+                    return response.json()
+                elif response.status_code in (429, 503):
+                    wait = 2 ** attempt  # 1s, 2s, 4s
+                    logger.warning(f"MB API {response.status_code} for {url}, retry {attempt+1}/{max_retries} after {wait}s")
+                    time.sleep(wait)
+                    continue
+                else:
+                    logger.warning(f"MB API unexpected status {response.status_code} for {url}")
+                    return None
+            except Exception as e:
+                wait = 2 ** attempt
+                logger.warning(f"MB API error for {url}: {e}, retry {attempt+1}/{max_retries} after {wait}s")
+                time.sleep(wait)
+                continue
 
-            response = self.mb.session.get(url, params=params, timeout=15)
-            if response.status_code != 200:
-                return []
+        logger.error(f"MB API failed after {max_retries} retries: {url}")
+        return None
 
-            data = response.json()
-            recordings = data.get('recordings', [])
+    def search_mb_recordings(self, title: str) -> Optional[List[Dict]]:
+        """Search MusicBrainz for recordings with matching title.
+        Returns list of recordings on success, None on API failure."""
+        escaped_title = self.mb._escape_lucene_query(title)
+        url = "https://musicbrainz.org/ws/2/recording/"
+        params = {
+            'query': f'recording:"{escaped_title}"',
+            'fmt': 'json',
+            'limit': self.recording_limit
+        }
 
-            # Filter to exact title matches
-            normalized_title = self.mb.normalize_title(title)
-            return [r for r in recordings
-                    if self.mb.normalize_title(r.get('title', '')) == normalized_title]
+        data = self._mb_request_with_retry(url, params)
+        if data is None:
+            return None
 
-        except Exception as e:
-            logger.error(f"Error searching MB recordings: {e}")
-            return []
+        recordings = data.get('recordings', [])
 
-    def get_recording_work_links(self, recording_id: str) -> List[Dict]:
-        """Get work relationships for a recording"""
-        self.mb.rate_limit()
+        # Filter to exact title matches
+        normalized_title = self.mb.normalize_title(title)
+        return [r for r in recordings
+                if self.mb.normalize_title(r.get('title', '')) == normalized_title]
 
-        try:
-            url = f"https://musicbrainz.org/ws/2/recording/{recording_id}"
-            params = {'inc': 'work-rels', 'fmt': 'json'}
+    def get_recording_work_links(self, recording_id: str) -> Optional[List[Dict]]:
+        """Get work relationships for a recording.
+        Returns list of work links on success, None on API failure."""
+        url = f"https://musicbrainz.org/ws/2/recording/{recording_id}"
+        params = {'inc': 'work-rels', 'fmt': 'json'}
 
-            response = self.mb.session.get(url, params=params, timeout=15)
-            if response.status_code != 200:
-                return []
+        data = self._mb_request_with_retry(url, params)
+        if data is None:
+            return None
 
-            data = response.json()
-
-            work_links = []
-            for relation in data.get('relations', []):
-                if relation.get('type') == 'performance':
-                    work = relation.get('work', {})
-                    work_links.append({
-                        'work_id': work.get('id'),
-                        'work_title': work.get('title')
-                    })
-
-            return work_links
-
-        except Exception as e:
-            logger.debug(f"Error getting work links: {e}")
-            return []
-
-    def get_recording_releases(self, recording_id: str) -> List[Dict]:
-        """Get all releases that contain this recording"""
-        self.mb.rate_limit()
-
-        try:
-            url = f"https://musicbrainz.org/ws/2/recording/{recording_id}"
-            params = {'inc': 'releases', 'fmt': 'json'}
-
-            response = self.mb.session.get(url, params=params, timeout=15)
-            if response.status_code != 200:
-                return []
-
-            data = response.json()
-
-            releases = []
-            for release in data.get('releases', []):
-                releases.append({
-                    'id': release.get('id'),
-                    'title': release.get('title'),
-                    'date': release.get('date', ''),
-                    'status': release.get('status', ''),
-                    'country': release.get('country', '')
+        work_links = []
+        for relation in data.get('relations', []):
+            if relation.get('type') == 'performance':
+                work = relation.get('work', {})
+                work_links.append({
+                    'work_id': work.get('id'),
+                    'work_title': work.get('title')
                 })
 
-            # Sort by date (oldest first)
-            releases.sort(key=lambda r: r.get('date', 'zzzz'))
-            return releases
+        return work_links
 
-        except Exception as e:
-            logger.debug(f"Error getting releases: {e}")
-            return []
+    def get_recording_releases(self, recording_id: str) -> Optional[List[Dict]]:
+        """Get all releases that contain this recording.
+        Returns list of releases on success, None on API failure."""
+        url = f"https://musicbrainz.org/ws/2/recording/{recording_id}"
+        params = {'inc': 'releases', 'fmt': 'json'}
+
+        data = self._mb_request_with_retry(url, params)
+        if data is None:
+            return None
+
+        releases = []
+        for release in data.get('releases', []):
+            releases.append({
+                'id': release.get('id'),
+                'title': release.get('title'),
+                'date': release.get('date', ''),
+                'status': release.get('status', ''),
+                'country': release.get('country', '')
+            })
+
+        # Sort by date (oldest first)
+        releases.sort(key=lambda r: r.get('date', 'zzzz'))
+        return releases
 
     def discover_orphans(self, song: Dict) -> List[Dict]:
         """Discover orphan recordings for a song"""
@@ -205,6 +213,9 @@ class OrphanManager:
 
         for title in all_titles:
             recordings = self.search_mb_recordings(title)
+            if recordings is None:
+                logger.warning(f"  MB API failure searching for title: {title}, skipping")
+                continue
             for rec in recordings:
                 if rec['id'] not in all_recordings:
                     all_recordings[rec['id']] = rec
@@ -234,6 +245,12 @@ class OrphanManager:
             # Check work relationships
             work_links = self.get_recording_work_links(rec_id)
 
+            # If API failed, skip this recording entirely — don't misclassify it
+            if work_links is None:
+                logger.warning(f"    SKIPPED (API failure checking work links): {artist_names}")
+                self.stats['errors'] += 1
+                continue
+
             issue_type = None
             linked_work_ids = []
 
@@ -250,7 +267,11 @@ class OrphanManager:
 
                 # Fetch releases for this recording
                 releases = self.get_recording_releases(rec_id)
-                logger.debug(f"      Found {len(releases)} releases")
+                if releases is None:
+                    logger.warning(f"      API failure fetching releases, storing orphan without release data")
+                    releases = []
+
+                logger.info(f"      Found {len(releases)} releases")
 
                 orphan = {
                     'song_id': song['id'],
@@ -263,7 +284,7 @@ class OrphanManager:
                     'mb_disambiguation': rec.get('disambiguation', ''),
                     'issue_type': issue_type,
                     'linked_work_ids': linked_work_ids if linked_work_ids else None,
-                    'mb_releases': releases  # Add releases data
+                    'mb_releases': releases
                 }
                 orphans.append(orphan)
                 self.stats['orphans_discovered'] += 1
@@ -310,7 +331,10 @@ class OrphanManager:
                                     mb_disambiguation = EXCLUDED.mb_disambiguation,
                                     issue_type = EXCLUDED.issue_type,
                                     linked_work_ids = EXCLUDED.linked_work_ids,
-                                    mb_releases = EXCLUDED.mb_releases,
+                                    mb_releases = CASE
+                                        WHEN EXCLUDED.mb_releases = '[]'::jsonb THEN orphan_recordings.mb_releases
+                                        ELSE EXCLUDED.mb_releases
+                                    END,
                                     status = CASE
                                         WHEN orphan_recordings.status = 'imported' THEN 'imported'
                                         ELSE 'pending'
@@ -349,7 +373,10 @@ class OrphanManager:
                                     mb_disambiguation = EXCLUDED.mb_disambiguation,
                                     issue_type = EXCLUDED.issue_type,
                                     linked_work_ids = EXCLUDED.linked_work_ids,
-                                    mb_releases = EXCLUDED.mb_releases,
+                                    mb_releases = CASE
+                                        WHEN EXCLUDED.mb_releases = '[]'::jsonb THEN orphan_recordings.mb_releases
+                                        ELSE EXCLUDED.mb_releases
+                                    END,
                                     updated_at = CURRENT_TIMESTAMP
                                 RETURNING (xmax = 0) AS is_insert
                             """, (

@@ -14,6 +14,7 @@ This ensures consistent behavior between:
 """
 
 from flask import Blueprint, render_template, request, jsonify, redirect, url_for
+import json
 import logging
 
 from db_utils import get_db_connection
@@ -121,6 +122,40 @@ def orphans_review(song_id):
                     mb_artist_credit
             """, (song_id,))
             orphans = [dict(row) for row in cur.fetchall()]
+
+            # Backfill empty mb_releases from MusicBrainz API
+            mb = MusicBrainzSearcher()
+            for orphan in orphans:
+                if not orphan.get('mb_releases'):
+                    try:
+                        mb.rate_limit()
+                        url = f"https://musicbrainz.org/ws/2/recording/{orphan['mb_recording_id']}"
+                        params = {'inc': 'releases', 'fmt': 'json'}
+                        response = mb.session.get(url, params=params, timeout=15)
+                        if response.status_code == 200:
+                            data = response.json()
+                            releases = []
+                            for release in data.get('releases', []):
+                                releases.append({
+                                    'id': release.get('id'),
+                                    'title': release.get('title'),
+                                    'date': release.get('date', ''),
+                                    'status': release.get('status', ''),
+                                    'country': release.get('country', '')
+                                })
+                            releases.sort(key=lambda r: r.get('date', 'zzzz'))
+                            if releases:
+                                orphan['mb_releases'] = releases
+                                # Persist to DB so we don't re-fetch next time
+                                cur.execute("""
+                                    UPDATE orphan_recordings
+                                    SET mb_releases = %s::jsonb, updated_at = CURRENT_TIMESTAMP
+                                    WHERE id = %s
+                                """, (json.dumps(releases), orphan['id']))
+                    except Exception as e:
+                        logger.debug(f"Error backfilling releases for {orphan['mb_recording_id']}: {e}")
+
+            db.commit()
 
     return render_template('admin/orphans_review.html', song=song, orphans=orphans)
 
