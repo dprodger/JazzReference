@@ -51,11 +51,11 @@ if USE_POOLING and not POOLING_AVAILABLE:
 
 # Database configuration
 DB_CONFIG = {
-    'host': os.environ.get('DB_HOST', 'aws-1-us-east-2.pooler.supabase.com'),
-    'dbname': os.environ.get('DB_NAME', 'postgres'),
-    'user': os.environ.get('DB_USER', 'postgres.wxinjyotnrqxrwqrtvkp'),
-    'password': os.environ.get('DB_PASSWORD', ''),
-    'port': os.environ.get('DB_PORT', '6543')
+    'host': os.environ.get('DB_HOST'),
+    'dbname': os.environ.get('DB_NAME'),
+    'user': os.environ.get('DB_USER'),
+    'password': os.environ.get('DB_PASSWORD'),
+    'port': os.environ.get('DB_PORT')
 }
 
 # Connection string for pooling
