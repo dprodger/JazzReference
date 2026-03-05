@@ -127,6 +127,7 @@ def research_song(song_id: str, song_name: str, force_refresh: bool = True) -> D
             dry_run=False,
             strict_mode=True,
             force_refresh=force_refresh,
+            rematch_tracks=force_refresh,
             logger=logger,
             progress_callback=progress_callback
         )
