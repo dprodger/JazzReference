@@ -153,9 +153,11 @@ Examples:
             "Cache hits": stats['cache_hits'],
             "API calls": stats['api_calls'],
         }
-        # Only show "had previous" stat if there were any (relevant for rematch modes)
+        # Only show rematch-specific stats if there were any
         if stats.get('tracks_had_previous', 0) > 0:
             summary["Tracks had previous match"] = stats['tracks_had_previous']
+        if stats.get('releases_cleared', 0) > 0:
+            summary["Stale matches cleared"] = stats['releases_cleared']
         script.print_summary(summary, title="MATCHING SUMMARY")
     else:
         script.logger.error(f"Matching failed: {result.get('error', 'Unknown error')}")

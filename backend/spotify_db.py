@@ -344,6 +344,53 @@ def update_release_spotify_data(conn, release_id: str, spotify_data: dict,
         # Note: commit is handled by the caller's context manager
 
 
+def clear_release_spotify_data(conn, release_id: str,
+                               dry_run: bool = False, log: logging.Logger = None):
+    """
+    Clear Spotify album data from a release.
+
+    Used during rematch when a previously matched release no longer passes
+    validation. Skips releases with manual overrides.
+
+    Args:
+        conn: Database connection
+        release_id: Our release ID
+        dry_run: If True, don't actually update
+        log: Logger instance
+    """
+    log = log or logger
+
+    if dry_run:
+        log.info(f"    [DRY RUN] Would clear Spotify data from release {release_id}")
+        return
+
+    # Don't clear manual overrides
+    if is_album_manual_override(conn, release_id, 'spotify'):
+        log.debug(f"    Skipping clear - manual override exists for release {release_id}")
+        return
+
+    with conn.cursor() as cur:
+        cur.execute("""
+            UPDATE releases
+            SET spotify_album_id = NULL,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = %s
+        """, (release_id,))
+
+        # Remove from streaming links table
+        cur.execute("""
+            DELETE FROM release_streaming_links
+            WHERE release_id = %s AND service = 'spotify'
+              AND (match_method != 'manual' OR match_method IS NULL)
+        """, (release_id,))
+
+        # Remove Spotify-sourced imagery
+        cur.execute("""
+            DELETE FROM release_imagery
+            WHERE release_id = %s AND source = 'Spotify'
+        """, (release_id,))
+
+
 def update_release_artwork(conn, release_id: str, album_art: dict,
                           dry_run: bool = False, log: logging.Logger = None):
     """

@@ -49,6 +49,7 @@ from spotify_db import (
     get_recordings_for_release,
     update_release_spotify_data,
     update_release_artwork,
+    clear_release_spotify_data,
     update_recording_release_track_id,
     update_recording_default_release,
     is_track_blocked,
@@ -117,6 +118,7 @@ class SpotifyMatcher:
             'releases_no_match': 0,
             'releases_skipped': 0,
             'releases_blocked': 0,  # Albums blocked via bad_streaming_matches
+            'releases_cleared': 0,  # Releases where stale Spotify data was cleared on rematch
             'tracks_matched': 0,
             'tracks_skipped': 0,
             'tracks_no_match': 0,
@@ -1227,6 +1229,9 @@ class SpotifyMatcher:
                     self.stats['releases_skipped'] += 1
                     continue
 
+                # Track whether this release had previous Spotify data (for cleanup on rematch failure)
+                had_previous_spotify = bool(release.get('spotify_album_id'))
+
                 # Search Spotify for album (with song title for track verification fallback)
                 spotify_match = self.search_spotify_album(title, artist_name, song['title'])
 
@@ -1235,6 +1240,12 @@ class SpotifyMatcher:
                     if is_album_blocked(song['id'], spotify_match['id']):
                         self.logger.info(f"[{i}/{len(releases)}] {title} ({artist_name or 'Unknown'}, {year or 'Unknown'}) - ⊘ Album blocked (in blocklist)")
                         self.stats['releases_blocked'] += 1
+                        if had_previous_spotify:
+                            with get_db_connection() as conn:
+                                clear_release_spotify_data(conn, release['id'],
+                                                          dry_run=self.dry_run, log=self.logger)
+                            self.logger.info(f"    ✓ Cleared stale Spotify data")
+                            self.stats['releases_cleared'] += 1
                         continue
                     # Check if we already know track matching fails for this combination
                     # This avoids opening a DB connection just to reach the same "no match" conclusion
@@ -1243,7 +1254,7 @@ class SpotifyMatcher:
                         self.logger.info(f"[{i}/{len(releases)}] {title} ({artist_name or 'Unknown'}, {year or 'Unknown'}) - ✗ Album matched but track not found (cached)")
                         self.stats['releases_no_match'] += 1
                         continue
-                    
+
                     # IMPORTANT: Fetch Spotify tracks BEFORE opening DB connection
                     # to avoid holding the connection idle during API calls
                     # (Supabase's PgBouncer has ~6 min idle timeout)
@@ -1278,7 +1289,7 @@ class SpotifyMatcher:
                                 i,
                                 len(releases)
                             )
-                            
+
                             # NEW: Set this as the default release for linked recordings
                             # (only if they don't already have a better default)
                             self.update_recording_default_release(
@@ -1293,9 +1304,22 @@ class SpotifyMatcher:
                             )
                             self.logger.info(f"[{i}/{len(releases)}] {title} ({artist_name or 'Unknown'}, {year or 'Unknown'}) - ✗ Album matched but track not found (possible false positive)")
                             self.stats['releases_no_match'] += 1
+                            # Clear stale Spotify data if this was a rematch
+                            if had_previous_spotify:
+                                clear_release_spotify_data(conn, release['id'],
+                                                          dry_run=self.dry_run, log=self.logger)
+                                self.logger.info(f"    ✓ Cleared stale Spotify data")
+                                self.stats['releases_cleared'] += 1
                 else:
                     self.logger.info(f"[{i}/{len(releases)}] {title} ({artist_name or 'Unknown'}, {year or 'Unknown'}) - ✗ No valid Spotify match found")
                     self.stats['releases_no_match'] += 1
+                    # Clear stale Spotify data if this was a rematch
+                    if had_previous_spotify:
+                        with get_db_connection() as conn:
+                            clear_release_spotify_data(conn, release['id'],
+                                                      dry_run=self.dry_run, log=self.logger)
+                        self.logger.info(f"    ✓ Cleared stale Spotify data")
+                        self.stats['releases_cleared'] += 1
             
             self._aggregate_client_stats()
             return {
