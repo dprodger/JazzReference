@@ -10,115 +10,7 @@
 
 import SwiftUI
 
-// MARK: - Song Recording Filter Enum
-enum SongRecordingFilter: String, CaseIterable {
-    case all = "All"
-    case playable = "Playable"
-    case withSpotify = "With Spotify"
-    case withAppleMusic = "With Apple Music"
-
-    var displayName: String {
-        rawValue
-    }
-
-    var subtitle: String {
-        switch self {
-        case .all: return "Show all recordings"
-        case .playable: return "Any streaming service available"
-        case .withSpotify: return "Recordings available on Spotify"
-        case .withAppleMusic: return "Recordings available on Apple Music"
-        }
-    }
-
-    var icon: String {
-        switch self {
-        case .all: return "music.note.list"
-        case .playable: return "play.circle"
-        case .withSpotify: return "music.note.list"
-        case .withAppleMusic: return "music.note"
-        }
-    }
-
-    var iconColor: Color {
-        switch self {
-        case .all: return JazzTheme.smokeGray
-        case .playable: return JazzTheme.burgundy
-        case .withSpotify: return StreamingService.spotify.brandColor
-        case .withAppleMusic: return StreamingService.appleMusic.brandColor
-        }
-    }
-}
-
-// MARK: - Vocal Filter Enum
-enum VocalFilter: String, CaseIterable {
-    case all = "All"
-    case instrumental = "Instrumental"
-    case vocal = "Vocal"
-
-    var displayName: String {
-        rawValue
-    }
-
-    var subtitle: String {
-        switch self {
-        case .all: return "Show all recordings"
-        case .instrumental: return "Instrumental performances only"
-        case .vocal: return "Vocal performances only"
-        }
-    }
-
-    var icon: String {
-        switch self {
-        case .all: return "music.note.list"
-        case .instrumental: return "pianokeys"
-        case .vocal: return "mic"
-        }
-    }
-
-    var iconColor: Color {
-        switch self {
-        case .all: return JazzTheme.smokeGray
-        case .instrumental: return JazzTheme.brass
-        case .vocal: return JazzTheme.burgundy
-        }
-    }
-}
-
-// MARK: - Instrument Family Enum
-enum InstrumentFamily: String, CaseIterable, Hashable {
-    case guitar = "Guitar"
-    case saxophone = "Saxophone"
-    case trumpet = "Trumpet"
-    case trombone = "Trombone"
-    case piano = "Piano"
-    case organ = "Organ"
-    case bass = "Bass"
-    case drums = "Drums"
-    case clarinet = "Clarinet"
-    case flute = "Flute"
-    case vibraphone = "Vibraphone"
-    case vocals = "Vocals"
-
-    // Map specific instruments to their family
-    static func family(for instrument: String) -> InstrumentFamily? {
-        let normalized = instrument.lowercased()
-
-        if normalized.contains("guitar") { return .guitar }
-        if normalized.contains("sax") { return .saxophone }
-        if normalized.contains("trumpet") || normalized.contains("flugelhorn") { return .trumpet }
-        if normalized.contains("trombone") { return .trombone }
-        if normalized.contains("piano") && !normalized.contains("organ") { return .piano }
-        if normalized.contains("organ") { return .organ }
-        if normalized.contains("bass") && !normalized.contains("brass") { return .bass }
-        if normalized.contains("drum") || normalized == "percussion" { return .drums }
-        if normalized.contains("clarinet") { return .clarinet }
-        if normalized.contains("flute") { return .flute }
-        if normalized.contains("vibraphone") || normalized.contains("vibes") { return .vibraphone }
-        if normalized.contains("vocal") || normalized.contains("voice") || normalized.contains("singer") { return .vocals }
-
-        return nil
-    }
-}
+// Filter enums (SongRecordingFilter, VocalFilter, InstrumentFamily) are in Shared/Support/RecordingFilters.swift
 
 // MARK: - Recordings Section
 struct RecordingsSection: View {
@@ -421,6 +313,8 @@ struct RecordingsSection: View {
             result = result.filter { $0.hasSpotifyAvailable }
         case .withAppleMusic:
             result = result.filter { $0.hasAppleMusicAvailable }
+        case .withYoutube:
+            result = result.filter { $0.hasYoutubeAvailable }
         }
         
         return result

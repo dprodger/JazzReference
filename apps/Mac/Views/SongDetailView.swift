@@ -8,114 +8,7 @@
 import SwiftUI
 
 // MARK: - Recording Filter Enum
-enum SongRecordingFilter: String, CaseIterable, Identifiable {
-    case all = "All"
-    case playable = "Playable"
-    case withSpotify = "Spotify"
-    case withAppleMusic = "Apple Music"
-
-    var id: String { rawValue }
-
-    var displayName: String { rawValue }
-
-    var icon: String {
-        switch self {
-        case .all: return "music.note.list"
-        case .playable: return "play.circle"
-        case .withSpotify: return "play.circle.fill"
-        case .withAppleMusic: return "play.circle.fill"
-        }
-    }
-
-    var iconColor: Color {
-        switch self {
-        case .all: return JazzTheme.smokeGray
-        case .playable: return JazzTheme.burgundy
-        case .withSpotify: return .green
-        case .withAppleMusic: return .pink
-        }
-    }
-}
-
-// MARK: - Instrument Family Enum
-enum InstrumentFamily: String, CaseIterable, Hashable, Identifiable {
-    case guitar = "Guitar"
-    case saxophone = "Saxophone"
-    case trumpet = "Trumpet"
-    case trombone = "Trombone"
-    case piano = "Piano"
-    case organ = "Organ"
-    case bass = "Bass"
-    case drums = "Drums"
-    case clarinet = "Clarinet"
-    case flute = "Flute"
-    case vibraphone = "Vibraphone"
-    case vocals = "Vocals"
-
-    var id: String { rawValue }
-
-    // Map specific instruments to their family
-    static func family(for instrument: String) -> InstrumentFamily? {
-        let normalized = instrument.lowercased()
-
-        if normalized.contains("guitar") { return .guitar }
-        if normalized.contains("sax") { return .saxophone }
-        if normalized.contains("trumpet") || normalized.contains("flugelhorn") { return .trumpet }
-        if normalized.contains("trombone") { return .trombone }
-        if normalized.contains("piano") && !normalized.contains("organ") { return .piano }
-        if normalized.contains("organ") { return .organ }
-        if normalized.contains("bass") && !normalized.contains("brass") { return .bass }
-        if normalized.contains("drum") || normalized == "percussion" { return .drums }
-        if normalized.contains("clarinet") { return .clarinet }
-        if normalized.contains("flute") { return .flute }
-        if normalized.contains("vibraphone") || normalized.contains("vibes") { return .vibraphone }
-        if normalized.contains("vocal") || normalized.contains("voice") || normalized.contains("singer") { return .vocals }
-
-        return nil
-    }
-
-    var icon: String {
-        switch self {
-        case .guitar: return "guitars"
-        case .saxophone: return "music.note"
-        case .trumpet: return "music.note"
-        case .trombone: return "music.note"
-        case .piano: return "pianokeys"
-        case .organ: return "pianokeys"
-        case .bass: return "music.note"
-        case .drums: return "drum"
-        case .clarinet: return "music.note"
-        case .flute: return "music.note"
-        case .vibraphone: return "music.note"
-        case .vocals: return "mic"
-        }
-    }
-}
-
-// MARK: - Vocal/Instrumental Filter
-enum VocalFilter: String, CaseIterable, Identifiable {
-    case all = "All"
-    case instrumental = "Instrumental"
-    case vocal = "Vocal"
-
-    var id: String { rawValue }
-
-    var icon: String {
-        switch self {
-        case .all: return "music.note.list"
-        case .instrumental: return "pianokeys"
-        case .vocal: return "mic"
-        }
-    }
-
-    var iconColor: Color {
-        switch self {
-        case .all: return JazzTheme.smokeGray
-        case .instrumental: return JazzTheme.brass
-        case .vocal: return JazzTheme.burgundy
-        }
-    }
-}
+// Filter enums (SongRecordingFilter, VocalFilter, InstrumentFamily) are in Shared/Support/RecordingFilters.swift
 
 struct SongDetailView: View {
     let songId: String
@@ -676,6 +569,8 @@ struct SongDetailView: View {
             result = result.filter { $0.hasSpotifyAvailable }
         case .withAppleMusic:
             result = result.filter { $0.hasAppleMusicAvailable }
+        case .withYoutube:
+            result = result.filter { $0.hasYoutubeAvailable }
         }
 
         // Apply vocal/instrumental filter

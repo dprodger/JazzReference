@@ -25,6 +25,7 @@ enum RecordingAvailabilityFilter: String, CaseIterable, Identifiable {
     case playable = "Playable"
     case spotify = "Spotify"
     case appleMusic = "Apple Music"
+    case youtube = "YouTube"
 
     var id: String { rawValue }
 
@@ -34,6 +35,7 @@ enum RecordingAvailabilityFilter: String, CaseIterable, Identifiable {
         case .playable: return "play.circle"
         case .spotify: return "play.circle.fill"
         case .appleMusic: return "play.circle.fill"
+        case .youtube: return "play.rectangle.fill"
         }
     }
 
@@ -43,6 +45,7 @@ enum RecordingAvailabilityFilter: String, CaseIterable, Identifiable {
         case .playable: return JazzTheme.burgundy
         case .spotify: return .green
         case .appleMusic: return .pink
+        case .youtube: return .red
         }
     }
 }
@@ -128,6 +131,8 @@ struct RecordingsListView: View {
             results = results.filter { $0.hasSpotifyAvailable }
         case .appleMusic:
             results = results.filter { $0.hasAppleMusicAvailable }
+        case .youtube:
+            results = results.filter { $0.hasYoutubeAvailable }
         }
 
         // Apply vocal/instrumental filter
@@ -485,6 +490,11 @@ struct RecordingRowView: View {
                 if recording.hasAppleMusicAvailable {
                     Image(systemName: "play.circle.fill")
                         .foregroundColor(.pink)
+                        .font(JazzTheme.caption())
+                }
+                if recording.hasYoutubeAvailable {
+                    Image(systemName: "play.rectangle.fill")
+                        .foregroundColor(.red)
                         .font(JazzTheme.caption())
                 }
             }

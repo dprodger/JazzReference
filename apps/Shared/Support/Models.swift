@@ -489,7 +489,7 @@ struct Recording: Codable, Identifiable {
 
     /// Whether this recording is playable on any streaming service
     var isPlayable: Bool {
-        hasSpotifyAvailable || hasAppleMusicAvailable
+        hasSpotifyAvailable || hasAppleMusicAvailable || hasYoutubeAvailable
     }
 
     /// Whether this recording is available on Spotify
@@ -505,6 +505,14 @@ struct Recording: Codable, Identifiable {
         if hasAppleMusic == true { return true }
         if appleMusicUrl != nil { return true }
         if streamingLinks?["apple_music"] != nil { return true }
+        return false
+    }
+
+    /// Whether this recording is available on YouTube
+    var hasYoutubeAvailable: Bool {
+        if hasYoutube == true { return true }
+        if youtubeUrl != nil { return true }
+        if streamingLinks?["youtube"] != nil { return true }
         return false
     }
 }
