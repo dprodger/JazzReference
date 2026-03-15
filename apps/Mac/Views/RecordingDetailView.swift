@@ -511,20 +511,12 @@ struct RecordingDetailView: View {
         return recording.bestSpotifyUrl
     }
 
-    /// Get Apple Music URL from streamingLinks or legacy field
     private func appleMusicUrl(for recording: Recording) -> String? {
-        if let link = recording.streamingLinks?["apple_music"], let url = link.bestPlaybackUrl {
-            return url
-        }
-        return recording.appleMusicUrl
+        recording.streamingLinks?["apple_music"]?.bestPlaybackUrl
     }
 
-    /// Get YouTube URL from streamingLinks or legacy field
     private func youtubeUrl(for recording: Recording) -> String? {
-        if let link = recording.streamingLinks?["youtube"], let url = link.bestPlaybackUrl {
-            return url
-        }
-        return recording.youtubeUrl
+        recording.streamingLinks?["youtube"]?.bestPlaybackUrl
     }
 
     @ViewBuilder

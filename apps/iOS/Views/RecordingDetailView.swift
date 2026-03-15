@@ -151,16 +151,10 @@ struct RecordingDetailView: View {
             }
         }
 
-        // Fall back to legacy fields if no streamingLinks
+        // Fall back to legacy Spotify URL if no streamingLinks
         if sources.isEmpty {
             if let spotifyUrl = displaySpotifyUrl {
                 sources.append((name: "Spotify", icon: "music.note.list", url: spotifyUrl, color: StreamingService.spotify.brandColor, service: .spotify))
-            }
-            if let appleMusicUrl = recording?.appleMusicUrl {
-                sources.append((name: "Apple Music", icon: "music.note", url: appleMusicUrl, color: StreamingService.appleMusic.brandColor, service: .appleMusic))
-            }
-            if let youtubeUrl = recording?.youtubeUrl {
-                sources.append((name: "YouTube", icon: "play.rectangle.fill", url: youtubeUrl, color: StreamingService.youtube.brandColor, service: .youtube))
             }
         }
 

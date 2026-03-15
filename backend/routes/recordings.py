@@ -305,8 +305,6 @@ def get_recordings():
                     {HAS_BACK_COVER_SQL},
                     {BACK_COVER_SOURCE_SQL},
                     {BACK_COVER_SOURCE_URL_SQL},
-                    r.youtube_url,
-                    r.apple_music_url,
                     r.musicbrainz_id,
                     r.is_canonical,
                     r.notes,
@@ -320,11 +318,9 @@ def get_recordings():
                            JOIN recording_release_streaming_links rrsl ON rrsl.recording_release_id = rr2.id
                            WHERE rr2.recording_id = r.id AND rrsl.service = 'apple_music'
                     ) as has_apple_music,
-                    (
-                        EXISTS(SELECT 1 FROM recording_releases rr2
-                               JOIN recording_release_streaming_links rrsl ON rrsl.recording_release_id = rr2.id
-                               WHERE rr2.recording_id = r.id AND rrsl.service = 'youtube')
-                        OR r.youtube_url IS NOT NULL
+                    EXISTS(SELECT 1 FROM recording_releases rr2
+                           JOIN recording_release_streaming_links rrsl ON rrsl.recording_release_id = rr2.id
+                           WHERE rr2.recording_id = r.id AND rrsl.service = 'youtube'
                     ) as has_youtube
                 FROM recordings r
                 JOIN songs s ON r.song_id = s.id
@@ -373,8 +369,6 @@ def get_recordings():
                     back_ri.release_id IS NOT NULL as has_back_cover,
                     back_ri.source::text as back_cover_source,
                     back_ri.source_url as back_cover_source_url,
-                    r.youtube_url,
-                    r.apple_music_url,
                     r.musicbrainz_id,
                     r.is_canonical,
                     r.notes,
@@ -388,11 +382,9 @@ def get_recordings():
                            JOIN recording_release_streaming_links rrsl ON rrsl.recording_release_id = rr2.id
                            WHERE rr2.recording_id = r.id AND rrsl.service = 'apple_music'
                     ) as has_apple_music,
-                    (
-                        EXISTS(SELECT 1 FROM recording_releases rr2
-                               JOIN recording_release_streaming_links rrsl ON rrsl.recording_release_id = rr2.id
-                               WHERE rr2.recording_id = r.id AND rrsl.service = 'youtube')
-                        OR r.youtube_url IS NOT NULL
+                    EXISTS(SELECT 1 FROM recording_releases rr2
+                           JOIN recording_release_streaming_links rrsl ON rrsl.recording_release_id = rr2.id
+                           WHERE rr2.recording_id = r.id AND rrsl.service = 'youtube'
                     ) as has_youtube
                 FROM recordings r
                 JOIN songs s ON r.song_id = s.id
@@ -468,8 +460,6 @@ def get_recording_detail(recording_id):
                     {HAS_BACK_COVER_SQL},
                     {BACK_COVER_SOURCE_SQL},
                     {BACK_COVER_SOURCE_URL_SQL},
-                    r.youtube_url,
-                    r.apple_music_url,
                     r.musicbrainz_id,
                     r.is_canonical,
                     r.notes,
@@ -655,14 +645,6 @@ def get_recording_detail(recording_id):
                 'track_url': link.get('track_url'),
                 'album_url': link.get('album_url'),
                 'preview_url': link.get('preview_url')
-            }
-
-        # Add YouTube from legacy recordings.youtube_url field
-        if recording_dict.get('youtube_url'):
-            streaming_links_dict['youtube'] = {
-                'track_url': recording_dict.get('youtube_url'),
-                'album_url': None,
-                'preview_url': None
             }
 
         # Add legacy Spotify URL if not already in streaming_links

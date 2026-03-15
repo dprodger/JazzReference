@@ -139,8 +139,6 @@ struct Recording: Codable, Identifiable {
     // Direct Spotify URL (from /recordings search endpoint)
     let spotifyUrl: String?
 
-    let youtubeUrl: String?
-    let appleMusicUrl: String?
     let musicbrainzId: String?
     let isCanonical: Bool?
     let notes: String?
@@ -207,8 +205,6 @@ struct Recording: Codable, Identifiable {
         case backCoverSourceUrl = "back_cover_source_url"
         case bestSpotifyUrlFromRelease = "best_spotify_url"
         case spotifyUrl = "spotify_url"
-        case youtubeUrl = "youtube_url"
-        case appleMusicUrl = "apple_music_url"
         case isCanonical = "is_canonical"
         case musicbrainzId = "musicbrainz_id"
         case authorityCount = "authority_count"
@@ -450,15 +446,9 @@ struct Recording: Codable, Identifiable {
                 }
             }
         }
-        // Legacy fallback to old URL fields
+        // Legacy fallback to old Spotify URL field
         if let url = bestSpotifyUrl {
             return ("spotify", url)
-        }
-        if let url = appleMusicUrl {
-            return ("apple_music", url)
-        }
-        if let url = youtubeUrl {
-            return ("youtube", url)
         }
         return nil
     }
@@ -472,15 +462,9 @@ struct Recording: Codable, Identifiable {
         if let links = streamingLinks {
             services = Array(links.keys).sorted()
         }
-        // Add legacy services if not already present
+        // Add legacy Spotify service if not already present
         if bestSpotifyUrl != nil && !services.contains("spotify") {
             services.append("spotify")
-        }
-        if appleMusicUrl != nil && !services.contains("apple_music") {
-            services.append("apple_music")
-        }
-        if youtubeUrl != nil && !services.contains("youtube") {
-            services.append("youtube")
         }
         return services
     }
@@ -503,7 +487,6 @@ struct Recording: Codable, Identifiable {
     /// Whether this recording is available on Apple Music
     var hasAppleMusicAvailable: Bool {
         if hasAppleMusic == true { return true }
-        if appleMusicUrl != nil { return true }
         if streamingLinks?["apple_music"] != nil { return true }
         return false
     }
@@ -511,7 +494,6 @@ struct Recording: Codable, Identifiable {
     /// Whether this recording is available on YouTube
     var hasYoutubeAvailable: Bool {
         if hasYoutube == true { return true }
-        if youtubeUrl != nil { return true }
         if streamingLinks?["youtube"] != nil { return true }
         return false
     }

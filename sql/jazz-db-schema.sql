@@ -79,8 +79,6 @@ CREATE TABLE recordings (
     mb_first_release_date VARCHAR(10),      -- MusicBrainz first-release-date (YYYY, YYYY-MM, or YYYY-MM-DD)
     label VARCHAR(255),
     spotify_url VARCHAR(500),
-    youtube_url VARCHAR(500),
-    apple_music_url VARCHAR(500),
     is_canonical BOOLEAN DEFAULT false,
     notes TEXT, -- Additional context about the recording
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -1065,8 +1063,7 @@ SELECT
     r.id as canonical_recording_id,
     r.album_title,
     r.recording_year,
-    r.spotify_url,
-    r.youtube_url
+    r.spotify_url
 FROM songs s
 LEFT JOIN recordings r ON s.id = r.song_id AND r.is_canonical = true;
 

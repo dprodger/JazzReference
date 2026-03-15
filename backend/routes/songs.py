@@ -270,9 +270,6 @@ def get_song_summary(song_id):
                         WHERE r2.song_id = s.id
                     ) OR EXISTS(
                         SELECT 1 FROM recordings r2
-                        WHERE r2.song_id = s.id AND r2.youtube_url IS NOT NULL
-                    ) OR EXISTS(
-                        SELECT 1 FROM recordings r2
                         JOIN recording_releases rr2 ON rr2.recording_id = r2.id
                         JOIN releases rel2 ON rr2.release_id = rel2.id
                         WHERE r2.song_id = s.id AND rel2.spotify_album_id IS NOT NULL
@@ -306,8 +303,6 @@ def get_song_summary(song_id):
                     {HAS_BACK_COVER_SQL},
                     {BACK_COVER_SOURCE_SQL},
                     {BACK_COVER_SOURCE_URL_SQL},
-                    r.youtube_url,
-                    r.apple_music_url,
                     r.musicbrainz_id,
                     r.is_canonical,
                     r.notes,
@@ -339,7 +334,6 @@ def get_song_summary(song_id):
                         EXISTS(SELECT 1 FROM recording_releases rr2
                                JOIN recording_release_streaming_links rrsl ON rrsl.recording_release_id = rr2.id
                                WHERE rr2.recording_id = r.id)
-                        OR r.youtube_url IS NOT NULL
                         OR EXISTS(SELECT 1 FROM recording_releases rr2
                                   JOIN releases rel2 ON rr2.release_id = rel2.id
                                   WHERE rr2.recording_id = r.id AND rel2.spotify_album_id IS NOT NULL)
@@ -361,8 +355,7 @@ def get_song_summary(song_id):
                 WHERE r.song_id = %s
                 GROUP BY r.id, def_rel.title, def_rel.artist_credit, r.recording_date, r.recording_year,
                          r.label, r.default_release_id,
-                         r.youtube_url, r.apple_music_url, r.musicbrainz_id,
-                         r.is_canonical, r.notes
+                         r.musicbrainz_id, r.is_canonical, r.notes
                 ORDER BY r.recording_year ASC NULLS LAST
             ),
             transcriptions_data AS (
@@ -461,8 +454,6 @@ def get_song_recordings(song_id):
                 {HAS_BACK_COVER_SQL},
                 {BACK_COVER_SOURCE_SQL},
                 {BACK_COVER_SOURCE_URL_SQL},
-                r.youtube_url,
-                r.apple_music_url,
                 r.musicbrainz_id,
                 r.is_canonical,
                 r.notes,
@@ -494,7 +485,6 @@ def get_song_recordings(song_id):
                     EXISTS(SELECT 1 FROM recording_releases rr2
                            JOIN recording_release_streaming_links rrsl ON rrsl.recording_release_id = rr2.id
                            WHERE rr2.recording_id = r.id)
-                    OR r.youtube_url IS NOT NULL
                     OR EXISTS(SELECT 1 FROM recording_releases rr2
                               JOIN releases rel2 ON rr2.release_id = rel2.id
                               WHERE rr2.recording_id = r.id AND rel2.spotify_album_id IS NOT NULL)
@@ -505,11 +495,9 @@ def get_song_recordings(song_id):
                        JOIN recording_release_streaming_links rrsl ON rrsl.recording_release_id = rr2.id
                        WHERE rr2.recording_id = r.id AND rrsl.service = 'apple_music'
                 ) as has_apple_music,
-                (
-                    EXISTS(SELECT 1 FROM recording_releases rr2
-                           JOIN recording_release_streaming_links rrsl ON rrsl.recording_release_id = rr2.id
-                           WHERE rr2.recording_id = r.id AND rrsl.service = 'youtube')
-                    OR r.youtube_url IS NOT NULL
+                EXISTS(SELECT 1 FROM recording_releases rr2
+                       JOIN recording_release_streaming_links rrsl ON rrsl.recording_release_id = rr2.id
+                       WHERE rr2.recording_id = r.id AND rrsl.service = 'youtube'
                 ) as has_youtube,
                 -- Available streaming services as array
                 COALESCE(
@@ -553,8 +541,7 @@ def get_song_recordings(song_id):
             WHERE r.song_id = %s
             GROUP BY r.id, def_rel.title, def_rel.artist_credit, r.recording_date, r.recording_year,
                      r.label, r.default_release_id,
-                     r.youtube_url, r.apple_music_url, r.musicbrainz_id,
-                     r.is_canonical, r.notes
+                     r.musicbrainz_id, r.is_canonical, r.notes
             ORDER BY {recordings_order}
         """
 
@@ -661,8 +648,6 @@ def get_song_detail(song_id):
                     {HAS_BACK_COVER_SQL},
                     {BACK_COVER_SOURCE_SQL},
                     {BACK_COVER_SOURCE_URL_SQL},
-                    r.youtube_url,
-                    r.apple_music_url,
                     r.musicbrainz_id,
                     r.is_canonical,
                     r.notes,
@@ -702,8 +687,7 @@ def get_song_detail(song_id):
                 WHERE r.song_id = %s
                 GROUP BY r.id, def_rel.title, def_rel.artist_credit, r.recording_date, r.recording_year,
                          r.label, r.default_release_id,
-                         r.youtube_url, r.apple_music_url, r.musicbrainz_id,
-                         r.is_canonical, r.notes
+                         r.musicbrainz_id, r.is_canonical, r.notes
                 ORDER BY {recordings_order}
             ),
             transcriptions_data AS (

@@ -1674,20 +1674,12 @@ struct StreamingButtons: View {
         return recording.bestSpotifyUrl
     }
 
-    /// Get Apple Music URL from streamingLinks or legacy field
     private var appleMusicUrl: String? {
-        if let link = recording.streamingLinks?["apple_music"], let url = link.bestPlaybackUrl {
-            return url
-        }
-        return recording.appleMusicUrl
+        recording.streamingLinks?["apple_music"]?.bestPlaybackUrl
     }
 
-    /// Get YouTube URL from streamingLinks or legacy field
     private var youtubeUrl: String? {
-        if let link = recording.streamingLinks?["youtube"], let url = link.bestPlaybackUrl {
-            return url
-        }
-        return recording.youtubeUrl
+        recording.streamingLinks?["youtube"]?.bestPlaybackUrl
     }
 
     var body: some View {
