@@ -942,11 +942,40 @@ def parse_streaming_url(url_or_id: str) -> dict:
     Supports:
     - Spotify URLs: https://open.spotify.com/track/xxx or spotify:track:xxx
     - Apple Music URLs: https://music.apple.com/*/song/*/xxx or just the ID
+    - YouTube URLs: https://www.youtube.com/watch?v=xxx or https://youtu.be/xxx
 
     Returns:
         dict with 'service', 'track_id', 'error' keys
     """
     url_or_id = url_or_id.strip()
+
+    # YouTube URL patterns
+    # https://www.youtube.com/watch?v=dQw4w9WgXcQ
+    # https://youtu.be/dQw4w9WgXcQ
+    # https://youtube.com/watch?v=dQw4w9WgXcQ
+    # https://m.youtube.com/watch?v=dQw4w9WgXcQ
+    youtube_url_match = re.match(
+        r'https?://(?:www\.|m\.)?youtube\.com/watch\?v=([a-zA-Z0-9_-]{11})',
+        url_or_id
+    )
+    if youtube_url_match:
+        return {'service': 'youtube', 'track_id': youtube_url_match.group(1), 'error': None}
+
+    youtube_short_match = re.match(
+        r'https?://youtu\.be/([a-zA-Z0-9_-]{11})',
+        url_or_id
+    )
+    if youtube_short_match:
+        return {'service': 'youtube', 'track_id': youtube_short_match.group(1), 'error': None}
+
+    # Detect wrong YouTube URL types (channel, playlist, etc.)
+    if re.match(r'https?://(?:www\.|m\.)?youtube\.com/(channel|playlist|c|user|@)', url_or_id):
+        url_type = re.match(r'https?://(?:www\.|m\.)?youtube\.com/(\w+)', url_or_id).group(1)
+        return {
+            'service': None,
+            'track_id': None,
+            'error': f'This is a YouTube {url_type} URL. Please provide a video URL instead (youtube.com/watch?v=...).'
+        }
 
     # Spotify URL patterns
     # https://open.spotify.com/track/4iV5W9uYEdYUVa79Axb7Rh
@@ -980,6 +1009,22 @@ def parse_streaming_url(url_or_id: str) -> dict:
     if apple_album_track_match:
         return {'service': 'apple_music', 'track_id': apple_album_track_match.group(1), 'error': None}
 
+    # Detect common mistakes: album/artist/playlist URLs instead of track URLs
+    if re.match(r'https?://open\.spotify\.com/(album|artist|playlist|episode|show)/', url_or_id):
+        url_type = re.match(r'https?://open\.spotify\.com/(\w+)/', url_or_id).group(1)
+        return {
+            'service': None,
+            'track_id': None,
+            'error': f'This is a Spotify {url_type} URL. Please provide a track URL instead (open.spotify.com/track/...).'
+        }
+
+    if re.match(r'https?://music\.apple\.com/[^/]+/album/[^/]+/\d+$', url_or_id):
+        return {
+            'service': None,
+            'track_id': None,
+            'error': 'This is an Apple Music album URL. Please provide a song URL instead (music.apple.com/.../song/...) or add ?i=TRACK_ID to the album URL.'
+        }
+
     # Check if it looks like a raw Spotify ID (22 alphanumeric chars)
     if re.match(r'^[a-zA-Z0-9]{22}$', url_or_id):
         return {'service': 'spotify', 'track_id': url_or_id, 'error': None}
@@ -991,7 +1036,7 @@ def parse_streaming_url(url_or_id: str) -> dict:
     return {
         'service': None,
         'track_id': None,
-        'error': 'Could not parse URL. Please provide a Spotify or Apple Music track URL.'
+        'error': 'Could not parse URL. Please provide a Spotify, Apple Music, or YouTube URL.'
     }
 
 
@@ -1036,6 +1081,8 @@ def add_manual_streaming_link(recording_id, release_id):
         # Build the canonical URL
         if service == 'spotify':
             track_url = f'https://open.spotify.com/track/{track_id}'
+        elif service == 'youtube':
+            track_url = f'https://www.youtube.com/watch?v={track_id}'
         else:  # apple_music
             track_url = f'https://music.apple.com/us/song/{track_id}'
 
@@ -1080,18 +1127,20 @@ def add_manual_streaming_link(recording_id, release_id):
                 logger.info(f"User {user_id} added manual {service} link for recording {recording_id} on release {release_id}: {track_id}")
 
                 # Fetch and save album artwork from the streaming service
+                # (YouTube doesn't provide album artwork)
                 artwork_added = False
-                try:
-                    artwork = fetch_artwork_for_track(service, track_id)
-                    if artwork:
-                        artwork_added = save_artwork_to_release(conn, release_id, artwork, service, track_id)
-                        if artwork_added:
-                            logger.info(f"  Also added {service} artwork for release {release_id}")
+                if service in ('spotify', 'apple_music'):
+                    try:
+                        artwork = fetch_artwork_for_track(service, track_id)
+                        if artwork:
+                            artwork_added = save_artwork_to_release(conn, release_id, artwork, service, track_id)
+                            if artwork_added:
+                                logger.info(f"  Also added {service} artwork for release {release_id}")
+                            conn.commit()
+                    except Exception as art_err:
+                        logger.warning(f"Failed to fetch/save artwork: {art_err}")
+                        # Don't fail the whole request if artwork fails
                         conn.commit()
-                except Exception as art_err:
-                    logger.warning(f"Failed to fetch/save artwork: {art_err}")
-                    # Don't fail the whole request if artwork fails
-                    conn.commit()
 
                 return jsonify({
                     'success': True,
@@ -1121,8 +1170,8 @@ def delete_manual_streaming_link(recording_id, release_id, service):
     try:
         user_id = g.current_user['id']
 
-        if service not in ('spotify', 'apple_music'):
-            return jsonify({'error': 'Invalid service. Must be spotify or apple_music'}), 400
+        if service not in ('spotify', 'apple_music', 'youtube'):
+            return jsonify({'error': 'Invalid service. Must be spotify, apple_music, or youtube'}), 400
 
         with db_tools.get_db_connection() as conn:
             with conn.cursor() as cur:

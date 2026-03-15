@@ -2,7 +2,7 @@
 //  MacAddStreamingLinkSheet.swift
 //  JazzReferenceMac
 //
-//  Sheet for adding manual Spotify/Apple Music streaming links
+//  Sheet for adding manual Spotify/Apple Music/YouTube streaming links
 //
 
 import SwiftUI
@@ -93,7 +93,7 @@ struct MacAddStreamingLinkSheet: View {
 
     private var instructionsView: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Paste a Spotify or Apple Music track URL")
+            Text("Paste a streaming service URL")
                 .font(JazzTheme.headline())
                 .foregroundColor(JazzTheme.charcoal)
 
@@ -112,6 +112,15 @@ struct MacAddStreamingLinkSheet: View {
                         .foregroundColor(.green)
                         .font(.caption)
                     Text("Apple Music: https://music.apple.com/.../song/...")
+                        .font(JazzTheme.caption())
+                        .foregroundColor(JazzTheme.smokeGray)
+                }
+
+                HStack(spacing: 8) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundColor(.green)
+                        .font(.caption)
+                    Text("YouTube: https://youtube.com/watch?v=...")
                         .font(JazzTheme.caption())
                         .foregroundColor(JazzTheme.smokeGray)
                 }
@@ -168,43 +177,90 @@ struct MacAddStreamingLinkSheet: View {
 
     @ViewBuilder
     private var serviceIndicator: some View {
-        let service = detectService(from: urlInput)
+        let detection = detectService(from: urlInput)
         HStack(spacing: 6) {
-            if let service = service {
-                Image(systemName: service == "spotify" ? "checkmark.circle.fill" : "checkmark.circle.fill")
+            switch detection {
+            case .valid(let service):
+                Image(systemName: "checkmark.circle.fill")
                     .foregroundColor(.green)
-                Text("Detected: \(service == "spotify" ? "Spotify" : "Apple Music")")
+                Text("Detected: \(serviceName(for: service))")
                     .font(JazzTheme.caption())
                     .foregroundColor(.green)
-            } else if urlInput.count > 5 {
-                Image(systemName: "questionmark.circle")
+            case .wrongType(let message):
+                Image(systemName: "exclamationmark.triangle.fill")
                     .foregroundColor(.orange)
-                Text("Could not detect service - will validate on save")
+                Text(message)
                     .font(JazzTheme.caption())
                     .foregroundColor(.orange)
+            case .unknown:
+                if urlInput.count > 5 {
+                    Image(systemName: "questionmark.circle")
+                        .foregroundColor(.orange)
+                    Text("Could not detect service - will validate on save")
+                        .font(JazzTheme.caption())
+                        .foregroundColor(.orange)
+                }
             }
         }
     }
 
+    private func serviceName(for service: String) -> String {
+        switch service {
+        case "spotify": return "Spotify"
+        case "apple_music": return "Apple Music"
+        case "youtube": return "YouTube"
+        default: return service
+        }
+    }
+
+    private enum ServiceDetection {
+        case valid(String)
+        case wrongType(String)  // e.g. "This is a Spotify album URL..."
+        case unknown
+    }
+
     /// Simple client-side service detection for UI feedback
-    private func detectService(from input: String) -> String? {
+    private func detectService(from input: String) -> ServiceDetection {
         let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.contains("spotify.com/track/") || trimmed.hasPrefix("spotify:track:") {
-            return "spotify"
+            return .valid("spotify")
+        }
+        // YouTube URL detection
+        if trimmed.contains("youtube.com/watch?v=") || trimmed.contains("youtu.be/") {
+            return .valid("youtube")
+        }
+        // Detect wrong YouTube URL types
+        if trimmed.contains("youtube.com/channel/") || trimmed.contains("youtube.com/playlist")
+            || trimmed.contains("youtube.com/@") || trimmed.contains("youtube.com/c/") {
+            return .wrongType("This is a YouTube channel/playlist URL. Please use a video URL instead.")
+        }
+        // Detect wrong Spotify URL types
+        let spotifyTypes = ["album", "artist", "playlist", "episode", "show"]
+        for type in spotifyTypes {
+            if trimmed.contains("spotify.com/\(type)/") {
+                return .wrongType("This is a Spotify \(type) URL. Please use a track URL instead.")
+            }
         }
         if trimmed.contains("music.apple.com") {
-            return "apple_music"
+            // Check for song URL (valid) vs album-only URL (wrong type)
+            if trimmed.contains("/song/") || trimmed.contains("?i=") {
+                return .valid("apple_music")
+            }
+            if trimmed.contains("/album/") {
+                return .wrongType("This is an Apple Music album URL. Please use a song URL instead.")
+            }
+            return .valid("apple_music")
         }
         // Check for raw IDs
         let alphanumericPattern = try? NSRegularExpression(pattern: "^[a-zA-Z0-9]{22}$")
         if alphanumericPattern?.firstMatch(in: trimmed, range: NSRange(trimmed.startIndex..., in: trimmed)) != nil {
-            return "spotify"
+            return .valid("spotify")
         }
         let numericPattern = try? NSRegularExpression(pattern: "^\\d{9,12}$")
         if numericPattern?.firstMatch(in: trimmed, range: NSRange(trimmed.startIndex..., in: trimmed)) != nil {
-            return "apple_music"
+            return .valid("apple_music")
         }
-        return nil
+        return .unknown
     }
 
     // MARK: - Messages
@@ -299,8 +355,8 @@ struct MacAddStreamingLinkSheet: View {
 
             if let response = response {
                 if response.success {
-                    let serviceName = response.service == "spotify" ? "Spotify" : "Apple Music"
-                    successMessage = "\(serviceName) link added successfully!"
+                    let name = serviceName(for: response.service)
+                    successMessage = "\(name) link added successfully!"
 
                     // Dismiss after a short delay
                     DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
