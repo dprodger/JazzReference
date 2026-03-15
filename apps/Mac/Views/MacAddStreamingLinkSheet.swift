@@ -355,7 +355,7 @@ struct MacAddStreamingLinkSheet: View {
 
             if let response = response {
                 if response.success {
-                    let name = serviceName(for: response.service)
+                    let name = serviceName(for: response.service ?? "unknown")
                     successMessage = "\(name) link added successfully!"
 
                     // Dismiss after a short delay
