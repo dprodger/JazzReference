@@ -371,11 +371,11 @@ class SpotifyMatcher:
     def update_recording_release_track_id(self, conn, recording_id: str, release_id: str,
                                           track_id: str, track_url: str,
                                           disc_number: int = None, track_number: int = None,
-                                          track_title: str = None):
+                                          track_title: str = None, duration_ms: int = None):
         """Update the recording_releases junction table with Spotify track info"""
         update_recording_release_track_id(conn, recording_id, release_id, track_id, track_url,
                                          disc_number=disc_number, track_number=track_number,
-                                         track_title=track_title,
+                                         track_title=track_title, duration_ms=duration_ms,
                                          dry_run=self.dry_run, log=self.logger)
     
     def update_recording_default_release(self, conn, song_id: str, release_id: str):
@@ -613,7 +613,8 @@ class SpotifyMatcher:
                         'name': item['name'],
                         'track_number': item['track_number'],
                         'disc_number': item['disc_number'],
-                        'url': item['external_urls']['spotify']
+                        'url': item['external_urls']['spotify'],
+                        'duration_ms': item.get('duration_ms'),
                     })
 
                 # Get next page URL (None if no more pages)
@@ -1504,7 +1505,8 @@ class SpotifyMatcher:
                     matched_track['url'],
                     disc_number=matched_track.get('disc_number'),
                     track_number=matched_track.get('track_number'),
-                    track_title=matched_track.get('name')
+                    track_title=matched_track.get('name'),
+                    duration_ms=matched_track.get('duration_ms'),
                 )
                 self.stats['tracks_matched'] += 1
                 any_matched = True
