@@ -649,7 +649,8 @@ class MBReleaseImporter:
             recording_id = self._create_recording(
                 conn, song_id, mb_recording_id, date_info,
                 source_mb_work_id=source_mb_work_id,
-                title=mb_recording.get('title')
+                title=mb_recording.get('title'),
+                duration_ms=mb_recording.get('length')
             )
             if recording_id:
                 # Add to cache for future reference
@@ -717,7 +718,8 @@ class MBReleaseImporter:
     def _create_recording(self, conn, song_id: str, mb_recording_id: str,
                            date_info: Dict[str, Any],
                            source_mb_work_id: Optional[str] = None,
-                           title: Optional[str] = None) -> Optional[str]:
+                           title: Optional[str] = None,
+                           duration_ms: Optional[int] = None) -> Optional[str]:
         """
         Create a new recording in the database.
 
@@ -733,6 +735,7 @@ class MBReleaseImporter:
                 - mb_first_release_date: Raw MB first-release-date
             source_mb_work_id: MusicBrainz work ID this recording was imported from
             title: MusicBrainz recording title (may differ from song title)
+            duration_ms: Recording duration in milliseconds (from MusicBrainz 'length' field)
 
         Returns:
             Recording ID if created, None otherwise
@@ -750,9 +753,9 @@ class MBReleaseImporter:
                 INSERT INTO recordings (
                     song_id, recording_year, recording_date,
                     recording_date_source, recording_date_precision, mb_first_release_date,
-                    is_canonical, musicbrainz_id, source_mb_work_id, title
+                    is_canonical, musicbrainz_id, source_mb_work_id, title, duration_ms
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING id
             """, (
                 song_id,
@@ -764,7 +767,8 @@ class MBReleaseImporter:
                 False,
                 mb_recording_id,
                 source_mb_work_id,
-                title
+                title,
+                duration_ms
             ))
 
             recording_id = cur.fetchone()['id']

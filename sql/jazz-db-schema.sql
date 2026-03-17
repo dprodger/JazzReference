@@ -90,7 +90,8 @@ CREATE TABLE recordings (
     spotify_track_id VARCHAR(100),
     album_art_small VARCHAR(500),
     album_art_medium VARCHAR(500),
-    album_art_large VARCHAR(500)
+    album_art_large VARCHAR(500),
+    duration_ms INTEGER
 );
 
 -- Recording performers (junction table with instrument role)
