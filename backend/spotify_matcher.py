@@ -213,6 +213,49 @@ class SpotifyMatcher:
         except Exception as e:
             self.logger.warning(f"    Failed to cache track match failure: {e}")
 
+    def _log_duration_rejection(self, song_title: str, recording_id: str,
+                                release_id: str, spotify_track_id: str,
+                                spotify_track_name: str, expected_ms: int,
+                                actual_ms: int, confidence: float, title_score: float):
+        """
+        Log a track rejected due to low duration confidence.
+        Appends to a CSV file for post-run verification.
+        """
+        from datetime import datetime
+        from pathlib import Path
+        import csv
+
+        log_file = Path('spotify_duration_rejections.csv')
+        file_exists = log_file.exists()
+
+        try:
+            with open(log_file, 'a', newline='') as f:
+                writer = csv.writer(f)
+                if not file_exists:
+                    writer.writerow([
+                        'timestamp', 'song_title', 'recording_id', 'release_id',
+                        'spotify_track_id', 'spotify_track_name', 'spotify_url',
+                        'mb_duration_sec', 'spotify_duration_sec', 'diff_sec',
+                        'confidence', 'title_score'
+                    ])
+                diff_sec = abs(expected_ms - actual_ms) / 1000.0
+                writer.writerow([
+                    datetime.now().isoformat(),
+                    song_title,
+                    str(recording_id),
+                    str(release_id),
+                    spotify_track_id,
+                    spotify_track_name,
+                    f'https://open.spotify.com/track/{spotify_track_id}',
+                    round(expected_ms / 1000.0, 1),
+                    round(actual_ms / 1000.0, 1),
+                    round(diff_sec, 1),
+                    confidence,
+                    title_score
+                ])
+        except Exception as e:
+            self.logger.warning(f"    Failed to log duration rejection: {e}")
+
     def _log_orphaned_track(self, release_id: str, recording_id: str, spotify_track_url: str):
         """
         Log details of a track that had a previous Spotify match but failed rematch.
@@ -371,11 +414,13 @@ class SpotifyMatcher:
     def update_recording_release_track_id(self, conn, recording_id: str, release_id: str,
                                           track_id: str, track_url: str,
                                           disc_number: int = None, track_number: int = None,
-                                          track_title: str = None, duration_ms: int = None):
+                                          track_title: str = None, duration_ms: int = None,
+                                          match_confidence: float = None):
         """Update the recording_releases junction table with Spotify track info"""
         update_recording_release_track_id(conn, recording_id, release_id, track_id, track_url,
                                          disc_number=disc_number, track_number=track_number,
                                          track_title=track_title, duration_ms=duration_ms,
+                                         match_confidence=match_confidence,
                                          dry_run=self.dry_run, log=self.logger)
     
     def update_recording_default_release(self, conn, song_id: str, release_id: str):
@@ -1338,10 +1383,56 @@ class SpotifyMatcher:
                 'stats': self.stats
             }
     
+    def _duration_confidence(self, expected_ms: int, actual_ms: int) -> float:
+        """
+        Calculate a confidence score (0.0-1.0) based on duration difference.
+
+        Thresholds:
+          < 5s:      1.0  (perfect - encoding/rounding difference)
+          5-30s:     0.9  (remaster or slight edit)
+          30s-2min:  0.7  (different edit/version, worth flagging)
+          2-5min:    0.4  (likely wrong performance)
+          > 5min:    0.2  (almost certainly wrong)
+        """
+        diff = abs(expected_ms - actual_ms)
+        if diff <= 5000:
+            return 1.0
+        elif diff <= 30000:
+            return 0.9
+        elif diff <= 120000:
+            return 0.7
+        elif diff <= 300000:
+            return 0.4
+        else:
+            return 0.2
+
+    def _duration_adjusted_score(self, title_score: float, expected_ms: int,
+                                  track_duration_ms: int) -> float:
+        """
+        Adjust a title similarity score using duration proximity.
+
+        Duration acts as a soft tie-breaker: when two tracks have similar title
+        scores, the one with closer duration wins. The adjustment is small enough
+        (+/- up to 5 points) that a clearly better title match still wins, but
+        large enough to break ties between identical titles (e.g., Take 1 vs Take 2,
+        live vs studio).
+
+        If expected duration is unknown, returns the title score unchanged.
+        """
+        if expected_ms is None or track_duration_ms is None:
+            return title_score
+
+        confidence = self._duration_confidence(expected_ms, track_duration_ms)
+        # Map confidence (0.2-1.0) to adjustment (-4 to +5 points)
+        # 1.0 → +5, 0.9 → +3.75, 0.7 → +1.25, 0.4 → -2.5, 0.2 → -5
+        adjustment = (confidence - 0.5) * 10
+        return title_score + adjustment
+
     def match_track_to_recording(self, song_title: str, spotify_tracks: List[dict],
                                    expected_disc: int = None, expected_track: int = None,
                                    alt_titles: List[str] = None,
-                                   song_id: str = None, conn=None) -> Optional[dict]:
+                                   song_id: str = None, conn=None,
+                                   expected_duration_ms: int = None) -> Optional[dict]:
         """
         Find the best matching Spotify track for a song title
 
@@ -1355,6 +1446,9 @@ class SpotifyMatcher:
             conn: Optional existing database connection. If provided, uses it
                   instead of opening a new connection (avoids idle connection
                   timeout issues when called from within a transaction).
+            expected_duration_ms: MusicBrainz recording duration in ms (optional).
+                  Used as a soft signal to prefer tracks with closer duration
+                  and to reject marginal title matches with extreme duration mismatch.
 
         Returns:
             Best matching track dict or None if no good match
@@ -1370,7 +1464,7 @@ class SpotifyMatcher:
             if blocked_track_ids:
                 self.logger.debug(f"      Found {len(blocked_track_ids)} blocked track(s) for this song")
 
-        # First pass: standard fuzzy matching with primary title
+        # First pass: standard fuzzy matching with primary title, duration-adjusted
         for track in spotify_tracks:
             # Check if this track is blocked for this song
             if track['id'] in blocked_track_ids:
@@ -1378,14 +1472,22 @@ class SpotifyMatcher:
                 self.stats['tracks_blocked'] += 1
                 continue
 
-            score = self.calculate_similarity(song_title, track['name'])
+            title_score = self.calculate_similarity(song_title, track['name'])
 
-            if score > best_score and score >= self.min_track_similarity:
-                best_score = score
-                best_match = track
+            if title_score >= self.min_track_similarity:
+                adjusted_score = self._duration_adjusted_score(
+                    title_score, expected_duration_ms, track.get('duration_ms'))
+
+                if adjusted_score > best_score:
+                    best_score = adjusted_score
+                    best_match = track
 
         if best_match:
-            self.logger.debug(f"      Track match: '{song_title}' → '{best_match['name']}' ({best_score}%)")
+            duration_info = ""
+            if expected_duration_ms and best_match.get('duration_ms'):
+                diff = abs(expected_duration_ms - best_match['duration_ms']) / 1000
+                duration_info = f", duration diff {diff:.0f}s"
+            self.logger.debug(f"      Track match: '{song_title}' → '{best_match['name']}' ({best_score:.0f}%{duration_info})")
             return best_match
 
         # Second pass: try alternative titles
@@ -1396,14 +1498,22 @@ class SpotifyMatcher:
                     if track['id'] in blocked_track_ids:
                         continue
 
-                    score = self.calculate_similarity(alt_title, track['name'])
+                    title_score = self.calculate_similarity(alt_title, track['name'])
 
-                    if score > best_score and score >= self.min_track_similarity:
-                        best_score = score
-                        best_match = track
+                    if title_score >= self.min_track_similarity:
+                        adjusted_score = self._duration_adjusted_score(
+                            title_score, expected_duration_ms, track.get('duration_ms'))
+
+                        if adjusted_score > best_score:
+                            best_score = adjusted_score
+                            best_match = track
 
                 if best_match:
-                    self.logger.debug(f"      Track match via alt title: '{alt_title}' → '{best_match['name']}' ({best_score}%)")
+                    duration_info = ""
+                    if expected_duration_ms and best_match.get('duration_ms'):
+                        diff = abs(expected_duration_ms - best_match['duration_ms']) / 1000
+                        duration_info = f", duration diff {diff:.0f}s"
+                    self.logger.debug(f"      Track match via alt title: '{alt_title}' → '{best_match['name']}' ({best_score:.0f}%{duration_info})")
                     return best_match
 
         # Fallback: if positions provided and no fuzzy match, try position-based substring match
@@ -1486,6 +1596,7 @@ class SpotifyMatcher:
             
             # Match song title to a track, passing position info for fallback matching
             # Pass conn to avoid nested connections and idle timeout issues
+            recording_duration_ms = recording.get('recording_duration_ms')
             matched_track = self.match_track_to_recording(
                 song_title,
                 spotify_tracks,
@@ -1493,10 +1604,38 @@ class SpotifyMatcher:
                 expected_track=recording.get('track_number'),
                 alt_titles=alt_titles,
                 song_id=song_id,
-                conn=conn
+                conn=conn,
+                expected_duration_ms=recording_duration_ms
             )
-            
+
             if matched_track:
+                # Calculate match confidence from duration proximity
+                confidence = None
+                if recording_duration_ms and matched_track.get('duration_ms'):
+                    confidence = self._duration_confidence(
+                        recording_duration_ms, matched_track['duration_ms'])
+
+                # Hard reject and log if confidence is too low
+                if confidence is not None and confidence <= 0.4:
+                    title_score = self.calculate_similarity(song_title, matched_track['name'])
+                    duration_diff = abs(recording_duration_ms - matched_track['duration_ms'])
+                    self.logger.info(
+                        f"      Rejecting low-confidence match: '{song_title}' → '{matched_track['name']}' "
+                        f"(title {title_score}%, duration diff {duration_diff/1000:.0f}s, confidence {confidence})")
+                    self._log_duration_rejection(
+                        song_title=song_title,
+                        recording_id=recording['recording_id'],
+                        release_id=release_id,
+                        spotify_track_id=matched_track['id'],
+                        spotify_track_name=matched_track['name'],
+                        expected_ms=recording_duration_ms,
+                        actual_ms=matched_track['duration_ms'],
+                        confidence=confidence,
+                        title_score=title_score,
+                    )
+                    self.stats['tracks_no_match'] += 1
+                    continue
+
                 self.update_recording_release_track_id(
                     conn,
                     recording['recording_id'],
@@ -1507,6 +1646,7 @@ class SpotifyMatcher:
                     track_number=matched_track.get('track_number'),
                     track_title=matched_track.get('name'),
                     duration_ms=matched_track.get('duration_ms'),
+                    match_confidence=confidence,
                 )
                 self.stats['tracks_matched'] += 1
                 any_matched = True

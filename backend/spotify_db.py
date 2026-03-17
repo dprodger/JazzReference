@@ -259,7 +259,8 @@ def get_recordings_for_release(song_id: str, release_id: str, conn=None) -> List
                     s.title as song_title,
                     rr.disc_number,
                     rr.track_number,
-                    rrsl.service_id as spotify_track_id
+                    rrsl.service_id as spotify_track_id,
+                    rec.duration_ms as recording_duration_ms
                 FROM recording_releases rr
                 JOIN recordings rec ON rr.recording_id = rec.id
                 JOIN songs s ON rec.song_id = s.id
@@ -530,6 +531,7 @@ def update_recording_release_track_id(conn, recording_id: str, release_id: str,
                                       track_id: str, track_url: str = None,
                                       disc_number: int = None, track_number: int = None,
                                       track_title: str = None, duration_ms: int = None,
+                                      match_confidence: float = None,
                                       dry_run: bool = False, log: logging.Logger = None):
     """
     Update recording_releases with Spotify track info and insert into streaming links table.
@@ -587,20 +589,21 @@ def update_recording_release_track_id(conn, recording_id: str, release_id: str,
         cur.execute("""
             INSERT INTO recording_release_streaming_links (
                 recording_release_id, service, service_id, service_url,
-                duration_ms, match_method, matched_at
+                duration_ms, match_confidence, match_method, matched_at
             )
-            VALUES (%s, 'spotify', %s, %s, %s, 'fuzzy_search', CURRENT_TIMESTAMP)
+            VALUES (%s, 'spotify', %s, %s, %s, %s, 'fuzzy_search', CURRENT_TIMESTAMP)
             ON CONFLICT (recording_release_id, service)
             DO UPDATE SET
                 service_id = EXCLUDED.service_id,
                 service_url = EXCLUDED.service_url,
                 duration_ms = EXCLUDED.duration_ms,
+                match_confidence = EXCLUDED.match_confidence,
                 match_method = EXCLUDED.match_method,
                 matched_at = CURRENT_TIMESTAMP,
                 updated_at = CURRENT_TIMESTAMP
             WHERE recording_release_streaming_links.match_method != 'manual'
                OR recording_release_streaming_links.match_method IS NULL
-        """, (recording_release_id, track_id, service_url, duration_ms))
+        """, (recording_release_id, track_id, service_url, duration_ms, match_confidence))
         # Note: commit is handled by the caller's context manager
 
 
