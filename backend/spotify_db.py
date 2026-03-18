@@ -214,6 +214,77 @@ def get_releases_for_song(song_id: str, artist_filter: str = None) -> List[dict]
             return cur.fetchall()
 
 
+def get_releases_with_duration_mismatches(song_id: str, threshold_ms: int = 60000,
+                                          artist_filter: str = None) -> List[dict]:
+    """
+    Get releases for a song where at least one Spotify streaming link has a
+    duration mismatch greater than the given threshold.
+
+    Returns the same shape as get_releases_for_song() so it can be used as a
+    drop-in replacement.
+    """
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            query = """
+                SELECT
+                    rel.id,
+                    rel.title,
+                    rel.artist_credit,
+                    rel.release_year,
+                    CASE WHEN rel.spotify_album_id IS NOT NULL
+                         THEN 'https://open.spotify.com/album/' || rel.spotify_album_id END as spotify_album_url,
+                    rel.spotify_album_id,
+                    (SELECT json_agg(
+                        json_build_object(
+                            'name', p.name,
+                            'role', rp.role,
+                            'instrument', i.name
+                        ) ORDER BY
+                            CASE rp.role
+                                WHEN 'leader' THEN 1
+                                WHEN 'sideman' THEN 2
+                                ELSE 3
+                            END,
+                            p.name
+                    )
+                    FROM recording_performers rp
+                    JOIN performers p ON rp.performer_id = p.id
+                    LEFT JOIN instruments i ON rp.instrument_id = i.id
+                    WHERE rp.recording_id = rr.recording_id
+                    ) as performers
+                FROM releases rel
+                JOIN recording_releases rr ON rel.id = rr.release_id
+                JOIN recordings rec ON rr.recording_id = rec.id
+                JOIN recording_release_streaming_links rrsl
+                    ON rrsl.recording_release_id = rr.id AND rrsl.service = 'spotify'
+                WHERE rec.song_id = %s
+                  AND rec.duration_ms IS NOT NULL
+                  AND rrsl.duration_ms IS NOT NULL
+                  AND ABS(rec.duration_ms - rrsl.duration_ms) > %s
+            """
+
+            params = [song_id, threshold_ms]
+            if artist_filter:
+                query += """
+                    AND EXISTS (
+                        SELECT 1
+                        FROM recording_performers rp2
+                        JOIN performers p2 ON rp2.performer_id = p2.id
+                        WHERE rp2.recording_id = rec.id
+                        AND LOWER(p2.name) = LOWER(%s)
+                    )
+                """
+                params.append(artist_filter)
+
+            query += """
+                GROUP BY rel.id, rel.title, rel.artist_credit, rel.release_year, rel.spotify_album_id, rr.recording_id
+                ORDER BY rel.release_year
+            """
+
+            cur.execute(query, params)
+            return cur.fetchall()
+
+
 def get_releases_without_artwork() -> List[dict]:
     """Get releases with Spotify ID but no Spotify artwork in release_imagery"""
     with get_db_connection() as conn:
@@ -605,6 +676,40 @@ def update_recording_release_track_id(conn, recording_id: str, release_id: str,
                OR recording_release_streaming_links.match_method IS NULL
         """, (recording_release_id, track_id, service_url, duration_ms, match_confidence))
         # Note: commit is handled by the caller's context manager
+
+
+def clear_recording_release_track(conn, recording_id: str, release_id: str,
+                                  dry_run: bool = False, log: logging.Logger = None):
+    """
+    Remove a Spotify streaming link from a recording-release pair.
+
+    Used during rematch when a track is rejected (e.g., duration mismatch)
+    or no longer matches. Skips manual overrides.
+    """
+    log = log or logger
+
+    if dry_run:
+        log.debug(f"      [DRY RUN] Would clear Spotify track link for recording {recording_id}, release {release_id}")
+        return
+
+    with conn.cursor() as cur:
+        cur.execute("""
+            SELECT id FROM recording_releases
+            WHERE recording_id = %s AND release_id = %s
+        """, (recording_id, release_id))
+        row = cur.fetchone()
+        if not row:
+            return
+        recording_release_id = row['id']
+
+        cur.execute("""
+            DELETE FROM recording_release_streaming_links
+            WHERE recording_release_id = %s AND service = 'spotify'
+              AND (match_method != 'manual' OR match_method IS NULL)
+        """, (recording_release_id,))
+
+        if cur.rowcount > 0:
+            log.debug(f"      Cleared stale Spotify track link for recording {recording_id}")
 
 
 def update_recording_default_release(conn, song_id: str, release_id: str,

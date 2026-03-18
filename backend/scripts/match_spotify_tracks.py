@@ -85,6 +85,16 @@ Examples:
     )
 
     script.parser.add_argument(
+        '--duration-mismatches',
+        type=int,
+        nargs='?',
+        const=60,
+        default=None,
+        metavar='SECONDS',
+        help='Only process releases with duration mismatches above this threshold (default: 60s). Implies --rematch-all.'
+    )
+
+    script.parser.add_argument(
         '--start-from',
         type=int,
         default=1,
@@ -98,8 +108,13 @@ Examples:
     # Create matcher
     strict_mode = not args.no_strict
 
-    # --rematch-all implies force_refresh, rematch, and rematch_tracks
-    force_refresh = args.force_refresh or args.rematch_all
+    # Convert duration-mismatches from seconds to milliseconds
+    duration_mismatch_threshold = None
+    if args.duration_mismatches is not None:
+        duration_mismatch_threshold = args.duration_mismatches * 1000
+
+    # --rematch-all and --duration-mismatches imply force_refresh, rematch, and rematch_tracks
+    force_refresh = args.force_refresh or args.rematch_all or duration_mismatch_threshold is not None
     rematch = args.rematch_all
     rematch_tracks = args.rematch_tracks or args.rematch_all
     rematch_all = args.rematch_all
@@ -113,15 +128,17 @@ Examples:
         force_refresh=force_refresh,
         rematch=rematch,
         rematch_tracks=rematch_tracks,
-        rematch_all=rematch_all
+        rematch_all=rematch_all,
+        duration_mismatch_threshold=duration_mismatch_threshold
     )
 
     # Print header with modes
     modes = {
         "DRY RUN": args.dry_run,
         "FORCE REFRESH": force_refresh,
-        "REMATCH ALL": args.rematch_all,
-        "REMATCH TRACKS": rematch_tracks and not args.rematch_all,
+        "REMATCH ALL": args.rematch_all or duration_mismatch_threshold is not None,
+        "REMATCH TRACKS": rematch_tracks and not args.rematch_all and duration_mismatch_threshold is None,
+        f"DURATION MISMATCHES (>{args.duration_mismatches}s)": duration_mismatch_threshold is not None,
         f"START FROM #{args.start_from}": args.start_from > 1,
     }
     script.print_header(modes)

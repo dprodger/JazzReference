@@ -45,11 +45,13 @@ from spotify_db import (
     find_song_by_id,
     get_recordings_for_song,
     get_releases_for_song,
+    get_releases_with_duration_mismatches,
     get_releases_without_artwork,
     get_recordings_for_release,
     update_release_spotify_data,
     update_release_artwork,
     clear_release_spotify_data,
+    clear_recording_release_track,
     update_recording_release_track_id,
     update_recording_default_release,
     is_track_blocked,
@@ -68,7 +70,7 @@ class SpotifyMatcher:
                  artist_filter=False, cache_days=30, logger=None,
                  rate_limit_delay=0.2, max_retries=3,
                  progress_callback=None, rematch=False, rematch_tracks=False,
-                 rematch_all=False):
+                 rematch_all=False, duration_mismatch_threshold=None):
         """
         Initialize Spotify Matcher
 
@@ -85,10 +87,18 @@ class SpotifyMatcher:
             rematch: If True, re-evaluate releases that already have Spotify URLs
             rematch_tracks: If True, re-run track matching for releases with album IDs
             rematch_all: If True, full re-match from scratch - ignores existing track IDs too
+            duration_mismatch_threshold: If set (in ms), only process releases with
+                duration mismatches above this threshold. Implies rematch-all behavior.
         """
         self.dry_run = dry_run
         self.artist_filter = artist_filter
         self.strict_mode = strict_mode
+        self.duration_mismatch_threshold = duration_mismatch_threshold
+        # duration-mismatches mode implies full rematch
+        if duration_mismatch_threshold is not None:
+            rematch = True
+            rematch_tracks = True
+            rematch_all = True
         self.rematch = rematch
         self.rematch_tracks = rematch_tracks
         self.rematch_all = rematch_all
@@ -1176,7 +1186,11 @@ class SpotifyMatcher:
             self.logger.info("")
             
             # Get releases
-            releases = self.get_releases_for_song(song['id'])
+            if self.duration_mismatch_threshold is not None:
+                releases = get_releases_with_duration_mismatches(
+                    song['id'], self.duration_mismatch_threshold, self.artist_filter)
+            else:
+                releases = self.get_releases_for_song(song['id'])
             
             if not releases:
                 return {
@@ -1359,13 +1373,21 @@ class SpotifyMatcher:
                 else:
                     self.logger.info(f"[{i}/{len(releases)}] {title} ({artist_name or 'Unknown'}, {year or 'Unknown'}) - ✗ No valid Spotify match found")
                     self.stats['releases_no_match'] += 1
-                    # Clear stale Spotify data if this was a rematch
-                    if had_previous_spotify:
+                    # Clear stale data if this was a rematch or duration-mismatches mode
+                    if had_previous_spotify or self.duration_mismatch_threshold is not None:
                         with get_db_connection() as conn:
-                            clear_release_spotify_data(conn, release['id'],
-                                                      dry_run=self.dry_run, log=self.logger)
-                        self.logger.info(f"    ✓ Cleared stale Spotify data")
-                        self.stats['releases_cleared'] += 1
+                            if had_previous_spotify:
+                                clear_release_spotify_data(conn, release['id'],
+                                                          dry_run=self.dry_run, log=self.logger)
+                                self.logger.info(f"    ✓ Cleared stale Spotify data")
+                                self.stats['releases_cleared'] += 1
+                            # Also clear track-level links (may exist even if release-level was already cleared)
+                            recordings = self.get_recordings_for_release(song['id'], release['id'], conn=conn)
+                            for recording in recordings:
+                                if recording.get('spotify_track_id'):
+                                    clear_recording_release_track(
+                                        conn, recording['recording_id'], release['id'],
+                                        dry_run=self.dry_run, log=self.logger)
             
             self._aggregate_client_stats()
             return {
@@ -1633,6 +1655,11 @@ class SpotifyMatcher:
                         confidence=confidence,
                         title_score=title_score,
                     )
+                    # Clear existing bad link if rematching
+                    if recording.get('spotify_track_id'):
+                        clear_recording_release_track(
+                            conn, recording['recording_id'], release_id,
+                            dry_run=self.dry_run, log=self.logger)
                     self.stats['tracks_no_match'] += 1
                     continue
 
@@ -1660,14 +1687,18 @@ class SpotifyMatcher:
                 self.logger.debug(f"      Album tracks: {track_names}{more}")
                 self.stats['tracks_no_match'] += 1
 
-                # Check if this recording had a previous match that would now be lost
+                # Clear existing bad link if rematching
                 if recording.get('spotify_track_id'):
                     self.stats['tracks_had_previous'] += 1
                     previous_track_id = recording['spotify_track_id']
                     previous_url = f"https://open.spotify.com/track/{previous_track_id}"
-                    self.logger.warning(f"      ⚠ Had previous track ID: {previous_track_id} (would be orphaned)")
+                    self.logger.warning(f"      ⚠ Had previous track ID: {previous_track_id} — clearing stale link")
 
-                    # Log to file for later investigation/cleanup
+                    clear_recording_release_track(
+                        conn, recording['recording_id'], release_id,
+                        dry_run=self.dry_run, log=self.logger)
+
+                    # Log to file for later investigation
                     self._log_orphaned_track(
                         release_id=release_id,
                         recording_id=recording['recording_id'],
