@@ -717,11 +717,14 @@ def validate_album_match(spotify_album: dict, expected_album: str,
 
             if song_title and album_similarity >= 80 and verify_track_callback and not album_is_song_title:
                 # For compilation artists (Various Artists, etc.), allow lenient track verification
-                # For real artists, require at least 40% artist similarity to use track verification
-                # This prevents matching "Illinois Jacquet" to "Charles Bradley" just because
-                # both have albums/tracks called "Black Velvet"
+                # For real artists, require at least 50% artist similarity to use track verification
+                # This prevents matching completely unrelated artists who happen to share
+                # album/track names (e.g., Charlie Parker → Stephane Grappelli at 43.8%,
+                # Art Tatum → Art Pepper at 42.1%) — common with jazz standards.
+                # Ensemble variations (Bill Evans → Bill Evans Trio) are already handled
+                # by the substring check above, so this threshold only affects non-substring cases.
                 is_compilation = is_compilation_artist(expected_artist)
-                min_artist_for_track_verify = 0 if is_compilation else 40
+                min_artist_for_track_verify = 0 if is_compilation else 50
 
                 if artist_similarity >= min_artist_for_track_verify:
                     album_id = spotify_album.get('id')
