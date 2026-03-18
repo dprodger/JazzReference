@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Duration Mismatches: {{ song.title }} - Admin</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f7;
+            color: #333;
+            line-height: 1.6;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        .back-link {
+            display: inline-block;
+            margin-bottom: 15px;
+            color: #0066cc;
+            text-decoration: none;
+            font-size: 14px;
+        }
+        .back-link:hover {
+            text-decoration: underline;
+        }
+        h1 {
+            color: #1d1d1f;
+            margin-bottom: 5px;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 20px;
+        }
+        .subtitle a {
+            color: #0066cc;
+        }
+
+        /* Threshold control */
+        .threshold-bar {
+            background: #fff;
+            border-radius: 12px;
+            padding: 16px 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .threshold-bar label {
+            font-size: 13px;
+            font-weight: 600;
+            color: #666;
+        }
+        .threshold-bar input[type="number"] {
+            padding: 6px 10px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+            width: 100px;
+        }
+        .threshold-bar input:focus {
+            outline: none;
+            border-color: #0066cc;
+        }
+        .threshold-bar button {
+            background: #0066cc;
+            color: #fff;
+            border: none;
+            padding: 6px 16px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+        }
+        .threshold-bar button:hover {
+            background: #0055aa;
+        }
+        .threshold-bar .count-label {
+            color: #888;
+            font-size: 13px;
+            margin-left: auto;
+        }
+
+        /* Bulk actions */
+        .bulk-actions {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            border-radius: 12px;
+            padding: 16px 20px;
+            margin-bottom: 20px;
+            display: none;
+            align-items: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        .bulk-actions.visible {
+            display: flex;
+        }
+        .bulk-actions .selected-count {
+            font-weight: 600;
+            color: #856404;
+        }
+        .bulk-actions button {
+            padding: 6px 16px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            border: none;
+        }
+        .btn-danger {
+            background: #dc3545;
+            color: #fff;
+        }
+        .btn-danger:hover {
+            background: #c82333;
+        }
+        .btn-secondary {
+            background: #6c757d;
+            color: #fff;
+        }
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+
+        /* Recording cards */
+        .recording-card {
+            background: #fff;
+            border-radius: 12px;
+            margin-bottom: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .recording-header {
+            padding: 14px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #eee;
+        }
+        .recording-info {
+            flex: 1;
+        }
+        .recording-title {
+            font-weight: 600;
+            color: #1d1d1f;
+            margin-bottom: 3px;
+        }
+        .recording-meta {
+            font-size: 12px;
+            color: #666;
+        }
+        .recording-meta a {
+            color: #0066cc;
+        }
+        .duration-badge {
+            font-size: 12px;
+            font-weight: 600;
+            padding: 3px 10px;
+            border-radius: 12px;
+            background: #e8e8e8;
+            color: #666;
+        }
+
+        /* Streaming links table */
+        .links-table {
+            width: 100%;
+            font-size: 13px;
+            border-collapse: collapse;
+        }
+        .links-table th {
+            text-align: left;
+            padding: 8px 12px;
+            background: #f8f8f8;
+            color: #666;
+            font-weight: 600;
+            font-size: 11px;
+            text-transform: uppercase;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        .links-table td {
+            padding: 10px 12px;
+            border-bottom: 1px solid #f0f0f0;
+            vertical-align: middle;
+        }
+        .links-table tr:last-child td {
+            border-bottom: none;
+        }
+        .links-table tr:hover {
+            background: #fafafa;
+        }
+        .links-table tr.mismatch {
+            background: #fff8e1;
+        }
+        .links-table tr.mismatch:hover {
+            background: #fff3cd;
+        }
+
+        /* Duration display */
+        .duration {
+            font-family: 'SF Mono', Monaco, Consolas, monospace;
+            font-size: 12px;
+        }
+        .duration-diff {
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 8px;
+            font-size: 11px;
+            font-family: 'SF Mono', Monaco, Consolas, monospace;
+        }
+        .diff-warning {
+            background: #f39c12;
+            color: #fff;
+        }
+        .diff-severe {
+            background: #e74c3c;
+            color: #fff;
+        }
+
+        /* Links */
+        .id-link {
+            font-family: 'SF Mono', Monaco, Consolas, monospace;
+            font-size: 11px;
+            text-decoration: none;
+            padding: 2px 6px;
+            border-radius: 3px;
+            display: inline-block;
+        }
+        .id-link.mb {
+            color: #9c3c78;
+            background: #f8f0f5;
+        }
+        .id-link.mb:hover {
+            background: #f0e0eb;
+        }
+        .id-link.spotify {
+            color: #169c46;
+            background: #e8f8ed;
+        }
+        .id-link.spotify:hover {
+            background: #d4f1dc;
+        }
+
+        /* Checkbox */
+        .link-checkbox {
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+        }
+
+        /* Confidence */
+        .confidence {
+            font-size: 11px;
+            color: #888;
+        }
+        .confidence-low {
+            color: #e74c3c;
+            font-weight: 600;
+        }
+        .confidence-medium {
+            color: #f39c12;
+            font-weight: 600;
+        }
+        .confidence-high {
+            color: #27ae60;
+        }
+
+        /* Match method */
+        .match-method {
+            font-size: 10px;
+            color: #aaa;
+            font-family: 'SF Mono', Monaco, Consolas, monospace;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #666;
+            background: #fff;
+            border-radius: 12px;
+        }
+
+        /* Toast notification */
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 12px 24px;
+            border-radius: 8px;
+            color: #fff;
+            font-weight: 500;
+            font-size: 14px;
+            z-index: 1000;
+            opacity: 0;
+            transform: translateY(20px);
+            transition: opacity 0.3s, transform 0.3s;
+        }
+        .toast.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        .toast.success {
+            background: #27ae60;
+        }
+        .toast.error {
+            background: #e74c3c;
+        }
+
+        /* Select all */
+        .select-all-row {
+            padding: 8px 12px;
+            background: #f0f4ff;
+            border-bottom: 1px solid #d0d8f0;
+            font-size: 12px;
+            color: #444;
+        }
+        .select-all-row label {
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="/admin/duration-mismatches?threshold={{ threshold }}" class="back-link">&larr; Back to Duration Mismatches</a>
+
+        <h1>Duration Mismatches</h1>
+        <p class="subtitle">
+            <strong>{{ song.title }}</strong>
+            {% if song.composer %} by {{ song.composer }}{% endif %}
+            {% if song.musicbrainz_id %}
+            &nbsp;&middot;&nbsp;
+            <a href="https://musicbrainz.org/work/{{ song.musicbrainz_id }}" target="_blank">MusicBrainz Work</a>
+            {% endif %}
+        </p>
+
+        <!-- Threshold control -->
+        <div class="threshold-bar">
+            <label>Min difference:</label>
+            <input type="number" id="thresholdInput" value="{{ threshold }}" min="1" max="600">
+            <label>seconds</label>
+            <button onclick="updateThreshold()">Update</button>
+            <span class="count-label">Showing <strong id="visibleCount">{{ recordings|length }}</strong> recording(s) with mismatched Spotify links</span>
+        </div>
+
+        <!-- Bulk actions -->
+        <div class="bulk-actions" id="bulkActions">
+            <span class="selected-count"><span id="selectedCount">0</span> link(s) selected</span>
+            <button class="btn-danger" onclick="deleteSelected()">Delete Selected Spotify Links</button>
+            <button class="btn-secondary" onclick="clearSelection()">Clear Selection</button>
+        </div>
+
+        <!-- Recordings -->
+        {% if recordings %}
+            {% for item in recordings %}
+            {% set rec = item.recording %}
+            {% set card_index = loop.index0 %}
+            <div class="recording-card">
+                <div class="recording-header">
+                    <div class="recording-info">
+                        <div class="recording-title">
+                            {{ rec.title or 'Unknown' }}
+                            {% if rec.recording_year %}({{ rec.recording_year }}){% endif %}
+                        </div>
+                        <div class="recording-meta">
+                            {% if rec.musicbrainz_id %}
+                            <a href="https://musicbrainz.org/recording/{{ rec.musicbrainz_id }}" target="_blank">MB Recording</a>
+                            &nbsp;&middot;&nbsp;
+                            {% endif %}
+                            MB Duration: <strong>{{ rec.duration_display }}</strong>
+                            &nbsp;&middot;&nbsp;
+                            {{ item.links|length }} mismatched Spotify link(s)
+                        </div>
+                    </div>
+                    <span class="duration-badge">{{ rec.duration_display }}</span>
+                </div>
+
+                <div class="select-all-row">
+                    <label>
+                        <input type="checkbox" class="select-all-card" data-card="{{ card_index }}" onchange="toggleCardSelection(this)">
+                        Select all in this recording
+                    </label>
+                </div>
+
+                <table class="links-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 30px;"></th>
+                            <th>Release</th>
+                            <th>MB Release</th>
+                            <th>Spotify Track</th>
+                            <th>MB Duration</th>
+                            <th>Spotify Duration</th>
+                            <th>Difference</th>
+                            <th>Confidence</th>
+                            <th>Method</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for link in item.links %}
+                        <tr class="mismatch">
+                            <td>
+                                <input type="checkbox" class="link-checkbox" data-card="{{ card_index }}" data-link-id="{{ link.streaming_link_id }}" onchange="updateBulkActions()">
+                            </td>
+                            <td>
+                                <div style="font-weight: 500;">{{ link.release_title or '?' }}</div>
+                                <div style="font-size: 11px; color: #888;">{{ link.artist_credit or '' }}</div>
+                            </td>
+                            <td>
+                                {% if link.release_mb_id %}
+                                <a href="https://musicbrainz.org/release/{{ link.release_mb_id }}" target="_blank" class="id-link mb" title="{{ link.release_mb_id }}">{{ link.release_mb_id[:8] }}...</a>
+                                {% else %}
+                                <span style="color: #ccc;">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if link.service_id %}
+                                <a href="https://open.spotify.com/track/{{ link.service_id }}" target="_blank" class="id-link spotify" title="{{ link.service_id }}">{{ link.service_id[:8] }}...</a>
+                                {% elif link.service_url %}
+                                <a href="{{ link.service_url }}" target="_blank" class="id-link spotify">Open</a>
+                                {% else %}
+                                <span style="color: #ccc;">-</span>
+                                {% endif %}
+                            </td>
+                            <td class="duration">{{ link.mb_duration_display }}</td>
+                            <td class="duration">{{ link.spotify_duration_display }}</td>
+                            <td>
+                                <span class="duration-diff {% if link.diff_seconds >= 300 %}diff-severe{% else %}diff-warning{% endif %}">
+                                    {{ link.diff_display }}
+                                </span>
+                            </td>
+                            <td>
+                                {% if link.match_confidence is not none %}
+                                <span class="confidence {% if link.match_confidence < 0.5 %}confidence-low{% elif link.match_confidence < 0.8 %}confidence-medium{% else %}confidence-high{% endif %}">
+                                    {{ (link.match_confidence * 100)|round|int }}%
+                                </span>
+                                {% else %}
+                                <span style="color: #ccc;">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="match-method">{{ link.match_method or '-' }}</span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% endfor %}
+        {% else %}
+        <div class="empty-state">
+            <h2>No mismatches found</h2>
+            <p>No Spotify tracks differ from the MusicBrainz recording duration by more than {{ threshold }} seconds for this song.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script>
+        function updateThreshold() {
+            const threshold = document.getElementById('thresholdInput').value;
+            window.location.href = `/admin/duration-mismatches/{{ song.id }}?threshold=${threshold}`;
+        }
+
+        // Enter key in threshold input
+        document.getElementById('thresholdInput').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') updateThreshold();
+        });
+
+        function getSelectedIds() {
+            return Array.from(document.querySelectorAll('.link-checkbox:checked'))
+                .map(cb => cb.dataset.linkId);
+        }
+
+        function updateBulkActions() {
+            const selected = getSelectedIds();
+            const bulkActions = document.getElementById('bulkActions');
+            const countEl = document.getElementById('selectedCount');
+            countEl.textContent = selected.length;
+            bulkActions.classList.toggle('visible', selected.length > 0);
+        }
+
+        function toggleCardSelection(selectAllCb) {
+            const cardIndex = selectAllCb.dataset.card;
+            const checkboxes = document.querySelectorAll(`.link-checkbox[data-card="${cardIndex}"]`);
+            checkboxes.forEach(cb => cb.checked = selectAllCb.checked);
+            updateBulkActions();
+        }
+
+        function clearSelection() {
+            document.querySelectorAll('.link-checkbox, .select-all-card').forEach(cb => cb.checked = false);
+            updateBulkActions();
+        }
+
+        function showToast(message, type) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = `toast ${type} visible`;
+            setTimeout(() => toast.classList.remove('visible'), 3000);
+        }
+
+        async function deleteSelected() {
+            const ids = getSelectedIds();
+            if (ids.length === 0) return;
+
+            if (!confirm(`Delete ${ids.length} Spotify streaming link(s)? This cannot be undone.`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/admin/duration-mismatches/delete-links', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ link_ids: ids })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showToast(`Deleted ${data.deleted_count} Spotify link(s)`, 'success');
+                    // Remove deleted rows from DOM
+                    ids.forEach(id => {
+                        const checkbox = document.querySelector(`.link-checkbox[data-link-id="${id}"]`);
+                        if (checkbox) {
+                            const row = checkbox.closest('tr');
+                            row.style.transition = 'opacity 0.3s';
+                            row.style.opacity = '0';
+                            setTimeout(() => row.remove(), 300);
+                        }
+                    });
+                    clearSelection();
+                    // Update visible count
+                    setTimeout(() => {
+                        const remaining = document.querySelectorAll('.link-checkbox').length;
+                        document.getElementById('visibleCount').textContent =
+                            document.querySelectorAll('.recording-card').length;
+                    }, 400);
+                } else {
+                    showToast(data.error || 'Failed to delete links', 'error');
+                }
+            } catch (err) {
+                showToast('Network error: ' + err.message, 'error');
+            }
+        }
+    </script>
+</body>
+</html>

@@ -2652,3 +2652,223 @@ def song_reset_execute(song_id):
         import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
+
+
+# ---------------------------------------------------------------------------
+# Duration Mismatch Review
+# ---------------------------------------------------------------------------
+
+def _format_duration(ms):
+    """Format milliseconds as M:SS"""
+    if ms is None:
+        return '—'
+    total_seconds = int(ms / 1000)
+    minutes = total_seconds // 60
+    seconds = total_seconds % 60
+    return f"{minutes}:{seconds:02d}"
+
+
+def _format_diff(diff_ms):
+    """Format a duration difference as +M:SS or -M:SS"""
+    sign = '+' if diff_ms >= 0 else '-'
+    abs_ms = abs(diff_ms)
+    total_seconds = int(abs_ms / 1000)
+    minutes = total_seconds // 60
+    seconds = total_seconds % 60
+    return f"{sign}{minutes}:{seconds:02d}"
+
+
+@admin_bp.route('/duration-mismatches')
+def duration_mismatches_list():
+    """List songs that have Spotify links with duration mismatches vs MusicBrainz"""
+    threshold = request.args.get('threshold', 60, type=int)
+    current_sort = request.args.get('sort', 'mismatch_count')
+    current_order = request.args.get('order', 'desc')
+    threshold_ms = threshold * 1000
+
+    sort_map = {
+        'title': 's.title',
+        'mismatch_count': 'mismatch_count',
+        'max_diff': 'max_diff_ms',
+    }
+    order_col = sort_map.get(current_sort, 'mismatch_count')
+    order_dir = 'ASC' if current_order == 'asc' else 'DESC'
+
+    with get_db_connection() as db:
+        with db.cursor() as cur:
+            cur.execute(f"""
+                SELECT
+                    s.id AS song_id,
+                    s.title,
+                    s.composer,
+                    COUNT(DISTINCT r.id) AS total_recordings,
+                    COUNT(rrsl.id) AS mismatch_count,
+                    MAX(ABS(r.duration_ms - rrsl.duration_ms)) AS max_diff_ms
+                FROM songs s
+                JOIN recordings r ON r.song_id = s.id
+                JOIN recording_releases rr ON rr.recording_id = r.id
+                JOIN recording_release_streaming_links rrsl
+                    ON rrsl.recording_release_id = rr.id
+                    AND rrsl.service = 'spotify'
+                WHERE r.duration_ms IS NOT NULL
+                  AND rrsl.duration_ms IS NOT NULL
+                  AND ABS(r.duration_ms - rrsl.duration_ms) > %s
+                GROUP BY s.id, s.title, s.composer
+                ORDER BY {order_col} {order_dir}, s.title ASC
+            """, (threshold_ms,))
+            songs = [dict(row) for row in cur.fetchall()]
+
+            for song in songs:
+                song['max_diff_display'] = _format_diff(song['max_diff_ms'])
+
+            # Summary stats
+            cur.execute("""
+                SELECT COUNT(*) AS cnt
+                FROM recording_release_streaming_links
+                WHERE service = 'spotify'
+            """)
+            total_spotify = cur.fetchone()['cnt']
+
+            total_mismatched = sum(s['mismatch_count'] for s in songs)
+
+    summary = {
+        'total_songs': len(songs),
+        'total_mismatched_links': total_mismatched,
+        'total_spotify_links': total_spotify,
+    }
+
+    return render_template('admin/duration_mismatches_list.html',
+                           songs=songs,
+                           summary=summary,
+                           threshold=threshold,
+                           current_sort=current_sort,
+                           current_order=current_order)
+
+
+@admin_bp.route('/duration-mismatches/<song_id>')
+def duration_mismatches_review(song_id):
+    """Review duration mismatches for a specific song"""
+    threshold = request.args.get('threshold', 60, type=int)
+    threshold_ms = threshold * 1000
+
+    with get_db_connection() as db:
+        with db.cursor() as cur:
+            cur.execute("""
+                SELECT id, title, composer, musicbrainz_id
+                FROM songs WHERE id = %s
+            """, (song_id,))
+            song = cur.fetchone()
+            if not song:
+                return "Song not found", 404
+            song = dict(song)
+
+            cur.execute("""
+                SELECT
+                    r.id AS recording_id,
+                    r.title,
+                    r.recording_year,
+                    r.musicbrainz_id,
+                    r.duration_ms,
+                    rrsl.id AS streaming_link_id,
+                    rrsl.service_id,
+                    rrsl.service_url,
+                    rrsl.duration_ms AS spotify_duration_ms,
+                    rrsl.match_confidence,
+                    rrsl.match_method,
+                    rr.id AS recording_release_id,
+                    rr.track_number,
+                    rr.disc_number,
+                    rel.id AS release_id,
+                    rel.title AS release_title,
+                    rel.artist_credit,
+                    rel.musicbrainz_release_id AS release_mb_id,
+                    rel.release_year,
+                    ABS(r.duration_ms - rrsl.duration_ms) AS diff_ms
+                FROM recordings r
+                JOIN recording_releases rr ON rr.recording_id = r.id
+                JOIN recording_release_streaming_links rrsl
+                    ON rrsl.recording_release_id = rr.id
+                    AND rrsl.service = 'spotify'
+                JOIN releases rel ON rel.id = rr.release_id
+                WHERE r.song_id = %s
+                  AND r.duration_ms IS NOT NULL
+                  AND rrsl.duration_ms IS NOT NULL
+                  AND ABS(r.duration_ms - rrsl.duration_ms) > %s
+                ORDER BY r.recording_year NULLS LAST, rel.title
+            """, (song_id, threshold_ms))
+            rows = [dict(row) for row in cur.fetchall()]
+
+    # Group by recording
+    recordings_map = {}
+    for row in rows:
+        rec_id = row['recording_id']
+        if rec_id not in recordings_map:
+            recordings_map[rec_id] = {
+                'recording': {
+                    'id': rec_id,
+                    'title': row['title'],
+                    'recording_year': row['recording_year'],
+                    'musicbrainz_id': row['musicbrainz_id'],
+                    'duration_ms': row['duration_ms'],
+                    'duration_display': _format_duration(row['duration_ms']),
+                },
+                'links': []
+            }
+        diff_ms = row['diff_ms']
+        recordings_map[rec_id]['links'].append({
+            'streaming_link_id': str(row['streaming_link_id']),
+            'service_id': row['service_id'],
+            'service_url': row['service_url'],
+            'spotify_duration_ms': row['spotify_duration_ms'],
+            'spotify_duration_display': _format_duration(row['spotify_duration_ms']),
+            'mb_duration_display': _format_duration(row['duration_ms']),
+            'diff_ms': diff_ms,
+            'diff_seconds': int(diff_ms / 1000),
+            'diff_display': _format_diff(diff_ms),
+            'match_confidence': float(row['match_confidence']) if row['match_confidence'] is not None else None,
+            'match_method': row['match_method'],
+            'release_title': row['release_title'],
+            'artist_credit': row['artist_credit'],
+            'release_mb_id': row['release_mb_id'],
+            'release_id': str(row['release_id']),
+        })
+
+    recordings = list(recordings_map.values())
+
+    return render_template('admin/duration_mismatches_review.html',
+                           song=song,
+                           recordings=recordings,
+                           threshold=threshold)
+
+
+@admin_bp.route('/duration-mismatches/delete-links', methods=['POST'])
+def duration_mismatches_delete():
+    """Delete selected Spotify streaming links"""
+    data = request.get_json()
+    link_ids = data.get('link_ids', [])
+
+    if not link_ids:
+        return jsonify({'error': 'No link IDs provided'}), 400
+
+    try:
+        with get_db_connection() as db:
+            with db.cursor() as cur:
+                cur.execute("""
+                    DELETE FROM recording_release_streaming_links
+                    WHERE id = ANY(%s)
+                      AND service = 'spotify'
+                    RETURNING id
+                """, (link_ids,))
+                deleted = cur.fetchall()
+                db.commit()
+
+                logger.info(f"Admin deleted {len(deleted)} Spotify streaming links for duration mismatch cleanup")
+
+                return jsonify({
+                    'success': True,
+                    'deleted_count': len(deleted)
+                })
+
+    except Exception as e:
+        logger.error(f"Error deleting streaming links: {e}")
+        return jsonify({'error': str(e)}), 500

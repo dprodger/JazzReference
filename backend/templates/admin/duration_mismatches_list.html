@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spotify Duration Mismatches - Admin</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f7;
+            color: #333;
+            line-height: 1.6;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        .back-link {
+            display: inline-block;
+            margin-bottom: 15px;
+            color: #0066cc;
+            text-decoration: none;
+            font-size: 14px;
+        }
+        .back-link:hover {
+            text-decoration: underline;
+        }
+        h1 {
+            color: #1d1d1f;
+            margin-bottom: 5px;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 20px;
+        }
+
+        /* Summary Cards */
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+        .summary-card {
+            background: #fff;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .summary-card.highlight {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #fff;
+        }
+        .summary-card.warning {
+            background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);
+            color: #fff;
+        }
+        .summary-card.spotify {
+            background: linear-gradient(135deg, #1db954 0%, #169c46 100%);
+            color: #fff;
+        }
+        .summary-value {
+            font-size: 36px;
+            font-weight: 700;
+            line-height: 1;
+        }
+        .summary-label {
+            font-size: 13px;
+            opacity: 0.9;
+            margin-top: 5px;
+        }
+
+        /* Filters */
+        .filters {
+            background: #fff;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            align-items: end;
+        }
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        .filter-group label {
+            font-size: 12px;
+            color: #666;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        .filter-group input, .filter-group select {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+            background: #fff;
+        }
+        .filter-group input:focus, .filter-group select:focus {
+            outline: none;
+            border-color: #0066cc;
+        }
+        .apply-btn {
+            background: #0066cc;
+            color: #fff;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            margin-top: auto;
+        }
+        .apply-btn:hover {
+            background: #0055aa;
+        }
+
+        /* Table */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: #fff;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        th {
+            background: #fafafa;
+            color: #1d1d1f;
+            font-weight: 600;
+        }
+        tr:hover {
+            background: #f9f9fb;
+        }
+        .song-title {
+            font-weight: 500;
+            color: #1d1d1f;
+        }
+        .composer {
+            color: #666;
+            font-size: 13px;
+        }
+        .badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .badge-warning {
+            background: #f39c12;
+            color: #fff;
+        }
+        .count {
+            color: #999;
+            font-size: 14px;
+        }
+        a.song-link {
+            text-decoration: none;
+            color: inherit;
+        }
+        a.song-link:hover .song-title {
+            color: #0066cc;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #666;
+            background: #fff;
+            border-radius: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="/admin" class="back-link">&larr; Back to Admin Dashboard</a>
+
+        <h1>Spotify Duration Mismatches</h1>
+        <p class="subtitle">Songs with Spotify tracks whose duration differs significantly from the MusicBrainz recording duration</p>
+
+        <!-- Summary Cards -->
+        <div class="summary-grid">
+            <div class="summary-card highlight">
+                <div class="summary-value">{{ summary.total_songs }}</div>
+                <div class="summary-label">Songs with Mismatches</div>
+            </div>
+            <div class="summary-card warning">
+                <div class="summary-value">{{ summary.total_mismatched_links }}</div>
+                <div class="summary-label">Mismatched Spotify Links</div>
+            </div>
+            <div class="summary-card spotify">
+                <div class="summary-value">{{ summary.total_spotify_links }}</div>
+                <div class="summary-label">Total Spotify Links</div>
+            </div>
+        </div>
+
+        <!-- Filters -->
+        <form class="filters" method="get">
+            <div class="filter-group">
+                <label>Min Difference (seconds)</label>
+                <input type="number" name="threshold" value="{{ threshold }}" min="1" max="600" style="width: 120px;">
+            </div>
+            <div class="filter-group">
+                <label>Sort By</label>
+                <select name="sort">
+                    <option value="title" {% if current_sort == 'title' %}selected{% endif %}>Title</option>
+                    <option value="mismatch_count" {% if current_sort == 'mismatch_count' %}selected{% endif %}>Mismatch Count</option>
+                    <option value="max_diff" {% if current_sort == 'max_diff' %}selected{% endif %}>Max Difference</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>Order</label>
+                <select name="order">
+                    <option value="asc" {% if current_order == 'asc' %}selected{% endif %}>Ascending</option>
+                    <option value="desc" {% if current_order == 'desc' %}selected{% endif %}>Descending</option>
+                </select>
+            </div>
+            <button type="submit" class="apply-btn">Apply</button>
+        </form>
+
+        <!-- Results Table -->
+        {% if songs %}
+        <table>
+            <thead>
+                <tr>
+                    <th style="width: 35%">Song</th>
+                    <th>Total Recordings</th>
+                    <th>Mismatched Links</th>
+                    <th>Max Difference</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for song in songs %}
+                <tr>
+                    <td>
+                        <a href="/admin/duration-mismatches/{{ song.song_id }}?threshold={{ threshold }}" class="song-link">
+                            <div class="song-title">{{ song.title }}</div>
+                            {% if song.composer %}
+                            <div class="composer">{{ song.composer }}</div>
+                            {% endif %}
+                        </a>
+                    </td>
+                    <td class="count">{{ song.total_recordings }}</td>
+                    <td>
+                        <span class="badge badge-warning">{{ song.mismatch_count }}</span>
+                    </td>
+                    <td>
+                        {{ song.max_diff_display }}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="empty-state">
+            <h2>No mismatches found</h2>
+            <p>No Spotify tracks differ from their MusicBrainz recording duration by more than {{ threshold }} seconds.</p>
+        </div>
+        {% endif %}
+    </div>
+</body>
+</html>
