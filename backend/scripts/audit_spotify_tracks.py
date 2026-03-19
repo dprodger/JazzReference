@@ -131,7 +131,8 @@ def get_releases_for_audit(song_id: str) -> list:
                         rel.title as release_title,
                         rel.release_year,
                         rel.spotify_album_id,
-                        rel.spotify_album_url,
+                        CASE WHEN rel.spotify_album_id IS NOT NULL
+                             THEN 'https://open.spotify.com/album/' || rel.spotify_album_id END as spotify_album_url,
                         rel.artist_credit
                     FROM releases rel
                     JOIN recording_releases rr ON rel.id = rr.release_id
@@ -781,7 +782,7 @@ def get_orphaned_albums(song_id: str) -> list:
 
 def clear_spotify_album_from_release(release_id: str) -> bool:
     """
-    Clear spotify_album_id and spotify_album_url from a release.
+    Clear spotify_album_id from a release.
     Returns True if successful.
     """
     with get_db_connection() as conn:
@@ -789,7 +790,6 @@ def clear_spotify_album_from_release(release_id: str) -> bool:
             cur.execute("""
                 UPDATE releases
                 SET spotify_album_id = NULL,
-                    spotify_album_url = NULL,
                     updated_at = NOW()
                 WHERE id = %s
             """, (release_id,))

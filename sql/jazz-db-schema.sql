@@ -1,11 +1,11 @@
 -- Jazz Reference Application - PostgreSQL Database Schema
--- Generated from live Supabase database on 2026-03-18
+-- Generated from live Supabase database on 2026-03-19
 
 -- Enable UUID extension for generating unique IDs
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- Enable unaccent extension for accent-insensitive text matching
--- (e.g., "Mel Tormé" matches "Mel Torme")
+-- (e.g., "Mel Torme" matches "Mel Torme")
 CREATE EXTENSION IF NOT EXISTS unaccent;
 
 -- ============================================================================
@@ -119,8 +119,6 @@ CREATE TABLE releases (
     cover_art_url VARCHAR(500),
     cover_art_checked_at TIMESTAMP WITH TIME ZONE,
     spotify_album_id VARCHAR(50),
-    spotify_album_url VARCHAR(500),
-    apple_music_url VARCHAR(500),
     apple_music_searched_at TIMESTAMP WITH TIME ZONE,
     amazon_url VARCHAR(500),
     discogs_url VARCHAR(500),
@@ -149,7 +147,7 @@ CREATE TABLE recordings (
     is_canonical BOOLEAN DEFAULT false,
     notes TEXT,
     default_release_id UUID REFERENCES releases(id) ON DELETE SET NULL,
-    musicbrainz_id VARCHAR(255) UNIQUE,
+    musicbrainz_id VARCHAR(255),
     source_mb_work_id VARCHAR(36),              -- MusicBrainz work ID this recording was imported from
     duration_ms INTEGER,                        -- Recording duration from MusicBrainz
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -162,7 +160,7 @@ CREATE TABLE recordings (
 -- JUNCTION TABLES
 -- ============================================================================
 
--- Recording ↔ Release junction
+-- Recording <-> Release junction
 CREATE TABLE recording_releases (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     recording_id UUID NOT NULL REFERENCES recordings(id) ON DELETE CASCADE,
@@ -178,7 +176,7 @@ CREATE TABLE recording_releases (
     UNIQUE (recording_id, release_id)
 );
 
--- Recording ↔ Performer junction
+-- Recording <-> Performer junction
 CREATE TABLE recording_performers (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     recording_id UUID NOT NULL REFERENCES recordings(id) ON DELETE CASCADE,
@@ -189,7 +187,7 @@ CREATE TABLE recording_performers (
     UNIQUE (recording_id, performer_id, instrument_id)
 );
 
--- Performer ↔ Instrument junction
+-- Performer <-> Instrument junction
 CREATE TABLE performer_instruments (
     performer_id UUID NOT NULL REFERENCES performers(id) ON DELETE CASCADE,
     instrument_id UUID NOT NULL REFERENCES instruments(id) ON DELETE CASCADE,
@@ -199,7 +197,7 @@ CREATE TABLE performer_instruments (
     PRIMARY KEY (performer_id, instrument_id)
 );
 
--- Release ↔ Performer junction
+-- Release <-> Performer junction
 CREATE TABLE release_performers (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     release_id UUID NOT NULL REFERENCES releases(id) ON DELETE CASCADE,
@@ -220,7 +218,7 @@ CREATE TABLE recording_release_streaming_links (
     recording_release_id UUID NOT NULL REFERENCES recording_releases(id) ON DELETE CASCADE,
     service VARCHAR(50) NOT NULL,               -- 'spotify', 'apple_music', 'youtube', 'youtube_music', 'tidal', etc.
     service_id VARCHAR(100),                    -- Track ID on this service
-    service_title VARCHAR(500),                -- Track title as it appears on this service
+    service_title VARCHAR(500),                 -- Track title as it appears on this service
     service_url VARCHAR(500),
     duration_ms INTEGER,
     popularity INTEGER,                         -- Spotify popularity score
@@ -574,6 +572,183 @@ CREATE TABLE audit_log (
     changed_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- View for orphan count
-CREATE VIEW orphan_count AS
-    SELECT COUNT(*) FROM orphan_recordings WHERE status = 'pending';
+-- Quick-lookup table for pending orphan count (maintained by application)
+CREATE TABLE orphan_count (
+    count BIGINT
+);
+
+-- ============================================================================
+-- VIEWS
+-- ============================================================================
+
+CREATE VIEW songs_with_authority_recs AS
+    SELECT s.id AS song_id,
+        s.title,
+        count(sar.id) AS recommendation_count,
+        count(DISTINCT sar.source) AS source_count,
+        array_agg(DISTINCT sar.source) FILTER (WHERE sar.source IS NOT NULL) AS sources
+    FROM songs s
+        LEFT JOIN song_authority_recommendations sar ON s.id = sar.song_id
+    GROUP BY s.id, s.title;
+
+-- ============================================================================
+-- INDEXES
+-- ============================================================================
+
+-- Songs
+CREATE INDEX idx_songs_title ON songs (title);
+CREATE INDEX idx_songs_composer ON songs (composer);
+CREATE INDEX idx_songs_musicbrainz_id ON songs (musicbrainz_id);
+CREATE INDEX idx_songs_second_mb_id ON songs (second_mb_id) WHERE second_mb_id IS NOT NULL;
+CREATE INDEX idx_songs_alt_titles ON songs USING gin (alt_titles);
+
+-- Performers
+CREATE INDEX idx_performers_name ON performers (name);
+CREATE INDEX idx_performers_sort_name ON performers (sort_name) WHERE sort_name IS NOT NULL;
+CREATE INDEX idx_performers_sort_order ON performers (COALESCE(sort_name, name));
+CREATE INDEX idx_performers_musicbrainz_id ON performers (musicbrainz_id) WHERE musicbrainz_id IS NOT NULL;
+CREATE INDEX idx_performers_wikipedia_url ON performers (wikipedia_url) WHERE wikipedia_url IS NOT NULL;
+CREATE INDEX idx_performers_external_links ON performers USING gin (external_links);
+
+-- Instruments
+CREATE INDEX idx_instruments_name ON instruments (name);
+CREATE INDEX idx_instruments_category ON instruments (category);
+
+-- Releases
+CREATE INDEX idx_releases_musicbrainz_release_id ON releases (musicbrainz_release_id);
+CREATE INDEX idx_releases_musicbrainz_release_group_id ON releases (musicbrainz_release_group_id);
+CREATE INDEX idx_releases_title ON releases (title);
+CREATE INDEX idx_releases_artist_credit ON releases (artist_credit);
+CREATE INDEX idx_releases_release_date ON releases (release_date);
+CREATE INDEX idx_releases_release_year ON releases (release_year);
+CREATE INDEX idx_releases_label ON releases (label);
+CREATE INDEX idx_releases_barcode ON releases (barcode);
+CREATE INDEX idx_releases_spotify_album_id ON releases (spotify_album_id);
+CREATE INDEX idx_releases_cover_art_checked_at ON releases (cover_art_checked_at) WHERE cover_art_checked_at IS NULL;
+
+-- Recordings
+CREATE INDEX idx_recordings_song_id ON recordings (song_id);
+CREATE INDEX idx_recordings_year ON recordings (recording_year);
+CREATE INDEX idx_recordings_is_canonical ON recordings (is_canonical);
+CREATE INDEX idx_recordings_default_release_id ON recordings (default_release_id) WHERE default_release_id IS NOT NULL;
+CREATE INDEX idx_recordings_source_mb_work_id ON recordings (source_mb_work_id) WHERE source_mb_work_id IS NOT NULL;
+CREATE INDEX idx_recordings_recording_date_source ON recordings (recording_date_source) WHERE recording_date_source IS NOT NULL;
+CREATE INDEX idx_recordings_mb_first_release_date ON recordings (mb_first_release_date) WHERE mb_first_release_date IS NOT NULL;
+CREATE INDEX idx_recordings_title ON recordings (title);
+
+-- Recording Releases
+CREATE INDEX idx_recording_releases_recording_id ON recording_releases (recording_id);
+CREATE INDEX idx_recording_releases_release_id ON recording_releases (release_id);
+CREATE INDEX idx_recording_releases_disc_track ON recording_releases (release_id, disc_number, track_number);
+
+-- Recording Performers
+CREATE INDEX idx_recording_performers_recording_id ON recording_performers (recording_id);
+CREATE INDEX idx_recording_performers_performer_id ON recording_performers (performer_id);
+CREATE INDEX idx_recording_performers_instrument_id ON recording_performers (instrument_id);
+
+-- Recording Release Streaming Links
+CREATE INDEX idx_rr_streaming_links_recording_release_id ON recording_release_streaming_links (recording_release_id);
+CREATE INDEX idx_rr_streaming_links_service ON recording_release_streaming_links (service);
+CREATE INDEX idx_rr_streaming_links_service_id ON recording_release_streaming_links (service_id) WHERE service_id IS NOT NULL;
+CREATE INDEX idx_rr_streaming_links_isrc ON recording_release_streaming_links (isrc) WHERE isrc IS NOT NULL;
+CREATE INDEX idx_rr_streaming_links_match_method ON recording_release_streaming_links (match_method) WHERE match_method IS NOT NULL;
+CREATE INDEX idx_rr_streaming_links_added_by_user ON recording_release_streaming_links (added_by_user_id) WHERE added_by_user_id IS NOT NULL;
+
+-- Release Streaming Links
+CREATE INDEX idx_release_streaming_links_release_id ON release_streaming_links (release_id);
+CREATE INDEX idx_release_streaming_links_service ON release_streaming_links (service);
+CREATE INDEX idx_release_streaming_links_service_id ON release_streaming_links (service_id) WHERE service_id IS NOT NULL;
+CREATE INDEX idx_release_streaming_links_match_method ON release_streaming_links (match_method) WHERE match_method IS NOT NULL;
+CREATE INDEX idx_release_streaming_links_added_by_user ON release_streaming_links (added_by_user_id) WHERE added_by_user_id IS NOT NULL;
+
+-- Release Events
+CREATE INDEX idx_release_events_release_id ON release_events (release_id);
+CREATE INDEX idx_release_events_country ON release_events (country);
+
+-- Release Labels
+CREATE INDEX idx_release_labels_release_id ON release_labels (release_id);
+CREATE INDEX idx_release_labels_label_name ON release_labels (label_name);
+
+-- Release Imagery
+CREATE INDEX idx_release_imagery_release_id ON release_imagery (release_id);
+CREATE INDEX idx_release_imagery_source ON release_imagery (source);
+CREATE INDEX idx_release_imagery_type ON release_imagery (type);
+CREATE INDEX idx_release_imagery_release_source ON release_imagery (release_id, source);
+
+-- Release Performers
+CREATE INDEX idx_release_performers_release_id ON release_performers (release_id);
+CREATE INDEX idx_release_performers_performer_id ON release_performers (performer_id);
+CREATE INDEX idx_release_performers_role ON release_performers (role);
+
+-- Images
+CREATE INDEX idx_images_source ON images (source);
+CREATE INDEX idx_images_source_identifier ON images (source_identifier);
+
+-- Artist Images
+CREATE INDEX idx_artist_images_performer ON artist_images (performer_id);
+CREATE INDEX idx_artist_images_image ON artist_images (image_id);
+CREATE INDEX idx_artist_images_primary ON artist_images (is_primary) WHERE is_primary = true;
+
+-- Users
+CREATE INDEX idx_users_email ON users (email);
+CREATE INDEX idx_users_google_id ON users (google_id);
+CREATE INDEX idx_users_apple_id ON users (apple_id);
+
+-- Auth Tokens
+CREATE INDEX idx_refresh_tokens_user_id ON refresh_tokens (user_id);
+CREATE INDEX idx_refresh_tokens_token ON refresh_tokens (token);
+CREATE INDEX idx_password_reset_tokens_user_id ON password_reset_tokens (user_id);
+CREATE INDEX idx_password_reset_tokens_token ON password_reset_tokens (token);
+CREATE INDEX idx_email_verification_tokens_user_id ON email_verification_tokens (user_id);
+CREATE INDEX idx_email_verification_tokens_token ON email_verification_tokens (token);
+
+-- Repertoires
+CREATE INDEX idx_repertoires_user_id ON repertoires (user_id);
+CREATE INDEX idx_repertoires_name ON repertoires (name);
+CREATE INDEX idx_repertoire_songs_repertoire_id ON repertoire_songs (repertoire_id);
+CREATE INDEX idx_repertoire_songs_song_id ON repertoire_songs (song_id);
+
+-- Recording Favorites
+CREATE INDEX idx_recording_favorites_recording_id ON recording_favorites (recording_id);
+CREATE INDEX idx_recording_favorites_user_id ON recording_favorites (user_id);
+
+-- Recording Contributions
+CREATE INDEX idx_recording_contributions_recording_id ON recording_contributions (recording_id);
+CREATE INDEX idx_recording_contributions_user_id ON recording_contributions (user_id);
+CREATE INDEX idx_recording_contributions_key ON recording_contributions (recording_id, performance_key) WHERE performance_key IS NOT NULL;
+CREATE INDEX idx_recording_contributions_instrumental ON recording_contributions (recording_id, is_instrumental) WHERE is_instrumental IS NOT NULL;
+
+-- Videos
+CREATE INDEX idx_videos_song_id ON videos (song_id);
+CREATE INDEX idx_videos_recording_id ON videos (recording_id);
+CREATE INDEX idx_videos_type ON videos (video_type);
+
+-- Solo Transcriptions
+CREATE INDEX idx_solo_transcriptions_song_id ON solo_transcriptions (song_id);
+CREATE INDEX idx_solo_transcriptions_recording_id ON solo_transcriptions (recording_id);
+
+-- Orphan Recordings
+CREATE INDEX idx_orphan_recordings_song_id ON orphan_recordings (song_id);
+CREATE INDEX idx_orphan_recordings_mb_recording_id ON orphan_recordings (mb_recording_id);
+CREATE INDEX idx_orphan_recordings_status ON orphan_recordings (status);
+CREATE INDEX idx_orphan_recordings_spotify_match ON orphan_recordings (spotify_match_confidence);
+
+-- Song Authority Recommendations
+CREATE INDEX idx_authority_recs_song_id ON song_authority_recommendations (song_id);
+CREATE INDEX idx_authority_recs_recording_id ON song_authority_recommendations (recording_id);
+CREATE INDEX idx_authority_recs_source ON song_authority_recommendations (source);
+CREATE INDEX idx_authority_recs_captured_at ON song_authority_recommendations (captured_at);
+CREATE INDEX idx_song_authority_recs_itunes_album ON song_authority_recommendations (itunes_album_id) WHERE itunes_album_id IS NOT NULL;
+CREATE INDEX idx_song_authority_recs_itunes_track ON song_authority_recommendations (itunes_track_id) WHERE itunes_track_id IS NOT NULL;
+
+-- Bad Streaming Matches
+CREATE INDEX idx_bad_streaming_matches_song_id ON bad_streaming_matches (song_id);
+CREATE INDEX idx_bad_streaming_matches_service_id ON bad_streaming_matches (service, service_id);
+CREATE INDEX idx_bad_streaming_matches_lookup ON bad_streaming_matches (service, block_level, service_id, song_id);
+
+-- Content Reports
+CREATE INDEX idx_content_reports_entity ON content_reports (entity_type, entity_id);
+CREATE INDEX idx_content_reports_entity_id ON content_reports (entity_id);
+CREATE INDEX idx_content_reports_status ON content_reports (status) WHERE status IN ('pending', 'reviewing');
+CREATE INDEX idx_content_reports_external_source ON content_reports (external_source);
+CREATE INDEX idx_content_reports_created_at ON content_reports (created_at DESC);
