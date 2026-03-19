@@ -756,7 +756,9 @@ class MBReleaseImporter:
                     is_canonical, musicbrainz_id, source_mb_work_id, title, duration_ms
                 )
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                RETURNING id
+                ON CONFLICT (musicbrainz_id, song_id) DO UPDATE
+                    SET updated_at = CURRENT_TIMESTAMP
+                RETURNING id, (xmax = 0) AS inserted
             """, (
                 song_id,
                 date_info.get('recording_year'),
@@ -771,13 +773,17 @@ class MBReleaseImporter:
                 duration_ms
             ))
 
-            recording_id = cur.fetchone()['id']
+            result = cur.fetchone()
+            recording_id = result['id']
 
-            # Log with source info
-            source = date_info.get('recording_date_source', 'none')
-            year = date_info.get('recording_year', '?')
-            self.logger.info(f"  ✓ Created recording: MB:{mb_recording_id[:8]}... (year={year}, source={source})")
-            self.stats['recordings_created'] += 1
+            if result['inserted']:
+                source = date_info.get('recording_date_source', 'none')
+                year = date_info.get('recording_year', '?')
+                self.logger.info(f"  ✓ Created recording: MB:{mb_recording_id[:8]}... (year={year}, source={source})")
+                self.stats['recordings_created'] += 1
+            else:
+                self.logger.debug(f"  Recording exists (concurrent insert resolved)")
+                self.stats['recordings_existing'] += 1
 
             return recording_id
 
@@ -1022,11 +1028,12 @@ class MBReleaseImporter:
             Recording ID or None
         """
         with conn.cursor() as cur:
-            # Match ONLY by MusicBrainz ID - this is the unique identifier
+            # Match by MusicBrainz ID and song_id (same MB recording can appear
+            # under different songs for medleys/multi-work recordings)
             cur.execute("""
                 SELECT id FROM recordings
-                WHERE musicbrainz_id = %s
-            """, (mb_recording_id,))
+                WHERE musicbrainz_id = %s AND song_id = %s
+            """, (mb_recording_id, song_id))
             result = cur.fetchone()
 
             if result:
@@ -1046,7 +1053,9 @@ class MBReleaseImporter:
                     is_canonical, musicbrainz_id, source_mb_work_id
                 )
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-                RETURNING id
+                ON CONFLICT (musicbrainz_id, song_id) DO UPDATE
+                    SET updated_at = CURRENT_TIMESTAMP
+                RETURNING id, (xmax = 0) AS inserted
             """, (
                 song_id,
                 date_info.get('recording_year'),
@@ -1059,11 +1068,17 @@ class MBReleaseImporter:
                 source_mb_work_id
             ))
 
-            recording_id = cur.fetchone()['id']
-            source = date_info.get('recording_date_source', 'none')
-            year = date_info.get('recording_year', '?')
-            self.logger.info(f"  ✓ Created recording: MB:{mb_recording_id[:8]}... (year={year}, source={source})")
-            self.stats['recordings_created'] += 1
+            result = cur.fetchone()
+            recording_id = result['id']
+
+            if result['inserted']:
+                source = date_info.get('recording_date_source', 'none')
+                year = date_info.get('recording_year', '?')
+                self.logger.info(f"  ✓ Created recording: MB:{mb_recording_id[:8]}... (year={year}, source={source})")
+                self.stats['recordings_created'] += 1
+            else:
+                self.logger.debug(f"  Recording exists (concurrent insert resolved)")
+                self.stats['recordings_existing'] += 1
 
             return recording_id
 

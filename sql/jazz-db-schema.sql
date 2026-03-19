@@ -635,6 +635,7 @@ CREATE INDEX idx_recordings_source_mb_work_id ON recordings (source_mb_work_id) 
 CREATE INDEX idx_recordings_recording_date_source ON recordings (recording_date_source) WHERE recording_date_source IS NOT NULL;
 CREATE INDEX idx_recordings_mb_first_release_date ON recordings (mb_first_release_date) WHERE mb_first_release_date IS NOT NULL;
 CREATE INDEX idx_recordings_title ON recordings (title);
+CREATE UNIQUE INDEX idx_recordings_mb_id_song_id ON recordings (musicbrainz_id, song_id) WHERE musicbrainz_id IS NOT NULL;
 
 -- Recording Releases
 CREATE INDEX idx_recording_releases_recording_id ON recording_releases (recording_id);
