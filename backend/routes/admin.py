@@ -2778,6 +2778,7 @@ def duration_mismatches_review(song_id):
                     rr.id AS recording_release_id,
                     rr.track_number,
                     rr.disc_number,
+                    rrsl.service_title AS spotify_track_title,
                     rel.id AS release_id,
                     rel.title AS release_title,
                     rel.artist_credit,
@@ -2831,6 +2832,8 @@ def duration_mismatches_review(song_id):
             'artist_credit': row['artist_credit'],
             'release_mb_id': row['release_mb_id'],
             'release_id': str(row['release_id']),
+            'mb_track_title': row['title'],
+            'spotify_track_title': row['spotify_track_title'],
         })
 
     recordings = list(recordings_map.values())

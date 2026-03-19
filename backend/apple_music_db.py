@@ -383,6 +383,7 @@ def upsert_track_streaming_link(
     duration_ms: int = None,
     preview_url: str = None,
     isrc: str = None,
+    service_title: str = None,
     match_confidence: float = None,
     match_method: str = None,
     dry_run: bool = False,
@@ -402,6 +403,7 @@ def upsert_track_streaming_link(
         duration_ms: Track duration in milliseconds
         preview_url: 30-second preview URL
         isrc: ISRC code if available
+        service_title: Track title as it appears on Apple Music
         match_confidence: Confidence score 0.0-1.0
         match_method: How the match was made
         dry_run: If True, don't actually update
@@ -425,14 +427,15 @@ def upsert_track_streaming_link(
         with conn.cursor() as cur:
             cur.execute("""
                 INSERT INTO recording_release_streaming_links (
-                    recording_release_id, service, service_id, service_url,
+                    recording_release_id, service, service_id, service_title, service_url,
                     duration_ms, preview_url, isrc,
                     match_confidence, match_method, matched_at
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
                 ON CONFLICT (recording_release_id, service)
                 DO UPDATE SET
                     service_id = EXCLUDED.service_id,
+                    service_title = COALESCE(EXCLUDED.service_title, recording_release_streaming_links.service_title),
                     service_url = EXCLUDED.service_url,
                     duration_ms = EXCLUDED.duration_ms,
                     preview_url = EXCLUDED.preview_url,
@@ -444,7 +447,7 @@ def upsert_track_streaming_link(
                 WHERE recording_release_streaming_links.match_method != 'manual'
                    OR recording_release_streaming_links.match_method IS NULL
             """, (
-                recording_release_id, SERVICE_NAME, service_id, service_url,
+                recording_release_id, SERVICE_NAME, service_id, service_title, service_url,
                 duration_ms, preview_url, isrc,
                 match_confidence, match_method
             ))

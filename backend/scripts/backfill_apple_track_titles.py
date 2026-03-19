@@ -2,11 +2,11 @@
 """
 Backfill Track Titles from Apple Music
 
-Fetches track names from Apple Music/iTunes API for recording_releases that have
-Apple Music track links but no track_title stored locally.
+Fetches track names from Apple Music/iTunes API for streaming links that have
+an Apple Music service_id but no service_title stored locally.
 
 This fills in gaps for tracks that were matched via Apple Music but where
-track_title wasn't saved at the time of matching.
+service_title wasn't saved at the time of matching.
 
 Usage:
     python backfill_apple_track_titles.py --limit 100
@@ -46,48 +46,50 @@ Examples:
     })
 
     stats = {
-        'recording_releases_found': 0,
+        'streaming_links_found': 0,
         'tracks_updated': 0,
         'tracks_not_found_in_apple': 0,
         'api_calls': 0,
         'errors': 0,
     }
 
-    # Query recording_releases that have Apple Music links but no track_title
-    # We need to join with recording_release_streaming_links to find Apple Music tracks
-    script.logger.info("Finding recording_releases with Apple Music links but no track_title...")
+    # Query Apple Music streaming links missing service_title
+    script.logger.info("Finding Apple Music streaming links without service_title...")
 
     with get_db_connection() as conn:
         with conn.cursor() as cur:
             cur.execute("""
-                SELECT rr.id, rrsl.service_id as apple_music_track_id
-                FROM recording_releases rr
-                JOIN recording_release_streaming_links rrsl ON rr.id = rrsl.recording_release_id
-                WHERE rrsl.service = 'apple_music'
-                  AND rr.track_title IS NULL
-                ORDER BY rr.created_at DESC
+                SELECT id, service_id
+                FROM recording_release_streaming_links
+                WHERE service = 'apple_music'
+                  AND service_id IS NOT NULL
+                  AND service_title IS NULL
+                ORDER BY created_at DESC
                 LIMIT %s
             """, (args.limit,))
 
-            recording_releases = cur.fetchall()
+            streaming_links = cur.fetchall()
 
-    stats['recording_releases_found'] = len(recording_releases)
-    script.logger.info(f"Found {len(recording_releases)} recording_releases to process")
+    stats['streaming_links_found'] = len(streaming_links)
+    script.logger.info(f"Found {len(streaming_links)} streaming links to process")
     script.logger.info("")
 
-    if not recording_releases:
+    if not streaming_links:
         script.print_summary(stats)
         return True
 
     # Initialize Apple Music client
     apple_client = AppleMusicClient(logger=script.logger)
 
-    # Process each recording_release
-    for i, rr in enumerate(recording_releases, 1):
-        recording_release_id = rr['id']
-        apple_track_id = rr['apple_music_track_id']
+    # Process each streaming link, batching DB writes
+    batch_size = 50
+    updates = []
 
-        script.logger.info(f"[{i}/{len(recording_releases)}] Looking up track {apple_track_id}...")
+    for i, link in enumerate(streaming_links, 1):
+        streaming_link_id = link['id']
+        apple_track_id = link['service_id']
+
+        script.logger.info(f"[{i}/{len(streaming_links)}] Looking up track {apple_track_id}...")
 
         try:
             # Look up track in Apple Music
@@ -106,22 +108,38 @@ Examples:
                 continue
 
             script.logger.info(f"  Title: {track_name}")
-
-            if not args.dry_run:
-                with get_db_connection() as conn:
-                    with conn.cursor() as cur:
-                        cur.execute("""
-                            UPDATE recording_releases
-                            SET track_title = %s
-                            WHERE id = %s
-                        """, (track_name, recording_release_id))
-                    conn.commit()
-
+            updates.append((track_name, streaming_link_id))
             stats['tracks_updated'] += 1
+
+            # Flush writes in batches
+            if len(updates) >= batch_size:
+                if not args.dry_run:
+                    with get_db_connection() as conn:
+                        with conn.cursor() as cur:
+                            cur.executemany("""
+                                UPDATE recording_release_streaming_links
+                                SET service_title = %s, updated_at = CURRENT_TIMESTAMP
+                                WHERE id = %s
+                            """, updates)
+                        conn.commit()
+                script.logger.info(f"  Committed {len(updates)} updates")
+                updates = []
 
         except Exception as e:
             script.logger.error(f"  Error: {e}")
             stats['errors'] += 1
+
+    # Flush remaining updates
+    if updates and not args.dry_run:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.executemany("""
+                    UPDATE recording_release_streaming_links
+                    SET service_title = %s, updated_at = CURRENT_TIMESTAMP
+                    WHERE id = %s
+                """, updates)
+            conn.commit()
+        script.logger.info(f"  Committed {len(updates)} updates")
 
     script.print_summary(stats)
     return stats['errors'] == 0

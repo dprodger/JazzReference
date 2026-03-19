@@ -659,13 +659,14 @@ def update_recording_release_track_id(conn, recording_id: str, release_id: str,
         service_url = f'https://open.spotify.com/track/{track_id}'
         cur.execute("""
             INSERT INTO recording_release_streaming_links (
-                recording_release_id, service, service_id, service_url,
+                recording_release_id, service, service_id, service_title, service_url,
                 duration_ms, match_confidence, match_method, matched_at
             )
-            VALUES (%s, 'spotify', %s, %s, %s, %s, 'fuzzy_search', CURRENT_TIMESTAMP)
+            VALUES (%s, 'spotify', %s, %s, %s, %s, %s, 'fuzzy_search', CURRENT_TIMESTAMP)
             ON CONFLICT (recording_release_id, service)
             DO UPDATE SET
                 service_id = EXCLUDED.service_id,
+                service_title = COALESCE(EXCLUDED.service_title, recording_release_streaming_links.service_title),
                 service_url = EXCLUDED.service_url,
                 duration_ms = EXCLUDED.duration_ms,
                 match_confidence = EXCLUDED.match_confidence,
@@ -674,7 +675,7 @@ def update_recording_release_track_id(conn, recording_id: str, release_id: str,
                 updated_at = CURRENT_TIMESTAMP
             WHERE recording_release_streaming_links.match_method != 'manual'
                OR recording_release_streaming_links.match_method IS NULL
-        """, (recording_release_id, track_id, service_url, duration_ms, match_confidence))
+        """, (recording_release_id, track_id, track_title, service_url, duration_ms, match_confidence))
         # Note: commit is handled by the caller's context manager
 
 

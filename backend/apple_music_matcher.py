@@ -796,6 +796,7 @@ class AppleMusicMatcher:
                     duration_ms=matched_track.get('duration_ms'),
                     preview_url=matched_track.get('preview_url'),
                     isrc=matched_track.get('isrc'),
+                    service_title=track_name,
                     match_confidence=matched_track.get('_match_confidence', 0.8),
                     match_method='fuzzy_search',
                     dry_run=self.dry_run,

@@ -220,6 +220,7 @@ CREATE TABLE recording_release_streaming_links (
     recording_release_id UUID NOT NULL REFERENCES recording_releases(id) ON DELETE CASCADE,
     service VARCHAR(50) NOT NULL,               -- 'spotify', 'apple_music', 'youtube', 'youtube_music', 'tidal', etc.
     service_id VARCHAR(100),                    -- Track ID on this service
+    service_title VARCHAR(500),                -- Track title as it appears on this service
     service_url VARCHAR(500),
     duration_ms INTEGER,
     popularity INTEGER,                         -- Spotify popularity score

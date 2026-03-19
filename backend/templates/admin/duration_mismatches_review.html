@@ -398,6 +398,8 @@
                         <tr>
                             <th style="width: 30px;"></th>
                             <th>Release</th>
+                            <th>MB Track Title</th>
+                            <th>Spotify Track Title</th>
                             <th>MB Release</th>
                             <th>Spotify Track</th>
                             <th>MB Duration</th>
@@ -416,6 +418,16 @@
                             <td>
                                 <div style="font-weight: 500;">{{ link.release_title or '?' }}</div>
                                 <div style="font-size: 11px; color: #888;">{{ link.artist_credit or '' }}</div>
+                            </td>
+                            <td>{{ link.mb_track_title or '-' }}</td>
+                            <td>
+                                {% if link.spotify_track_title and link.spotify_track_title != link.mb_track_title %}
+                                <span style="color: #e74c3c; font-weight: 500;">{{ link.spotify_track_title }}</span>
+                                {% elif link.spotify_track_title %}
+                                {{ link.spotify_track_title }}
+                                {% else %}
+                                <span style="color: #ccc;">-</span>
+                                {% endif %}
                             </td>
                             <td>
                                 {% if link.release_mb_id %}

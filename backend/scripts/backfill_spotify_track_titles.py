@@ -2,8 +2,8 @@
 """
 Backfill Track Titles from Spotify
 
-Fetches track names from Spotify API for recording_releases that have
-a spotify_track_id but no track_title stored locally.
+Fetches track names from Spotify API for streaming links that have
+a Spotify service_id but no service_title stored locally.
 
 Uses Spotify's batch endpoint to fetch up to 50 tracks per API call,
 making this much more efficient than individual lookups.
@@ -45,7 +45,7 @@ Examples:
     })
 
     stats = {
-        'recording_releases_found': 0,
+        'streaming_links_found': 0,
         'batches_processed': 0,
         'tracks_updated': 0,
         'tracks_not_found_in_spotify': 0,
@@ -53,31 +53,27 @@ Examples:
         'errors': 0,
     }
 
-    # Query recording_releases that have spotify_track_id but no track_title
-    # Check both normalized streaming_links table and legacy column
-    script.logger.info("Finding recording_releases without track_titles...")
+    # Query Spotify streaming links missing service_title
+    script.logger.info("Finding Spotify streaming links without service_title...")
 
     with get_db_connection() as conn:
         with conn.cursor() as cur:
             cur.execute("""
-                SELECT
-                    rr.id,
-                    COALESCE(rrsl.service_id, rr.spotify_track_id) as spotify_track_id
-                FROM recording_releases rr
-                LEFT JOIN recording_release_streaming_links rrsl
-                    ON rrsl.recording_release_id = rr.id AND rrsl.service = 'spotify'
-                WHERE (rrsl.service_id IS NOT NULL OR rr.spotify_track_id IS NOT NULL)
-                  AND rr.track_title IS NULL
-                ORDER BY rr.created_at DESC
+                SELECT id, service_id
+                FROM recording_release_streaming_links
+                WHERE service = 'spotify'
+                  AND service_id IS NOT NULL
+                  AND service_title IS NULL
+                ORDER BY created_at DESC
                 LIMIT %s
             """, (args.limit,))
 
-            recording_releases = cur.fetchall()
+            streaming_links = cur.fetchall()
 
-    stats['recording_releases_found'] = len(recording_releases)
-    script.logger.info(f"Found {len(recording_releases)} recording_releases to process")
+    stats['streaming_links_found'] = len(streaming_links)
+    script.logger.info(f"Found {len(streaming_links)} streaming links to process")
 
-    if not recording_releases:
+    if not streaming_links:
         script.print_summary(stats)
         return True
 
@@ -89,8 +85,8 @@ Examples:
     batches = []
     current_batch = []
 
-    for rr in recording_releases:
-        current_batch.append(rr)
+    for link in streaming_links:
+        current_batch.append(link)
         if len(current_batch) >= batch_size:
             batches.append(current_batch)
             current_batch = []
@@ -106,7 +102,7 @@ Examples:
         script.logger.info(f"[Batch {batch_num}/{len(batches)}] Fetching {len(batch)} tracks...")
 
         # Extract track IDs for this batch
-        track_ids = [rr['spotify_track_id'] for rr in batch]
+        track_ids = [link['service_id'] for link in batch]
 
         try:
             # Fetch track data in batch
@@ -120,10 +116,11 @@ Examples:
 
             stats['batches_processed'] += 1
 
-            # Update each recording_release with track name
-            for rr in batch:
-                track_id = rr['spotify_track_id']
-                recording_release_id = rr['id']
+            # Collect updates for batch write
+            updates = []
+            for link in batch:
+                track_id = link['service_id']
+                streaming_link_id = link['id']
 
                 track_data = tracks_data.get(track_id)
                 if not track_data:
@@ -137,19 +134,21 @@ Examples:
                     stats['tracks_not_found_in_spotify'] += 1
                     continue
 
-                if not args.dry_run:
-                    with get_db_connection() as conn:
-                        with conn.cursor() as cur:
-                            cur.execute("""
-                                UPDATE recording_releases
-                                SET track_title = %s
-                                WHERE id = %s
-                            """, (track_name, recording_release_id))
-                        conn.commit()
+                updates.append((track_name, streaming_link_id))
 
-                stats['tracks_updated'] += 1
+            # Write all updates in a single connection/transaction
+            if updates and not args.dry_run:
+                with get_db_connection() as conn:
+                    with conn.cursor() as cur:
+                        cur.executemany("""
+                            UPDATE recording_release_streaming_links
+                            SET service_title = %s, updated_at = CURRENT_TIMESTAMP
+                            WHERE id = %s
+                        """, updates)
+                    conn.commit()
 
-            script.logger.info(f"  Updated {sum(1 for rr in batch if tracks_data.get(rr['spotify_track_id']))} tracks")
+            stats['tracks_updated'] += len(updates)
+            script.logger.info(f"  Updated {len(updates)} tracks")
 
         except Exception as e:
             script.logger.error(f"  Error processing batch: {e}")
