@@ -20,6 +20,9 @@ from db_utils import get_db_connection
 from mb_utils import MusicBrainzSearcher
 
 
+BATCH_SIZE = 500  # Flush DB updates every N releases
+
+
 def main():
     script = ScriptBase(
         name="backfill_mb_track_titles",
@@ -34,7 +37,7 @@ Examples:
 
     script.add_dry_run_arg()
     script.add_debug_arg()
-    script.add_limit_arg(default=100)
+    script.add_limit_arg(default=10000)
 
     args = script.parse_args()
 
@@ -49,14 +52,17 @@ Examples:
         'tracks_already_set': 0,
         'tracks_no_mb_match': 0,
         'mb_api_calls': 0,
+        'mb_cache_hits': 0,
         'errors': 0,
     }
 
-    # Find releases that have MB release IDs and recording_releases without track_title
+    # Find releases that have MB release IDs and recording_releases without track_title.
+    # Also pre-fetch all the recording_releases we'll need in one query.
     script.logger.info("Finding releases with recording_releases missing track_title...")
 
     with get_db_connection() as conn:
         with conn.cursor() as cur:
+            # Get distinct releases needing work
             cur.execute("""
                 SELECT DISTINCT
                     rel.id AS release_id,
@@ -66,39 +72,71 @@ Examples:
                 JOIN recording_releases rr ON rr.release_id = rel.id
                 WHERE rel.musicbrainz_release_id IS NOT NULL
                   AND rr.track_title IS NULL
-                ORDER BY rel.title
                 LIMIT %s
             """, (args.limit,))
             releases = cur.fetchall()
 
-    stats['releases_found'] = len(releases)
-    script.logger.info(f"Found {len(releases)} releases to process")
+            if not releases:
+                stats['releases_found'] = 0
+                script.logger.info("No releases to process")
+                script.print_summary(stats)
+                return True
+
+            release_ids = [r['release_id'] for r in releases]
+            stats['releases_found'] = len(releases)
+            script.logger.info(f"Found {len(releases)} releases to process")
+
+            # Pre-fetch ALL recording_releases for these releases in one query
+            cur.execute("""
+                SELECT rr.id, rr.release_id, rr.track_title,
+                       rec.musicbrainz_id AS mb_recording_id,
+                       rec.title AS recording_title
+                FROM recording_releases rr
+                JOIN recordings rec ON rr.recording_id = rec.id
+                WHERE rr.release_id = ANY(%s)
+            """, (release_ids,))
+            all_rrs = cur.fetchall()
+
+    # Index recording_releases by release_id
+    rrs_by_release = {}
+    for rr in all_rrs:
+        rrs_by_release.setdefault(rr['release_id'], []).append(rr)
+
+    script.logger.info(f"Pre-fetched {len(all_rrs)} recording_releases")
     script.logger.info("")
 
-    if not releases:
-        script.print_summary(stats)
-        return True
+    import time
+    start_time = time.time()
 
-    mb_searcher = MusicBrainzSearcher()
+    mb_searcher = MusicBrainzSearcher(cache_days=365)
+    pending_updates = []  # (track_title, rr_id) tuples
 
     for i, release in enumerate(releases, 1):
         release_id = release['release_id']
         mb_release_id = release['mb_release_id']
         release_title = release['release_title']
 
-        script.logger.info(f"[{i}/{len(releases)}] {release_title} (MB: {mb_release_id})")
+        if i % 1000 == 0 or i == 1:
+            script.logger.info(f"[{i}/{len(releases)}] "
+                             f"updated: {stats['tracks_updated']}, "
+                             f"cache: {stats['mb_cache_hits']}, "
+                             f"API: {stats['mb_api_calls']}, "
+                             f"errors: {stats['errors']}")
 
         try:
-            # Fetch release details from MusicBrainz
+            # Fetch release details from MusicBrainz (cached or API)
             release_data = mb_searcher.get_release_details(mb_release_id)
-            stats['mb_api_calls'] += 1
+            if mb_searcher.last_made_api_call:
+                stats['mb_api_calls'] += 1
+            else:
+                stats['mb_cache_hits'] += 1
 
             if not release_data:
-                script.logger.warning(f"  Could not fetch release details from MB")
+                script.logger.debug(f"  [{i}] {release_title}: no MB data")
                 stats['errors'] += 1
                 continue
 
-            # Build a map of MB recording ID → track title from the release
+            # Build a map of MB recording ID -> track title from the release
             mb_track_map = {}
             for medium in release_data.get('media', []):
                 for track in medium.get('tracks', []):
@@ -107,21 +145,10 @@ Examples:
                     if recording_id:
                         mb_track_map[recording_id] = track.get('title', '')
 
-            script.logger.debug(f"  MB release has {len(mb_track_map)} tracks")
+            # Match against our recording_releases
+            recording_releases = rrs_by_release.get(release_id, [])
+            release_updates = 0
 
-            # Get our recording_releases for this release
-            with get_db_connection() as conn:
-                with conn.cursor() as cur:
-                    cur.execute("""
-                        SELECT rr.id, rr.track_title, rec.musicbrainz_id AS mb_recording_id,
-                               rec.title AS recording_title
-                        FROM recording_releases rr
-                        JOIN recordings rec ON rr.recording_id = rec.id
-                        WHERE rr.release_id = %s
-                    """, (release_id,))
-                    recording_releases = cur.fetchall()
-
-            updates = []
             for rr in recording_releases:
                 mb_recording_id = rr['mb_recording_id']
                 if not mb_recording_id:
@@ -134,37 +161,48 @@ Examples:
 
                 mb_track_title = mb_track_map.get(mb_recording_id)
                 if not mb_track_title:
-                    script.logger.debug(
-                        f"  Recording {mb_recording_id} not found in MB release tracklist")
                     stats['tracks_no_mb_match'] += 1
                     continue
 
-                updates.append((mb_track_title, rr['id']))
-                if mb_track_title != rr['recording_title']:
-                    script.logger.debug(
-                        f"  '{rr['recording_title']}' → '{mb_track_title}' on this release")
+                pending_updates.append((mb_track_title, rr['id']))
+                release_updates += 1
 
-            if updates and not args.dry_run:
-                with get_db_connection() as conn:
-                    with conn.cursor() as cur:
-                        cur.executemany("""
-                            UPDATE recording_releases
-                            SET track_title = %s
-                            WHERE id = %s
-                        """, updates)
-                    conn.commit()
-
-            stats['tracks_updated'] += len(updates)
+            stats['tracks_updated'] += release_updates
             stats['releases_processed'] += 1
-            if updates:
-                script.logger.info(f"  Updated {len(updates)} track title(s)")
+
+            # Flush batch to DB periodically
+            if len(pending_updates) >= BATCH_SIZE and not args.dry_run:
+                _flush_updates(pending_updates)
+                pending_updates = []
 
         except Exception as e:
-            script.logger.error(f"  Error: {e}")
+            script.logger.error(f"  [{i}] {release_title}: {e}")
             stats['errors'] += 1
 
+    # Final flush
+    if pending_updates and not args.dry_run:
+        _flush_updates(pending_updates)
+
+    elapsed = time.time() - start_time
+    script.logger.info(f"\nCompleted in {elapsed:.1f}s "
+                      f"({stats['releases_processed']} releases, "
+                      f"{stats['tracks_updated']} tracks updated, "
+                      f"{stats['mb_cache_hits']} cache hits, "
+                      f"{stats['mb_api_calls']} API calls)")
     script.print_summary(stats)
     return stats['errors'] == 0
+
+
+def _flush_updates(updates):
+    """Write a batch of (track_title, rr_id) updates to the DB."""
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.executemany("""
+                UPDATE recording_releases
+                SET track_title = %s
+                WHERE id = %s
+            """, updates)
+        conn.commit()
 
 
 if __name__ == "__main__":
