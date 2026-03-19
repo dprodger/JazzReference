@@ -143,7 +143,7 @@ Examples:
                     recording = track.get('recording', {})
                     recording_id = recording.get('id')
                     if recording_id:
-                        mb_track_map[recording_id] = track.get('title', '')
+                        mb_track_map[recording_id] = track.get('title', '')[:500]
 
             # Match against our recording_releases
             recording_releases = rrs_by_release.get(release_id, [])
