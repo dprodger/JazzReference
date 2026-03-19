@@ -6,6 +6,7 @@ Matches Spotify albums to existing releases and updates the database
 
 from script_base import ScriptBase, run_script
 from spotify_utils import SpotifyMatcher
+from spotify_db import get_songs_with_duration_mismatches
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -50,8 +51,8 @@ Examples:
         """
     )
 
-    # Add arguments
-    script.add_song_args()
+    # Add arguments (song args optional — not needed for --duration-mismatches across all songs)
+    script.add_song_args(required=False)
     script.add_common_args()
 
     script.parser.add_argument(
@@ -102,6 +103,18 @@ Examples:
         help='Resume from release number N (1-indexed). Use to continue after an interrupted run.'
     )
 
+    script.parser.add_argument(
+        '--audit-album-context',
+        action='store_true',
+        help='Evaluate album-context rescue for duration-rejected tracks and log results to album_context_audit.csv (no behavior change)'
+    )
+
+    script.parser.add_argument(
+        '--album-context',
+        action='store_true',
+        help='Enable album-context rescue: accept duration-rejected tracks when the full MB/Spotify tracklists match well'
+    )
+
     # Parse arguments
     args = script.parse_args()
 
@@ -119,6 +132,13 @@ Examples:
     rematch_tracks = args.rematch_tracks or args.rematch_all
     rematch_all = args.rematch_all
 
+    # Album context mode
+    album_context = None
+    if args.album_context:
+        album_context = 'rescue'
+    elif args.audit_album_context:
+        album_context = 'audit'
+
     matcher = SpotifyMatcher(
         dry_run=args.dry_run,
         artist_filter=args.artist,
@@ -129,7 +149,8 @@ Examples:
         rematch=rematch,
         rematch_tracks=rematch_tracks,
         rematch_all=rematch_all,
-        duration_mismatch_threshold=duration_mismatch_threshold
+        duration_mismatch_threshold=duration_mismatch_threshold,
+        album_context=album_context,
     )
 
     # Print header with modes
@@ -139,6 +160,8 @@ Examples:
         "REMATCH ALL": args.rematch_all or duration_mismatch_threshold is not None,
         "REMATCH TRACKS": rematch_tracks and not args.rematch_all and duration_mismatch_threshold is None,
         f"DURATION MISMATCHES (>{args.duration_mismatches}s)": duration_mismatch_threshold is not None,
+        "ALBUM CONTEXT AUDIT": album_context == 'audit',
+        "ALBUM CONTEXT RESCUE": album_context == 'rescue',
         f"START FROM #{args.start_from}": args.start_from > 1,
     }
     script.print_header(modes)
@@ -152,7 +175,24 @@ Examples:
 
     # Get song identifier and run matcher
     song_identifier = args.name or args.id
-    result = matcher.match_releases(song_identifier, start_from=args.start_from)
+
+    if not song_identifier and duration_mismatch_threshold is not None:
+        # Process all songs with duration mismatches
+        songs = get_songs_with_duration_mismatches(duration_mismatch_threshold)
+        script.logger.info(f"Found {len(songs)} songs with duration mismatches")
+        script.logger.info("")
+        for i, song in enumerate(songs, 1):
+            script.logger.info(f"{'='*60}")
+            script.logger.info(f"[{i}/{len(songs)}] {song['title']}")
+            script.logger.info(f"{'='*60}")
+            matcher.match_releases(str(song['id']), start_from=args.start_from)
+        # Stats accumulate on the matcher instance across all songs
+        result = {'success': True, 'stats': matcher.stats}
+    elif not song_identifier:
+        script.logger.error("Either --name/--id or --duration-mismatches is required")
+        return False
+    else:
+        result = matcher.match_releases(song_identifier, start_from=args.start_from)
 
     # Print summary
     if result['success']:
@@ -175,6 +215,10 @@ Examples:
             summary["Tracks had previous match"] = stats['tracks_had_previous']
         if stats.get('releases_cleared', 0) > 0:
             summary["Stale matches cleared"] = stats['releases_cleared']
+        if stats.get('tracks_album_context_rescued', 0) > 0:
+            summary["Album context rescued"] = stats['tracks_album_context_rescued']
+        if stats.get('tracks_album_context_would_rescue', 0) > 0:
+            summary["Album context would rescue"] = stats['tracks_album_context_would_rescue']
         script.print_summary(summary, title="MATCHING SUMMARY")
     else:
         script.logger.error(f"Matching failed: {result.get('error', 'Unknown error')}")

@@ -70,7 +70,8 @@ class SpotifyMatcher:
                  artist_filter=False, cache_days=30, logger=None,
                  rate_limit_delay=0.2, max_retries=3,
                  progress_callback=None, rematch=False, rematch_tracks=False,
-                 rematch_all=False, duration_mismatch_threshold=None):
+                 rematch_all=False, duration_mismatch_threshold=None,
+                 album_context=None):
         """
         Initialize Spotify Matcher
 
@@ -89,11 +90,17 @@ class SpotifyMatcher:
             rematch_all: If True, full re-match from scratch - ignores existing track IDs too
             duration_mismatch_threshold: If set (in ms), only process releases with
                 duration mismatches above this threshold. Implies rematch-all behavior.
+            album_context: None (default), 'audit', or 'rescue'. When set, tracks
+                that would be rejected for low duration confidence are evaluated
+                against album-wide match context. 'audit' logs what would be rescued
+                without changing behavior. 'rescue' accepts them with match_method
+                'album_context'.
         """
         self.dry_run = dry_run
         self.artist_filter = artist_filter
         self.strict_mode = strict_mode
         self.duration_mismatch_threshold = duration_mismatch_threshold
+        self.album_context = album_context
         # duration-mismatches mode implies full rematch
         if duration_mismatch_threshold is not None:
             rematch = True
@@ -134,6 +141,8 @@ class SpotifyMatcher:
             'tracks_no_match': 0,
             'tracks_had_previous': 0,  # Tracks that had a match before but failed rematch
             'tracks_blocked': 0,  # Tracks blocked via bad_streaming_matches
+            'tracks_album_context_rescued': 0,  # Tracks rescued by album context
+            'tracks_album_context_would_rescue': 0,  # Tracks that would be rescued (audit mode)
             'errors': 0,
             'cache_hits': 0,
             'api_calls': 0,
@@ -425,12 +434,14 @@ class SpotifyMatcher:
                                           track_id: str, track_url: str,
                                           disc_number: int = None, track_number: int = None,
                                           track_title: str = None, duration_ms: int = None,
-                                          match_confidence: float = None):
+                                          match_confidence: float = None,
+                                          match_method: str = 'fuzzy_search'):
         """Update the recording_releases junction table with Spotify track info"""
         update_recording_release_track_id(conn, recording_id, release_id, track_id, track_url,
                                          disc_number=disc_number, track_number=track_number,
                                          track_title=track_title, duration_ms=duration_ms,
                                          match_confidence=match_confidence,
+                                         match_method=match_method,
                                          dry_run=self.dry_run, log=self.logger)
     
     def update_recording_default_release(self, conn, song_id: str, release_id: str):
@@ -1428,6 +1439,148 @@ class SpotifyMatcher:
         else:
             return 0.2
 
+    def _check_album_context_via_tracklist(self, conn, release_id: str,
+                                           spotify_tracks: list) -> dict:
+        """
+        Compare the full MusicBrainz release tracklist against the Spotify album
+        tracklist to assess whether this is genuinely the same album.
+
+        Returns:
+            Dict with mb_track_count, spotify_track_count, matched_count,
+            match_ratio, and matched_titles (list of (mb_title, sp_title, similarity)).
+        """
+        from mb_utils import MusicBrainzSearcher
+        from spotify_matching import normalize_for_comparison
+        from rapidfuzz import fuzz
+
+        result = {
+            'mb_track_count': 0,
+            'spotify_track_count': len(spotify_tracks),
+            'matched_count': 0,
+            'match_ratio': 0.0,
+            'matched_titles': [],
+        }
+
+        # Get the MB release ID for this release
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT musicbrainz_release_id FROM releases WHERE id = %s
+            """, (release_id,))
+            row = cur.fetchone()
+
+        if not row or not row['musicbrainz_release_id']:
+            return result
+
+        mb_release_id = row['musicbrainz_release_id']
+
+        # Fetch full tracklist from MusicBrainz
+        mb_searcher = MusicBrainzSearcher()
+        release_data = mb_searcher.get_release_details(mb_release_id)
+        if not release_data:
+            return result
+
+        # Extract MB tracks
+        mb_tracks = []
+        position = 0
+        for medium in release_data.get('media', []):
+            for track in medium.get('tracks', []):
+                position += 1
+                mb_tracks.append({
+                    'title': track.get('title', ''),
+                    'position': position,
+                    'normalized': normalize_for_comparison(track.get('title', '')),
+                })
+
+        result['mb_track_count'] = len(mb_tracks)
+        if not mb_tracks:
+            return result
+
+        # Pre-normalize Spotify track titles
+        sp_normalized = [
+            normalize_for_comparison(t['name']) for t in spotify_tracks
+        ]
+
+        # Match MB tracks to Spotify tracks by title similarity
+        used_sp_indices = set()
+        for mb_track in mb_tracks:
+            best_score = 0
+            best_idx = -1
+            best_sp_title = ''
+
+            for idx, sp_norm in enumerate(sp_normalized):
+                if idx in used_sp_indices:
+                    continue
+                score = fuzz.token_sort_ratio(mb_track['normalized'], sp_norm)
+                # Small position bonus
+                if abs(mb_track['position'] - (idx + 1)) <= 2 and score >= 70:
+                    score = min(100, score + 5)
+                if score > best_score:
+                    best_score = score
+                    best_idx = idx
+                    best_sp_title = spotify_tracks[idx]['name']
+
+            if best_score >= 75:
+                result['matched_titles'].append(
+                    (mb_track['title'], best_sp_title, best_score))
+                used_sp_indices.add(best_idx)
+
+        result['matched_count'] = len(result['matched_titles'])
+        result['match_ratio'] = (
+            result['matched_count'] / result['mb_track_count']
+            if result['mb_track_count'] > 0 else 0.0
+        )
+        return result
+
+    def _log_album_context_audit(self, song_title: str, recording_id: str,
+                                  release_id: str, spotify_track_id: str,
+                                  spotify_track_name: str, expected_ms: int,
+                                  actual_ms: int, confidence: float,
+                                  title_score: float, album_context: dict,
+                                  would_rescue: bool):
+        """Log album-context evaluation to CSV for audit review."""
+        from datetime import datetime
+        from pathlib import Path
+        import csv
+
+        log_file = Path('album_context_audit.csv')
+        file_exists = log_file.exists()
+
+        try:
+            with open(log_file, 'a', newline='') as f:
+                writer = csv.writer(f)
+                if not file_exists:
+                    writer.writerow([
+                        'timestamp', 'song_title', 'recording_id', 'release_id',
+                        'spotify_track_id', 'spotify_track_name', 'spotify_url',
+                        'mb_duration_sec', 'spotify_duration_sec', 'diff_sec',
+                        'duration_confidence', 'title_score',
+                        'mb_track_count', 'spotify_track_count',
+                        'tracklist_matched', 'tracklist_match_ratio',
+                        'would_rescue',
+                    ])
+                diff_sec = abs(expected_ms - actual_ms) / 1000.0
+                writer.writerow([
+                    datetime.now().isoformat(),
+                    song_title,
+                    str(recording_id),
+                    str(release_id),
+                    spotify_track_id,
+                    spotify_track_name,
+                    f'https://open.spotify.com/track/{spotify_track_id}',
+                    round(expected_ms / 1000.0, 1),
+                    round(actual_ms / 1000.0, 1),
+                    round(diff_sec, 1),
+                    confidence,
+                    title_score,
+                    album_context['mb_track_count'],
+                    album_context['spotify_track_count'],
+                    album_context['matched_count'],
+                    round(album_context['match_ratio'], 2),
+                    would_rescue,
+                ])
+        except Exception as e:
+            self.logger.warning(f"    Failed to log album context audit: {e}")
+
     def _duration_adjusted_score(self, title_score: float, expected_ms: int,
                                   track_duration_ms: int) -> float:
         """
@@ -1638,31 +1791,71 @@ class SpotifyMatcher:
                         recording_duration_ms, matched_track['duration_ms'])
 
                 # Hard reject and log if confidence is too low
+                rescued = False
                 if confidence is not None and confidence <= 0.4:
                     title_score = self.calculate_similarity(song_title, matched_track['name'])
                     duration_diff = abs(recording_duration_ms - matched_track['duration_ms'])
                     self.logger.info(
                         f"      Rejecting low-confidence match: '{song_title}' → '{matched_track['name']}' "
                         f"(title {title_score}%, duration diff {duration_diff/1000:.0f}s, confidence {confidence})")
-                    self._log_duration_rejection(
-                        song_title=song_title,
-                        recording_id=recording['recording_id'],
-                        release_id=release_id,
-                        spotify_track_id=matched_track['id'],
-                        spotify_track_name=matched_track['name'],
-                        expected_ms=recording_duration_ms,
-                        actual_ms=matched_track['duration_ms'],
-                        confidence=confidence,
-                        title_score=title_score,
-                    )
-                    # Clear existing bad link if rematching
-                    if recording.get('spotify_track_id'):
-                        clear_recording_release_track(
-                            conn, recording['recording_id'], release_id,
-                            dry_run=self.dry_run, log=self.logger)
-                    self.stats['tracks_no_match'] += 1
-                    continue
 
+                    # Album context rescue: compare full MB vs Spotify tracklists
+                    if self.album_context and title_score >= 90:
+                        album_ctx = self._check_album_context_via_tracklist(
+                            conn, release_id, spotify_tracks)
+                        would_rescue = (
+                            album_ctx['match_ratio'] >= 0.7
+                            and album_ctx['matched_count'] >= 3
+                        )
+                        self.logger.info(
+                            f"      Album context: {album_ctx['matched_count']}/{album_ctx['mb_track_count']} "
+                            f"MB tracks match Spotify ({album_ctx['match_ratio']:.0%}) → "
+                            f"{'RESCUE' if would_rescue else 'still reject'}")
+                        self._log_album_context_audit(
+                            song_title=song_title,
+                            recording_id=recording['recording_id'],
+                            release_id=release_id,
+                            spotify_track_id=matched_track['id'],
+                            spotify_track_name=matched_track['name'],
+                            expected_ms=recording_duration_ms,
+                            actual_ms=matched_track['duration_ms'],
+                            confidence=confidence,
+                            title_score=title_score,
+                            album_context=album_ctx,
+                            would_rescue=would_rescue,
+                        )
+                        if would_rescue:
+                            self.stats['tracks_album_context_would_rescue'] += 1
+                            if self.album_context == 'rescue':
+                                rescued = True
+
+                    if not rescued:
+                        self._log_duration_rejection(
+                            song_title=song_title,
+                            recording_id=recording['recording_id'],
+                            release_id=release_id,
+                            spotify_track_id=matched_track['id'],
+                            spotify_track_name=matched_track['name'],
+                            expected_ms=recording_duration_ms,
+                            actual_ms=matched_track['duration_ms'],
+                            confidence=confidence,
+                            title_score=title_score,
+                        )
+                        # Clear existing bad link if rematching
+                        if recording.get('spotify_track_id'):
+                            clear_recording_release_track(
+                                conn, recording['recording_id'], release_id,
+                                dry_run=self.dry_run, log=self.logger)
+                        self.stats['tracks_no_match'] += 1
+                        continue
+
+                    # Rescued by album context — accept with low confidence
+                    self.logger.info(
+                        f"      ✓ Rescued by album context (match_method='album_context')")
+                    self.stats['tracks_album_context_rescued'] += 1
+                    rescued = True
+
+                match_method = 'album_context' if rescued else 'fuzzy_search'
                 self.update_recording_release_track_id(
                     conn,
                     recording['recording_id'],
@@ -1674,6 +1867,7 @@ class SpotifyMatcher:
                     track_title=matched_track.get('name'),
                     duration_ms=matched_track.get('duration_ms'),
                     match_confidence=confidence,
+                    match_method=match_method,
                 )
                 self.stats['tracks_matched'] += 1
                 any_matched = True

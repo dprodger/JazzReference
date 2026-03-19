@@ -285,6 +285,31 @@ def get_releases_with_duration_mismatches(song_id: str, threshold_ms: int = 6000
             return cur.fetchall()
 
 
+def get_songs_with_duration_mismatches(threshold_ms: int = 60000) -> List[dict]:
+    """
+    Get all songs that have at least one Spotify streaming link with a
+    duration mismatch greater than the given threshold.
+
+    Returns:
+        List of dicts with 'id' and 'title'.
+    """
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT DISTINCT s.id, s.title
+                FROM songs s
+                JOIN recordings rec ON rec.song_id = s.id
+                JOIN recording_releases rr ON rr.recording_id = rec.id
+                JOIN recording_release_streaming_links rrsl
+                    ON rrsl.recording_release_id = rr.id AND rrsl.service = 'spotify'
+                WHERE rec.duration_ms IS NOT NULL
+                  AND rrsl.duration_ms IS NOT NULL
+                  AND ABS(rec.duration_ms - rrsl.duration_ms) > %s
+                ORDER BY s.title
+            """, (threshold_ms,))
+            return cur.fetchall()
+
+
 def get_releases_without_artwork() -> List[dict]:
     """Get releases with Spotify ID but no Spotify artwork in release_imagery"""
     with get_db_connection() as conn:
@@ -603,6 +628,7 @@ def update_recording_release_track_id(conn, recording_id: str, release_id: str,
                                       disc_number: int = None, track_number: int = None,
                                       track_title: str = None, duration_ms: int = None,
                                       match_confidence: float = None,
+                                      match_method: str = 'fuzzy_search',
                                       dry_run: bool = False, log: logging.Logger = None):
     """
     Update recording_releases with Spotify track info and insert into streaming links table.
@@ -662,7 +688,7 @@ def update_recording_release_track_id(conn, recording_id: str, release_id: str,
                 recording_release_id, service, service_id, service_title, service_url,
                 duration_ms, match_confidence, match_method, matched_at
             )
-            VALUES (%s, 'spotify', %s, %s, %s, %s, %s, 'fuzzy_search', CURRENT_TIMESTAMP)
+            VALUES (%s, 'spotify', %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
             ON CONFLICT (recording_release_id, service)
             DO UPDATE SET
                 service_id = EXCLUDED.service_id,
@@ -675,7 +701,7 @@ def update_recording_release_track_id(conn, recording_id: str, release_id: str,
                 updated_at = CURRENT_TIMESTAMP
             WHERE recording_release_streaming_links.match_method != 'manual'
                OR recording_release_streaming_links.match_method IS NULL
-        """, (recording_release_id, track_id, track_title, service_url, duration_ms, match_confidence))
+        """, (recording_release_id, track_id, track_title, service_url, duration_ms, match_confidence, match_method))
         # Note: commit is handled by the caller's context manager
 
 
