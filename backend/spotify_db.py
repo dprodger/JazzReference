@@ -672,14 +672,15 @@ def update_recording_release_track_id(conn, recording_id: str, release_id: str,
             log.debug(f"      Skipping track update - manual override exists for recording_release {recording_release_id}")
             return
 
-        # Update disc/track info on recording_releases
+        # Update disc/track positional info on recording_releases
+        # Note: track_title is reserved for MusicBrainz data.
+        # Spotify track names go to recording_release_streaming_links.service_title.
         cur.execute("""
             UPDATE recording_releases
             SET disc_number = COALESCE(%s, disc_number),
-                track_number = COALESCE(%s, track_number),
-                track_title = COALESCE(%s, track_title)
+                track_number = COALESCE(%s, track_number)
             WHERE recording_id = %s AND release_id = %s
-        """, (disc_number, track_number, track_title, recording_id, release_id))
+        """, (disc_number, track_number, recording_id, release_id))
 
         # Insert/update the streaming links table (only if not a manual override)
         service_url = f'https://open.spotify.com/track/{track_id}'

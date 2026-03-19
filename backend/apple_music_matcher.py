@@ -43,7 +43,6 @@ from apple_music_db import (
     upsert_release_streaming_link,
     upsert_track_streaming_link,
     upsert_release_imagery,
-    update_recording_release_track_title,
 )
 
 # Optional: Apple Music Feed catalog (much faster, no rate limits)
@@ -802,16 +801,6 @@ class AppleMusicMatcher:
                     dry_run=self.dry_run,
                     log=self.logger,
                 )
-
-                # Also save track_title to recording_releases table
-                if track_name:
-                    update_recording_release_track_title(
-                        conn,
-                        recording_release_id=recording_release_id,
-                        track_title=track_name,
-                        dry_run=self.dry_run,
-                        log=self.logger,
-                    )
 
                 self.stats['tracks_matched'] += 1
                 self.logger.debug(f"      Matched track: {track_name}")
