@@ -48,7 +48,6 @@ Examples:
         'tracks_updated': 0,
         'tracks_already_set': 0,
         'tracks_no_mb_match': 0,
-        'tracks_title_same': 0,
         'mb_api_calls': 0,
         'errors': 0,
     }
@@ -140,14 +139,10 @@ Examples:
                     stats['tracks_no_mb_match'] += 1
                     continue
 
-                # Only set if it differs from the recording title (otherwise it's redundant)
-                if mb_track_title == rr['recording_title']:
-                    stats['tracks_title_same'] += 1
-                    continue
-
                 updates.append((mb_track_title, rr['id']))
-                script.logger.debug(
-                    f"  '{rr['recording_title']}' → '{mb_track_title}' on this release")
+                if mb_track_title != rr['recording_title']:
+                    script.logger.debug(
+                        f"  '{rr['recording_title']}' → '{mb_track_title}' on this release")
 
             if updates and not args.dry_run:
                 with get_db_connection() as conn:
