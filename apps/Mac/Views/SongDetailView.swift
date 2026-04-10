@@ -12,107 +12,52 @@ import SwiftUI
 
 struct SongDetailView: View {
     let songId: String
-    @State private var song: Song?
-    @State private var isLoading = true
-    @State private var isRecordingsLoading = true
-    @State private var sortOrder: RecordingSortOrder = .year
+
+    // Shared data + network state lives on the view model; layout/presentation
+    // state stays here.
+    @StateObject private var viewModel = SongDetailViewModel()
+
     @State private var selectedRecordingId: String?
     @State private var selectedFilter: SongRecordingFilter = .playable
     @State private var selectedVocalFilter: VocalFilter = .all
     @State private var selectedInstrument: InstrumentFamily? = nil
-    @State private var transcriptions: [SoloTranscription] = []
-    @State private var backingTracks: [Video] = []
     @State private var isSummaryInfoExpanded = false
     @State private var showAddToRepertoire = false
     @State private var successMessage: String?
     @State private var errorMessage: String?
-    @State private var isRefreshing = false
-    @State private var researchStatus: SongResearchStatus = .notInQueue
-    @State private var researchStatusTimer: Timer?
     @EnvironmentObject var repertoireManager: RepertoireManager
     @EnvironmentObject var authManager: AuthenticationManager
 
-    @StateObject private var networkManager = NetworkManager()
+    // Read-only aliases so existing reference sites in this view can keep
+    // using the short names unchanged.
+    private var song: Song? { viewModel.song }
+    private var isLoading: Bool { viewModel.isLoading }
+    private var isRecordingsLoading: Bool { viewModel.isRecordingsLoading }
+    private var sortOrder: RecordingSortOrder { viewModel.sortOrder }
+    private var transcriptions: [SoloTranscription] { viewModel.transcriptions }
+    private var backingTracks: [Video] { viewModel.backingTracks }
+    private var isRefreshing: Bool { viewModel.isRefreshing }
+    private var researchStatus: SongResearchStatus { viewModel.researchStatus }
+    private var canQueueForRefresh: Bool { viewModel.canQueueForRefresh }
 
     // MARK: - Song Refresh
 
-    /// Queue song for background research
-    /// - Parameter forceRefresh: If true, bypass cache and re-fetch all data.
-    ///                          If false, use cached data where available (faster).
+    /// Queue song for background research and show a success/error message.
     private func refreshSongData(forceRefresh: Bool) {
-        isRefreshing = true
         let refreshType = forceRefresh ? "full" : "quick"
-
         Task {
-            let success = await networkManager.refreshSongData(songId: songId, forceRefresh: forceRefresh)
-
-            await MainActor.run {
-                isRefreshing = false
-                if success {
-                    // Update research status to show it's now in queue
-                    checkResearchStatus()
-                    successMessage = "Song queued for \(refreshType) refresh"
-                    // Auto-dismiss success message after 3 seconds
-                    Task {
-                        try? await Task.sleep(nanoseconds: 3_000_000_000)
-                        await MainActor.run {
-                            successMessage = nil
-                        }
-                    }
-                } else {
-                    errorMessage = "Failed to queue song for refresh"
-                }
+            let success = await viewModel.queueRefresh(songId: songId, forceRefresh: forceRefresh)
+            if success {
+                successMessage = "Song queued for \(refreshType) refresh"
+                try? await Task.sleep(nanoseconds: 3_000_000_000)
+                successMessage = nil
+            } else {
+                errorMessage = "Failed to queue song for refresh"
             }
         }
     }
 
-    // MARK: - Research Status
-
-    /// Check if this song is currently being researched or in the queue
-    private func checkResearchStatus() {
-        Task {
-            let status = await networkManager.checkSongResearchStatus(songId: songId)
-            await MainActor.run {
-                researchStatus = status
-                // Start or stop polling based on status
-                updateResearchStatusPolling()
-            }
-        }
-    }
-
-    /// Start polling for research status updates every 10 seconds
-    private func startResearchStatusPolling() {
-        guard researchStatusTimer == nil else { return }
-        researchStatusTimer = Timer.scheduledTimer(withTimeInterval: 10.0, repeats: true) { _ in
-            checkResearchStatus()
-        }
-    }
-
-    /// Stop polling for research status updates
-    private func stopResearchStatusPolling() {
-        researchStatusTimer?.invalidate()
-        researchStatusTimer = nil
-    }
-
-    /// Update polling state based on current research status
-    private func updateResearchStatusPolling() {
-        switch researchStatus {
-        case .notInQueue:
-            stopResearchStatusPolling()
-        case .inQueue, .currentlyResearching:
-            startResearchStatusPolling()
-        }
-    }
-
-    /// Whether the song can be queued for refresh (not already in queue or being researched)
-    private var canQueueForRefresh: Bool {
-        if case .notInQueue = researchStatus {
-            return true
-        }
-        return false
-    }
-
-    /// Helper text for the research status
+    /// Helper text for the research status tooltip
     private var researchStatusHelperText: String {
         switch researchStatus {
         case .currentlyResearching:
@@ -122,13 +67,6 @@ struct SongDetailView: View {
         case .notInQueue:
             return ""
         }
-    }
-
-    private func researchingMessage(progress: ResearchProgress?) -> String {
-        guard let progress = progress else {
-            return "Processing..."
-        }
-        return "\(progress.phaseDescription) (\(progress.current)/\(progress.total))"
     }
 
     var body: some View {
@@ -217,15 +155,27 @@ struct SongDetailView: View {
             }
         }
         .task(id: songId) {
-            await loadSong()
+            await viewModel.load(songId: songId)
         }
         .onChange(of: sortOrder) { _, _ in
-            Task {
-                await reloadRecordings()
+            Task { await viewModel.reloadRecordings(songId: songId) }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .transcriptionCreated)) { notification in
+            // Refresh if this notification is for our song
+            if let notifSongId = notification.userInfo?["songId"] as? String,
+               notifSongId == songId {
+                Task { await viewModel.load(songId: songId) }
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .videoCreated)) { notification in
+            // Refresh backing tracks if this notification is for our song
+            if let notifSongId = notification.userInfo?["songId"] as? String,
+               notifSongId == songId {
+                Task { await viewModel.refreshBackingTracks(songId: songId) }
             }
         }
         .onDisappear {
-            stopResearchStatusPolling()
+            viewModel.stopResearchStatusPolling()
         }
     }
 
@@ -274,7 +224,7 @@ struct SongDetailView: View {
                             recordings: song.recordings ?? [],
                             authManager: authManager,
                             onDismiss: {
-                                Task { await reloadRecordings() }
+                                Task { await viewModel.reloadRecordings(songId: songId) }
                             }
                         )
                     }) {
@@ -358,7 +308,7 @@ struct SongDetailView: View {
                 icon: "waveform.circle.fill",
                 iconColor: JazzTheme.burgundy,
                 title: "Researching Now",
-                message: researchingMessage(progress: progress),
+                message: viewModel.researchingMessage(progress: progress),
                 helperText: researchStatusHelperText,
                 isAnimating: true
             )
@@ -376,19 +326,14 @@ struct SongDetailView: View {
         }
     }
 
-    // MARK: - Summary Information Helpers
+    // MARK: - Summary Information Helpers (delegated to the view model)
 
     private func hasSummaryContent(for song: Song) -> Bool {
-        let hasStructure = song.structure != nil
-        let hasComposedKey = song.composedKey != nil
-        return hasStructure || hasComposedKey || hasExternalLinks(for: song)
+        viewModel.hasSummaryContent(for: song)
     }
 
     private func hasExternalLinks(for song: Song) -> Bool {
-        let hasWikipedia = song.wikipediaUrl != nil
-        let hasMusicbrainz = song.musicbrainzId != nil
-        let hasJazzStandards = song.externalReferences?["jazzstandards"] != nil
-        return hasWikipedia || hasMusicbrainz || hasJazzStandards
+        viewModel.hasExternalLinks(for: song)
     }
 
     @ViewBuilder
@@ -831,7 +776,7 @@ struct SongDetailView: View {
                 // Sort menu (matching iOS style)
                 Menu {
                     ForEach(RecordingSortOrder.allCases) { order in
-                        Button(action: { sortOrder = order }) {
+                        Button(action: { viewModel.sortOrder = order }) {
                             HStack {
                                 Text(order.displayName)
                                 if sortOrder == order {
@@ -1016,49 +961,6 @@ struct SongDetailView: View {
         .cornerRadius(12)
     }
 
-    // MARK: - Data Loading
-
-    private func loadSong() async {
-        isLoading = true
-        isRecordingsLoading = true
-
-        // Clear any previous messages and reset research status
-        successMessage = nil
-        errorMessage = nil
-        researchStatus = .notInQueue
-        stopResearchStatusPolling()
-
-        // Phase 1: Load summary (fast) - includes song metadata, featured recordings, transcriptions
-        let fetchedSong = await networkManager.fetchSongSummary(id: songId)
-        song = fetchedSong
-        transcriptions = fetchedSong?.transcriptions ?? []
-        isLoading = false
-
-        // Check if this song is in the research queue
-        checkResearchStatus()
-
-        // Load backing tracks
-        do {
-            let videos = try await networkManager.fetchSongVideos(songId: songId, videoType: "backing_track")
-            backingTracks = videos
-        } catch {
-            print("Error fetching backing tracks: \(error)")
-        }
-
-        // Phase 2: Load all recordings with full streaming data
-        if let recordings = await networkManager.fetchSongRecordings(id: songId, sortBy: sortOrder) {
-            song?.recordings = recordings
-        }
-        isRecordingsLoading = false
-    }
-
-    private func reloadRecordings() async {
-        isRecordingsLoading = true
-        if let recordings = await networkManager.fetchSongRecordings(id: songId, sortBy: sortOrder) {
-            song?.recordings = recordings
-        }
-        isRecordingsLoading = false
-    }
 }
 
 // MARK: - Recording Card
