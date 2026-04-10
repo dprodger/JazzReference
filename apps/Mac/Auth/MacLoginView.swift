@@ -15,10 +15,7 @@ struct MacLoginView: View {
     @EnvironmentObject var authManager: AuthenticationManager
     @Environment(\.dismiss) var dismiss
 
-    @State private var email = ""
-    @State private var password = ""
-    @State private var showingRegister = false
-    @State private var showingForgotPassword = false
+    @StateObject private var viewModel = LoginViewModel()
 
     /// Whether this view is presented inline (in Settings) vs as a sheet
     var isInline: Bool = false
@@ -43,7 +40,7 @@ struct MacLoginView: View {
                     .font(JazzTheme.subheadline())
                     .foregroundColor(.secondary)
 
-                TextField("your@email.com", text: $email)
+                TextField("your@email.com", text: $viewModel.email)
                     .textFieldStyle(.roundedBorder)
                     .textContentType(.emailAddress)
                     .disableAutocorrection(true)
@@ -55,7 +52,7 @@ struct MacLoginView: View {
                     .font(JazzTheme.subheadline())
                     .foregroundColor(.secondary)
 
-                SecureField("Enter password", text: $password)
+                SecureField("Enter password", text: $viewModel.password)
                     .textFieldStyle(.roundedBorder)
             }
 
@@ -63,7 +60,7 @@ struct MacLoginView: View {
             HStack {
                 Spacer()
                 Button("Forgot password?") {
-                    showingForgotPassword = true
+                    viewModel.showingForgotPassword = true
                 }
                 .buttonStyle(.link)
                 .foregroundColor(JazzTheme.burgundy)
@@ -93,7 +90,7 @@ struct MacLoginView: View {
             .buttonStyle(.borderedProminent)
             .tint(JazzTheme.burgundy)
             .controlSize(.large)
-            .disabled(email.isEmpty || password.isEmpty || authManager.isLoading)
+            .disabled(!viewModel.canSubmit || authManager.isLoading)
 
             // Divider
             HStack {
@@ -148,7 +145,7 @@ struct MacLoginView: View {
 
             // Create account button
             Button(action: {
-                showingRegister = true
+                viewModel.showingRegister = true
             }) {
                 Text("Create Account")
                     .frame(maxWidth: .infinity)
@@ -162,11 +159,11 @@ struct MacLoginView: View {
         }
         .padding(isInline ? 0 : 24)
         .frame(minWidth: 300, maxWidth: 400)
-        .sheet(isPresented: $showingRegister) {
+        .sheet(isPresented: $viewModel.showingRegister) {
             MacRegisterView()
                 .environmentObject(authManager)
         }
-        .sheet(isPresented: $showingForgotPassword) {
+        .sheet(isPresented: $viewModel.showingForgotPassword) {
             MacForgotPasswordView()
                 .environmentObject(authManager)
         }
@@ -179,10 +176,7 @@ struct MacLoginView: View {
 
     private func signIn() {
         Task {
-            let success = await authManager.login(
-                email: email.trimmingCharacters(in: .whitespacesAndNewlines),
-                password: password.trimmingCharacters(in: .whitespacesAndNewlines)
-            )
+            let success = await viewModel.signIn(using: authManager)
             if success && !isInline {
                 dismiss()
             }
@@ -191,7 +185,7 @@ struct MacLoginView: View {
 
     private func signInWithGoogle() {
         Task {
-            let success = await authManager.signInWithGoogle()
+            let success = await viewModel.signInWithGoogle(using: authManager)
             if success && !isInline {
                 dismiss()
             }

@@ -12,11 +12,8 @@ import GoogleSignInSwift
 struct LoginView: View {
     @EnvironmentObject var authManager: AuthenticationManager
     @Environment(\.dismiss) var dismiss
-    
-    @State private var email = ""
-    @State private var password = ""
-    @State private var showingRegister = false
-    @State private var showingForgotPassword = false
+
+    @StateObject private var viewModel = LoginViewModel()
     
     var body: some View {
         NavigationView {
@@ -41,7 +38,7 @@ struct LoginView: View {
                             .font(.subheadline)
                             .foregroundColor(.secondary)
                         
-                        TextField("your@email.com", text: $email)
+                        TextField("your@email.com", text: $viewModel.email)
                             .textInputAutocapitalization(.never)
                             .keyboardType(.emailAddress)
                             .autocorrectionDisabled()
@@ -56,7 +53,7 @@ struct LoginView: View {
                             .font(.subheadline)
                             .foregroundColor(.secondary)
                         
-                        SecureField("Enter password", text: $password)
+                        SecureField("Enter password", text: $viewModel.password)
                             .padding()
                             .background(Color(.systemGray6))
                             .cornerRadius(10)
@@ -79,7 +76,7 @@ struct LoginView: View {
                     // Google Sign In Button
                     GoogleSignInButton(action: {
                         Task {
-                            let success = await authManager.signInWithGoogle()
+                            let success = await viewModel.signInWithGoogle(using: authManager)
                             if success {
                                 dismiss()
                             }
@@ -93,7 +90,7 @@ struct LoginView: View {
                     HStack {
                         Spacer()
                         Button("Forgot password?") {
-                            showingForgotPassword = true
+                            viewModel.showingForgotPassword = true
                         }
                         .font(.subheadline)
                         .foregroundColor(JazzTheme.burgundy)
@@ -111,10 +108,7 @@ struct LoginView: View {
                     // Login button
                     Button(action: {
                         Task {
-                            let success = await authManager.login(
-                                email: email.trimmingCharacters(in: .whitespacesAndNewlines),
-                                password: password.trimmingCharacters(in: .whitespacesAndNewlines)
-                            )
+                            let success = await viewModel.signIn(using: authManager)
                             if success {
                                 dismiss()
                             }
@@ -130,10 +124,10 @@ struct LoginView: View {
                     }
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(email.isEmpty || password.isEmpty ? Color.gray : JazzTheme.burgundy)
+                    .background(viewModel.canSubmit ? JazzTheme.burgundy : Color.gray)
                     .foregroundColor(.white)
                     .cornerRadius(10)
-                    .disabled(email.isEmpty || password.isEmpty || authManager.isLoading)
+                    .disabled(!viewModel.canSubmit || authManager.isLoading)
                     
                     // Divider
                     HStack {
@@ -150,7 +144,7 @@ struct LoginView: View {
                     
                     // Create account button
                     Button(action: {
-                        showingRegister = true
+                        viewModel.showingRegister = true
                     }) {
                         Text("Create Account")
                             .fontWeight(.semibold)
@@ -175,10 +169,10 @@ struct LoginView: View {
                     .foregroundColor(JazzTheme.charcoal)
                 }
             }
-            .sheet(isPresented: $showingRegister) {
+            .sheet(isPresented: $viewModel.showingRegister) {
                 RegisterView()
             }
-            .sheet(isPresented: $showingForgotPassword) {
+            .sheet(isPresented: $viewModel.showingForgotPassword) {
                 ForgotPasswordView()
             }
             .onChange(of: authManager.isAuthenticated) { isAuthenticated in
