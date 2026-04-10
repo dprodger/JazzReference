@@ -11,14 +11,25 @@ import os
 import time
 import sys
 
-# Database configuration (from your app)
+# Database configuration — read entirely from the environment. Previously
+# this dict had hardcoded fallback defaults containing a real Supabase
+# credential, which landed in git history. That password has since been
+# rotated. Do not add literal fallbacks here again.
 DB_CONFIG = {
-    'host': os.environ.get('DB_HOST', 'db.wxinjyotnrqxrwqrtvkp.supabase.co'),
-    'database': os.environ.get('DB_NAME', 'postgres'),
-    'user': os.environ.get('DB_USER', 'postgres'),
-    'password': os.environ.get('DB_PASSWORD', 'jovpeW-pukgu0-nifron'),
-    'port': os.environ.get('DB_PORT', '5432')
+    'host': os.environ.get('DB_HOST'),
+    'database': os.environ.get('DB_NAME'),
+    'user': os.environ.get('DB_USER'),
+    'password': os.environ.get('DB_PASSWORD'),
+    'port': os.environ.get('DB_PORT'),
 }
+
+if not all(DB_CONFIG.values()):
+    missing = [k for k, v in DB_CONFIG.items() if not v]
+    sys.exit(
+        f"Missing required environment variables for database connection: "
+        f"{', '.join('DB_' + k.upper() for k in missing)}. "
+        f"Set them in your shell or .env before running this diagnostic."
+    )
 
 CONNECTION_STRING = (
     f"postgresql://{DB_CONFIG['user']}:{DB_CONFIG['password']}"

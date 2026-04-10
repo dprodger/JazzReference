@@ -96,12 +96,12 @@ You should see `(venv)` at the beginning of your terminal prompt
 
 ### Database Configuration
 
-The app uses environment variables for database connection. These are currently hardcoded in `app.py`:
+The app reads the following environment variables for its database connection. Put them in `backend/.env` for local development, and set them as environment variables wherever the backend runs in production:
 
-- `DB_HOST`: db.wxinjyotnrqxrwqrtvkp.supabase.co
-- `DB_NAME`: postgres
-- `DB_USER`: postgres
-- `DB_PASSWORD`: jovpeW-pukgu0-nifron
-- `DB_PORT`: 5432
+- `DB_HOST` — the Supabase project host (find it in the Supabase dashboard under *Project Settings → Database → Connection info*)
+- `DB_NAME` — usually `postgres`
+- `DB_USER` — usually `postgres`
+- `DB_PASSWORD` — the database password from the Supabase dashboard (*Project Settings → Database → Database password*)
+- `DB_PORT` — `5432` for direct connections, `6543` for the Supavisor pooler
 
-For production, set these as environment variables instead of using the defaults.
+Never check the actual values into git. `backend/.env` is already listed in `.gitignore`.

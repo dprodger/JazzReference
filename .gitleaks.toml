@@ -1,0 +1,44 @@
+# gitleaks configuration for JazzReference
+#
+# Inherits the full set of built-in gitleaks rules and adds a narrowly
+# scoped allowlist for known false positives and for dead credentials
+# already burned-and-rotated. The goal of this file is to keep the scan
+# noise-free WITHOUT weakening detection anywhere else.
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Narrowly-scoped false positives and dead rotated credentials"
+
+# Regex allowlist. Each pattern is matched against the secret value that a
+# gitleaks rule extracted. Any finding whose secret matches one of these
+# patterns is suppressed. Keep these as tight as possible — every entry
+# here is a blind spot.
+regexes = [
+  # --------------------------------------------------------------------
+  # 1. JWT truncation placeholders in docstrings/examples.
+  #
+  # Real JWTs have structure `header.payload.signature` with exactly two
+  # dot separators. A literal `...` cannot appear in a valid JWT, so any
+  # `eyJ…...` string is unambiguously a documentation truncation marker.
+  #
+  # Source: backend/routes/auth.py — docstring for POST /auth/google
+  # showing the expected request body shape.
+  # --------------------------------------------------------------------
+  '''eyJ[A-Za-z0-9_-]+\.\.\.''',
+
+  # --------------------------------------------------------------------
+  # 2. Rotated Supabase database password.
+  #
+  # This credential was committed as a hardcoded fallback in Oct–Nov
+  # 2025 across several files (app.py, db_utils.py, db_tools.py,
+  # diagnose_connections.py, match_spotify_tracks.py,
+  # import_mb_releases.py, scripts/db_utils.py). It was rotated via
+  # the Supabase dashboard on 2026-04-10 and is no longer valid.
+  #
+  # Kept only to silence gitleaks on the historical commits. If you
+  # ever rotate credentials again, DO NOT add the new value here.
+  # --------------------------------------------------------------------
+  '''jovpeW-pukgu0-nifron''',
+]

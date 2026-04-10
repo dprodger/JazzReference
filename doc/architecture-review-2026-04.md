@@ -61,4 +61,6 @@ For reference — these came up during the review but are fine as-is:
 - Route blueprint layout — thin routes, logic delegated out.
 - Database schema — 3NF, 48 FKs with deliberate cascades, 106 indexes, good use of enum types.
 - `scripts/script_base.py` shared infrastructure.
-- Git hygiene: `.env`, `cache/`, and the `.p8` Apple key are all properly gitignored and not in history (verified).
+- Git hygiene (file-level): `.env`, `cache/`, and the `.p8` Apple key are all properly gitignored and not in history (verified).
+
+> **Correction (2026-04-10):** The initial review claimed git hygiene was "clean" based on verifying those three paths. That was technically accurate but misleadingly incomplete — it did not check for hardcoded secrets inline in source files. When the gitleaks CI workflow was added (see P1), its first run caught 10 historical commits between 2025-10-04 and 2025-11-19 containing the production Supabase database password as a hardcoded fallback default (`os.environ.get('DB_PASSWORD', '<literal>')`) across seven files. The credential was rotated via the Supabase dashboard on 2026-04-10, the remaining at-HEAD occurrences in `diagnose_connections.py` and `venv_setup_instructions.md` were scrubbed in the same session, and the dead-credential fingerprint was added to `.gitleaks.toml` so future scans pass. Lesson: manual review is not a substitute for automated scanning, and the scanner paid for itself on its first run.
