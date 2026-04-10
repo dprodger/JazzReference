@@ -273,6 +273,7 @@
 			isa = PBXGroup;
 			children = (
 				B400E2002F1D9C69004B7557 /* SharedDataManagers.swift */,
+				B47FCC1E2F16C937006281D7 /* Components */,
 			);
 			name = Managers;
 			path = Mac/Managers;
@@ -306,7 +307,6 @@
 			isa = PBXGroup;
 			children = (
 				B400E2012F1D9C69004B7557 /* Managers */,
-				B47FCC1E2F16C937006281D7 /* Components */,
 				B42A1D902F10D00000DAC930 /* App */,
 				B41D0FA22EE633EE00DB427C /* Assets.xcassets */,
 				B42A1D802F10B00000DAC930 /* Auth */,
@@ -346,7 +346,7 @@
 				B47FCC1D2F16C937006281D7 /* MacRecordingContributionEditView.swift */,
 			);
 			name = Components;
-			path = Mac/Components;
+			path = ../Components;
 			sourceTree = "<group>";
 		};
 		B486B3142F1D93C4005E6644 /* Import */ = {
