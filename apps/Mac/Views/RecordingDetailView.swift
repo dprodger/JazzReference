@@ -9,11 +9,11 @@ import SwiftUI
 
 struct RecordingDetailView: View {
     let recordingId: String
-    @State private var recording: Recording?
-    @State private var isLoading = true
-    @State private var localFavoriteCount: Int?
-    @State private var showingLoginAlert = false
-    @State private var selectedReleaseId: String?
+
+    // Shared data + network state lives on the view model; layout/presentation
+    // state stays here.
+    @StateObject private var viewModel = RecordingDetailViewModel()
+
     @State private var showingBackCover = false
     @State private var showingContributionSheet = false
     @State private var showingStreamingLinkSheet = false
@@ -24,7 +24,12 @@ struct RecordingDetailView: View {
     @EnvironmentObject var authManager: AuthenticationManager
     @EnvironmentObject var favoritesManager: FavoritesManager
 
-    private let networkManager = NetworkManager()
+    // Read-only aliases so the dozens of existing reference sites in this
+    // view can keep using the short names unchanged.
+    private var recording: Recording? { viewModel.recording }
+    private var isLoading: Bool { viewModel.isLoading }
+    private var selectedReleaseId: String? { viewModel.selectedReleaseId }
+    private var localFavoriteCount: Int? { viewModel.localFavoriteCount }
 
     // MARK: - Computed Properties for Selected Release
 
@@ -173,7 +178,7 @@ struct RecordingDetailView: View {
             }
             ToolbarItem(placement: .primaryAction) {
                 Button {
-                    handleFavoriteButtonTap()
+                    viewModel.handleFavoriteTap()
                 } label: {
                     HStack(spacing: 4) {
                         Image(systemName: isFavorited ? "heart.fill" : "heart")
@@ -188,7 +193,7 @@ struct RecordingDetailView: View {
                 .help(isFavorited ? "Remove from favorites" : "Add to favorites")
             }
         }
-        .alert("Sign In Required", isPresented: $showingLoginAlert) {
+        .alert("Sign In Required", isPresented: $viewModel.showingLoginAlert) {
             Button("OK", role: .cancel) { }
         } message: {
             Text("Please sign in to favorite recordings.")
@@ -201,7 +206,7 @@ struct RecordingDetailView: View {
                     currentContribution: recording.userContribution,
                     onSave: {
                         Task {
-                            await loadRecording()
+                            await viewModel.load()
                         }
                     }
                 )
@@ -217,7 +222,7 @@ struct RecordingDetailView: View {
                     releaseTitle: releaseTitle,
                     onSuccess: {
                         Task {
-                            await loadRecording()
+                            await viewModel.load()
                         }
                     }
                 )
@@ -225,7 +230,12 @@ struct RecordingDetailView: View {
             }
         }
         .task(id: recordingId) {
-            await loadRecording()
+            viewModel.configure(
+                recordingId: recordingId,
+                authManager: authManager,
+                favoritesManager: favoritesManager
+            )
+            await viewModel.load()
         }
     }
 
@@ -658,9 +668,9 @@ struct RecordingDetailView: View {
                     withAnimation(.easeInOut(duration: 0.3)) {
                         if selectedReleaseId == release.id {
                             // Deselect if already selected
-                            selectedReleaseId = nil
+                            viewModel.selectedReleaseId = nil
                         } else {
-                            selectedReleaseId = release.id
+                            viewModel.selectedReleaseId = release.id
                         }
                         // Reset back cover when changing release
                         showingBackCover = false
@@ -775,96 +785,6 @@ struct RecordingDetailView: View {
         }
     }
 
-    // MARK: - Data Loading
-
-    private func loadRecording() async {
-        isLoading = true
-        recording = await fetchRecordingWithAuth()
-        autoSelectFirstRelease()
-        isLoading = false
-    }
-
-    /// Fetch recording detail, using authenticated request if user is logged in
-    /// This ensures the user's contribution is included in the response
-    private func fetchRecordingWithAuth() async -> Recording? {
-        guard let url = URL(string: "\(NetworkManager.baseURL)/recordings/\(recordingId)") else {
-            return nil
-        }
-
-        do {
-            let data: Data
-            if authManager.isAuthenticated {
-                // Use authenticated request to get user's contribution
-                data = try await authManager.makeAuthenticatedRequest(url: url)
-            } else {
-                // Unauthenticated request
-                let (responseData, _) = try await URLSession.shared.data(from: url)
-                data = responseData
-            }
-            return try JSONDecoder().decode(Recording.self, from: data)
-        } catch {
-            print("Error fetching recording detail: \(error)")
-            return nil
-        }
-    }
-
-    /// Auto-select the default release from the API, falling back to first release with art
-    private func autoSelectFirstRelease() {
-        guard let releases = recording?.releases, !releases.isEmpty else { return }
-
-        // Prefer the API's default_release_id - this is computed server-side
-        // to match the best_cover_art_* and best_spotify_url logic
-        if let defaultId = recording?.defaultReleaseId,
-           releases.contains(where: { $0.id == defaultId }) {
-            selectedReleaseId = defaultId
-            return
-        }
-
-        // Fallback: Sort and pick the first release with Spotify and cover art
-        let sorted = releases.sorted { r1, r2 in
-            let r1HasSpotify = r1.spotifyAlbumId != nil
-            let r2HasSpotify = r2.spotifyAlbumId != nil
-            if r1HasSpotify != r2HasSpotify {
-                return r1HasSpotify && !r2HasSpotify
-            }
-            switch (r1.releaseYear, r2.releaseYear) {
-            case (nil, nil): return false
-            case (nil, _): return false
-            case (_, nil): return true
-            case let (y1?, y2?): return y1 > y2
-            }
-        }
-
-        if let releaseWithSpotifyAndArt = sorted.first(where: {
-            $0.spotifyAlbumId != nil && ($0.coverArtLarge != nil || $0.coverArtMedium != nil)
-        }) {
-            selectedReleaseId = releaseWithSpotifyAndArt.id
-            return
-        }
-
-        if let releaseWithArt = sorted.first(where: { $0.coverArtLarge != nil || $0.coverArtMedium != nil }) {
-            selectedReleaseId = releaseWithArt.id
-            return
-        }
-
-        selectedReleaseId = sorted.first?.id
-    }
-
-    // MARK: - Favorites
-
-    /// Handle favorite button tap - toggle favorite or show login prompt
-    private func handleFavoriteButtonTap() {
-        guard authManager.isAuthenticated else {
-            showingLoginAlert = true
-            return
-        }
-
-        Task {
-            if let newCount = await favoritesManager.toggleFavorite(recordingId: recordingId) {
-                localFavoriteCount = newCount
-            }
-        }
-    }
 }
 
 #Preview {
