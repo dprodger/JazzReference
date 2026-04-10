@@ -39,6 +39,7 @@ Captured from a senior-architect review on 2026-04-10. Ordered by priority. Chec
 
 - [ ] **Delete `apps/New Group/`** — empty Xcode-default directory.
 - [ ] **Consolidate `SharedDataManagers.swift`.** Two copies exist: `apps/SharedDataManagers.swift` and `apps/Mac/Managers/SharedDataManagers.swift`. The root file's own comment says "THIS FILE GOES IN THE MAC APP TARGET ONLY" — so move to `Mac/` and delete the root copy.
+- [ ] **Clarify the three `Managers/` directories.** `Shared/Managers/`, `iOS/Managers/`, and `Mac/Managers/` all exist side-by-side, and from the names it's not obvious why. The legitimate reason is that `iOS/Managers/` and `Mac/Managers/` hold share-extension IPC wrappers (platform-specific by nature) while `Shared/Managers/` holds the real cross-platform managers. Either rename the platform-specific ones (e.g., `iOS/ShareExtensionBridge/`, `Mac/ShareExtensionBridge/`) or add a short README in each directory explaining its scope. Prevents future drift and makes it clear where new managers should land.
 - [ ] **Replace `print()` with `os.Logger`** in Swift code (~109 in `NetworkManager.swift` alone). Use `.private` for anything PII-adjacent.
 - [ ] **Replace force-unwrapped URLs in `AuthenticationManager.swift`** (lines 104, 160, 216, 288, 330, 355, 497, 630) with a single `URL.api(path:)` helper.
 - [ ] **Schema cleanup:** redundant UNIQUE constraints on `recording_releases` (the `(recording_id, release_id, disc_number, track_number)` and `(recording_id, release_id)` constraints overlap). Document the dual-MB-ID design on `songs` (`musicbrainz_id` + `second_mb_id`).
@@ -55,6 +56,8 @@ For reference — these came up during the review but are fine as-is:
 - `db_utils.py` pooling, health checks, keepalive thread.
 - `KeychainHelper.swift` — correct use of `kSecAttrAccessibleWhenUnlocked` and `SecItem*` APIs.
 - `AuthenticationManager` token-refresh serialization (prevents concurrent-refresh races).
+- `Shared/Managers/FavoritesManager` and `RepertoireManager` are consistently patterned (`@MainActor class ... : ObservableObject` with `@Published` state) — good consistency that the rest of the Swift managers should follow.
+- Explicit `MainActor.run { ... }` wrappers on network-completion callbacks show main-thread boundaries are understood, even though `NetworkManager` itself isn't `@MainActor`-annotated.
 - Route blueprint layout — thin routes, logic delegated out.
 - Database schema — 3NF, 48 FKs with deliberate cascades, 106 indexes, good use of enum types.
 - `scripts/script_base.py` shared infrastructure.
