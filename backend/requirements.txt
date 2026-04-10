@@ -22,8 +22,8 @@ cryptography==42.0.0  # For JWT ES256 signing (Apple Music Feed)
 # Email Service (Phase 3 - optional for Phase 2)
 sendgrid==6.11.0
 
-# Rate Limiting (Phase 8 - optional for Phase 2)
-# Flask-Limiter==3.5.0
+# Rate Limiting
+Flask-Limiter==3.5.0
 
 # Google OAuth (Phase 6 - optional for Phase 2)
 google-auth==2.27.0

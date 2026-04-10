@@ -4,6 +4,7 @@ A Flask API with robust database connection handling
 """
 
 from flask import Flask, render_template, request, jsonify
+from werkzeug.middleware.proxy_fix import ProxyFix
 import logging
 import os
 
@@ -28,6 +29,21 @@ logger = configure_logging()
 # Create Flask app
 app = Flask(__name__)
 init_app_config(app)
+
+# Install ProxyFix so `request.remote_addr` and `request.url` reflect the
+# real client's IP and scheme rather than Render's reverse proxy. Rate
+# limiting (below) depends on this: without ProxyFix, Flask-Limiter would
+# see every request as coming from Render's outbound IP and lump all
+# users together. `x_for=1` tells Werkzeug to trust exactly one hop of
+# X-Forwarded-For (Render). If another proxy is ever added in front
+# (e.g. Cloudflare), bump this to 2.
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
+
+# Initialize the rate limiter against the Flask app. MUST come after
+# ProxyFix is installed, so the key function sees the real client IP
+# from the very first request.
+from rate_limit import init_rate_limiter
+init_rate_limiter(app)
 
 logger.info(f"Spotify credentials present: {bool(os.environ.get('SPOTIFY_CLIENT_ID'))}")
 logger.info(f"Flask app initialized in PID {os.getpid()}")

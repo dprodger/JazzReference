@@ -19,14 +19,21 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from db_utils import get_db_connection
 from auth_utils import (
-    hash_password, 
-    verify_password, 
-    generate_access_token, 
+    hash_password,
+    verify_password,
+    generate_access_token,
     generate_refresh_token,
     decode_token
 )
 from middleware.auth_middleware import require_auth
 from email_service import send_welcome_email
+from rate_limit import (
+    limiter,
+    LOGIN_LIMIT,
+    REGISTER_LIMIT,
+    GOOGLE_LOGIN_LIMIT,
+    REFRESH_TOKEN_LIMIT,
+)
 
 # Google OAuth imports (ADD THESE LINES)
 from google.auth.transport import requests as google_requests
@@ -39,6 +46,7 @@ auth_bp = Blueprint('auth', __name__, url_prefix='/auth')
 GOOGLE_CLIENT_ID = os.getenv('GOOGLE_CLIENT_ID')
 
 @auth_bp.route('/register', methods=['POST'])
+@limiter.limit(REGISTER_LIMIT)
 def register():
     """
     Register new user with email and password
@@ -132,6 +140,7 @@ def register():
 
 
 @auth_bp.route('/login', methods=['POST'])
+@limiter.limit(LOGIN_LIMIT)
 def login():
     """
     Login with email and password
@@ -238,6 +247,7 @@ def login():
 
 
 @auth_bp.route('/refresh-token', methods=['POST'])
+@limiter.limit(REFRESH_TOKEN_LIMIT)
 def refresh_token():
     """
     Get new access token using refresh token
@@ -382,6 +392,7 @@ def logout():
     return jsonify({'message': 'Logged out successfully'}), 200
     
 @auth_bp.route('/google', methods=['POST'])
+@limiter.limit(GOOGLE_LOGIN_LIMIT)
 def google_login():
     """
     Authenticate with Google ID token

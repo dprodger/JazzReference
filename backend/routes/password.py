@@ -20,12 +20,20 @@ from db_utils import get_db_connection
 from auth_utils import hash_password, verify_password, generate_reset_token
 from middleware.auth_middleware import require_auth
 from email_service import send_password_reset_email
+from rate_limit import (
+    limiter,
+    FORGOT_PASSWORD_LIMIT,
+    RESET_PASSWORD_LIMIT,
+    CHANGE_PASSWORD_LIMIT,
+    _user_id_or_ip_key,
+)
 
 logger = logging.getLogger(__name__)
 password_bp = Blueprint('password', __name__, url_prefix='/auth')
 
 
 @password_bp.route('/forgot-password', methods=['POST'])
+@limiter.limit(FORGOT_PASSWORD_LIMIT)
 def forgot_password():
     """
     Request password reset email
@@ -91,6 +99,7 @@ def forgot_password():
 
 
 @password_bp.route('/reset-password', methods=['POST'])
+@limiter.limit(RESET_PASSWORD_LIMIT)
 def reset_password():
     """
     Reset password using token
@@ -165,6 +174,7 @@ def reset_password():
 
 
 @password_bp.route('/change-password', methods=['POST'])
+@limiter.limit(CHANGE_PASSWORD_LIMIT, key_func=_user_id_or_ip_key)
 @require_auth
 def change_password():
     """
