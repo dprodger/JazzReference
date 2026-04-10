@@ -4,7 +4,6 @@ A Flask API with robust database connection handling
 """
 
 from flask import Flask, render_template, request, jsonify
-from flask_cors import CORS
 import logging
 import os
 
@@ -28,7 +27,6 @@ logger = configure_logging()
 
 # Create Flask app
 app = Flask(__name__)
-CORS(app)
 init_app_config(app)
 
 logger.info(f"Spotify credentials present: {bool(os.environ.get('SPOTIFY_CLIENT_ID'))}")

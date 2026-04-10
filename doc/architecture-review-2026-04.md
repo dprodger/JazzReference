@@ -9,7 +9,7 @@ Captured from a senior-architect review on 2026-04-10. Ordered by priority. Chec
 
 ## P1 — Security hardening
 
-- [ ] **Lock down CORS.** `app.py:31` calls `CORS(app)` with defaults (any origin). Restrict to `api.approachnote.com` and the app's custom scheme(s).
+- [x] **Lock down CORS.** ✅ 2026-04-10 — Removed `CORS(app)` entirely. All browser UIs (landing page, admin pages) are same-origin with the API, so no cross-origin allowance is needed. Native iOS/Mac apps are unaffected by CORS. If a future web client on a separate origin is added, add a narrow `CORS(app, resources={r"/api/*": {"origins": [...]}})` then.
 - [ ] **Add rate limiting on `/auth/*` and `/password/*`.** Flask-Limiter is already commented out in `requirements.txt` — uncomment and wire it up. Account lockout only mitigates brute-force on known accounts, not credential stuffing.
 - [ ] **Add a pre-commit secret scanner** (gitleaks or detect-secrets). Git hygiene is currently clean, but a hook makes it mechanical rather than vigilance-dependent.
 - [ ] **Mask DB credentials in log output.** `db_utils.py:64` constructs a connection string with the password inline; it can end up in error logs on pool init failure (around line 151).
