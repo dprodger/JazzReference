@@ -206,7 +206,7 @@ struct RecordingDetailView: View {
                     currentContribution: recording.userContribution,
                     onSave: {
                         Task {
-                            await viewModel.load()
+                            await viewModel.refresh()
                         }
                     }
                 )
@@ -222,7 +222,7 @@ struct RecordingDetailView: View {
                     releaseTitle: releaseTitle,
                     onSuccess: {
                         Task {
-                            await viewModel.load()
+                            await viewModel.refresh()
                         }
                     }
                 )
