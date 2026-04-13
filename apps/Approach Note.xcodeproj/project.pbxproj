@@ -258,7 +258,7 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		B400E2012F1D9C69004B7557 /* Managers */ = {
+		B400E2012F1D9C69004B7557 /* ShareExtensionBridge */ = {
 			isa = PBXGroup;
 			children = (
 				B400E2002F1D9C69004B7557 /* SharedDataManagers.swift */,
@@ -295,7 +295,7 @@
 		B42A1D702F10A06C00DAC930 /* Mac */ = {
 			isa = PBXGroup;
 			children = (
-				B400E2012F1D9C69004B7557 /* Managers */,
+				B400E2012F1D9C69004B7557 /* ShareExtensionBridge */,
 				B42A1D902F10D00000DAC930 /* App */,
 				B41D0FA22EE633EE00DB427C /* Assets.xcassets */,
 				B42A1D802F10B00000DAC930 /* Auth */,
