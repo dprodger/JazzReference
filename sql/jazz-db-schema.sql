@@ -650,6 +650,7 @@ CREATE INDEX idx_recording_performers_instrument_id ON recording_performers (ins
 -- Recording Release Streaming Links
 CREATE INDEX idx_rr_streaming_links_recording_release_id ON recording_release_streaming_links (recording_release_id);
 CREATE INDEX idx_rr_streaming_links_service ON recording_release_streaming_links (service);
+CREATE INDEX idx_rr_streaming_links_rr_service ON recording_release_streaming_links (recording_release_id, service);
 CREATE INDEX idx_rr_streaming_links_service_id ON recording_release_streaming_links (service_id) WHERE service_id IS NOT NULL;
 CREATE INDEX idx_rr_streaming_links_isrc ON recording_release_streaming_links (isrc) WHERE isrc IS NOT NULL;
 CREATE INDEX idx_rr_streaming_links_match_method ON recording_release_streaming_links (match_method) WHERE match_method IS NOT NULL;
@@ -675,6 +676,7 @@ CREATE INDEX idx_release_imagery_release_id ON release_imagery (release_id);
 CREATE INDEX idx_release_imagery_source ON release_imagery (source);
 CREATE INDEX idx_release_imagery_type ON release_imagery (type);
 CREATE INDEX idx_release_imagery_release_source ON release_imagery (release_id, source);
+CREATE INDEX idx_release_imagery_release_type ON release_imagery (release_id, type);
 
 -- Release Performers
 CREATE INDEX idx_release_performers_release_id ON release_performers (release_id);

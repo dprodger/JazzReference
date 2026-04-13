@@ -51,9 +51,18 @@ THRESHOLDS = {
         'max_payload_kb': 200,      # 200 KB should cover even large songs
     },
     'recordings': {
-        'max_db_calls': 1,          # Currently 1 query with subqueries
-        'max_response_ms': 5000,    # 5s wall clock (can be heavy for 100+ recordings)
+        'max_db_calls': 1,          # Currently 1 CTE query
+        'max_response_ms': 3000,    # 3s wall clock (CTE-based query)
         'max_payload_kb': 1000,     # 1 MB for songs with many recordings
+    },
+}
+
+# Additional thresholds for high-recording-count stress test
+STRESS_THRESHOLDS = {
+    'recordings': {
+        'max_db_calls': 1,
+        'max_response_ms': 8000,    # 8s for 500+ recordings (remote DB, cold cache)
+        'max_payload_kb': 3000,     # 3 MB for very large songs
     },
 }
 
@@ -118,6 +127,26 @@ def find_test_song():
             ORDER BY rec_count DESC
             LIMIT 1
         """, fetch_one=True)
+    return result
+
+
+def find_stress_test_song():
+    """Find a song with 500+ recordings for stress testing.
+
+    Songs with many recordings (like "Summertime" or "All of Me") are the
+    ones most likely to expose N+1 query regressions. If the query uses
+    correlated subqueries instead of CTEs, these songs will be dramatically
+    slower than songs with ~50 recordings.
+    """
+    result = db_tools.execute_query("""
+        SELECT s.id, s.title, COUNT(r.id) as rec_count
+        FROM songs s
+        JOIN recordings r ON r.song_id = s.id
+        GROUP BY s.id, s.title
+        HAVING COUNT(r.id) >= 500
+        ORDER BY ABS(COUNT(r.id) - 700)
+        LIMIT 1
+    """, fetch_one=True)
     return result
 
 
@@ -248,6 +277,29 @@ def main():
         verbose=args.verbose,
     )
     all_passed = all_passed and passed
+
+    # Stress test: high-recording-count song (catches N+1 regressions)
+    if not args.song_id:
+        stress_song = find_stress_test_song()
+        if stress_song:
+            stress_id = stress_song['id']
+            stress_title = stress_song['title']
+            stress_count = stress_song['rec_count']
+            print()
+            print("-" * 60)
+            print(f"  Stress test: {stress_title} ({stress_count} recordings)")
+            print("-" * 60)
+
+            passed = test_endpoint(
+                client,
+                f'/songs/{stress_id}/recordings',
+                'recordings',
+                STRESS_THRESHOLDS['recordings'],
+                verbose=args.verbose,
+            )
+            all_passed = all_passed and passed
+        else:
+            print("\n  (No song with 500+ recordings found — stress test skipped)")
 
     # Summary
     print()
