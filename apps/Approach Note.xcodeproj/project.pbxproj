@@ -264,8 +264,8 @@
 				B400E2002F1D9C69004B7557 /* SharedDataManagers.swift */,
 				B47FCC1E2F16C937006281D7 /* Components */,
 			);
-			name = Managers;
-			path = Mac/Managers;
+			name = ShareExtensionBridge;
+			path = Mac/ShareExtensionBridge;
 			sourceTree = "<group>";
 		};
 		B41D0FAD2EE633EE00DB427C /* Views */ = {
