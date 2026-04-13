@@ -501,22 +501,14 @@ def get_song_recordings(song_id):
                         SELECT default_release_id FROM recordings WHERE id = rr.recording_id
                     ) THEN 0 ELSE 1 END
             ),
-            -- CTE 5: Community-contributed consensus data (uses jsonb for GROUP BY compatibility)
+            -- CTE 5: Lightweight community data — only is_instrumental consensus
+            -- (used for vocal/instrumental filter in recordings list; full community
+            -- data is fetched by the recording detail endpoint when needed)
             community AS (
                 SELECT
                     rc.recording_id,
                     jsonb_build_object(
                         'consensus', jsonb_build_object(
-                            'performance_key', (
-                                SELECT performance_key FROM recording_contributions rc2
-                                WHERE rc2.recording_id = rc.recording_id AND rc2.performance_key IS NOT NULL
-                                GROUP BY performance_key ORDER BY COUNT(*) DESC, MAX(updated_at) DESC LIMIT 1
-                            ),
-                            'tempo_marking', (
-                                SELECT tempo_marking FROM recording_contributions rc2
-                                WHERE rc2.recording_id = rc.recording_id AND rc2.tempo_marking IS NOT NULL
-                                GROUP BY tempo_marking ORDER BY COUNT(*) DESC, MAX(updated_at) DESC LIMIT 1
-                            ),
                             'is_instrumental', (
                                 SELECT is_instrumental FROM recording_contributions rc2
                                 WHERE rc2.recording_id = rc.recording_id AND rc2.is_instrumental IS NOT NULL
@@ -524,8 +516,6 @@ def get_song_recordings(song_id):
                             )
                         ),
                         'counts', jsonb_build_object(
-                            'key', COUNT(*) FILTER (WHERE rc.performance_key IS NOT NULL),
-                            'tempo', COUNT(*) FILTER (WHERE rc.tempo_marking IS NOT NULL),
                             'instrumental', COUNT(*) FILTER (WHERE rc.is_instrumental IS NOT NULL)
                         )
                     ) as community_data
