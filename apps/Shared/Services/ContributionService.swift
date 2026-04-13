@@ -77,7 +77,7 @@ class ContributionService {
             if (200...299).contains(httpResponse.statusCode) {
                 let contributionResponse = try JSONDecoder().decode(ContributionResponse.self, from: data)
                 if APIClient.diagnosticsEnabled {
-                    let keyCount = contributionResponse.counts.key
+                    let keyCount = contributionResponse.counts.key ?? 0
                     Log.network.debug("Saved contribution, key_count: \(keyCount, privacy: .public)")
                 }
                 return contributionResponse

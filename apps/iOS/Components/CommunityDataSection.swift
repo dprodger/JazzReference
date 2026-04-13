@@ -64,7 +64,7 @@ struct CommunityDataSection: View {
                                 icon: "music.note",
                                 label: "Key",
                                 value: data.consensus.performanceKey ?? "Not set",
-                                count: data.counts.key,
+                                count: data.counts.key ?? 0,
                                 userValue: userContribution?.performanceKey,
                                 isEmpty: data.consensus.performanceKey == nil
                             )
@@ -74,7 +74,7 @@ struct CommunityDataSection: View {
                                 icon: "metronome",
                                 label: "Tempo",
                                 value: data.consensus.tempoMarking ?? "Not set",
-                                count: data.counts.tempo,
+                                count: data.counts.tempo ?? 0,
                                 userValue: userContribution?.tempoMarking,
                                 isEmpty: data.consensus.tempoMarking == nil,
                                 subtitleText: data.consensus.tempoMarking.flatMap { TempoMarking(rawValue: $0)?.bpmRange }.map { "\($0) BPM" }
@@ -120,7 +120,7 @@ struct CommunityDataSection: View {
     }
 
     private func hasAnyData(_ data: CommunityData) -> Bool {
-        data.counts.key > 0 || data.counts.tempo > 0 || data.counts.instrumental > 0
+        (data.counts.key ?? 0) > 0 || (data.counts.tempo ?? 0) > 0 || data.counts.instrumental > 0
     }
 
     private func formatInstrumental(_ value: Bool?) -> String {

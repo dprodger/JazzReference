@@ -16,9 +16,12 @@ struct CommunityConsensus: Codable {
 }
 
 /// Contribution counts per field
+/// Note: key and tempo are optional because the recordings list endpoint
+/// only returns the instrumental count (lightweight query for filtering).
+/// The full counts are available from the recording detail endpoint.
 struct ContributionCounts: Codable {
-    let key: Int
-    let tempo: Int
+    let key: Int?
+    let tempo: Int?
     let instrumental: Int
 }
 
