@@ -110,6 +110,41 @@ When adding or modifying fields in `Shared/Support/Models.swift`:
 2. Update the `CodingKeys` enum if the API field name differs
 3. **Update `Shared/Support/PreviewHelpers.swift`** - add the new field to ALL preview instances of that model (e.g., `Recording.preview1`, `Recording.preview2`, `Recording.previewMinimal`)
 
+### Swift Coding Conventions
+
+**Logging**: Never use `print()` in Swift code. Use `os.Logger` via the shared `Log` enum in `Shared/Support/Logging.swift`:
+
+```swift
+import os
+
+// Categories
+Log.network.debug("GET /songs returned \(count, privacy: .public) results")
+Log.auth.info("User logged in")
+Log.ui.error("Failed to load view: \(error.localizedDescription)")
+Log.data.debug("Saved repertoire")
+Log.research.info("Song queued for refresh")
+
+// Log levels
+.debug   // Diagnostic trace, API call details
+.info    // Success, completion messages
+.warning // Conflicts, degraded states
+.error   // Failures, catch blocks
+
+// Privacy: redact sensitive values in release builds
+Log.auth.info("Login: \(email, privacy: .private)")
+Log.network.debug("Status: \(statusCode, privacy: .public)")
+```
+
+For the `MusicBrainzImporter` target (separate target, can't access `Log`), create a local `Logger`:
+```swift
+private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.jazzreference", category: "data")
+```
+
+**Services architecture**: API calls live in per-domain services under `Shared/Services/` (not in views or view models):
+- `SongService`, `PerformerService`, `RecordingService` — stateful (`@MainActor class: ObservableObject`)
+- `ResearchService`, `FavoritesService`, `ContributionService`, `MusicBrainzService`, `ContentService` — stateless
+- `APIClient` — shared infrastructure (baseURL, diagnostics, URL helpers)
+
 ### Database Schema
 
 Core tables (see `sql/jazz-db-schema.sql`):
