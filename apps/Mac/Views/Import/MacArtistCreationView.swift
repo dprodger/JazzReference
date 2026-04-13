@@ -141,7 +141,7 @@ struct MacArtistCreationView: View {
 
         switch httpResponse.statusCode {
         case 200...299:
-            if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            if (try? JSONSerialization.jsonObject(with: data)) != nil {
                 Log.ui.info("Artist creation success response received")
             }
 

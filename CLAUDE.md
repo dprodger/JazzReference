@@ -105,7 +105,12 @@ apps/
 
 ### Model Changes Checklist
 
-When adding or modifying fields in `Shared/Support/Models.swift`:
+Models live in per-domain files under `Shared/Models/`:
+- `Song.swift`, `Recording.swift`, `Performer.swift`, `Release.swift`
+- `CommunityData.swift`, `Repertoire.swift`, `SoloTranscription.swift`, `Video.swift`
+- `AuthorityRecommendation.swift`, `MusicBrainz.swift`
+
+When adding or modifying fields:
 1. Update the struct definition with the new field
 2. Update the `CodingKeys` enum if the API field name differs
 3. **Update `Shared/Support/PreviewHelpers.swift`** - add the new field to ALL preview instances of that model (e.g., `Recording.preview1`, `Recording.preview2`, `Recording.previewMinimal`)
