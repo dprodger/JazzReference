@@ -8,6 +8,7 @@
 
 import SwiftUI
 import Combine
+import os
 
 /// Manages the current repertoire selection and provides repertoire list
 @MainActor
@@ -40,12 +41,12 @@ class RepertoireManager: ObservableObject {
     init() {
         // Restore previously selected repertoire from UserDefaults
         if let savedId = UserDefaults.standard.string(forKey: selectedRepertoireKey) {
-            print("📚 Restored saved repertoire ID: \(savedId)")
+            Log.data.debug("Restored saved repertoire ID: \(savedId, privacy: .private)")
         }
         
         // Restore last used repertoire for adding
         if let lastUsedId = UserDefaults.standard.string(forKey: lastUsedRepertoireKey) {
-            print("📚 Restored last used repertoire ID: \(lastUsedId)")
+            Log.data.debug("Restored last used repertoire ID: \(lastUsedId, privacy: .private)")
         }
     }
     
@@ -66,7 +67,7 @@ class RepertoireManager: ObservableObject {
     func loadRepertoires() async {
         // Skip if already loading (prevents duplicate concurrent requests)
         guard !isLoading else {
-            print("📚 Already loading repertoires - skipping duplicate request")
+            Log.data.debug("Already loading repertoires - skipping duplicate request")
             return
         }
 
@@ -77,7 +78,7 @@ class RepertoireManager: ObservableObject {
                 self.repertoires = [.allSongs]
                 self.selectedRepertoire = .allSongs
                 self.isAuthenticated = false
-                print("📚 Not authenticated - showing only 'All Songs'")
+                Log.data.debug("Not authenticated - showing only All Songs")
             }
             return
         }
@@ -97,7 +98,7 @@ class RepertoireManager: ObservableObject {
             return
         }
         
-        print("📚 Loading repertoires from: \(url.absoluteString)")
+        Log.data.debug("Loading repertoires from: \(url.absoluteString, privacy: .private)")
         
         do {
             // Use AuthenticationManager's method which handles token refresh automatically
@@ -105,7 +106,8 @@ class RepertoireManager: ObservableObject {
             
             // DEBUG: Log response
             if let responseString = String(data: data, encoding: .utf8) {
-                print("📥 Response received: \(String(responseString.prefix(200)))...")
+                let preview = String(responseString.prefix(200))
+                Log.data.debug("Response received: \(preview, privacy: .private)...")
             }
             
             let fetchedRepertoires = try JSONDecoder().decode([Repertoire].self, from: data)
@@ -118,7 +120,8 @@ class RepertoireManager: ObservableObject {
                 if let savedId = UserDefaults.standard.string(forKey: selectedRepertoireKey),
                    let saved = self.repertoires.first(where: { $0.id == savedId }) {
                     self.selectedRepertoire = saved
-                    print("📚 Restored repertoire: \(saved.name)")
+                    let savedName = saved.name
+                    Log.data.debug("Restored repertoire: \(savedName, privacy: .public)")
                 } else {
                     self.selectedRepertoire = .allSongs
                 }
@@ -127,13 +130,14 @@ class RepertoireManager: ObservableObject {
                 if let lastUsedId = UserDefaults.standard.string(forKey: lastUsedRepertoireKey),
                    let lastUsed = fetchedRepertoires.first(where: { $0.id == lastUsedId }) {
                     self.lastUsedRepertoire = lastUsed
-                    print("📚 Restored last used repertoire: \(lastUsed.name)")
+                    let lastUsedName = lastUsed.name
+                    Log.data.debug("Restored last used repertoire: \(lastUsedName, privacy: .public)")
                 }
                 
                 self.isLoading = false
                 self.isAuthenticated = true
                 
-                print("✅ Loaded \(fetchedRepertoires.count) user repertoires")
+                Log.data.info("Loaded \(fetchedRepertoires.count) user repertoires")
             }
         } catch URLError.userAuthenticationRequired {
             // Token refresh failed - user needs to log in again
@@ -143,13 +147,13 @@ class RepertoireManager: ObservableObject {
                 self.selectedRepertoire = .allSongs
                 errorMessage = "Authentication expired. Please sign in again."
                 isLoading = false
-                print("⚠️ Authentication required - token refresh failed")
+                Log.data.warning("Authentication required - token refresh failed")
             }
         } catch {
             await MainActor.run {
                 errorMessage = "Failed to load repertoires: \(error.localizedDescription)"
                 isLoading = false
-                print("❌ Error loading repertoires: \(error)")
+                Log.data.error("Error loading repertoires: \(error.localizedDescription)")
             }
         }
     }
@@ -168,7 +172,7 @@ class RepertoireManager: ObservableObject {
             return false
         }
         
-        print("📚 Adding song \(songId) to repertoire \(repertoireId)")
+        Log.data.debug("Adding song \(songId, privacy: .private) to repertoire \(repertoireId, privacy: .private)")
         
         do {
             // POST request with automatic token refresh
@@ -177,7 +181,7 @@ class RepertoireManager: ObservableObject {
                 method: "POST"
             )
             
-            print("✅ Song added to repertoire")
+            Log.data.info("Song added to repertoire")
             // Refresh repertoires to update counts
             await loadRepertoires()
             return true
@@ -187,7 +191,7 @@ class RepertoireManager: ObservableObject {
             await MainActor.run {
                 errorMessage = "Song already in repertoire"
             }
-            print("⚠️ Song already in repertoire")
+            Log.data.warning("Song already in repertoire")
             return false
             
         } catch URLError.userAuthenticationRequired {
@@ -195,14 +199,14 @@ class RepertoireManager: ObservableObject {
                 errorMessage = "Authentication expired"
                 isAuthenticated = false
             }
-            print("⚠️ Authentication required")
+            Log.data.warning("Authentication required")
             return false
             
         } catch {
             await MainActor.run {
                 errorMessage = "Failed to add song: \(error.localizedDescription)"
             }
-            print("❌ Failed to add song: \(error)")
+            Log.data.error("Failed to add song: \(error.localizedDescription)")
             return false
         }
     }
@@ -230,7 +234,7 @@ class RepertoireManager: ObservableObject {
             return false
         }
         
-        print("📚 Creating repertoire: \(name)")
+        Log.data.debug("Creating repertoire: \(name, privacy: .public)")
         
         do {
             _ = try await authManager.makeAuthenticatedRequest(
@@ -239,7 +243,7 @@ class RepertoireManager: ObservableObject {
                 body: bodyData
             )
             
-            print("✅ Repertoire created: \(name)")
+            Log.data.info("Repertoire created: \(name, privacy: .public)")
             await loadRepertoires()
             return true
             
@@ -254,7 +258,7 @@ class RepertoireManager: ObservableObject {
             await MainActor.run {
                 errorMessage = "Failed to create repertoire: \(error.localizedDescription)"
             }
-            print("❌ Failed to create repertoire: \(error)")
+            Log.data.error("Failed to create repertoire: \(error.localizedDescription)")
             return false
         }
     }
@@ -270,7 +274,7 @@ class RepertoireManager: ObservableObject {
             return false
         }
         
-        print("📚 Deleting repertoire: \(id)")
+        Log.data.debug("Deleting repertoire: \(id, privacy: .private)")
         
         do {
             _ = try await authManager.makeAuthenticatedRequest(
@@ -278,7 +282,7 @@ class RepertoireManager: ObservableObject {
                 method: "DELETE"
             )
             
-            print("✅ Repertoire deleted")
+            Log.data.info("Repertoire deleted")
             await loadRepertoires()
             return true
             
@@ -289,7 +293,7 @@ class RepertoireManager: ObservableObject {
             return false
             
         } catch {
-            print("❌ Failed to delete repertoire: \(error)")
+            Log.data.error("Failed to delete repertoire: \(error.localizedDescription)")
             return false
         }
     }
@@ -324,7 +328,8 @@ class RepertoireManager: ObservableObject {
         // Save to UserDefaults
         UserDefaults.standard.set(repertoire.id, forKey: lastUsedRepertoireKey)
         
-        print("📚 Last used repertoire updated: \(repertoire.name)")
+        let repName = repertoire.name
+        Log.data.debug("Last used repertoire updated: \(repName, privacy: .public)")
     }
     
     /// Get display name for current repertoire with song count

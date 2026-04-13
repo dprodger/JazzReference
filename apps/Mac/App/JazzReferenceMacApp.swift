@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import os
 #if canImport(GoogleSignIn)
 import GoogleSignIn
 #endif
@@ -51,7 +52,7 @@ struct JazzReferenceMacApp: App {
                     // Restore Google Sign-In session if available
                     GIDSignIn.sharedInstance.restorePreviousSignIn { user, error in
                         if let error = error {
-                            print("Google Sign-In restore error: \(error.localizedDescription)")
+                            Log.ui.error("Google Sign-In restore error: \(error.localizedDescription)")
                         }
                     }
                     #endif

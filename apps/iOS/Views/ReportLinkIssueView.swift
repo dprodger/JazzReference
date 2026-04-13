@@ -5,6 +5,7 @@
 //  Created by Dave Rodger on 10/24/25.
 //
 import SwiftUI
+import os
 
 // MARK: - Report Bad Reference View
 
@@ -162,10 +163,10 @@ struct IssueInfoRow: View {
         externalSource: "Wikipedia",
         externalUrl: "https://en.wikipedia.org/wiki/Take_Five",
         onSubmit: { explanation in
-            print("Submitted: \(explanation)")
+            Log.ui.debug("Submitted: \(explanation, privacy: .public)")
         },
         onCancel: {
-            print("Cancelled")
+            Log.ui.debug("Cancelled")
         }
     )
 }

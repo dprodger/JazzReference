@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 // MARK: - API Client
 
@@ -15,19 +16,22 @@ enum APIClient {
         guard diagnosticsEnabled else { return }
         requestCounter += 1
         let duration = Date().timeIntervalSince(startTime)
-        print("🌐 API Call #\(requestCounter): \(endpoint) (took \(String(format: "%.2f", duration))s)")
+        let durationStr = String(format: "%.2f", duration)
+        let callNumber = self.requestCounter
+        Log.network.debug("API Call #\(callNumber, privacy: .public): \(endpoint, privacy: .public) (took \(durationStr)s)")
     }
 
     static func resetRequestCounter() {
         requestCounter = 0
         if diagnosticsEnabled {
-            print("📊 Request counter reset")
+            Log.network.debug("Request counter reset")
         }
     }
 
     static func printRequestSummary() {
         guard diagnosticsEnabled else { return }
-        print("📊 Total API calls in this session: \(requestCounter)")
+        let totalCalls = self.requestCounter
+        Log.network.debug("Total API calls in this session: \(totalCalls, privacy: .public)")
     }
 
     // MARK: - Search Text Normalization

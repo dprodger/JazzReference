@@ -1,5 +1,6 @@
 import SwiftUI
 import Combine
+import os
 
 // MARK: - Recording Service
 
@@ -38,7 +39,7 @@ class RecordingService: ObservableObject {
             APIClient.logRequest("GET /recordings?search=...", startTime: startTime)
 
             if APIClient.diagnosticsEnabled {
-                print("   \u{21B3} Returned \(decodedRecordings.count) recordings")
+                Log.network.debug("Returned \(decodedRecordings.count, privacy: .public) recordings")
             }
         } catch is CancellationError {
             return
@@ -79,13 +80,14 @@ class RecordingService: ObservableObject {
             APIClient.logRequest("GET /recordings/\(id)", startTime: startTime)
 
             if APIClient.diagnosticsEnabled {
-                print("   \u{21B3} Returned recording with \(recording.performers?.count ?? 0) performers")
+                let performerCount = recording.performers?.count ?? 0
+                Log.network.debug("Returned recording with \(performerCount, privacy: .public) performers")
             }
             return recording
         } catch let error as NSError where error.code == NSURLErrorCancelled {
             return nil
         } catch {
-            print("Error fetching recording detail: \(error)")
+            Log.network.error("Error fetching recording detail: \(error)")
             return nil
         }
     }
@@ -105,7 +107,7 @@ class RecordingService: ObservableObject {
             let (data, _) = try await URLSession.shared.data(from: url)
             return try JSONDecoder().decode([SoloTranscription].self, from: data)
         } catch {
-            print("Error fetching recording transcriptions: \(error)")
+            Log.network.error("Error fetching recording transcriptions: \(error)")
             return []
         }
     }

@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import os
 
 /// Artist data structure shared between the extension and main app
 struct ImportedArtistData: Codable, Identifiable {
@@ -29,23 +30,23 @@ class SharedArtistDataManager {
     /// Call this when your app launches to check for pending imports
     static func retrieveSharedData() -> ImportedArtistData? {
         guard let sharedDefaults = UserDefaults(suiteName: appGroupIdentifier) else {
-            print("❌ Failed to access App Group UserDefaults")
+            Log.data.error("Failed to access App Group UserDefaults")
             return nil
         }
 
         guard let savedData = sharedDefaults.data(forKey: sharedDataKey) else {
             return nil
         }
-        
-        print("✓ Found pending import data")
-        
+
+        Log.data.debug("Found pending import data")
+
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
-        
+
         do {
             // First, try to decode with timestamp (new format from extension)
             let artistData = try decoder.decode(ImportedArtistDataWithTimestamp.self, from: savedData)
-            
+
             // Convert to ImportedArtistData
             let result = ImportedArtistData(
                 name: artistData.name,
@@ -53,15 +54,16 @@ class SharedArtistDataManager {
                 sourceUrl: artistData.sourceUrl,
                 importedAt: Date() // Current time
             )
-            
+
             // Clear the data after reading
             clearSharedData()
-            print("✅ Retrieved artist data: \(result.name)")
+            let name = result.name
+            Log.data.info("Retrieved artist data: \(name, privacy: .public)")
             return result
-            
+
         } catch {
-            print("⚠️ Could not decode with timestamp, trying simple format...")
-            
+            Log.data.warning("Could not decode with timestamp, trying simple format...")
+
             // Try simpler format (just the basic artist data)
             do {
                 let basicData = try decoder.decode(BasicArtistData.self, from: savedData)
@@ -71,13 +73,14 @@ class SharedArtistDataManager {
                     sourceUrl: basicData.sourceUrl,
                     importedAt: Date()
                 )
-                
+
                 clearSharedData()
-                print("✅ Retrieved artist data (basic format): \(result.name)")
+                let basicName = result.name
+                Log.data.info("Retrieved artist data (basic format): \(basicName, privacy: .public)")
                 return result
-                
+
             } catch {
-                print("❌ Failed to decode artist data: \(error)")
+                Log.data.error("Failed to decode artist data: \(error.localizedDescription)")
                 // Clear corrupted data
                 clearSharedData()
                 return nil
@@ -100,7 +103,7 @@ class SharedArtistDataManager {
         }
         sharedDefaults.removeObject(forKey: sharedDataKey)
         sharedDefaults.synchronize()
-        print("🗑️ Cleared pending import data")
+        Log.data.debug("Cleared pending import data")
     }
 }
 
@@ -189,7 +192,7 @@ class SharedYouTubeDataManager {
     /// Retrieve YouTube data in the main app
     static func retrieveSharedData() -> ImportedYouTubeData? {
         guard let sharedDefaults = UserDefaults(suiteName: appGroupIdentifier) else {
-            print("❌ Failed to access App Group UserDefaults")
+            Log.data.error("Failed to access App Group UserDefaults")
             return nil
         }
 
@@ -197,7 +200,7 @@ class SharedYouTubeDataManager {
             return nil
         }
 
-        print("✓ Found pending YouTube import data")
+        Log.data.debug("Found pending YouTube import data")
 
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
@@ -207,7 +210,7 @@ class SharedYouTubeDataManager {
 
             // Convert to ImportedYouTubeData
             guard let videoType = youtubeData.videoType else {
-                print("❌ No video type set in YouTube data")
+                Log.data.error("No video type set in YouTube data")
                 clearSharedData()
                 return nil
             }
@@ -225,11 +228,12 @@ class SharedYouTubeDataManager {
             )
 
             // Don't clear the data yet - clear after successful import
-            print("✅ Retrieved YouTube data: \(result.title)")
+            let title = result.title
+            Log.data.info("Retrieved YouTube data: \(title, privacy: .public)")
             return result
 
         } catch {
-            print("❌ Failed to decode YouTube data: \(error)")
+            Log.data.error("Failed to decode YouTube data: \(error.localizedDescription)")
             clearSharedData()
             return nil
         }
@@ -250,7 +254,7 @@ class SharedYouTubeDataManager {
         }
         sharedDefaults.removeObject(forKey: sharedDataKey)
         sharedDefaults.synchronize()
-        print("🗑️ Cleared pending YouTube import data")
+        Log.data.debug("Cleared pending YouTube import data")
     }
 }
 

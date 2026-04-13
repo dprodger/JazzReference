@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import os
 
 struct MacSongCreationView: View {
     @Environment(\.dismiss) var dismiss
@@ -119,7 +120,7 @@ struct MacSongCreationView: View {
 
                 await MainActor.run {
                     isSaving = false
-                    print("Song saved successfully")
+                    Log.ui.info("Song saved successfully")
                     NotificationCenter.default.post(name: .songCreated, object: nil)
                     dismiss()
                 }
@@ -156,9 +157,7 @@ struct MacSongCreationView: View {
 
         request.httpBody = try JSONSerialization.data(withJSONObject: songData)
 
-        print("Sending song creation request:")
-        print("   URL: \(url)")
-        print("   Title: \(title)")
+        Log.ui.debug("Sending song creation request: url=\(url, privacy: .private), title=\(title, privacy: .public)")
 
         let (data, response) = try await URLSession.shared.data(for: request)
 
@@ -175,7 +174,7 @@ struct MacSongCreationView: View {
             throw URLError(.badServerResponse)
         }
 
-        print("Song created successfully (status: \(httpResponse.statusCode))")
+        Log.ui.info("Song created successfully (status: \(httpResponse.statusCode))")
     }
 }
 

@@ -7,6 +7,7 @@
 //
 
 import SwiftUI
+import os
 
 struct AddToRepertoireSheet: View {
     let songId: String
@@ -77,10 +78,13 @@ struct AddToRepertoireSheet: View {
                     isLoadingRepertoires = false
                     
                     // Debug logging
-                    print("🎵 Loaded \(repertoireManager.repertoires.count) total repertoires")
-                    print("🎵 Addable repertoires: \(repertoireManager.addableRepertoires.count)")
+                    let totalCount = repertoireManager.repertoires.count
+                    let addableCount = repertoireManager.addableRepertoires.count
+                    Log.ui.debug("Loaded \(totalCount, privacy: .public) total repertoires, \(addableCount, privacy: .public) addable")
                     for rep in repertoireManager.addableRepertoires {
-                        print("   - \(rep.name) (ID: \(rep.id))")
+                        let name = rep.name
+                        let id = rep.id
+                        Log.ui.debug("  - \(name, privacy: .public) (ID: \(id, privacy: .private))")
                     }
                 }
             }

@@ -7,6 +7,7 @@
 //
 
 import SwiftUI
+import os
 
 // MARK: - Save Status
 
@@ -490,7 +491,7 @@ struct SongBulkEditRecordingsView: View {
                     }
                 }
             } catch {
-                print("❌ Bulk edit save failed for \(recordingId): \(error)")
+                Log.ui.error("Bulk edit save failed for \(recordingId, privacy: .private): \(error.localizedDescription)")
                 await MainActor.run {
                     rowStates[recordingId]?.saveStatus = .error
                 }

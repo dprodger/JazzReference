@@ -7,6 +7,7 @@
 //
 
 import SwiftUI
+import os
 
 // Notification for when an artist is created and lists need to refresh
 extension Notification.Name {
@@ -109,7 +110,7 @@ struct ArtistCreationView: View {
                 
                 await MainActor.run {
                     isSaving = false
-                    print("✅ Artist saved successfully")
+                    Log.ui.info("Artist saved successfully")
                     // Notify ArtistsListView to refresh
                     NotificationCenter.default.post(name: .artistCreated, object: nil)
                     dismiss()
@@ -144,12 +145,7 @@ struct ArtistCreationView: View {
         request.httpBody = try JSONSerialization.data(withJSONObject: artistData)
         
         // Log the request (for debugging)
-        print("📤 Sending artist creation request:")
-        print("   URL: \(url)")
-        print("   Name: \(name)")
-        if !musicbrainzId.isEmpty {
-            print("   MusicBrainz ID: \(musicbrainzId)")
-        }
+        Log.ui.debug("Sending artist creation request: url=\(url, privacy: .private), name=\(name, privacy: .public), musicbrainzId=\(musicbrainzId, privacy: .private)")
         
         // Perform request
         let (data, response) = try await URLSession.shared.data(for: request)
@@ -159,14 +155,14 @@ struct ArtistCreationView: View {
             throw URLError(.badServerResponse)
         }
         
-        print("📥 Response status: \(httpResponse.statusCode)")
+        Log.ui.debug("Response status: \(httpResponse.statusCode)")
         
         // Handle different status codes
         switch httpResponse.statusCode {
         case 200...299:
             // Success
             if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-                print("✅ Success response: \(json)")
+                Log.ui.info("Artist creation success response received")
             }
             
         case 409:

@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import os
 
 // MARK: - Imported Song Data Model
 
@@ -40,23 +41,23 @@ class SharedSongDataManager {
     /// Call this when your app launches to check for pending imports
     static func retrieveSharedData() -> ImportedSongData? {
         guard let sharedDefaults = UserDefaults(suiteName: appGroupIdentifier) else {
-            print("❌ Failed to access App Group UserDefaults")
+            Log.data.error("Failed to access App Group UserDefaults")
             return nil
         }
 
         guard let savedData = sharedDefaults.data(forKey: sharedDataKey) else {
             return nil
         }
-        
-        print("✓ Found pending song import data")
-        
+
+        Log.data.debug("Found pending song import data")
+
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
-        
+
         do {
             // Decode the SongData from the extension
             let songData = try decoder.decode(SongData.self, from: savedData)
-            
+
             // Convert to ImportedSongData
             let result = ImportedSongData(
                 title: songData.title,
@@ -69,14 +70,15 @@ class SharedSongDataManager {
                 sourceUrl: songData.sourceUrl,
                 importedAt: Date()
             )
-            
+
             // Clear the data after reading
             clearSharedData()
-            print("✅ Retrieved song data: \(result.title)")
+            let title = result.title
+            Log.data.info("Retrieved song data: \(title, privacy: .public)")
             return result
-            
+
         } catch {
-            print("❌ Failed to decode song data: \(error)")
+            Log.data.error("Failed to decode song data: \(error.localizedDescription)")
             // Clear corrupted data
             clearSharedData()
             return nil
@@ -98,7 +100,7 @@ class SharedSongDataManager {
         }
         sharedDefaults.removeObject(forKey: sharedDataKey)
         sharedDefaults.synchronize()
-        print("🗑️ Cleared pending song import data")
+        Log.data.debug("Cleared pending song import data")
     }
 }
 // MARK: - Private Decoding Model

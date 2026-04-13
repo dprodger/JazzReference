@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import os
 
 // Notification for when a song is created and lists need to refresh
 extension Notification.Name {
@@ -119,7 +120,7 @@ struct SongCreationView: View {
                 
                 await MainActor.run {
                     isSaving = false
-                    print("✅ Song saved successfully")
+                    Log.ui.info("Song saved successfully")
                     // Notify SongsListView to refresh
                     NotificationCenter.default.post(name: .songCreated, object: nil)
                     dismiss()
@@ -168,15 +169,7 @@ struct SongCreationView: View {
         request.httpBody = try JSONSerialization.data(withJSONObject: songData)
         
         // Log the request (for debugging)
-        print("📤 Sending song creation request:")
-        print("   URL: \(url)")
-        print("   Title: \(title)")
-        if !composer.isEmpty {
-            print("   Composer: \(composer)")
-        }
-        if !musicbrainzId.isEmpty {
-            print("   MusicBrainz ID: \(musicbrainzId)")
-        }
+        Log.ui.debug("Sending song creation request: url=\(url, privacy: .private), title=\(title, privacy: .public), composer=\(composer, privacy: .public), musicbrainzId=\(musicbrainzId, privacy: .private)")
         
         // Perform request
         let (data, response) = try await URLSession.shared.data(for: request)
@@ -196,7 +189,7 @@ struct SongCreationView: View {
             throw URLError(.badServerResponse)
         }
         
-        print("✅ Song created successfully (status: \(httpResponse.statusCode))")
+        Log.ui.info("Song created successfully (status: \(httpResponse.statusCode))")
     }
 }
 

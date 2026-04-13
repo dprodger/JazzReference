@@ -8,6 +8,7 @@
 
 import SwiftUI
 import Combine
+import os
 #if canImport(GoogleSignIn)
 import GoogleSignIn
 #endif
@@ -70,7 +71,7 @@ class AuthenticationManager: ObservableObject {
     private func refreshAccessToken() async -> Bool {
         // If a refresh is already in progress, wait for its result
         if isRefreshingToken {
-            print("🔄 Token refresh already in progress - waiting for result")
+            Log.auth.debug("Token refresh already in progress - waiting for result")
             return await withCheckedContinuation { continuation in
                 refreshWaiters.append(continuation)
             }
@@ -97,7 +98,7 @@ class AuthenticationManager: ObservableObject {
     /// Actually performs the token refresh network request
     private func performTokenRefresh() async -> Bool {
         guard let refreshToken = keychainHelper.load(forKey: "refresh_token") else {
-            print("❌ No refresh token available")
+            Log.auth.error("No refresh token available")
             return false
         }
 
@@ -133,14 +134,14 @@ class AuthenticationManager: ObservableObject {
                 saveTokens(accessToken: refreshResponse.accessToken,
                           refreshToken: refreshResponse.refreshToken)
 
-                print("✅ Access token refreshed successfully")
+                Log.auth.info("Access token refreshed successfully")
                 return true
             } else {
-                print("❌ Token refresh failed with status: \(httpResponse.statusCode)")
+                Log.auth.error("Token refresh failed with status: \(httpResponse.statusCode)")
                 return false
             }
         } catch {
-            print("❌ Token refresh error: \(error)")
+            Log.auth.error("Token refresh error: \(error.localizedDescription)")
             return false
         }
     }
@@ -186,7 +187,7 @@ class AuthenticationManager: ObservableObject {
                 isAuthenticated = true
                 isLoading = false
                 
-                print("✅ Registration successful: \(authResponse.user.email)")
+                Log.auth.info("Registration successful: \(authResponse.user.email, privacy: .private)")
                 return true
             } else {
                 // Try to parse error message
@@ -196,13 +197,14 @@ class AuthenticationManager: ObservableObject {
                     errorMessage = "Registration failed"
                 }
                 
-                print("❌ Registration failed: \(errorMessage ?? "Unknown error")")
+                let msg = errorMessage ?? "Unknown error"
+                Log.auth.error("Registration failed: \(msg)")
                 isLoading = false
                 return false
             }
         } catch {
             errorMessage = "Registration failed: \(error.localizedDescription)"
-            print("❌ Registration error: \(error)")
+            Log.auth.error("Registration error: \(error.localizedDescription)")
             isLoading = false
             return false
         }
@@ -241,7 +243,7 @@ class AuthenticationManager: ObservableObject {
                 isAuthenticated = true
                 isLoading = false
                 
-                print("✅ Login successful: \(authResponse.user.email)")
+                Log.auth.info("Login successful: \(authResponse.user.email, privacy: .private)")
                 return true
             } else {
                 // Try to parse error message
@@ -251,13 +253,14 @@ class AuthenticationManager: ObservableObject {
                     errorMessage = "Login failed"
                 }
                 
-                print("❌ Login failed: \(errorMessage ?? "Unknown error")")
+                let msg = errorMessage ?? "Unknown error"
+                Log.auth.error("Login failed: \(msg)")
                 isLoading = false
                 return false
             }
         } catch {
             errorMessage = "Login failed: \(error.localizedDescription)"
-            print("❌ Login error: \(error)")
+            Log.auth.error("Login error: \(error.localizedDescription)")
             isLoading = false
             return false
         }
@@ -265,7 +268,8 @@ class AuthenticationManager: ObservableObject {
     
     /// Logout and clear all tokens
     func logout() {
-        print("🔒 Logging out user: \(currentUser?.email ?? "unknown")")
+        let userEmail = currentUser?.email ?? "unknown"
+        Log.auth.info("Logging out user: \(userEmail, privacy: .private)")
         
         // Optional: Call logout endpoint to invalidate refresh token on backend
         if let token = accessToken,
@@ -300,26 +304,26 @@ class AuthenticationManager: ObservableObject {
                 let user = try JSONDecoder().decode(User.self, from: data)
                 currentUser = user
                 isAuthenticated = true
-                print("✅ Token valid, user authenticated: \(user.email)")
+                Log.auth.info("Token valid, user authenticated: \(user.email, privacy: .private)")
             } else if httpResponse.statusCode == 401 {
                 // Access token expired — try refreshing before giving up
-                print("⚠️ Access token expired, attempting refresh")
+                Log.auth.warning("Access token expired, attempting refresh")
                 let refreshed = await refreshAccessToken()
                 if refreshed {
                     // Retry with the new access token
                     await fetchCurrentUser()
                 } else {
-                    print("❌ Token refresh failed, clearing authentication")
+                    Log.auth.error("Token refresh failed, clearing authentication")
                     clearTokens()
                     isAuthenticated = false
                 }
             } else {
-                print("⚠️ Unexpected status \(httpResponse.statusCode), clearing authentication")
+                Log.auth.warning("Unexpected status \(httpResponse.statusCode), clearing authentication")
                 clearTokens()
                 isAuthenticated = false
             }
         } catch {
-            print("⚠️ Token validation failed: \(error)")
+            Log.auth.warning("Token validation failed: \(error.localizedDescription)")
             clearTokens()
             isAuthenticated = false
         }
@@ -338,10 +342,10 @@ class AuthenticationManager: ObservableObject {
         
         do {
             _ = try await URLSession.shared.data(for: request)
-            print("✅ Backend logout successful")
+            Log.auth.info("Backend logout successful")
         } catch {
             // Don't worry if it fails - tokens already cleared locally
-            print("⚠️ Backend logout failed (non-critical): \(error)")
+            Log.auth.warning("Backend logout failed (non-critical): \(error.localizedDescription)")
         }
     }
     
@@ -370,7 +374,7 @@ class AuthenticationManager: ObservableObject {
             isLoading = false
             
             if httpResponse.statusCode == 200 {
-                print("✅ Password reset email sent to: \(email)")
+                Log.auth.info("Password reset email sent to: \(email, privacy: .private)")
                 return true
             } else {
                 if let errorResponse = try? JSONDecoder().decode(AuthError.self, from: data) {
@@ -378,12 +382,13 @@ class AuthenticationManager: ObservableObject {
                 } else {
                     errorMessage = "Failed to send reset email"
                 }
-                print("❌ Password reset failed: \(errorMessage ?? "Unknown error")")
+                let msg = errorMessage ?? "Unknown error"
+                Log.auth.error("Password reset failed: \(msg)")
                 return false
             }
         } catch {
             errorMessage = "Failed to send reset email: \(error.localizedDescription)"
-            print("❌ Password reset error: \(error)")
+            Log.auth.error("Password reset error: \(error.localizedDescription)")
             isLoading = false
             return false
         }
@@ -435,23 +440,23 @@ class AuthenticationManager: ObservableObject {
         
         // Check for redirect - Authorization header gets stripped on cross-origin redirects
         if let responseURL = httpResponse.url, responseURL != url {
-            print("🔀 Redirect detected: \(url.absoluteString) → \(responseURL.absoluteString)")
+            Log.auth.debug("Redirect detected: \(url.absoluteString, privacy: .private) -> \(responseURL.absoluteString, privacy: .private)")
             if httpResponse.statusCode == 401 {
-                print("⚠️ 401 after redirect - Authorization header was likely stripped!")
-                print("   💡 Fix: Update baseURL to use the final URL directly (avoid redirects)")
+                Log.auth.warning("401 after redirect - Authorization header was likely stripped!")
+                Log.auth.debug("Fix: Update baseURL to use the final URL directly (avoid redirects)")
             }
         }
 
         // If unauthorized, try to refresh token and retry
         if httpResponse.statusCode == 401 {
-            print("⚠️ 401 Unauthorized - attempting token refresh")
+            Log.auth.warning("401 Unauthorized - attempting token refresh")
             
             // Try to refresh token
             let refreshed = await refreshAccessToken()
             
             if refreshed && maxRetries > 0 {
                 // Retry the request with new token
-                print("🔄 Retrying request with refreshed token")
+                Log.auth.debug("Retrying request with refreshed token")
                 return try await makeAuthenticatedRequest(
                     url: url,
                     method: method,
@@ -461,7 +466,7 @@ class AuthenticationManager: ObservableObject {
                 )
             } else {
                 // Refresh failed or no retries left, clear tokens
-                print("❌ Token refresh failed - clearing authentication")
+                Log.auth.error("Token refresh failed - clearing authentication")
                 await MainActor.run {
                     clearTokens()
                     isAuthenticated = false
@@ -473,7 +478,7 @@ class AuthenticationManager: ObservableObject {
         // For non-200 responses, throw an error with status code
         if httpResponse.statusCode >= 400 {
             let errorMessage = String(data: data, encoding: .utf8) ?? "HTTP \(httpResponse.statusCode)"
-            print("❌ API error \(httpResponse.statusCode): \(errorMessage)")
+            Log.auth.error("API error \(httpResponse.statusCode): \(errorMessage)")
             throw NSError(
                 domain: "APIError",
                 code: httpResponse.statusCode,
@@ -515,7 +520,7 @@ class AuthenticationManager: ObservableObject {
             isLoading = false
             
             if httpResponse.statusCode == 200 {
-                print("✅ Password reset successful")
+                Log.auth.info("Password reset successful")
                 return true
             } else {
                 if let errorResponse = try? JSONDecoder().decode(AuthError.self, from: data) {
@@ -523,12 +528,13 @@ class AuthenticationManager: ObservableObject {
                 } else {
                     errorMessage = "Password reset failed"
                 }
-                print("❌ Password reset failed: \(errorMessage ?? "Unknown error")")
+                let msg = errorMessage ?? "Unknown error"
+                Log.auth.error("Password reset failed: \(msg)")
                 return false
             }
         } catch {
             errorMessage = "Password reset failed: \(error.localizedDescription)"
-            print("❌ Password reset error: \(error)")
+            Log.auth.error("Password reset error: \(error.localizedDescription)")
             isLoading = false
             return false
         }

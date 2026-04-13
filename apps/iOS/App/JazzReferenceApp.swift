@@ -3,6 +3,7 @@
 
 import SwiftUI
 import GoogleSignIn
+import os
 
 @main
 struct JazzReferenceApp: App {
@@ -118,11 +119,11 @@ struct JazzReferenceApp: App {
                 .onAppear {
                     // PHASE 5: Connect RepertoireManager to AuthenticationManager
                     repertoireManager.setAuthManager(authManager)
-                    print("📚 Connected RepertoireManager to AuthenticationManager")
+                    Log.ui.debug("Connected RepertoireManager to AuthenticationManager")
 
                     // Connect FavoritesManager to AuthenticationManager
                     favoritesManager.setAuthManager(authManager)
-                    print("❤️ Connected FavoritesManager to AuthenticationManager")
+                    Log.ui.debug("Connected FavoritesManager to AuthenticationManager")
 
                     // Show onboarding on first launch
                     if !hasCompletedOnboarding {
@@ -143,20 +144,20 @@ struct JazzReferenceApp: App {
                 .onChange(of: authManager.isAuthenticated) { wasAuthenticated, isAuthenticated in
                     // PHASE 5: Update repertoire manager when auth state changes
                     if isAuthenticated {
-                        print("📚 User authenticated - loading repertoires")
+                        Log.ui.debug("User authenticated - loading repertoires")
                         Task {
                             await repertoireManager.loadRepertoires()
                         }
-                        print("❤️ User authenticated - loading favorites")
+                        Log.ui.debug("User authenticated - loading favorites")
                         Task {
                             await favoritesManager.loadFavorites()
                         }
                     } else {
-                        print("📚 User logged out - clearing repertoires")
+                        Log.ui.debug("User logged out - clearing repertoires")
                         Task {
                             await repertoireManager.loadRepertoires()
                         }
-                        print("❤️ User logged out - clearing favorites")
+                        Log.ui.debug("User logged out - clearing favorites")
                         favoritesManager.clearFavorites()
                     }
                 }

@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import os
 import Security
 
 /// Helper class for securely storing and retrieving tokens from Keychain
@@ -27,7 +28,7 @@ class KeychainHelper {
     /// - Returns: True if save was successful
     func save(_ value: String, forKey key: String) -> Bool {
         guard let data = value.data(using: .utf8) else {
-            print("KeychainHelper: Failed to encode value as UTF-8")
+            Log.auth.error("Keychain: Failed to encode value as UTF-8")
             return false
         }
         
@@ -45,10 +46,10 @@ class KeychainHelper {
         let status = SecItemAdd(query as CFDictionary, nil)
         
         if status == errSecSuccess {
-            print("KeychainHelper: Successfully saved '\(key)'")
+            Log.auth.debug("Keychain: Successfully saved '\(key, privacy: .private)'")
             return true
         } else {
-            print("KeychainHelper: Failed to save '\(key)' with status: \(status)")
+            Log.auth.error("Keychain: Failed to save '\(key, privacy: .private)' with status: \(Int(status))")
             return false
         }
     }
@@ -72,12 +73,12 @@ class KeychainHelper {
               let data = result as? Data,
               let value = String(data: data, encoding: .utf8) else {
             if status != errSecItemNotFound {
-                print("KeychainHelper: Failed to load '\(key)' with status: \(status)")
+                Log.auth.error("Keychain: Failed to load '\(key, privacy: .private)' with status: \(Int(status))")
             }
             return nil
         }
         
-        print("KeychainHelper: Successfully loaded '\(key)'")
+        Log.auth.debug("Keychain: Successfully loaded '\(key, privacy: .private)'")
         return value
     }
     
@@ -98,9 +99,9 @@ class KeychainHelper {
         let success = status == errSecSuccess || status == errSecItemNotFound
         
         if success {
-            print("KeychainHelper: Deleted '\(key)'")
+            Log.auth.debug("Keychain: Deleted '\(key, privacy: .private)'")
         } else {
-            print("KeychainHelper: Failed to delete '\(key)' with status: \(status)")
+            Log.auth.error("Keychain: Failed to delete '\(key, privacy: .private)' with status: \(Int(status))")
         }
         
         return success
@@ -108,7 +109,7 @@ class KeychainHelper {
     
     /// Clear all authentication tokens (used on logout)
     func clearAll() {
-        print("KeychainHelper: Clearing all tokens")
+        Log.auth.info("Keychain: Clearing all tokens")
         delete(forKey: "access_token")
         delete(forKey: "refresh_token")
     }

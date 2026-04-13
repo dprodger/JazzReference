@@ -8,6 +8,7 @@
 //
 
 import SwiftUI
+import os
 
 // MARK: - Authority Recommendations View
 
@@ -234,7 +235,7 @@ struct AuthorityRecommendationsView: View {
                 errorMessage = "Failed to load authorities"
             }
         } catch {
-            print("Error loading authorities: \(error)")
+            Log.ui.error("Error loading authorities: \(error.localizedDescription)")
             errorMessage = "Failed to load: \(error.localizedDescription)"
         }
         
@@ -257,7 +258,7 @@ struct AuthorityRecommendationsView: View {
             // Filter to only unmatched (recording_id is nil)
             unmatchedAuthorities = decoded.authorities.filter { $0.recordingId == nil }
         } catch {
-            print("Error loading song authorities: \(error)")
+            Log.ui.error("Error loading song authorities: \(error.localizedDescription)")
         }
     }
     
@@ -276,7 +277,7 @@ struct AuthorityRecommendationsView: View {
                 authorities.removeAll { $0.id == authority.id }
             }
         } catch {
-            print("Error deleting authority: \(error)")
+            Log.ui.error("Error deleting authority: \(error.localizedDescription)")
         }
         
         deleteTarget = nil
@@ -308,7 +309,7 @@ struct AuthorityRecommendationsView: View {
                 authorities.append(updatedAuthority)
             }
         } catch {
-            print("Error linking authority: \(error)")
+            Log.ui.error("Error linking authority: \(error.localizedDescription)")
         }
         
         linkTarget = nil
@@ -634,7 +635,7 @@ struct AddAuthorityView: View {
                 errorMessage = "Failed to add reference"
             }
         } catch {
-            print("Error adding authority: \(error)")
+            Log.ui.error("Error adding authority: \(error.localizedDescription)")
             errorMessage = "Error: \(error.localizedDescription)"
         }
         

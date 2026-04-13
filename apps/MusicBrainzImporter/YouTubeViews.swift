@@ -6,6 +6,9 @@
 //
 
 import SwiftUI
+import os
+
+private let uiLogger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.jazzreference.MusicBrainzImporter", category: "ui")
 
 // MARK: - YouTube Type Selection View
 
@@ -152,7 +155,7 @@ struct YouTubeTypeSelectionView: View {
             songId: nil,
             recordingId: nil
         ),
-        onSelectType: { type in print("Selected: \(type)") },
-        onCancel: { print("Cancelled") }
+        onSelectType: { type in uiLogger.debug("Selected: \(String(describing: type), privacy: .public)") },
+        onCancel: { uiLogger.debug("Cancelled") }
     )
 }

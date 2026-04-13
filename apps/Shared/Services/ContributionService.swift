@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 // MARK: - Contribution Response Types
 
@@ -76,24 +77,25 @@ class ContributionService {
             if (200...299).contains(httpResponse.statusCode) {
                 let contributionResponse = try JSONDecoder().decode(ContributionResponse.self, from: data)
                 if APIClient.diagnosticsEnabled {
-                    print("   \u{21B3} Saved contribution, key_count: \(contributionResponse.counts.key)")
+                    let keyCount = contributionResponse.counts.key
+                    Log.network.debug("Saved contribution, key_count: \(keyCount, privacy: .public)")
                 }
                 return contributionResponse
             } else if httpResponse.statusCode == 401 {
-                print("Error: Unauthorized")
+                Log.network.error("Unauthorized")
                 return nil
             } else if httpResponse.statusCode == 400 {
                 if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                    let error = json["error"] as? String {
-                    print("Validation error: \(error)")
+                    Log.network.error("Validation error: \(error)")
                 }
                 return nil
             } else {
-                print("Error saving contribution: HTTP \(httpResponse.statusCode)")
+                Log.network.error("Error saving contribution: HTTP \(httpResponse.statusCode, privacy: .public)")
                 return nil
             }
         } catch {
-            print("Error saving contribution: \(error)")
+            Log.network.error("Error saving contribution: \(error)")
             return nil
         }
     }
@@ -122,21 +124,21 @@ class ContributionService {
             if (200...299).contains(httpResponse.statusCode) {
                 let contributionResponse = try JSONDecoder().decode(ContributionResponse.self, from: data)
                 if APIClient.diagnosticsEnabled {
-                    print("   \u{21B3} Deleted contribution")
+                    Log.network.info("Deleted contribution")
                 }
                 return contributionResponse
             } else if httpResponse.statusCode == 404 {
-                print("No contribution found to delete")
+                Log.network.warning("No contribution found to delete")
                 return nil
             } else if httpResponse.statusCode == 401 {
-                print("Error: Unauthorized")
+                Log.network.error("Unauthorized")
                 return nil
             } else {
-                print("Error deleting contribution: HTTP \(httpResponse.statusCode)")
+                Log.network.error("Error deleting contribution: HTTP \(httpResponse.statusCode, privacy: .public)")
                 return nil
             }
         } catch {
-            print("Error deleting contribution: \(error)")
+            Log.network.error("Error deleting contribution: \(error)")
             return nil
         }
     }
@@ -162,18 +164,19 @@ class ContributionService {
             if httpResponse.statusCode == 200 {
                 let stats = try JSONDecoder().decode(UserContributionStats.self, from: data)
                 if APIClient.diagnosticsEnabled {
-                    print("   \u{21B3} Total contributions: \(stats.totalContributions)")
+                    let total = stats.totalContributions
+                    Log.network.debug("Total contributions: \(total, privacy: .public)")
                 }
                 return stats
             } else if httpResponse.statusCode == 401 {
-                print("Error: Unauthorized")
+                Log.network.error("Unauthorized")
                 return nil
             } else {
-                print("Error fetching contribution stats: HTTP \(httpResponse.statusCode)")
+                Log.network.error("Error fetching contribution stats: HTTP \(httpResponse.statusCode, privacy: .public)")
                 return nil
             }
         } catch {
-            print("Error fetching contribution stats: \(error)")
+            Log.network.error("Error fetching contribution stats: \(error)")
             return nil
         }
     }

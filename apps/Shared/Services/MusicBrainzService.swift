@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import os
 
 // MARK: - MusicBrainz Service
 
@@ -25,15 +26,15 @@ class MusicBrainzService: ObservableObject {
             if httpResponse.statusCode == 200 {
                 let searchResponse = try JSONDecoder().decode(MusicBrainzSearchResponse.self, from: data)
                 if APIClient.diagnosticsEnabled {
-                    print("   \u{21B3} Found \(searchResponse.results.count) MusicBrainz works")
+                    Log.network.debug("Found \(searchResponse.results.count, privacy: .public) MusicBrainz works")
                 }
                 return searchResponse.results
             } else {
-                print("Error searching MusicBrainz: HTTP \(httpResponse.statusCode)")
+                Log.network.error("Error searching MusicBrainz: HTTP \(httpResponse.statusCode, privacy: .public)")
                 return []
             }
         } catch {
-            print("Error searching MusicBrainz: \(error)")
+            Log.network.error("Error searching MusicBrainz: \(error)")
             return []
         }
     }
@@ -71,21 +72,22 @@ class MusicBrainzService: ObservableObject {
             if httpResponse.statusCode == 201 {
                 let importResponse = try JSONDecoder().decode(MusicBrainzImportResponse.self, from: data)
                 if APIClient.diagnosticsEnabled {
-                    print("   \u{21B3} Imported song: \(importResponse.song?.title ?? "unknown")")
+                    let songTitle = importResponse.song?.title ?? "unknown"
+                    Log.network.info("Imported song: \(songTitle, privacy: .private)")
                 }
                 return importResponse
             } else if httpResponse.statusCode == 409 {
-                print("Error: Song with this MusicBrainz ID already exists")
+                Log.network.warning("Song with this MusicBrainz ID already exists")
                 if let errorResponse = try? JSONDecoder().decode(MusicBrainzImportResponse.self, from: data) {
                     return errorResponse
                 }
                 return nil
             } else {
-                print("Error importing from MusicBrainz: HTTP \(httpResponse.statusCode)")
+                Log.network.error("Error importing from MusicBrainz: HTTP \(httpResponse.statusCode, privacy: .public)")
                 return nil
             }
         } catch {
-            print("Error importing from MusicBrainz: \(error)")
+            Log.network.error("Error importing from MusicBrainz: \(error)")
             return nil
         }
     }

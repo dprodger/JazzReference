@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import os
 
 struct MacArtistCreationView: View {
     @Environment(\.dismiss) var dismiss
@@ -100,7 +101,7 @@ struct MacArtistCreationView: View {
 
                 await MainActor.run {
                     isSaving = false
-                    print("Artist saved successfully")
+                    Log.ui.info("Artist saved successfully")
                     NotificationCenter.default.post(name: .artistCreated, object: nil)
                     dismiss()
                 }
@@ -128,9 +129,7 @@ struct MacArtistCreationView: View {
 
         request.httpBody = try JSONSerialization.data(withJSONObject: artistData)
 
-        print("Sending artist creation request:")
-        print("   URL: \(url)")
-        print("   Name: \(name)")
+        Log.ui.debug("Sending artist creation request: url=\(url, privacy: .private), name=\(name, privacy: .public)")
 
         let (data, response) = try await URLSession.shared.data(for: request)
 
@@ -138,12 +137,12 @@ struct MacArtistCreationView: View {
             throw URLError(.badServerResponse)
         }
 
-        print("Response status: \(httpResponse.statusCode)")
+        Log.ui.debug("Response status: \(httpResponse.statusCode)")
 
         switch httpResponse.statusCode {
         case 200...299:
             if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-                print("Success response: \(json)")
+                Log.ui.info("Artist creation success response received")
             }
 
         case 409:

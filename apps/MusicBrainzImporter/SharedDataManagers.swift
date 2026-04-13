@@ -6,24 +6,26 @@
 //
 
 import Foundation
+import os
 
+private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.jazzreference.MusicBrainzImporter", category: "data")
 
 // MARK: - Shared Data Manager
 
 class SharedArtistData {
     static func saveSharedData(_ artistData: ArtistData, appGroup: String) {
         guard let sharedDefaults = UserDefaults(suiteName: appGroup) else {
-            print("❌ Failed to get shared UserDefaults")
+            logger.error("Failed to get shared UserDefaults")
             return
         }
-        
+
         let encoder = JSONEncoder()
         if let encoded = try? encoder.encode(artistData) {
             sharedDefaults.set(encoded, forKey: "pendingArtistImport")
             sharedDefaults.synchronize()
-            print("✅ Artist data saved to shared container")
+            logger.info("Artist data saved to shared container")
         } else {
-            print("❌ Failed to encode artist data")
+            logger.error("Failed to encode artist data")
         }
     }
 }
@@ -31,7 +33,7 @@ class SharedArtistData {
 class SharedSongData {
     static func saveSharedData(_ songData: SongData, appGroup: String) {
         guard let sharedDefaults = UserDefaults(suiteName: appGroup) else {
-            print("❌ Failed to get shared UserDefaults")
+            logger.error("Failed to get shared UserDefaults")
             return
         }
 
@@ -40,9 +42,9 @@ class SharedSongData {
             sharedDefaults.set(encoded, forKey: "pendingSongImport")
             sharedDefaults.removeObject(forKey: "pendingArtistImport") // Clear any pending artist import
             sharedDefaults.synchronize()
-            print("✅ Song data saved to shared container")
+            logger.info("Song data saved to shared container")
         } else {
-            print("❌ Failed to encode song data")
+            logger.error("Failed to encode song data")
         }
     }
 }
@@ -50,7 +52,7 @@ class SharedSongData {
 class SharedYouTubeData {
     static func saveSharedData(_ youtubeData: YouTubeData, appGroup: String) {
         guard let sharedDefaults = UserDefaults(suiteName: appGroup) else {
-            print("❌ Failed to get shared UserDefaults")
+            logger.error("Failed to get shared UserDefaults")
             return
         }
 
@@ -61,9 +63,9 @@ class SharedYouTubeData {
             sharedDefaults.removeObject(forKey: "pendingArtistImport")
             sharedDefaults.removeObject(forKey: "pendingSongImport")
             sharedDefaults.synchronize()
-            print("✅ YouTube data saved to shared container")
+            logger.info("YouTube data saved to shared container")
         } else {
-            print("❌ Failed to encode YouTube data")
+            logger.error("Failed to encode YouTube data")
         }
     }
 }

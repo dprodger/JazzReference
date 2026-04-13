@@ -1,5 +1,6 @@
 import SwiftUI
 import Combine
+import os
 
 // MARK: - Song Service
 
@@ -69,16 +70,16 @@ class SongService: ObservableObject {
 
             if let httpResponse = response as? HTTPURLResponse {
                 guard (200...299).contains(httpResponse.statusCode) else {
-                    print("HTTP error: \(httpResponse.statusCode)")
+                    Log.network.error("HTTP error: \(httpResponse.statusCode, privacy: .public)")
                     return nil
                 }
             }
 
             return try JSONDecoder().decode(Song.self, from: data)
         } catch {
-            print("Error fetching song detail with sort: \(error)")
+            Log.network.error("Error fetching song detail with sort: \(error)")
             if let decodingError = error as? DecodingError {
-                print("Decoding error details: \(decodingError)")
+                Log.network.error("Decoding error details: \(decodingError)")
             }
             return nil
         }
@@ -99,7 +100,7 @@ class SongService: ObservableObject {
 
             if let httpResponse = response as? HTTPURLResponse {
                 guard (200...299).contains(httpResponse.statusCode) else {
-                    print("HTTP error fetching song summary: \(httpResponse.statusCode)")
+                    Log.network.error("HTTP error fetching song summary: \(httpResponse.statusCode, privacy: .public)")
                     return nil
                 }
             }
@@ -108,13 +109,15 @@ class SongService: ObservableObject {
             APIClient.logRequest("GET /songs/\(id)/summary", startTime: startTime)
 
             if APIClient.diagnosticsEnabled {
-                print("   \u{21B3} Summary: \(song.featuredRecordings?.count ?? 0) featured recordings, \(song.recordingCount ?? 0) total")
+                let featuredCount = song.featuredRecordings?.count ?? 0
+                let totalCount = song.recordingCount ?? 0
+                Log.network.debug("Summary: \(featuredCount, privacy: .public) featured recordings, \(totalCount, privacy: .public) total")
             }
             return song
         } catch {
-            print("Error fetching song summary: \(error)")
+            Log.network.error("Error fetching song summary: \(error)")
             if let decodingError = error as? DecodingError {
-                print("Decoding error details: \(decodingError)")
+                Log.network.error("Decoding error details: \(decodingError)")
             }
             return nil
         }
@@ -129,7 +132,7 @@ class SongService: ObservableObject {
 
             if let httpResponse = response as? HTTPURLResponse {
                 guard (200...299).contains(httpResponse.statusCode) else {
-                    print("HTTP error fetching song recordings: \(httpResponse.statusCode)")
+                    Log.network.error("HTTP error fetching song recordings: \(httpResponse.statusCode, privacy: .public)")
                     return nil
                 }
             }
@@ -138,13 +141,14 @@ class SongService: ObservableObject {
             APIClient.logRequest("GET /songs/\(id)/recordings", startTime: startTime)
 
             if APIClient.diagnosticsEnabled {
-                print("   \u{21B3} Loaded \(recordingsResponse.recordingCount) recordings")
+                let count = recordingsResponse.recordingCount
+                Log.network.debug("Loaded \(count, privacy: .public) recordings")
             }
             return recordingsResponse.recordings
         } catch {
-            print("Error fetching song recordings: \(error)")
+            Log.network.error("Error fetching song recordings: \(error)")
             if let decodingError = error as? DecodingError {
-                print("Decoding error details: \(decodingError)")
+                Log.network.error("Decoding error details: \(decodingError)")
             }
             return nil
         }
@@ -165,7 +169,7 @@ class SongService: ObservableObject {
             let (data, _) = try await URLSession.shared.data(from: url)
             return try JSONDecoder().decode([SoloTranscription].self, from: data)
         } catch {
-            print("Error fetching song transcriptions: \(error)")
+            Log.network.error("Error fetching song transcriptions: \(error)")
             return []
         }
     }
@@ -233,7 +237,7 @@ class SongService: ObservableObject {
             APIClient.logRequest(endpoint + (searchQuery.isEmpty ? "" : "?search=..."), startTime: startTime)
 
             if APIClient.diagnosticsEnabled {
-                print("   \u{21B3} Returned \(decodedSongs.count) songs")
+                Log.network.debug("Returned \(decodedSongs.count, privacy: .public) songs")
             }
         } catch is CancellationError {
             return
@@ -243,7 +247,7 @@ class SongService: ObservableObject {
             guard !Task.isCancelled else { return }
             self.errorMessage = "Failed to fetch songs: \(error.localizedDescription)"
             self.isLoading = false
-            print("Error fetching repertoire songs: \(error)")
+            Log.network.error("Error fetching repertoire songs: \(error)")
         }
     }
 
@@ -259,11 +263,11 @@ class SongService: ObservableObject {
             APIClient.logRequest("GET /repertoires", startTime: startTime)
 
             if APIClient.diagnosticsEnabled {
-                print("   \u{21B3} Returned \(repertoires.count) repertoires")
+                Log.network.debug("Returned \(repertoires.count, privacy: .public) repertoires")
             }
             return repertoires
         } catch {
-            print("Error fetching repertoires: \(error)")
+            Log.network.error("Error fetching repertoires: \(error)")
             return []
         }
     }
@@ -292,14 +296,14 @@ class SongService: ObservableObject {
             if httpResponse.statusCode == 201 {
                 if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                    let message = json["message"] as? String {
-                    print("   \u{21B3} \(message)")
+                    Log.network.info("\(message)")
                     return .success(message)
                 }
                 return .success("Song added to repertoire")
             } else if httpResponse.statusCode == 409 {
                 if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                    let error = json["error"] as? String {
-                    print("   \u{21B3} \(error)")
+                    Log.network.warning("\(error)")
                     return .failure(NSError(domain: "SongService", code: 409, userInfo: [NSLocalizedDescriptionKey: error]))
                 }
                 return .failure(NSError(domain: "SongService", code: 409, userInfo: [NSLocalizedDescriptionKey: "Song already in repertoire"]))
@@ -311,7 +315,7 @@ class SongService: ObservableObject {
                 return .failure(NSError(domain: "SongService", code: httpResponse.statusCode, userInfo: [NSLocalizedDescriptionKey: "Failed to add song"]))
             }
         } catch {
-            print("Error adding song to repertoire: \(error)")
+            Log.network.error("Error adding song to repertoire: \(error)")
             return .failure(error)
         }
     }

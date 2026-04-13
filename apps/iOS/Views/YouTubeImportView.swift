@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import os
 
 extension Notification.Name {
     static let transcriptionCreated = Notification.Name("transcriptionCreated")
@@ -66,11 +67,8 @@ struct YouTubeImportView: View {
             }
         }
         .onAppear {
-            print("📺 YouTubeImportView received data:")
-            print("   Title: '\(youtubeData.title)'")
-            print("   URL: \(youtubeData.url)")
-            print("   VideoType: \(youtubeData.videoType.rawValue)")
-            print("   Channel: \(youtubeData.channelName ?? "(none)")")
+            let channel = youtubeData.channelName ?? "(none)"
+            Log.ui.debug("YouTubeImportView received data: title='\(youtubeData.title, privacy: .public)', url=\(youtubeData.url, privacy: .private), videoType=\(youtubeData.videoType.rawValue, privacy: .public), channel=\(channel, privacy: .public)")
         }
         .alert("Import Error", isPresented: Binding(
             get: { importError != nil },
@@ -391,7 +389,7 @@ struct YouTubeImportView: View {
         do {
             searchResults = try await songService.searchSongs(query: searchText)
         } catch {
-            print("Search error: \(error)")
+            Log.ui.error("Search error: \(error.localizedDescription)")
             searchResults = []
         }
     }
@@ -665,8 +663,8 @@ struct RecordingPickerView: View {
                 description: nil,
                 videoType: .transcription
             ),
-            onSuccess: { print("Success") },
-            onCancel: { print("Cancel") }
+            onSuccess: { Log.ui.debug("Success") },
+            onCancel: { Log.ui.debug("Cancel") }
         )
         .environmentObject(AuthenticationManager())
     }

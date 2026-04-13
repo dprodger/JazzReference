@@ -1,5 +1,6 @@
 import SwiftUI
 import Combine
+import os
 
 // MARK: - Performer Service
 
@@ -143,7 +144,7 @@ class PerformerService: ObservableObject {
         } catch {
             guard !Task.isCancelled else { return }
             self.isLoadingMorePerformers = false
-            print("Error loading more performers: \(error)")
+            Log.network.error("Error loading more performers: \(error)")
         }
     }
 
@@ -163,13 +164,14 @@ class PerformerService: ObservableObject {
             APIClient.logRequest("GET /performers/\(id)?sort=\(sortBy.rawValue)", startTime: startTime)
 
             if APIClient.diagnosticsEnabled {
-                print("   \u{21B3} Returned performer with \(performer.recordings?.count ?? 0) recordings")
+                let recordingCount = performer.recordings?.count ?? 0
+                Log.network.debug("Returned performer with \(recordingCount, privacy: .public) recordings")
             }
             return performer
         } catch let error as NSError where error.code == NSURLErrorCancelled {
             return nil
         } catch {
-            print("Error fetching performer detail: \(error)")
+            Log.network.error("Error fetching performer detail: \(error)")
             return nil
         }
     }
@@ -185,7 +187,7 @@ class PerformerService: ObservableObject {
 
             if let httpResponse = response as? HTTPURLResponse {
                 guard (200...299).contains(httpResponse.statusCode) else {
-                    print("HTTP error fetching performer summary: \(httpResponse.statusCode)")
+                    Log.network.error("HTTP error fetching performer summary: \(httpResponse.statusCode, privacy: .public)")
                     return nil
                 }
             }
@@ -194,13 +196,14 @@ class PerformerService: ObservableObject {
             APIClient.logRequest("GET /performers/\(id)/summary", startTime: startTime)
 
             if APIClient.diagnosticsEnabled {
-                print("   \u{21B3} Summary: \(performer.recordingCount ?? 0) total recordings")
+                let totalRecordings = performer.recordingCount ?? 0
+                Log.network.debug("Summary: \(totalRecordings, privacy: .public) total recordings")
             }
             return performer
         } catch {
-            print("Error fetching performer summary: \(error)")
+            Log.network.error("Error fetching performer summary: \(error)")
             if let decodingError = error as? DecodingError {
-                print("Decoding error details: \(decodingError)")
+                Log.network.error("Decoding error details: \(decodingError)")
             }
             return nil
         }
@@ -215,7 +218,7 @@ class PerformerService: ObservableObject {
 
             if let httpResponse = response as? HTTPURLResponse {
                 guard (200...299).contains(httpResponse.statusCode) else {
-                    print("HTTP error fetching performer recordings: \(httpResponse.statusCode)")
+                    Log.network.error("HTTP error fetching performer recordings: \(httpResponse.statusCode, privacy: .public)")
                     return nil
                 }
             }
@@ -224,13 +227,14 @@ class PerformerService: ObservableObject {
             APIClient.logRequest("GET /performers/\(id)/recordings", startTime: startTime)
 
             if APIClient.diagnosticsEnabled {
-                print("   \u{21B3} Loaded \(recordingsResponse.recordingCount) recordings")
+                let count = recordingsResponse.recordingCount
+                Log.network.debug("Loaded \(count, privacy: .public) recordings")
             }
             return recordingsResponse.recordings
         } catch {
-            print("Error fetching performer recordings: \(error)")
+            Log.network.error("Error fetching performer recordings: \(error)")
             if let decodingError = error as? DecodingError {
-                print("Decoding error details: \(decodingError)")
+                Log.network.error("Decoding error details: \(decodingError)")
             }
             return nil
         }

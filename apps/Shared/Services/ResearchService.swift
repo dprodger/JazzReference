@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 // MARK: - Queue Status Models
 
@@ -109,7 +110,7 @@ class ResearchService {
             let (data, response) = try await URLSession.shared.data(for: request)
 
             guard let httpResponse = response as? HTTPURLResponse else {
-                print("Error: Invalid response")
+                Log.research.error("Invalid response")
                 return false
             }
 
@@ -117,19 +118,19 @@ class ResearchService {
                 if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
                     let refreshType = forceRefresh ? "deep" : "quick"
                     if let queueSize = json["queue_size"] as? Int {
-                        print("\u{2713} Song queued for \(refreshType) refresh (queue size: \(queueSize))")
+                        Log.research.info("Song queued for \(refreshType) refresh (queue size: \(queueSize, privacy: .public))")
                     }
                 }
                 return true
             } else {
-                print("Error: Unexpected status code \(httpResponse.statusCode)")
+                Log.research.error("Unexpected status code \(httpResponse.statusCode, privacy: .public)")
                 if let responseString = String(data: data, encoding: .utf8) {
-                    print("Response: \(responseString)")
+                    Log.research.error("Response: \(responseString)")
                 }
                 return false
             }
         } catch {
-            print("Error refreshing song data: \(error.localizedDescription)")
+            Log.research.error("Error refreshing song data: \(error.localizedDescription)")
             return false
         }
     }
@@ -146,16 +147,18 @@ class ResearchService {
             APIClient.logRequest("GET /research/queue", startTime: startTime)
 
             if APIClient.diagnosticsEnabled {
+                let size = queueStatus.queueSize
                 if let currentSong = queueStatus.currentSong {
-                    print("   \u{21B3} Queue: \(queueStatus.queueSize), Processing: \(currentSong.songName)")
+                    let name = currentSong.songName
+                    Log.research.debug("Queue: \(size, privacy: .public), Processing: \(name, privacy: .private)")
                 } else {
-                    print("   \u{21B3} Queue: \(queueStatus.queueSize)")
+                    Log.research.debug("Queue: \(size, privacy: .public)")
                 }
             }
 
             return queueStatus
         } catch {
-            print("Error fetching queue status: \(error.localizedDescription)")
+            Log.research.error("Error fetching queue status: \(error.localizedDescription)")
             return nil
         }
     }
@@ -172,12 +175,12 @@ class ResearchService {
             APIClient.logRequest("GET /research/queue/items", startTime: startTime)
 
             if APIClient.diagnosticsEnabled {
-                print("   \u{21B3} Queued songs: \(response.queuedSongs.count)")
+                Log.research.debug("Queued songs: \(response.queuedSongs.count, privacy: .public)")
             }
 
             return response.queuedSongs
         } catch {
-            print("Error fetching queued songs: \(error.localizedDescription)")
+            Log.research.error("Error fetching queued songs: \(error.localizedDescription)")
             return []
         }
     }

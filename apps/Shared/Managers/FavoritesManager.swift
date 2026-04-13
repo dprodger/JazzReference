@@ -7,6 +7,7 @@
 
 import SwiftUI
 import Combine
+import os
 
 /// Manages the user's favorited recordings
 @MainActor
@@ -52,7 +53,7 @@ class FavoritesManager: ObservableObject {
     func loadFavorites() async {
         // Skip if already loading
         guard !isLoading else {
-            print("❤️ Already loading favorites - skipping duplicate request")
+            Log.data.debug("Already loading favorites - skipping duplicate request")
             return
         }
 
@@ -64,7 +65,7 @@ class FavoritesManager: ObservableObject {
                 self.favoriteRecordingIds = []
                 self.favoriteRecordings = []
                 self.isAuthenticated = false
-                print("❤️ Not authenticated - clearing favorites")
+                Log.data.debug("Not authenticated - clearing favorites")
             }
             return
         }
@@ -81,7 +82,7 @@ class FavoritesManager: ObservableObject {
             self.favoriteRecordingIds = Set(favorites.map { $0.id })
             self.isLoading = false
             self.isAuthenticated = true
-            print("✅ Loaded \(favorites.count) favorites")
+            Log.data.info("Loaded \(favorites.count) favorites")
         }
     }
 
@@ -139,7 +140,7 @@ class FavoritesManager: ObservableObject {
             if !wasFavorited {
                 await loadFavorites()
             }
-            print("❤️ Favorite toggled for recording \(recordingId)")
+            Log.data.debug("Favorite toggled for recording \(recordingId, privacy: .private)")
         }
 
         return result
@@ -170,7 +171,7 @@ class FavoritesManager: ObservableObject {
         } else {
             // Reload to get full recording data
             await loadFavorites()
-            print("❤️ Added favorite: \(recordingId)")
+            Log.data.debug("Added favorite: \(recordingId, privacy: .private)")
         }
 
         return result
@@ -204,7 +205,7 @@ class FavoritesManager: ObservableObject {
             // Reload to ensure consistency
             await loadFavorites()
         } else {
-            print("❤️ Removed favorite: \(recordingId)")
+            Log.data.debug("Removed favorite: \(recordingId, privacy: .private)")
         }
 
         return result
@@ -215,7 +216,7 @@ class FavoritesManager: ObservableObject {
         favoriteRecordingIds = []
         favoriteRecordings = []
         isAuthenticated = false
-        print("❤️ Favorites cleared")
+        Log.data.debug("Favorites cleared")
     }
 
     /// Number of favorited recordings

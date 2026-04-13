@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import os
 
 struct MacYouTubeImportView: View {
     let youtubeData: ImportedYouTubeData
@@ -330,7 +331,7 @@ struct MacYouTubeImportView: View {
         do {
             searchResults = try await songService.searchSongs(query: searchText)
         } catch {
-            print("Search error: \(error)")
+            Log.ui.error("Search error: \(error.localizedDescription)")
             searchResults = []
         }
     }
@@ -607,8 +608,8 @@ extension Notification.Name {
             description: nil,
             videoType: .transcription
         ),
-        onSuccess: { print("Success") },
-        onCancel: { print("Cancel") }
+        onSuccess: { Log.ui.debug("Success") },
+        onCancel: { Log.ui.debug("Cancel") }
     )
     .environmentObject(AuthenticationManager())
 }

@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 // MARK: - Content Service Response Types
 
@@ -49,7 +50,7 @@ class ContentService {
             let transcription = try JSONDecoder().decode(SoloTranscription.self, from: data)
             return transcription
         } catch {
-            print("Error fetching transcription detail: \(error)")
+            Log.network.error("Error fetching transcription detail: \(error)")
             return nil
         }
     }
@@ -214,7 +215,7 @@ class ContentService {
         } else {
             if let errorDict = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                let errorMessage = errorDict["error"] as? String {
-                print("API Error submitting content report: \(errorMessage)")
+                Log.network.error("API Error submitting content report: \(errorMessage)")
             }
             return false
         }
@@ -230,7 +231,7 @@ class ContentService {
             let response = try JSONDecoder().decode(AuthorityRecommendationsResponse.self, from: data)
             return response
         } catch {
-            print("Error fetching authority recommendations: \(error)")
+            Log.network.error("Error fetching authority recommendations: \(error)")
             return nil
         }
     }
@@ -271,7 +272,9 @@ class ContentService {
             if (200...299).contains(httpResponse.statusCode) {
                 let linkResponse = try JSONDecoder().decode(ManualStreamingLinkResponse.self, from: data)
                 if APIClient.diagnosticsEnabled {
-                    print("   \u{21B3} Added \(linkResponse.service ?? "unknown") link: \(linkResponse.trackId ?? "?")")
+                    let service = linkResponse.service ?? "unknown"
+                    let trackId = linkResponse.trackId ?? "?"
+                    Log.network.info("Added \(service, privacy: .public) link: \(trackId, privacy: .private)")
                 }
                 return linkResponse
             } else {
@@ -279,11 +282,11 @@ class ContentService {
                    let error = json["error"] as? String {
                     return ManualStreamingLinkResponse(success: false, service: nil, trackId: nil, trackUrl: nil, error: error)
                 }
-                print("Error adding streaming link: HTTP \(httpResponse.statusCode)")
+                Log.network.error("Error adding streaming link: HTTP \(httpResponse.statusCode, privacy: .public)")
                 return ManualStreamingLinkResponse(success: false, service: nil, trackId: nil, trackUrl: nil, error: "HTTP \(httpResponse.statusCode)")
             }
         } catch {
-            print("Error adding streaming link: \(error)")
+            Log.network.error("Error adding streaming link: \(error)")
             return ManualStreamingLinkResponse(success: false, service: nil, trackId: nil, trackUrl: nil, error: error.localizedDescription)
         }
     }

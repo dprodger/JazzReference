@@ -20,6 +20,7 @@
 
 import SwiftUI
 import Combine
+import os
 
 @MainActor
 final class SongDetailViewModel: ObservableObject {
@@ -153,7 +154,7 @@ final class SongDetailViewModel: ObservableObject {
             let videos = try await contentService.fetchSongVideos(songId: songId, videoType: "backing_track")
             backingTracks = videos
         } catch {
-            print("Error fetching backing tracks: \(error)")
+            Log.ui.error("Error fetching backing tracks: \(error.localizedDescription)")
         }
     }
 

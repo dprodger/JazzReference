@@ -21,6 +21,7 @@
 
 import SwiftUI
 import Combine
+import os
 
 @MainActor
 final class RecordingDetailViewModel: ObservableObject {
@@ -119,7 +120,7 @@ final class RecordingDetailViewModel: ObservableObject {
             }
             return try JSONDecoder().decode(Recording.self, from: data)
         } catch {
-            print("Error fetching recording detail: \(error)")
+            Log.ui.error("Error fetching recording detail: \(error.localizedDescription)")
             return nil
         }
     }

@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import os
 
 // MARK: - Imported Artist Data
 
@@ -47,7 +48,7 @@ class SharedArtistDataManager {
     /// Retrieve artist data in the main app
     static func retrieveSharedData() -> ImportedArtistData? {
         guard let sharedDefaults = UserDefaults(suiteName: appGroupIdentifier) else {
-            print("Failed to access App Group UserDefaults")
+            Log.data.error("Failed to access App Group UserDefaults")
             return nil
         }
 
@@ -55,7 +56,7 @@ class SharedArtistDataManager {
             return nil
         }
 
-        print("Found pending artist import data")
+        Log.data.debug("Found pending artist import data")
 
         let decoder = JSONDecoder()
         // Don't use ISO8601 - extension uses default encoding
@@ -72,11 +73,12 @@ class SharedArtistDataManager {
             )
 
             clearSharedData()
-            print("Retrieved artist data: \(result.name)")
+            let name = result.name
+            Log.data.info("Retrieved artist data: \(name, privacy: .public)")
             return result
 
         } catch {
-            print("Could not decode with timestamp, trying simple format...")
+            Log.data.warning("Could not decode with timestamp, trying simple format...")
 
             do {
                 let basicData = try decoder.decode(BasicArtistData.self, from: savedData)
@@ -88,11 +90,12 @@ class SharedArtistDataManager {
                 )
 
                 clearSharedData()
-                print("Retrieved artist data (basic format): \(result.name)")
+                let basicName = result.name
+                Log.data.info("Retrieved artist data (basic format): \(basicName, privacy: .public)")
                 return result
 
             } catch {
-                print("Failed to decode artist data: \(error)")
+                Log.data.error("Failed to decode artist data: \(error.localizedDescription)")
                 clearSharedData()
                 return nil
             }
@@ -114,7 +117,7 @@ class SharedArtistDataManager {
         }
         sharedDefaults.removeObject(forKey: sharedDataKey)
         sharedDefaults.synchronize()
-        print("Cleared pending artist import data")
+        Log.data.debug("Cleared pending artist import data")
     }
 }
 
@@ -166,7 +169,7 @@ class SharedSongDataManager {
     /// Retrieve song data in the main app
     static func retrieveSharedData() -> ImportedSongData? {
         guard let sharedDefaults = UserDefaults(suiteName: appGroupIdentifier) else {
-            print("Failed to access App Group UserDefaults")
+            Log.data.error("Failed to access App Group UserDefaults")
             return nil
         }
 
@@ -174,14 +177,15 @@ class SharedSongDataManager {
             return nil
         }
 
-        print("Found pending song import data")
+        Log.data.debug("Found pending song import data")
 
         let decoder = JSONDecoder()
         // Don't use ISO8601 - extension uses default encoding
 
         do {
             let songData = try decoder.decode(SongDataFromExtension.self, from: savedData)
-            print("Successfully decoded song data: \(songData.title)")
+            let songTitle = songData.title
+            Log.data.debug("Successfully decoded song data: \(songTitle, privacy: .public)")
 
             let result = ImportedSongData(
                 title: songData.title,
@@ -196,11 +200,12 @@ class SharedSongDataManager {
             )
 
             clearSharedData()
-            print("Retrieved song data: \(result.title)")
+            let title = result.title
+            Log.data.info("Retrieved song data: \(title, privacy: .public)")
             return result
 
         } catch {
-            print("Failed to decode song data: \(error)")
+            Log.data.error("Failed to decode song data: \(error.localizedDescription)")
             clearSharedData()
             return nil
         }
@@ -221,7 +226,7 @@ class SharedSongDataManager {
         }
         sharedDefaults.removeObject(forKey: sharedDataKey)
         sharedDefaults.synchronize()
-        print("Cleared pending song import data")
+        Log.data.debug("Cleared pending song import data")
     }
 }
 
@@ -306,7 +311,7 @@ class SharedYouTubeDataManager {
     /// Retrieve YouTube data in the main app
     static func retrieveSharedData() -> ImportedYouTubeData? {
         guard let sharedDefaults = UserDefaults(suiteName: appGroupIdentifier) else {
-            print("Failed to access App Group UserDefaults")
+            Log.data.error("Failed to access App Group UserDefaults")
             return nil
         }
 
@@ -314,16 +319,17 @@ class SharedYouTubeDataManager {
             return nil
         }
 
-        print("Found pending YouTube import data")
+        Log.data.debug("Found pending YouTube import data")
 
         let decoder = JSONDecoder()
 
         do {
             let youtubeData = try decoder.decode(YouTubeDataFromExtension.self, from: savedData)
-            print("Successfully decoded YouTube data: \(youtubeData.title)")
+            let ytTitle = youtubeData.title
+            Log.data.debug("Successfully decoded YouTube data: \(ytTitle, privacy: .public)")
 
             guard let videoType = youtubeData.videoType else {
-                print("No video type set in YouTube data")
+                Log.data.warning("No video type set in YouTube data")
                 clearSharedData()
                 return nil
             }
@@ -341,11 +347,12 @@ class SharedYouTubeDataManager {
             )
 
             clearSharedData()
-            print("Retrieved YouTube data: \(result.title)")
+            let retrievedTitle = result.title
+            Log.data.info("Retrieved YouTube data: \(retrievedTitle, privacy: .public)")
             return result
 
         } catch {
-            print("Failed to decode YouTube data: \(error)")
+            Log.data.error("Failed to decode YouTube data: \(error.localizedDescription)")
             clearSharedData()
             return nil
         }
@@ -366,7 +373,7 @@ class SharedYouTubeDataManager {
         }
         sharedDefaults.removeObject(forKey: sharedDataKey)
         sharedDefaults.synchronize()
-        print("Cleared pending YouTube import data")
+        Log.data.debug("Cleared pending YouTube import data")
     }
 }
 

@@ -9,11 +9,14 @@ import UIKit
 import SwiftUI
 import Social
 import UniformTypeIdentifiers
+import os
 
 // MARK: - Share View Controller
 
+private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.jazzreference.MusicBrainzImporter", category: "data")
+
 class ShareViewController: UIViewController {
-    
+
     // MARK: - Properties
     private var artistData: ArtistData?
     private var existingArtist: ExistingArtist?
@@ -1040,25 +1043,21 @@ class ShareViewController: UIViewController {
     }
     
     private func openMainApp(path: String) {
-        print("🔗 [ShareExt] Opening main app with path: \(path)")
-        NSLog("🔗 Opening main app with path: %@", path)
+        logger.debug("Opening main app with path: \(path, privacy: .public)")
 
         guard let url = URL(string: "jazzreference://\(path)") else {
-            print("❌ [ShareExt] Invalid URL scheme")
-            NSLog("❌ Invalid URL scheme")
+            logger.error("Invalid URL scheme")
             fallbackToManualOpen(path: path)
             return
         }
 
-        print("🔗 [ShareExt] Attempting to open URL: \(url)")
-        NSLog("🔗 Attempting to open URL: %@", url.absoluteString)
+        logger.debug("Attempting to open URL: \(url.absoluteString, privacy: .private)")
 
         // Method 1: Try NSExtensionContext.open (works on iOS 16+ for some extension types)
         if #available(iOS 16.0, *) {
-            print("🔗 [ShareExt] Trying extensionContext.open()")
+            logger.debug("Trying extensionContext.open()")
             extensionContext?.open(url) { [weak self] success in
-                print("🔗 [ShareExt] extensionContext.open completed, success: \(success)")
-                NSLog("🔗 extensionContext.open completed, success: %d", success)
+                logger.debug("extensionContext.open completed, success: \(success)")
 
                 if success {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
@@ -1079,23 +1078,21 @@ class ShareViewController: UIViewController {
     }
 
     private func tryResponderChain(url: URL, path: String) {
-        print("🔗 [ShareExt] Trying responder chain approach")
-        NSLog("🔗 Trying responder chain approach")
+        logger.debug("Trying responder chain approach")
 
         var responder: UIResponder? = self
 
         while let r = responder {
-            print("🔗 [ShareExt] Checking responder: \(type(of: r))")
+            let responderType = String(describing: type(of: r))
+            logger.debug("Checking responder: \(responderType, privacy: .public)")
 
             // Check if this responder is UIApplication (or can open URLs)
             // We need to use the modern open(_:options:completionHandler:) API
             if let application = r as? UIApplication {
-                print("✅ [ShareExt] Found UIApplication, using modern open API")
-                NSLog("✅ Found UIApplication, using modern open API")
+                logger.info("Found UIApplication, using modern open API")
 
                 application.open(url, options: [:]) { [weak self] success in
-                    print("🔗 [ShareExt] UIApplication.open completed, success: \(success)")
-                    NSLog("🔗 UIApplication.open completed, success: %d", success)
+                    logger.debug("UIApplication.open completed, success: \(success)")
 
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                         self?.extensionContext?.completeRequest(returningItems: nil, completionHandler: nil)
@@ -1106,14 +1103,12 @@ class ShareViewController: UIViewController {
             responder = r.next
         }
 
-        print("⚠️ [ShareExt] Responder chain failed - no UIApplication found")
-        NSLog("⚠️ Responder chain approach failed")
+        logger.warning("Responder chain failed - no UIApplication found")
         fallbackToManualOpen(path: path)
     }
 
     private func fallbackToManualOpen(path: String) {
-        print("⚠️ [ShareExt] Using fallback manual open")
-        NSLog("⚠️ Using fallback manual open")
+        logger.warning("Using fallback manual open")
 
         DispatchQueue.main.async { [weak self] in
             let alert = UIAlertController(
@@ -1140,20 +1135,18 @@ class ShareViewController: UIViewController {
     }
     
     private func importSong() {
-        print("💾 [ShareExt] importSong() called")
-        NSLog("💾 importSong() called")
+        logger.debug("importSong() called")
 
         guard let songData = songData else {
-            print("❌ [ShareExt] No song data")
+            logger.error("No song data")
             showError("No song data to import")
             return
         }
 
-        print("💾 [ShareExt] Saving song: \(songData.title)")
-        NSLog("💾 Saving song data to shared container: %@", songData.title)
+        let songTitle = songData.title
+        logger.debug("Saving song: \(songTitle, privacy: .public)")
         SharedSongData.saveSharedData(songData, appGroup: appGroupIdentifier)
-        print("✅ [ShareExt] Data saved, now opening main app")
-        NSLog("✅ Data saved successfully, opening main app")
+        logger.info("Data saved, now opening main app")
 
         // Try to open the main app directly
         openMainApp(path: "import-song")

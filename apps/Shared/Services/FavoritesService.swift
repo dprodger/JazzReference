@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 // MARK: - Favorites Response Types
 
@@ -50,11 +51,11 @@ class FavoritesService {
 
             if let httpResponse = response as? HTTPURLResponse {
                 if httpResponse.statusCode == 401 {
-                    print("Error: Unauthorized - user needs to re-authenticate")
+                    Log.network.error("Unauthorized - user needs to re-authenticate")
                     return []
                 }
                 guard (200...299).contains(httpResponse.statusCode) else {
-                    print("HTTP error fetching favorites: \(httpResponse.statusCode)")
+                    Log.network.error("HTTP error fetching favorites: \(httpResponse.statusCode, privacy: .public)")
                     return []
                 }
             }
@@ -63,11 +64,11 @@ class FavoritesService {
             APIClient.logRequest("GET /favorites", startTime: startTime)
 
             if APIClient.diagnosticsEnabled {
-                print("   \u{21B3} Returned \(favorites.count) favorites")
+                Log.network.debug("Returned \(favorites.count, privacy: .public) favorites")
             }
             return favorites
         } catch {
-            print("Error fetching favorites: \(error)")
+            Log.network.error("Error fetching favorites: \(error)")
             return []
         }
     }
@@ -93,21 +94,22 @@ class FavoritesService {
             if httpResponse.statusCode == 201 {
                 let toggleResponse = try JSONDecoder().decode(FavoriteToggleResponse.self, from: data)
                 if APIClient.diagnosticsEnabled {
-                    print("   \u{21B3} \(toggleResponse.message), count: \(toggleResponse.favoriteCount)")
+                    let count = toggleResponse.favoriteCount
+                    Log.network.debug("\(toggleResponse.message), count: \(count, privacy: .public)")
                 }
                 return toggleResponse.favoriteCount
             } else if httpResponse.statusCode == 409 {
-                print("Recording already favorited")
+                Log.network.warning("Recording already favorited")
                 return nil
             } else if httpResponse.statusCode == 401 {
-                print("Error: Unauthorized")
+                Log.network.error("Unauthorized")
                 return nil
             } else {
-                print("Error adding favorite: HTTP \(httpResponse.statusCode)")
+                Log.network.error("Error adding favorite: HTTP \(httpResponse.statusCode, privacy: .public)")
                 return nil
             }
         } catch {
-            print("Error adding favorite: \(error)")
+            Log.network.error("Error adding favorite: \(error)")
             return nil
         }
     }
@@ -133,21 +135,22 @@ class FavoritesService {
             if httpResponse.statusCode == 200 {
                 let toggleResponse = try JSONDecoder().decode(FavoriteToggleResponse.self, from: data)
                 if APIClient.diagnosticsEnabled {
-                    print("   \u{21B3} \(toggleResponse.message), count: \(toggleResponse.favoriteCount)")
+                    let count = toggleResponse.favoriteCount
+                    Log.network.debug("\(toggleResponse.message), count: \(count, privacy: .public)")
                 }
                 return toggleResponse.favoriteCount
             } else if httpResponse.statusCode == 404 {
-                print("Recording not in favorites")
+                Log.network.warning("Recording not in favorites")
                 return nil
             } else if httpResponse.statusCode == 401 {
-                print("Error: Unauthorized")
+                Log.network.error("Unauthorized")
                 return nil
             } else {
-                print("Error removing favorite: HTTP \(httpResponse.statusCode)")
+                Log.network.error("Error removing favorite: HTTP \(httpResponse.statusCode, privacy: .public)")
                 return nil
             }
         } catch {
-            print("Error removing favorite: \(error)")
+            Log.network.error("Error removing favorite: \(error)")
             return nil
         }
     }
