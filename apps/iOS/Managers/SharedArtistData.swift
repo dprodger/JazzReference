@@ -10,7 +10,7 @@ import Foundation
 
 /// Artist data structure shared between the extension and main app
 struct ImportedArtistData: Codable, Identifiable {
-    let id = UUID()
+    var id = UUID()
     let name: String
     let musicbrainzId: String
     let sourceUrl: String?

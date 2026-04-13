@@ -175,8 +175,8 @@ struct LoginView: View {
             .sheet(isPresented: $viewModel.showingForgotPassword) {
                 ForgotPasswordView()
             }
-            .onChange(of: authManager.isAuthenticated) { isAuthenticated in
-                if isAuthenticated {
+            .onChange(of: authManager.isAuthenticated) {
+                if authManager.isAuthenticated {
                     dismiss()
                 }
             }

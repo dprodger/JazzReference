@@ -81,7 +81,7 @@ struct ResetPasswordView: View {
                                 .padding()
                                 .background(Color(.systemGray6))
                                 .cornerRadius(10)
-                                .onChange(of: newPassword) { _ in
+                                .onChange(of: newPassword) {
                                     checkPasswordsMatch()
                                 }
                         }
@@ -98,7 +98,7 @@ struct ResetPasswordView: View {
                                 .padding()
                                 .background(Color(.systemGray6))
                                 .cornerRadius(10)
-                                .onChange(of: confirmPassword) { _ in
+                                .onChange(of: confirmPassword) {
                                     checkPasswordsMatch()
                                 }
                             

@@ -48,7 +48,7 @@ class AuthenticationManager: ObservableObject {
     
     private func loadTokensFromKeychain() {
         if let accessToken = keychainHelper.load(forKey: "access_token"),
-           let refreshToken = keychainHelper.load(forKey: "refresh_token") {
+           let _ = keychainHelper.load(forKey: "refresh_token") {
             self.accessToken = accessToken
             
             // Validate token by fetching current user

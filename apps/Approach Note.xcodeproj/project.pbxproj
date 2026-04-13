@@ -174,16 +174,6 @@
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
-/* Begin PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet section */
-		B49E75372EB547640053A338 /* Exceptions for "MusicBrainzImporter" folder in "Compile Sources" phase from "MusicBrainzImporter" target */ = {
-			isa = PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet;
-			buildPhase = B4911D262EB316F600326CA7 /* Sources */;
-			membershipExceptions = (
-				ExtractMusicBrainzData.js,
-			);
-		};
-/* End PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet section */
-
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		B486B2F32F1D922B005E6644 /* MusicBrainzImporterMac */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
@@ -197,7 +187,6 @@
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
 				B4911D382EB316F700326CA7 /* Exceptions for "MusicBrainzImporter" folder in "MusicBrainzImporter" target */,
-				B49E75372EB547640053A338 /* Exceptions for "MusicBrainzImporter" folder in "Compile Sources" phase from "MusicBrainzImporter" target */,
 				B486B30A2F1D92E9005E6644 /* Exceptions for "MusicBrainzImporter" folder in "MusicBrainzImporterMac" target */,
 			);
 			path = MusicBrainzImporter;

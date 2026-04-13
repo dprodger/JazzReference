@@ -157,9 +157,7 @@ class FavoritesManager: ObservableObject {
         }
 
         // Optimistic UI update
-        await MainActor.run {
-            favoriteRecordingIds.insert(recordingId)
-        }
+        favoriteRecordingIds.insert(recordingId)
 
         let result = await networkManager.addFavorite(recordingId: recordingId, authToken: token)
 
