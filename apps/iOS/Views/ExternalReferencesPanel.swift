@@ -215,7 +215,7 @@ struct ExternalReferencesPanel: View {
     private func submitLinkReport(entityType: String, entityId: String, entityName: String, externalSource: String, externalUrl: String, explanation: String) {
         Task {
             do {
-                let success = try await NetworkManager.submitContentReport(
+                let success = try await ContentService.submitContentReport(
                     entityType: entityType,
                     entityId: entityId,
                     entityName: entityName,

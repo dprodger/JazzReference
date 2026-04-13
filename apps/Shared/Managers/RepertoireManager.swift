@@ -30,7 +30,7 @@ class RepertoireManager: ObservableObject {
     /// Whether user is authenticated (updated by AuthenticationManager)
     @Published var isAuthenticated = false
     
-    private let networkManager = NetworkManager()
+    private let songService = SongService()
     private let selectedRepertoireKey = "selectedRepertoireId"
     private let lastUsedRepertoireKey = "lastUsedRepertoireId"
     
@@ -88,7 +88,7 @@ class RepertoireManager: ObservableObject {
         }
         
         // Build URL
-        let urlString = "\(NetworkManager.baseURL)/repertoires/"
+        let urlString = "\(APIClient.baseURL)/repertoires/"
         guard let url = URL(string: urlString) else {
             await MainActor.run {
                 errorMessage = "Invalid URL"
@@ -163,7 +163,7 @@ class RepertoireManager: ObservableObject {
             return false
         }
         
-        let urlString = "\(NetworkManager.baseURL)/repertoires/\(repertoireId)/songs/\(songId)"
+        let urlString = "\(APIClient.baseURL)/repertoires/\(repertoireId)/songs/\(songId)"
         guard let url = URL(string: urlString) else {
             return false
         }
@@ -216,7 +216,7 @@ class RepertoireManager: ObservableObject {
             return false
         }
         
-        let urlString = "\(NetworkManager.baseURL)/repertoires/"
+        let urlString = "\(APIClient.baseURL)/repertoires/"
         guard let url = URL(string: urlString) else {
             return false
         }
@@ -265,7 +265,7 @@ class RepertoireManager: ObservableObject {
             return false
         }
         
-        let urlString = "\(NetworkManager.baseURL)/repertoires/\(id)"
+        let urlString = "\(APIClient.baseURL)/repertoires/\(id)"
         guard let url = URL(string: urlString) else {
             return false
         }
@@ -307,12 +307,12 @@ class RepertoireManager: ObservableObject {
         // Fetch songs with authentication if needed
         Task {
             if repertoire.id != "all", let authManager = authManager, let token = authManager.getAccessToken() {
-                await networkManager.fetchSongsInRepertoire(
+                await songService.fetchSongsInRepertoire(
                     repertoireId: repertoire.id,
                     authToken: token
                 )
             } else {
-                await networkManager.fetchSongsInRepertoire(repertoireId: repertoire.id)
+                await songService.fetchSongsInRepertoire(repertoireId: repertoire.id)
             }
         }
     }

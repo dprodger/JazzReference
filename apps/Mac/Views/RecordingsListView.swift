@@ -79,7 +79,7 @@ enum RecordingVocalFilter: String, CaseIterable, Identifiable {
 // MARK: - Main View
 
 struct RecordingsListView: View {
-    @StateObject private var networkManager = NetworkManager()
+    @StateObject private var recordingService = RecordingService()
     @State private var searchText = ""
     @State private var searchTask: Task<Void, Never>?
     @State private var selectedRecordingId: String?
@@ -96,7 +96,7 @@ struct RecordingsListView: View {
 
     // Filtered recordings based on scope and availability
     private var filteredRecordings: [Recording] {
-        var results = networkManager.recordings
+        var results = recordingService.recordings
 
         // Apply search scope filter (client-side refinement)
         // Use normalized search text to match smart apostrophes in data
@@ -164,9 +164,9 @@ struct RecordingsListView: View {
                 filterToolbar
 
                 // Results count when filtered
-                if !networkManager.recordings.isEmpty && hasActiveFilters {
+                if !recordingService.recordings.isEmpty && hasActiveFilters {
                     HStack {
-                        Text("\(filteredRecordings.count) of \(networkManager.recordings.count) recordings")
+                        Text("\(filteredRecordings.count) of \(recordingService.recordings.count) recordings")
                             .font(JazzTheme.caption())
                             .foregroundColor(JazzTheme.smokeGray)
                         Spacer()
@@ -183,7 +183,7 @@ struct RecordingsListView: View {
                 }
 
                 // No results message
-                if !searchText.isEmpty && filteredRecordings.isEmpty && !networkManager.isLoading {
+                if !searchText.isEmpty && filteredRecordings.isEmpty && !recordingService.isLoading {
                     VStack(spacing: 12) {
                         Image(systemName: "magnifyingglass")
                             .font(.system(size: 32))
@@ -246,7 +246,7 @@ struct RecordingsListView: View {
             searchTask = Task {
                 try? await Task.sleep(nanoseconds: 300_000_000)
                 if !Task.isCancelled {
-                    await networkManager.fetchRecordings(searchQuery: newValue)
+                    await recordingService.fetchRecordings(searchQuery: newValue)
                 }
             }
         }

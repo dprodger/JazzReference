@@ -10,7 +10,7 @@
 import SwiftUI
 
 struct ArtistsListView: View {
-    @StateObject private var networkManager = NetworkManager()
+    @StateObject private var performerService = PerformerService()
     @State private var searchText = ""
     @State private var searchTask: Task<Void, Never>?
     @State private var hasPerformedInitialLoad = false
@@ -56,7 +56,7 @@ struct ArtistsListView: View {
     // Computed property to group artists by first letter of sort_name
     // Uses the lightweight index (id, name, sort_name) for all 30k performers
     private var groupedArtists: [(String, [Performer])] {
-        let filtered = networkManager.performersIndex
+        let filtered = performerService.performersIndex
 
         // Group by first letter of sortName (or name if sortName is nil)
         let grouped = Dictionary(grouping: filtered) { performer in
@@ -85,7 +85,7 @@ struct ArtistsListView: View {
 
     // Total count for display
     private var totalArtistsCount: Int {
-        networkManager.performersIndex.count
+        performerService.performersIndex.count
     }
 
     var body: some View {
@@ -99,21 +99,21 @@ struct ArtistsListView: View {
                     searchTask = Task {
                         try? await Task.sleep(nanoseconds: 300_000_000)
                         if !Task.isCancelled {
-                            await networkManager.fetchPerformersIndex(searchQuery: newValue)
+                            await performerService.fetchPerformersIndex(searchQuery: newValue)
                         }
                     }
                 }
                 .task {
                     // Only load on initial appear, not when returning from detail view
                     if !hasPerformedInitialLoad {
-                        await networkManager.fetchPerformersIndex(searchQuery: searchText)
+                        await performerService.fetchPerformersIndex(searchQuery: searchText)
                         hasPerformedInitialLoad = true
                     }
                 }
                 .onReceive(NotificationCenter.default.publisher(for: .artistCreated)) { _ in
                     // Refresh artists list when a new artist is created
                     Task {
-                        await networkManager.fetchPerformersIndex(searchQuery: searchText)
+                        await performerService.fetchPerformersIndex(searchQuery: searchText)
                     }
                 }
         }
@@ -124,9 +124,9 @@ struct ArtistsListView: View {
     @ViewBuilder
     private var contentView: some View {
         VStack(spacing: 0) {
-            if networkManager.isLoading {
+            if performerService.isLoading {
                 loadingView
-            } else if let error = networkManager.errorMessage {
+            } else if let error = performerService.errorMessage {
                 errorView(error: error)
             } else {
                 artistsListView
@@ -159,7 +159,7 @@ struct ArtistsListView: View {
                 .padding(.horizontal)
             Button("Retry") {
                 Task {
-                    await networkManager.fetchPerformers()
+                    await performerService.fetchPerformers()
                 }
             }
             .buttonStyle(.borderedProminent)

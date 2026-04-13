@@ -21,7 +21,7 @@ struct MacAddStreamingLinkSheet: View {
     @State private var errorMessage: String?
     @State private var successMessage: String?
 
-    private let networkManager = NetworkManager()
+    private let contentService = ContentService()
 
     var body: some View {
         VStack(spacing: 0) {
@@ -343,7 +343,7 @@ struct MacAddStreamingLinkSheet: View {
         errorMessage = nil
         successMessage = nil
 
-        let response = await networkManager.addManualStreamingLink(
+        let response = await contentService.addManualStreamingLink(
             recordingId: recordingId,
             releaseId: releaseId,
             url: trimmedUrl,

@@ -10,11 +10,11 @@ import SwiftUI
 struct CommunitySettingsView: View {
     @EnvironmentObject var authManager: AuthenticationManager
 
-    @State private var contributionStats: NetworkManager.UserContributionStats?
+    @State private var contributionStats: UserContributionStats?
     @State private var isLoading = true
     @State private var errorMessage: String?
 
-    private let networkManager = NetworkManager()
+    private let contributionService = ContributionService()
 
     var body: some View {
         Group {
@@ -85,7 +85,7 @@ struct CommunitySettingsView: View {
     }
 
     @ViewBuilder
-    private func contributionStatsView(stats: NetworkManager.UserContributionStats) -> some View {
+    private func contributionStatsView(stats: UserContributionStats) -> some View {
         VStack(spacing: 0) {
             ContributionStatRow(
                 icon: "music.note.list",
@@ -197,7 +197,7 @@ struct CommunitySettingsView: View {
         isLoading = true
         errorMessage = nil
 
-        if let stats = await networkManager.fetchUserContributionStats(authToken: token) {
+        if let stats = await contributionService.fetchUserContributionStats(authToken: token) {
             contributionStats = stats
         } else {
             errorMessage = "Could not load contribution stats"

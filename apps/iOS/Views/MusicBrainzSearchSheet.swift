@@ -13,7 +13,7 @@ struct MusicBrainzSearchSheet: View {
 
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var authManager: AuthenticationManager
-    @StateObject private var networkManager = NetworkManager()
+    @StateObject private var musicBrainzService = MusicBrainzService()
 
     @State private var searchResults: [MusicBrainzWork] = []
     @State private var isSearching = false
@@ -217,7 +217,7 @@ struct MusicBrainzSearchSheet: View {
 
     private func performSearch() async {
         isSearching = true
-        searchResults = await networkManager.searchMusicBrainzWorks(query: searchQuery)
+        searchResults = await musicBrainzService.searchMusicBrainzWorks(query: searchQuery)
         isSearching = false
     }
 
@@ -231,7 +231,7 @@ struct MusicBrainzSearchSheet: View {
             return
         }
 
-        if let response = await networkManager.importSongFromMusicBrainz(work: work, authToken: token) {
+        if let response = await musicBrainzService.importSongFromMusicBrainz(work: work, authToken: token) {
             if response.success {
                 importSuccess = true
             } else {

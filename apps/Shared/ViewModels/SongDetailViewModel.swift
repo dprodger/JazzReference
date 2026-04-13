@@ -37,7 +37,9 @@ final class SongDetailViewModel: ObservableObject {
 
     // MARK: - Private
 
-    private let networkManager = NetworkManager()
+    private let songService = SongService()
+    private let contentService = ContentService()
+    private let researchService = ResearchService()
     private var researchStatusTimer: Timer?
     /// The song ID whose data currently populates `song`. Used by `load(songId:)`
     /// to skip re-fetching when the view re-appears with the same song (e.g.
@@ -98,7 +100,7 @@ final class SongDetailViewModel: ObservableObject {
         stopResearchStatusPolling()
 
         // Phase 1: summary (fast) — song metadata, transcriptions, featured recordings.
-        let fetchedSong = await networkManager.fetchSongSummary(id: songId)
+        let fetchedSong = await songService.fetchSongSummary(id: songId)
         song = fetchedSong
         transcriptions = fetchedSong?.transcriptions ?? []
         isLoading = false
@@ -110,7 +112,7 @@ final class SongDetailViewModel: ObservableObject {
         await refreshBackingTracks(songId: songId)
 
         // Phase 2: all recordings with streaming data.
-        if let recordings = await networkManager.fetchSongRecordings(id: songId, sortBy: sortOrder) {
+        if let recordings = await songService.fetchSongRecordings(id: songId, sortBy: sortOrder) {
             song?.recordings = recordings
         }
         isRecordingsLoading = false
@@ -121,14 +123,14 @@ final class SongDetailViewModel: ObservableObject {
     func forceRefresh(songId: String) async {
         isRecordingsLoading = true
 
-        if let fetchedSong = await networkManager.fetchSongSummary(id: songId) {
+        if let fetchedSong = await songService.fetchSongSummary(id: songId) {
             song = fetchedSong
             transcriptions = fetchedSong.transcriptions ?? []
         }
 
         await refreshBackingTracks(songId: songId)
 
-        if let recordings = await networkManager.fetchSongRecordings(id: songId, sortBy: sortOrder) {
+        if let recordings = await songService.fetchSongRecordings(id: songId, sortBy: sortOrder) {
             song?.recordings = recordings
         }
         isRecordingsLoading = false
@@ -138,7 +140,7 @@ final class SongDetailViewModel: ObservableObject {
     /// Used when the sort order changes or when a child view edits community data.
     func reloadRecordings(songId: String) async {
         isRecordingsReloading = true
-        if let recordings = await networkManager.fetchSongRecordings(id: songId, sortBy: sortOrder) {
+        if let recordings = await songService.fetchSongRecordings(id: songId, sortBy: sortOrder) {
             song?.recordings = recordings
         }
         isRecordingsReloading = false
@@ -148,17 +150,17 @@ final class SongDetailViewModel: ObservableObject {
     /// notification handler.
     func refreshBackingTracks(songId: String) async {
         do {
-            let videos = try await networkManager.fetchSongVideos(songId: songId, videoType: "backing_track")
+            let videos = try await contentService.fetchSongVideos(songId: songId, videoType: "backing_track")
             backingTracks = videos
         } catch {
             print("Error fetching backing tracks: \(error)")
         }
     }
 
-    /// SwiftUI preview stub loader. Pulls synchronous stub data from NetworkManager.
+    /// SwiftUI preview stub loader. Pulls synchronous stub data from SongService.
     /// Only call from inside an `XCODE_RUNNING_FOR_PREVIEWS` guard.
     func loadPreview(songId: String) {
-        song = networkManager.fetchSongDetailSync(id: songId)
+        song = songService.fetchSongDetailSync(id: songId)
         transcriptions = song?.transcriptions ?? []
         isLoading = false
         isRecordingsLoading = false
@@ -171,7 +173,7 @@ final class SongDetailViewModel: ObservableObject {
     /// The caller is responsible for showing a toast/alert in response.
     func queueRefresh(songId: String, forceRefresh: Bool) async -> Bool {
         isRefreshing = true
-        let success = await networkManager.refreshSongData(songId: songId, forceRefresh: forceRefresh)
+        let success = await researchService.refreshSongData(songId: songId, forceRefresh: forceRefresh)
         isRefreshing = false
         if success {
             // Kick the research-status check so the "in queue" banner shows up quickly.
@@ -187,7 +189,7 @@ final class SongDetailViewModel: ObservableObject {
     func checkResearchStatus(songId: String) {
         Task { [weak self] in
             guard let self else { return }
-            let status = await self.networkManager.checkSongResearchStatus(songId: songId)
+            let status = await self.researchService.checkSongResearchStatus(songId: songId)
             self.researchStatus = status
             self.updateResearchStatusPolling(songId: songId)
         }

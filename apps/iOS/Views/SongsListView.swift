@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct SongsListView: View {
-    @StateObject private var networkManager = NetworkManager()
+    @StateObject private var songService = SongService()
     @EnvironmentObject var repertoireManager: RepertoireManager
     @EnvironmentObject var authManager: AuthenticationManager
     @State private var searchText = ""
@@ -20,7 +20,7 @@ struct SongsListView: View {
     
     // Computed property to group songs by first letter
     private var groupedSongs: [(String, [Song])] {
-        let filtered = networkManager.songs
+        let filtered = songService.songs
         
         // Group songs by first letter
         let grouped = Dictionary(grouping: filtered) { song in
@@ -44,7 +44,7 @@ struct SongsListView: View {
         NavigationStack {
             contentView
                 .background(JazzTheme.backgroundLight)
-                .jazzNavigationBar(title: "Songs (\(networkManager.songs.count.formatted()))")
+                .jazzNavigationBar(title: "Songs (\(songService.songs.count.formatted()))")
                 .searchable(text: $searchText, prompt: "Search songs")
                 .onChange(of: searchText) { oldValue, newValue in
                     searchTask?.cancel()
@@ -94,13 +94,13 @@ struct SongsListView: View {
     private func loadSongs() async {
         if repertoireManager.selectedRepertoire.id != "all",
            let token = authManager.getAccessToken() {
-            await networkManager.fetchSongsInRepertoire(
+            await songService.fetchSongsInRepertoire(
                 repertoireId: repertoireManager.selectedRepertoire.id,
                 searchQuery: searchText,
                 authToken: token
             )
         } else {
-            await networkManager.fetchSongsInRepertoire(
+            await songService.fetchSongsInRepertoire(
                 repertoireId: repertoireManager.selectedRepertoire.id,
                 searchQuery: searchText
             )
@@ -117,11 +117,11 @@ struct SongsListView: View {
 
             // Only show full loading view on initial load (no songs yet)
             // During pull-to-refresh, keep showing the list
-            if networkManager.isLoading && networkManager.songs.isEmpty {
+            if songService.isLoading && songService.songs.isEmpty {
                 loadingView
-            } else if let error = networkManager.errorMessage {
+            } else if let error = songService.errorMessage {
                 errorView(error: error)
-            } else if networkManager.songs.isEmpty && !searchText.isEmpty {
+            } else if songService.songs.isEmpty && !searchText.isEmpty {
                 emptySearchResultsView
             } else {
                 songsListView
@@ -258,7 +258,7 @@ struct SongsListView: View {
                         ForEach(songs) { song in
                             NavigationLink(destination: SongDetailView(
                                                 songId: song.id,
-                                                allSongs: networkManager.songs,
+                                                allSongs: songService.songs,
                                                 repertoireId: repertoireManager.selectedRepertoire.id
                                             )
                                                 .environmentObject(repertoireManager)) {

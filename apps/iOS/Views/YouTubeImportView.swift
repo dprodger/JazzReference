@@ -30,7 +30,8 @@ struct YouTubeImportView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var authManager: AuthenticationManager
 
-    private let networkManager = NetworkManager()
+    private let songService = SongService()
+    private let contentService = ContentService()
 
     var body: some View {
         Group {
@@ -388,7 +389,7 @@ struct YouTubeImportView: View {
         defer { isSearching = false }
 
         do {
-            searchResults = try await networkManager.searchSongs(query: searchText)
+            searchResults = try await songService.searchSongs(query: searchText)
         } catch {
             print("Search error: \(error)")
             searchResults = []
@@ -403,14 +404,14 @@ struct YouTubeImportView: View {
 
         do {
             if youtubeData.videoType == .transcription {
-                try await networkManager.createTranscription(
+                try await contentService.createTranscription(
                     songId: songId,
                     recordingId: recordingId,
                     youtubeUrl: youtubeData.url,
                     userId: userId
                 )
             } else {
-                try await networkManager.createVideo(
+                try await contentService.createVideo(
                     songId: songId,
                     youtubeUrl: youtubeData.url,
                     videoType: "backing_track",
@@ -458,7 +459,7 @@ struct RecordingPickerView: View {
 
     @Environment(\.dismiss) private var dismiss
 
-    private let networkManager = NetworkManager()
+    private let songService = SongService()
 
     /// Recordings sorted by artist name
     private var sortedRecordings: [Recording] {
@@ -643,7 +644,7 @@ struct RecordingPickerView: View {
         isLoading = true
         defer { isLoading = false }
 
-        if let songDetail = await networkManager.fetchSongDetail(id: song.id) {
+        if let songDetail = await songService.fetchSongDetail(id: song.id) {
             recordings = songDetail.recordings ?? []
         } else {
             loadError = "Failed to load recordings"

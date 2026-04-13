@@ -182,8 +182,8 @@ struct PerformerDetailView: View {
                             onSortOrderChanged: { newOrder in
                                 Task {
                                     isRecordingsReloading = true
-                                    let networkManager = NetworkManager()
-                                    if let recordings = await networkManager.fetchPerformerRecordings(id: performerId, sortBy: newOrder) {
+                                    let performerService = PerformerService()
+                                    if let recordings = await performerService.fetchPerformerRecordings(id: performerId, sortBy: newOrder) {
                                         self.performer?.recordings = recordings
                                     }
                                     isRecordingsReloading = false
@@ -209,25 +209,25 @@ struct PerformerDetailView: View {
         .task {
             #if DEBUG
             if ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1" {
-                let networkManager = NetworkManager()
-                performer = networkManager.fetchPerformerDetailSync(id: performerId)
+                let performerService = PerformerService()
+                performer = performerService.fetchPerformerDetailSync(id: performerId)
                 isLoading = false
                 isRecordingsLoading = false
                 return
             }
             #endif
 
-            let networkManager = NetworkManager()
+            let performerService = PerformerService()
 
             // Phase 1: Load summary (fast) - includes performer metadata, bio, instruments, images
-            let fetchedPerformer = await networkManager.fetchPerformerSummary(id: performerId)
+            let fetchedPerformer = await performerService.fetchPerformerSummary(id: performerId)
             await MainActor.run {
                 performer = fetchedPerformer
                 isLoading = false
             }
 
             // Phase 2: Load all recordings in background
-            if let recordings = await networkManager.fetchPerformerRecordings(id: performerId, sortBy: recordingSortOrder) {
+            if let recordings = await performerService.fetchPerformerRecordings(id: performerId, sortBy: recordingSortOrder) {
                 await MainActor.run {
                     self.performer?.recordings = recordings
                     isRecordingsLoading = false

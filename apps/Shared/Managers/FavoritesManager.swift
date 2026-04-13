@@ -15,7 +15,7 @@ class FavoritesManager: ObservableObject {
     @Published var favoriteRecordingIds: Set<String> = []
 
     /// Full list of favorite recordings (for Settings display)
-    @Published var favoriteRecordings: [NetworkManager.FavoriteRecordingResponse] = []
+    @Published var favoriteRecordings: [FavoriteRecordingResponse] = []
 
     /// Whether favorites are being loaded
     @Published var isLoading = false
@@ -26,7 +26,7 @@ class FavoritesManager: ObservableObject {
     /// Whether user is authenticated
     @Published var isAuthenticated = false
 
-    private let networkManager = NetworkManager()
+    private let favoritesService = FavoritesService()
 
     // Reference to AuthenticationManager (set by app)
     private weak var authManager: AuthenticationManager?
@@ -74,7 +74,7 @@ class FavoritesManager: ObservableObject {
             errorMessage = nil
         }
 
-        let favorites = await networkManager.fetchUserFavorites(authToken: token)
+        let favorites = await favoritesService.fetchUserFavorites(authToken: token)
 
         await MainActor.run {
             self.favoriteRecordings = favorites
@@ -116,9 +116,9 @@ class FavoritesManager: ObservableObject {
 
         let result: Int?
         if wasFavorited {
-            result = await networkManager.removeFavorite(recordingId: recordingId, authToken: token)
+            result = await favoritesService.removeFavorite(recordingId: recordingId, authToken: token)
         } else {
-            result = await networkManager.addFavorite(recordingId: recordingId, authToken: token)
+            result = await favoritesService.addFavorite(recordingId: recordingId, authToken: token)
         }
 
         if result == nil {
@@ -159,7 +159,7 @@ class FavoritesManager: ObservableObject {
         // Optimistic UI update
         favoriteRecordingIds.insert(recordingId)
 
-        let result = await networkManager.addFavorite(recordingId: recordingId, authToken: token)
+        let result = await favoritesService.addFavorite(recordingId: recordingId, authToken: token)
 
         if result == nil {
             // Revert on failure
@@ -193,7 +193,7 @@ class FavoritesManager: ObservableObject {
             favoriteRecordings.removeAll { $0.id == recordingId }
         }
 
-        let result = await networkManager.removeFavorite(recordingId: recordingId, authToken: token)
+        let result = await favoritesService.removeFavorite(recordingId: recordingId, authToken: token)
 
         if result == nil {
             // Revert on failure

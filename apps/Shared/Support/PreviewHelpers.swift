@@ -505,60 +505,11 @@ extension PerformerDetail {
 
 extension NetworkManager {
     static var isPreviewMode: Bool {
-        ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1"
+        APIClient.isPreviewMode
     }
-    
+
     static var preview: NetworkManager {
         let manager = NetworkManager()
-        manager.setupPreviewData()
         return manager
-    }
-    
-    private func setupPreviewData() {
-        // Set up mock data that can be accessed synchronously
-    }
-    
-    func fetchSongDetailSync(id: String) -> Song? {
-        if Self.isPreviewMode {
-            switch id {
-            case "preview-song-1":
-                return Song.preview
-            case "preview-song-2":
-                return Song.previewNoRecordings
-            default:
-                return Song.preview
-            }
-        }
-        return nil
-    }
-    
-    func fetchRecordingDetailSync(id: String) -> Recording? {
-        if Self.isPreviewMode {
-            switch id {
-            case "preview-recording-1":
-                return Recording.preview1
-            case "preview-recording-2":
-                return Recording.preview2
-            case "preview-recording-3":
-                return Recording.previewMinimal
-            default:
-                return Recording.preview1
-            }
-        }
-        return nil
-    }
-    
-    func fetchPerformerDetailSync(id: String) -> PerformerDetail? {
-        if Self.isPreviewMode {
-            switch id {
-            case "preview-performer-detail-1":
-                return PerformerDetail.preview
-            case "preview-performer-detail-2":
-                return PerformerDetail.previewMinimal
-            default:
-                return PerformerDetail.preview
-            }
-        }
-        return nil
     }
 }

@@ -303,7 +303,7 @@ struct AccountSettingsView: View {
 // MARK: - Favorite Recording Card
 
 struct FavoriteRecordingCard: View {
-    let recording: NetworkManager.FavoriteRecordingResponse
+    let recording: FavoriteRecordingResponse
     @State private var isHovering = false
 
     var body: some View {
@@ -352,7 +352,7 @@ struct GeneralSettingsView: View {
     @State private var isLoadingQueue: Bool = true
     @State private var isRefreshing: Bool = false
 
-    private let networkManager = NetworkManager()
+    private let researchService = ResearchService()
 
     var body: some View {
         Form {
@@ -449,7 +449,7 @@ struct GeneralSettingsView: View {
     }
 
     private func loadQueueStatus() async {
-        if let status = await networkManager.fetchQueueStatus() {
+        if let status = await researchService.fetchQueueStatus() {
             queueSize = status.queueSize
             workerActive = status.workerActive
             currentSongName = status.currentSong?.songName
@@ -463,7 +463,7 @@ struct GeneralSettingsView: View {
 
         isRefreshing = true
 
-        if let status = await networkManager.fetchQueueStatus() {
+        if let status = await researchService.fetchQueueStatus() {
             queueSize = status.queueSize
             workerActive = status.workerActive
             currentSongName = status.currentSong?.songName

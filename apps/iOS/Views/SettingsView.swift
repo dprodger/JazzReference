@@ -8,11 +8,11 @@ struct SettingsView: View {
     @EnvironmentObject var favoritesManager: FavoritesManager
     @AppStorage("preferredStreamingService") private var preferredStreamingService: String = StreamingService.spotify.rawValue
 
-    @State private var contributionStats: NetworkManager.UserContributionStats?
+    @State private var contributionStats: UserContributionStats?
     @State private var isLoadingContributions = false
     @State private var contributionsError: String?
 
-    private let networkManager = NetworkManager()
+    private let contributionService = ContributionService()
 
     var body: some View {
         NavigationStack {
@@ -318,7 +318,7 @@ struct SettingsView: View {
         isLoadingContributions = true
         contributionsError = nil
 
-        if let stats = await networkManager.fetchUserContributionStats(authToken: token) {
+        if let stats = await contributionService.fetchUserContributionStats(authToken: token) {
             contributionStats = stats
         } else {
             contributionsError = "Could not load contributions"

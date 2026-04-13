@@ -26,7 +26,7 @@ struct PerformerDetailView: View {
     @State private var searchText: String = ""
     @State private var selectedRecordingId: String?
 
-    @StateObject private var networkManager = NetworkManager()
+    @StateObject private var performerService = PerformerService()
 
     var body: some View {
         ScrollView {
@@ -533,12 +533,12 @@ struct PerformerDetailView: View {
         isRecordingsLoading = true
 
         // Phase 1: Load summary (fast)
-        let fetchedPerformer = await networkManager.fetchPerformerSummary(id: performerId)
+        let fetchedPerformer = await performerService.fetchPerformerSummary(id: performerId)
         performer = fetchedPerformer
         isLoading = false
 
         // Phase 2: Load recordings
-        if let recordings = await networkManager.fetchPerformerRecordings(id: performerId, sortBy: sortOrder) {
+        if let recordings = await performerService.fetchPerformerRecordings(id: performerId, sortBy: sortOrder) {
             performer?.recordings = recordings
         }
         isRecordingsLoading = false
@@ -546,7 +546,7 @@ struct PerformerDetailView: View {
 
     private func reloadRecordings(sortBy order: PerformerRecordingSortOrder) async {
         isRecordingsLoading = true
-        if let recordings = await networkManager.fetchPerformerRecordings(id: performerId, sortBy: order) {
+        if let recordings = await performerService.fetchPerformerRecordings(id: performerId, sortBy: order) {
             performer?.recordings = recordings
         }
         isRecordingsLoading = false

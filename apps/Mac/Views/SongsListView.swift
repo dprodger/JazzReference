@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct SongsListView: View {
-    @StateObject private var networkManager = NetworkManager()
+    @StateObject private var songService = SongService()
     @EnvironmentObject var repertoireManager: RepertoireManager
     @EnvironmentObject var authManager: AuthenticationManager
     @State private var searchText = ""
@@ -51,7 +51,7 @@ struct SongsListView: View {
                 backgroundColor: JazzTheme.burgundy
             )
 
-            if networkManager.songs.isEmpty && !searchText.isEmpty {
+            if songService.songs.isEmpty && !searchText.isEmpty {
                 emptySearchResultsView
             } else {
                 songListView
@@ -135,7 +135,7 @@ struct SongsListView: View {
     // MARK: - Helper Methods
 
     private var groupedSongs: [(String, [Song])] {
-        let grouped = Dictionary(grouping: networkManager.songs) { song in
+        let grouped = Dictionary(grouping: songService.songs) { song in
             let firstChar = song.title.prefix(1).uppercased()
             return firstChar.rangeOfCharacter(from: .letters) != nil ? firstChar : "#"
         }
@@ -150,13 +150,13 @@ struct SongsListView: View {
     private func loadSongs() async {
         if repertoireManager.selectedRepertoire.id != "all",
            let token = authManager.getAccessToken() {
-            await networkManager.fetchSongsInRepertoire(
+            await songService.fetchSongsInRepertoire(
                 repertoireId: repertoireManager.selectedRepertoire.id,
                 searchQuery: searchText,
                 authToken: token
             )
         } else {
-            await networkManager.fetchSongsInRepertoire(
+            await songService.fetchSongsInRepertoire(
                 repertoireId: repertoireManager.selectedRepertoire.id,
                 searchQuery: searchText
             )

@@ -17,7 +17,7 @@ struct AboutView: View {
     @State private var rotationAngle: Double = 0
     @State private var showingOnboarding: Bool = false
 
-    let networkManager = NetworkManager()
+    let researchService = ResearchService()
 
     // Get version from build settings
     private var appVersion: String {
@@ -234,7 +234,7 @@ struct AboutView: View {
     }
     
     private func loadQueueStatus() async {
-        if let status = await networkManager.fetchQueueStatus() {
+        if let status = await researchService.fetchQueueStatus() {
             queueSize = status.queueSize
             workerActive = status.workerActive
             currentSongName = status.currentSong?.songName
@@ -253,7 +253,7 @@ struct AboutView: View {
             rotationAngle = 360
         }
         
-        if let status = await networkManager.fetchQueueStatus() {
+        if let status = await researchService.fetchQueueStatus() {
             queueSize = status.queueSize
             workerActive = status.workerActive
             currentSongName = status.currentSong?.songName

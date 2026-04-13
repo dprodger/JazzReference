@@ -40,7 +40,7 @@ final class RecordingDetailViewModel: ObservableObject {
 
     /// Used only for the SwiftUI preview stub loader. Production paths go
     /// directly through `authManager.makeAuthenticatedRequest` / `URLSession`.
-    private let networkManager = NetworkManager()
+    private let recordingService = RecordingService()
 
     // MARK: - Configuration
 
@@ -74,10 +74,10 @@ final class RecordingDetailViewModel: ObservableObject {
         }
     }
 
-    /// SwiftUI preview loader. Synchronously pulls stub data from NetworkManager's
+    /// SwiftUI preview loader. Synchronously pulls stub data from RecordingService's
     /// preview helper. Only call this from inside an `XCODE_RUNNING_FOR_PREVIEWS` guard.
     func loadPreview() {
-        recording = networkManager.fetchRecordingDetailSync(id: recordingId)
+        recording = recordingService.fetchRecordingDetailSync(id: recordingId)
         autoSelectFirstRelease()
         isLoading = false
     }

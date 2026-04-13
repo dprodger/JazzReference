@@ -9,14 +9,14 @@
 import SwiftUI
 
 struct RecordingsListView: View {
-    @StateObject private var networkManager = NetworkManager()
+    @StateObject private var recordingService = RecordingService()
     @State private var searchText = ""
     @State private var searchTask: Task<Void, Never>?
     @State private var hasPerformedInitialLoad = false
     
     // Group recordings by album title for display
     private var groupedRecordings: [(String, [Recording])] {
-        let filtered = networkManager.recordings
+        let filtered = recordingService.recordings
         
         let grouped = Dictionary(grouping: filtered) { recording in
             let albumTitle = recording.albumTitle ?? "Unknown Album"
@@ -40,22 +40,22 @@ struct RecordingsListView: View {
         NavigationStack {
             contentView
                 .background(JazzTheme.backgroundLight)
-                .jazzNavigationBar(title: "Recordings (\(networkManager.recordingsCount.formatted()))", color: JazzTheme.brass)
+                .jazzNavigationBar(title: "Recordings (\(recordingService.recordingsCount.formatted()))", color: JazzTheme.brass)
                 .searchable(text: $searchText, prompt: "Artist, album, or song")
                 .onChange(of: searchText) { oldValue, newValue in
                     searchTask?.cancel()
                     searchTask = Task {
                         try? await Task.sleep(nanoseconds: 300_000_000)
                         if !Task.isCancelled {
-                            await networkManager.fetchRecordings(searchQuery: newValue)
+                            await recordingService.fetchRecordings(searchQuery: newValue)
                         }
                     }
                 }
                 .task {
                     // Only load on initial appear, not when returning from detail view
                     if !hasPerformedInitialLoad {
-                        await networkManager.fetchRecordingsCount()
-                        await networkManager.fetchRecordings(searchQuery: searchText)
+                        await recordingService.fetchRecordingsCount()
+                        await recordingService.fetchRecordings(searchQuery: searchText)
                         hasPerformedInitialLoad = true
                     }
                 }
@@ -71,11 +71,11 @@ struct RecordingsListView: View {
             // Search hint banner
             searchHintBanner
             
-            if networkManager.isLoading {
+            if recordingService.isLoading {
                 loadingView
-            } else if let error = networkManager.errorMessage {
+            } else if let error = recordingService.errorMessage {
                 errorView(error: error)
-            } else if networkManager.recordings.isEmpty {
+            } else if recordingService.recordings.isEmpty {
                 emptyStateView
             } else {
                 recordingsListView
@@ -123,7 +123,7 @@ struct RecordingsListView: View {
                 .padding(.horizontal)
             Button("Retry") {
                 Task {
-                    await networkManager.fetchRecordings(searchQuery: searchText)
+                    await recordingService.fetchRecordings(searchQuery: searchText)
                 }
             }
             .buttonStyle(.borderedProminent)

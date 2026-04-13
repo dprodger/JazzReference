@@ -9,7 +9,7 @@
 import SwiftUI
 
 struct ArtistsListView: View {
-    @StateObject private var networkManager = NetworkManager()
+    @StateObject private var performerService = PerformerService()
     @State private var searchText = ""
     @State private var searchTask: Task<Void, Never>?
     @State private var selectedPerformerId: String?
@@ -64,14 +64,14 @@ struct ArtistsListView: View {
             searchTask = Task {
                 try? await Task.sleep(nanoseconds: 300_000_000)
                 if !Task.isCancelled {
-                    await networkManager.fetchPerformersIndex(searchQuery: newValue)
+                    await performerService.fetchPerformersIndex(searchQuery: newValue)
                 }
             }
         }
         .task {
             // Only load on initial appear, not when returning from detail view
             if !hasPerformedInitialLoad {
-                await networkManager.fetchPerformersIndex(searchQuery: searchText)
+                await performerService.fetchPerformersIndex(searchQuery: searchText)
                 hasPerformedInitialLoad = true
             }
         }
@@ -152,7 +152,7 @@ struct ArtistsListView: View {
 
     /// Group performers by first letter of sortName for proper alphabetical ordering
     private var groupedPerformers: [(String, [Performer])] {
-        let grouped = Dictionary(grouping: networkManager.performersIndex) { performer in
+        let grouped = Dictionary(grouping: performerService.performersIndex) { performer in
             firstLetter(for: effectiveSortName(for: performer))
         }
 
