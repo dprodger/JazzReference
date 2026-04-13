@@ -223,9 +223,7 @@ struct RecordingContributionEditView: View {
 
                 let bodyData = try JSONSerialization.data(withJSONObject: body)
 
-                guard let url = URL(string: "\(NetworkManager.baseURL)/recordings/\(recordingId)/contribution") else {
-                    throw URLError(.badURL)
-                }
+                let url = URL.api(path: "/recordings/\(recordingId)/contribution")
 
                 _ = try await authManager.makeAuthenticatedRequest(
                     url: url,
@@ -258,9 +256,7 @@ struct RecordingContributionEditView: View {
 
         Task {
             do {
-                guard let url = URL(string: "\(NetworkManager.baseURL)/recordings/\(recordingId)/contribution") else {
-                    throw URLError(.badURL)
-                }
+                let url = URL.api(path: "/recordings/\(recordingId)/contribution")
 
                 _ = try await authManager.makeAuthenticatedRequest(
                     url: url,

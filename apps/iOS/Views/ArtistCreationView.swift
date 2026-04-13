@@ -127,10 +127,8 @@ struct ArtistCreationView: View {
     // MARK: - API Integration
     
     private func saveArtistToAPI() async throws {
-        guard let url = URL(string: "\(NetworkManager.baseURL)/performers") else {
-            throw URLError(.badURL)
-        }
-        
+        let url = URL.api(path: "/performers")
+
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")

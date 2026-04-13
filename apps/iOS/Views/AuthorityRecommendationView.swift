@@ -208,12 +208,8 @@ struct AuthorityRecommendationsView: View {
         errorMessage = nil
         
         // Load recording authorities
-        guard let url = URL(string: "\(NetworkManager.baseURL)/recordings/\(recordingId)/authorities") else {
-            errorMessage = "Invalid URL"
-            isLoading = false
-            return
-        }
-        
+        let url = URL.api(path: "/recordings/\(recordingId)/authorities")
+
         do {
             let (data, response) = try await URLSession.shared.data(from: url)
             
@@ -246,10 +242,8 @@ struct AuthorityRecommendationsView: View {
     }
     
     private func loadUnmatchedSongAuthorities(songId: String) async {
-        guard let url = URL(string: "\(NetworkManager.baseURL)/songs/\(songId)/authorities") else {
-            return
-        }
-        
+        let url = URL.api(path: "/songs/\(songId)/authorities")
+
         do {
             let (data, response) = try await URLSession.shared.data(from: url)
             
@@ -268,10 +262,8 @@ struct AuthorityRecommendationsView: View {
     }
     
     private func deleteAuthority(_ authority: AuthorityRecommendation) async {
-        guard let url = URL(string: "\(NetworkManager.baseURL)/authorities/\(authority.id)") else {
-            return
-        }
-        
+        let url = URL.api(path: "/authorities/\(authority.id)")
+
         var request = URLRequest(url: url)
         request.httpMethod = "DELETE"
         
@@ -293,11 +285,8 @@ struct AuthorityRecommendationsView: View {
     private func linkAuthority(_ authority: AuthorityRecommendation) async {
         linkingInProgress = true
         
-        guard let url = URL(string: "\(NetworkManager.baseURL)/authorities/\(authority.id)/link") else {
-            linkingInProgress = false
-            return
-        }
-        
+        let url = URL.api(path: "/authorities/\(authority.id)/link")
+
         var request = URLRequest(url: url)
         request.httpMethod = "PATCH"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -601,12 +590,8 @@ struct AddAuthorityView: View {
         isSubmitting = true
         errorMessage = nil
         
-        guard let url = URL(string: "\(NetworkManager.baseURL)/recordings/\(recordingId)/authorities") else {
-            errorMessage = "Invalid URL"
-            isSubmitting = false
-            return
-        }
-        
+        let url = URL.api(path: "/recordings/\(recordingId)/authorities")
+
         var requestBody: [String: Any] = [
             "source": source,
             "source_url": sourceUrl

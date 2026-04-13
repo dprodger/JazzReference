@@ -103,6 +103,19 @@ enum SongResearchStatus {
     case currentlyResearching(progress: ResearchProgress?)
 }
 
+// MARK: - URL Helper
+
+extension URL {
+    /// Constructs an API URL from a path relative to `NetworkManager.baseURL`.
+    /// Crashes with a descriptive message instead of a generic force-unwrap failure.
+    static func api(path: String) -> URL {
+        guard let url = URL(string: "\(NetworkManager.baseURL)\(path)") else {
+            preconditionFailure("Invalid API URL: \(NetworkManager.baseURL)\(path)")
+        }
+        return url
+    }
+}
+
 // MARK: - Network Manager
 import SwiftUI
 import Combine
@@ -164,19 +177,13 @@ class NetworkManager: ObservableObject {
             errorMessage = nil
         }
         
-        var urlString = "\(NetworkManager.baseURL)/songs"
+        var path = "/songs"
         if !searchQuery.isEmpty {
             let normalizedQuery = Self.normalizeSearchText(searchQuery)
-            urlString += "?search=\(normalizedQuery.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")"
+            path += "?search=\(normalizedQuery.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")"
         }
-        
-        guard let url = URL(string: urlString) else {
-            await MainActor.run {
-                errorMessage = "Invalid URL"
-                isLoading = false
-            }
-            return
-        }
+
+        let url = URL.api(path: path)
         
         do {
             let (data, _) = try await URLSession.shared.data(from: url)
@@ -215,19 +222,13 @@ class NetworkManager: ObservableObject {
             errorMessage = nil
         }
 
-        var urlString = "\(NetworkManager.baseURL)/performers/index"
+        var path = "/performers/index"
         if !searchQuery.isEmpty {
             let normalizedQuery = Self.normalizeSearchText(searchQuery)
-            urlString += "?search=\(normalizedQuery.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")"
+            path += "?search=\(normalizedQuery.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")"
         }
 
-        guard let url = URL(string: urlString) else {
-            await MainActor.run {
-                errorMessage = "Invalid URL"
-                isLoading = false
-            }
-            return
-        }
+        let url = URL.api(path: path)
 
         do {
             let (data, _) = try await URLSession.shared.data(from: url)
@@ -265,19 +266,13 @@ class NetworkManager: ObservableObject {
             performers = []
         }
 
-        var urlString = "\(NetworkManager.baseURL)/performers?limit=\(performersPageSize)&offset=0"
+        var path = "/performers?limit=\(performersPageSize)&offset=0"
         if !searchQuery.isEmpty {
             let normalizedQuery = Self.normalizeSearchText(searchQuery)
-            urlString += "&search=\(normalizedQuery.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")"
+            path += "&search=\(normalizedQuery.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")"
         }
 
-        guard let url = URL(string: urlString) else {
-            await MainActor.run {
-                errorMessage = "Invalid URL"
-                isLoading = false
-            }
-            return
-        }
+        let url = URL.api(path: path)
 
         do {
             let (data, response) = try await URLSession.shared.data(from: url)
@@ -329,18 +324,13 @@ class NetworkManager: ObservableObject {
             isLoadingMorePerformers = true
         }
 
-        var urlString = "\(NetworkManager.baseURL)/performers?limit=\(performersPageSize)&offset=\(currentPerformersOffset)"
+        var path = "/performers?limit=\(performersPageSize)&offset=\(currentPerformersOffset)"
         if !searchQuery.isEmpty {
             let normalizedQuery = Self.normalizeSearchText(searchQuery)
-            urlString += "&search=\(normalizedQuery.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")"
+            path += "&search=\(normalizedQuery.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")"
         }
 
-        guard let url = URL(string: urlString) else {
-            await MainActor.run {
-                isLoadingMorePerformers = false
-            }
-            return
-        }
+        let url = URL.api(path: path)
 
         do {
             let (data, response) = try await URLSession.shared.data(from: url)
@@ -405,9 +395,7 @@ class NetworkManager: ObservableObject {
 */
     func fetchRecordingDetail(id: String) async -> Recording? {
         let startTime = Date()
-        guard let url = URL(string: "\(NetworkManager.baseURL)/recordings/\(id)") else {
-            return nil
-        }
+        let url = URL.api(path: "/recordings/\(id)")
         
         do {
             let (data, _) = try await URLSession.shared.data(from: url)
@@ -434,9 +422,7 @@ class NetworkManager: ObservableObject {
 
     func fetchPerformerDetail(id: String, sortBy: PerformerRecordingSortOrder) async -> PerformerDetail? {
         let startTime = Date()
-        guard let url = URL(string: "\(NetworkManager.baseURL)/performers/\(id)?sort=\(sortBy.rawValue)") else {
-            return nil
-        }
+        let url = URL.api(path: "/performers/\(id)?sort=\(sortBy.rawValue)")
 
         do {
             let (data, _) = try await URLSession.shared.data(from: url)
@@ -463,10 +449,7 @@ class NetworkManager: ObservableObject {
     /// Returns performer metadata, instruments, images, and recording count - NO recordings
     func fetchPerformerSummary(id: String) async -> PerformerDetail? {
         let startTime = Date()
-        guard let url = URL(string: "\(NetworkManager.baseURL)/performers/\(id)/summary") else {
-            print("Invalid URL for performer summary")
-            return nil
-        }
+        let url = URL.api(path: "/performers/\(id)/summary")
 
         do {
             let (data, response) = try await URLSession.shared.data(from: url)
@@ -498,10 +481,7 @@ class NetworkManager: ObservableObject {
     /// Fetch all recordings for a performer - heavier endpoint, call after summary loads
     func fetchPerformerRecordings(id: String, sortBy: PerformerRecordingSortOrder = .year) async -> [PerformerRecording]? {
         let startTime = Date()
-        guard let url = URL(string: "\(NetworkManager.baseURL)/performers/\(id)/recordings?sort=\(sortBy.rawValue)") else {
-            print("Invalid URL for performer recordings")
-            return nil
-        }
+        let url = URL.api(path: "/performers/\(id)/recordings?sort=\(sortBy.rawValue)")
 
         do {
             let (data, response) = try await URLSession.shared.data(from: url)
@@ -535,10 +515,7 @@ class NetworkManager: ObservableObject {
     /// Fetch all available repertoires
     func fetchRepertoires() async -> [Repertoire] {
         let startTime = Date()
-        guard let url = URL(string: "\(NetworkManager.baseURL)/repertoires") else {
-            print("Error: Invalid repertoires URL")
-            return []
-        }
+        let url = URL.api(path: "/repertoires")
         
         do {
             let (data, _) = try await URLSession.shared.data(from: url)
@@ -568,28 +545,22 @@ class NetworkManager: ObservableObject {
         }
         
         // Build URL - "all" uses lightweight /songs/index endpoint, others use protected /repertoires endpoint
-        var urlString: String
+        var path: String
         if repertoireId == "all" {
             // Use the lightweight songs index endpoint (no auth required, faster loading)
-            urlString = "\(NetworkManager.baseURL)/songs/index"
+            path = "/songs/index"
         } else {
             // Use the protected repertoire endpoint (requires auth)
-            urlString = "\(NetworkManager.baseURL)/repertoires/\(repertoireId)/songs"
+            path = "/repertoires/\(repertoireId)/songs"
         }
-        
+
         // Add search query if present
         if !searchQuery.isEmpty {
             let normalizedQuery = Self.normalizeSearchText(searchQuery)
-            urlString += "?search=\(normalizedQuery.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")"
+            path += "?search=\(normalizedQuery.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")"
         }
 
-        guard let url = URL(string: urlString) else {
-            await MainActor.run {
-                errorMessage = "Invalid URL"
-                isLoading = false
-            }
-            return
-        }
+        let url = URL.api(path: path)
         
         // Build request with optional authentication
         var request = URLRequest(url: url)
@@ -661,10 +632,7 @@ class NetworkManager: ObservableObject {
     /// - Returns: Result with success message or error
     func addSongToRepertoire(songId: String, repertoireId: String) async -> Result<String, Error> {
         let startTime = Date()
-        guard let url = URL(string: "\(NetworkManager.baseURL)/repertoires/\(repertoireId)/songs") else {
-            print("Error: Invalid add song URL")
-            return .failure(NSError(domain: "NetworkManager", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid URL"]))
-        }
+        let url = URL.api(path: "/repertoires/\(repertoireId)/songs")
         
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -722,10 +690,7 @@ class NetworkManager: ObservableObject {
     /// - Returns: True if successfully queued, false otherwise
     func refreshSongData(songId: String, forceRefresh: Bool = true) async -> Bool {
         let forceRefreshParam = forceRefresh ? "true" : "false"
-        guard let url = URL(string: "\(NetworkManager.baseURL)/songs/\(songId)/refresh?force_refresh=\(forceRefreshParam)") else {
-            print("Error: Invalid refresh URL")
-            return false
-        }
+        let url = URL.api(path: "/songs/\(songId)/refresh?force_refresh=\(forceRefreshParam)")
         
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -765,10 +730,7 @@ class NetworkManager: ObservableObject {
     /// Fetch the current research queue status
     func fetchQueueStatus() async -> QueueStatus? {
         let startTime = Date()
-        guard let url = URL(string: "\(NetworkManager.baseURL)/research/queue") else {
-            print("Error: Invalid queue status URL")
-            return nil
-        }
+        let url = URL.api(path: "/research/queue")
         
         do {
             let (data, _) = try await URLSession.shared.data(from: url)
@@ -794,10 +756,7 @@ class NetworkManager: ObservableObject {
     /// Fetch the list of songs currently in the research queue
     func fetchQueuedSongs() async -> [QueuedSong] {
         let startTime = Date()
-        guard let url = URL(string: "\(NetworkManager.baseURL)/research/queue/items") else {
-            print("Error: Invalid queued songs URL")
-            return []
-        }
+        let url = URL.api(path: "/research/queue/items")
 
         do {
             let (data, _) = try await URLSession.shared.data(from: url)
@@ -840,9 +799,7 @@ class NetworkManager: ObservableObject {
     }
 
     func fetchAuthorityRecommendations(songId: String) async -> AuthorityRecommendationsResponse? {
-        guard let url = URL(string: "\(Self.baseURL)/songs/\(songId)/authority_recommendations") else {
-            return nil
-        }
+        let url = URL.api(path: "/songs/\(songId)/authority_recommendations")
         
         do {
             let (data, _) = try await URLSession.shared.data(from: url)
@@ -856,10 +813,7 @@ class NetworkManager: ObservableObject {
     
     func fetchSongDetail(id: String, sortBy: RecordingSortOrder) async -> Song? {
         // Build URL with sort parameter
-        guard let url = URL(string: "\(Self.baseURL)/songs/\(id)?sort=\(sortBy.rawValue)") else {
-            print("Invalid URL for song detail with sort parameter")
-            return nil
-        }
+        let url = URL.api(path: "/songs/\(id)?sort=\(sortBy.rawValue)")
 
         do {
             let (data, response) = try await URLSession.shared.data(from: url)
@@ -896,10 +850,7 @@ class NetworkManager: ObservableObject {
     /// Returns song metadata, transcriptions, and only featured (authoritative) recordings
     func fetchSongSummary(id: String) async -> Song? {
         let startTime = Date()
-        guard let url = URL(string: "\(Self.baseURL)/songs/\(id)/summary") else {
-            print("Invalid URL for song summary")
-            return nil
-        }
+        let url = URL.api(path: "/songs/\(id)/summary")
 
         do {
             let (data, response) = try await URLSession.shared.data(from: url)
@@ -931,10 +882,7 @@ class NetworkManager: ObservableObject {
     /// Fetch all recordings for a song - heavier endpoint, call after summary loads
     func fetchSongRecordings(id: String, sortBy: RecordingSortOrder = .year) async -> [Recording]? {
         let startTime = Date()
-        guard let url = URL(string: "\(Self.baseURL)/songs/\(id)/recordings?sort=\(sortBy.rawValue)") else {
-            print("Invalid URL for song recordings")
-            return nil
-        }
+        let url = URL.api(path: "/songs/\(id)/recordings?sort=\(sortBy.rawValue)")
 
         do {
             let (data, response) = try await URLSession.shared.data(from: url)
@@ -986,9 +934,7 @@ class NetworkManager: ObservableObject {
         }
         #endif
         
-        guard let url = URL(string: "\(NetworkManager.baseURL)/songs/\(songId)/transcriptions") else {
-            return []
-        }
+        let url = URL.api(path: "/songs/\(songId)/transcriptions")
         
         do {
             let (data, _) = try await URLSession.shared.data(from: url)
@@ -1007,9 +953,7 @@ class NetworkManager: ObservableObject {
         }
         #endif
         
-        guard let url = URL(string: "\(NetworkManager.baseURL)/recordings/\(recordingId)/transcriptions") else {
-            return []
-        }
+        let url = URL.api(path: "/recordings/\(recordingId)/transcriptions")
         
         do {
             let (data, _) = try await URLSession.shared.data(from: url)
@@ -1037,9 +981,7 @@ class NetworkManager: ObservableObject {
         }
         #endif
         
-        guard let url = URL(string: "\(NetworkManager.baseURL)/transcriptions/\(id)") else {
-            return nil
-        }
+        let url = URL.api(path: "/transcriptions/\(id)")
         
         do {
             let (data, _) = try await URLSession.shared.data(from: url)
@@ -1055,9 +997,7 @@ class NetworkManager: ObservableObject {
 
     func searchSongs(query: String) async throws -> [Song] {
         let encodedQuery = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? query
-        guard let url = URL(string: "\(NetworkManager.baseURL)/songs?search=\(encodedQuery)&limit=20") else {
-            throw URLError(.badURL)
-        }
+        let url = URL.api(path: "/songs?search=\(encodedQuery)&limit=20")
 
         let (data, response) = try await URLSession.shared.data(from: url)
 
@@ -1073,9 +1013,7 @@ class NetworkManager: ObservableObject {
     // MARK: - Create Transcription
 
     func createTranscription(songId: String, recordingId: String?, youtubeUrl: String, userId: String? = nil) async throws {
-        guard let url = URL(string: "\(NetworkManager.baseURL)/transcriptions") else {
-            throw URLError(.badURL)
-        }
+        let url = URL.api(path: "/transcriptions")
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -1113,9 +1051,7 @@ class NetworkManager: ObservableObject {
     // MARK: - Create Video
 
     func createVideo(songId: String, youtubeUrl: String, videoType: String, title: String, tempo: Int? = nil, keySignature: String? = nil, userId: String? = nil) async throws {
-        guard let url = URL(string: "\(NetworkManager.baseURL)/videos") else {
-            throw URLError(.badURL)
-        }
+        let url = URL.api(path: "/videos")
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -1157,14 +1093,12 @@ class NetworkManager: ObservableObject {
     // MARK: - Fetch Song Videos
 
     func fetchSongVideos(songId: String, videoType: String? = nil) async throws -> [Video] {
-        var urlString = "\(NetworkManager.baseURL)/songs/\(songId)/videos"
+        var path = "/songs/\(songId)/videos"
         if let videoType = videoType {
-            urlString += "?type=\(videoType)"
+            path += "?type=\(videoType)"
         }
 
-        guard let url = URL(string: urlString) else {
-            throw URLError(.badURL)
-        }
+        let url = URL.api(path: path)
 
         let (data, response) = try await URLSession.shared.data(from: url)
 
@@ -1187,9 +1121,7 @@ class NetworkManager: ObservableObject {
 
     /// Fetch total recordings count (lightweight endpoint)
     func fetchRecordingsCount() async {
-        guard let url = URL(string: "\(NetworkManager.baseURL)/recordings/count") else {
-            return
-        }
+        let url = URL.api(path: "/recordings/count")
 
         do {
             let (data, _) = try await URLSession.shared.data(from: url)
@@ -1225,15 +1157,7 @@ class NetworkManager: ObservableObject {
         }
 
         let normalizedQuery = Self.normalizeSearchText(searchQuery)
-        let urlString = "\(NetworkManager.baseURL)/recordings?search=\(normalizedQuery.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")"
-
-        guard let url = URL(string: urlString) else {
-            await MainActor.run {
-                errorMessage = "Invalid URL"
-                isLoading = false
-            }
-            return
-        }
+        let url = URL.api(path: "/recordings?search=\(normalizedQuery.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")")
 
         do {
             let (data, _) = try await URLSession.shared.data(from: url)
@@ -1320,9 +1244,7 @@ class NetworkManager: ObservableObject {
         externalUrl: String,
         explanation: String
     ) async throws -> Bool {
-        guard let url = URL(string: "\(baseURL)/content-reports") else {
-            throw URLError(.badURL)
-        }
+        let url = URL.api(path: "/content-reports")
 
         let requestBody: [String: Any] = [
             "entity_type": entityType,
@@ -1395,10 +1317,7 @@ class NetworkManager: ObservableObject {
     /// - Returns: Array of favorited recordings
     func fetchUserFavorites(authToken: String) async -> [FavoriteRecordingResponse] {
         let startTime = Date()
-        guard let url = URL(string: "\(NetworkManager.baseURL)/favorites") else {
-            print("Error: Invalid favorites URL")
-            return []
-        }
+        let url = URL.api(path: "/favorites")
 
         var request = URLRequest(url: url)
         request.setValue("Bearer \(authToken)", forHTTPHeaderField: "Authorization")
@@ -1437,10 +1356,7 @@ class NetworkManager: ObservableObject {
     /// - Returns: The new favorite count, or nil on error
     func addFavorite(recordingId: String, authToken: String) async -> Int? {
         let startTime = Date()
-        guard let url = URL(string: "\(NetworkManager.baseURL)/recordings/\(recordingId)/favorite") else {
-            print("Error: Invalid favorite URL")
-            return nil
-        }
+        let url = URL.api(path: "/recordings/\(recordingId)/favorite")
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -1484,10 +1400,7 @@ class NetworkManager: ObservableObject {
     /// - Returns: The new favorite count, or nil on error
     func removeFavorite(recordingId: String, authToken: String) async -> Int? {
         let startTime = Date()
-        guard let url = URL(string: "\(NetworkManager.baseURL)/recordings/\(recordingId)/favorite") else {
-            print("Error: Invalid unfavorite URL")
-            return nil
-        }
+        let url = URL.api(path: "/recordings/\(recordingId)/favorite")
 
         var request = URLRequest(url: url)
         request.httpMethod = "DELETE"
@@ -1555,10 +1468,7 @@ class NetworkManager: ObservableObject {
         authToken: String
     ) async -> ContributionResponse? {
         let startTime = Date()
-        guard let url = URL(string: "\(NetworkManager.baseURL)/recordings/\(recordingId)/contribution") else {
-            print("Error: Invalid contribution URL")
-            return nil
-        }
+        let url = URL.api(path: "/recordings/\(recordingId)/contribution")
 
         var request = URLRequest(url: url)
         request.httpMethod = "PUT"
@@ -1616,10 +1526,7 @@ class NetworkManager: ObservableObject {
         authToken: String
     ) async -> ContributionResponse? {
         let startTime = Date()
-        guard let url = URL(string: "\(NetworkManager.baseURL)/recordings/\(recordingId)/contribution") else {
-            print("Error: Invalid contribution URL")
-            return nil
-        }
+        let url = URL.api(path: "/recordings/\(recordingId)/contribution")
 
         var request = URLRequest(url: url)
         request.httpMethod = "DELETE"
@@ -1685,10 +1592,7 @@ class NetworkManager: ObservableObject {
     /// - Returns: User contribution stats, or nil on error
     func fetchUserContributionStats(authToken: String) async -> UserContributionStats? {
         let startTime = Date()
-        guard let url = URL(string: "\(NetworkManager.baseURL)/users/me/contribution-stats") else {
-            print("Error: Invalid contribution stats URL")
-            return nil
-        }
+        let url = URL.api(path: "/users/me/contribution-stats")
 
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
@@ -1731,10 +1635,7 @@ class NetworkManager: ObservableObject {
         let startTime = Date()
 
         let encodedQuery = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? query
-        guard let url = URL(string: "\(NetworkManager.baseURL)/musicbrainz/works/search?q=\(encodedQuery)") else {
-            print("Error: Invalid MusicBrainz search URL")
-            return []
-        }
+        let url = URL.api(path: "/musicbrainz/works/search?q=\(encodedQuery)")
 
         do {
             let (data, response) = try await URLSession.shared.data(from: url)
@@ -1769,10 +1670,7 @@ class NetworkManager: ObservableObject {
     func importSongFromMusicBrainz(work: MusicBrainzWork, authToken: String) async -> MusicBrainzImportResponse? {
         let startTime = Date()
 
-        guard let url = URL(string: "\(NetworkManager.baseURL)/musicbrainz/import") else {
-            print("Error: Invalid MusicBrainz import URL")
-            return nil
-        }
+        let url = URL.api(path: "/musicbrainz/import")
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -1858,10 +1756,7 @@ class NetworkManager: ObservableObject {
         authToken: String
     ) async -> ManualStreamingLinkResponse? {
         let startTime = Date()
-        guard let apiUrl = URL(string: "\(NetworkManager.baseURL)/recordings/\(recordingId)/releases/\(releaseId)/streaming-link") else {
-            print("Error: Invalid streaming link URL")
-            return nil
-        }
+        let apiUrl = URL.api(path: "/recordings/\(recordingId)/releases/\(releaseId)/streaming-link")
 
         var request = URLRequest(url: apiUrl)
         request.httpMethod = "POST"

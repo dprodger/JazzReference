@@ -134,9 +134,7 @@ struct MacSongCreationView: View {
     }
 
     private func saveSongToAPI() async throws {
-        guard let url = URL(string: "\(NetworkManager.baseURL)/songs") else {
-            throw URLError(.badURL)
-        }
+        let url = URL.api(path: "/songs")
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
