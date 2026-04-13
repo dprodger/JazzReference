@@ -107,9 +107,7 @@ final class RecordingDetailViewModel: ObservableObject {
     /// (so the response includes the user's own contribution, if any).
     private func fetchRecordingWithAuth() async -> Recording? {
         guard let authManager else { return nil }
-        guard let url = URL(string: "\(NetworkManager.baseURL)/recordings/\(recordingId)") else {
-            return nil
-        }
+        let url = URL.api(path: "/recordings/\(recordingId)")
 
         do {
             let data: Data

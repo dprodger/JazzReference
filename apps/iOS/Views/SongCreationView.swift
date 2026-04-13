@@ -137,10 +137,8 @@ struct SongCreationView: View {
     // MARK: - API Integration
     
     private func saveSongToAPI() async throws {
-        guard let url = URL(string: "\(NetworkManager.baseURL)/songs") else {
-            throw URLError(.badURL)
-        }
-        
+        let url = URL.api(path: "/songs")
+
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")

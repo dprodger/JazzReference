@@ -101,7 +101,7 @@ class AuthenticationManager: ObservableObject {
             return false
         }
 
-        let url = URL(string: "\(NetworkManager.baseURL)/auth/refresh-token")!
+        let url = URL.api(path: "/auth/refresh-token")
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -157,7 +157,7 @@ class AuthenticationManager: ObservableObject {
         isLoading = true
         errorMessage = nil
         
-        let url = URL(string: "\(NetworkManager.baseURL)/auth/register")!
+        let url = URL.api(path: "/auth/register")
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -213,7 +213,7 @@ class AuthenticationManager: ObservableObject {
         isLoading = true
         errorMessage = nil
         
-        let url = URL(string: "\(NetworkManager.baseURL)/auth/login")!
+        let url = URL.api(path: "/auth/login")
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -285,7 +285,7 @@ class AuthenticationManager: ObservableObject {
     private func fetchCurrentUser() async {
         guard let token = accessToken else { return }
 
-        let url = URL(string: "\(NetworkManager.baseURL)/auth/me")!
+        let url = URL.api(path: "/auth/me")
         var request = URLRequest(url: url)
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
 
@@ -327,7 +327,7 @@ class AuthenticationManager: ObservableObject {
     
     /// Call logout endpoint on backend (best effort)
     private func callLogoutEndpoint(accessToken: String, refreshToken: String) async {
-        let url = URL(string: "\(NetworkManager.baseURL)/auth/logout")!
+        let url = URL.api(path: "/auth/logout")
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
@@ -352,7 +352,7 @@ class AuthenticationManager: ObservableObject {
         isLoading = true
         errorMessage = nil
         
-        let url = URL(string: "\(NetworkManager.baseURL)/auth/forgot-password")!
+        let url = URL.api(path: "/auth/forgot-password")
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -494,7 +494,7 @@ class AuthenticationManager: ObservableObject {
         isLoading = true
         errorMessage = nil
         
-        let url = URL(string: "\(NetworkManager.baseURL)/auth/reset-password")!
+        let url = URL.api(path: "/auth/reset-password")
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -627,7 +627,7 @@ class AuthenticationManager: ObservableObject {
     #endif
     
     private func authenticateWithGoogle(idToken: String) async -> Bool {
-        let url = URL(string: "\(NetworkManager.baseURL)/auth/google")!
+        let url = URL.api(path: "/auth/google")
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")

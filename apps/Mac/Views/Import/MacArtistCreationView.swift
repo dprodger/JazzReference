@@ -115,9 +115,7 @@ struct MacArtistCreationView: View {
     }
 
     private func saveArtistToAPI() async throws {
-        guard let url = URL(string: "\(NetworkManager.baseURL)/performers") else {
-            throw URLError(.badURL)
-        }
+        let url = URL.api(path: "/performers")
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
