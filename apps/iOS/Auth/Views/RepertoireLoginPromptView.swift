@@ -7,6 +7,7 @@
 //
 
 import SwiftUI
+import AuthenticationServices
 import GoogleSignInSwift
 
 struct RepertoireLoginPromptView: View {
@@ -128,6 +129,23 @@ struct RepertoireLoginPromptView: View {
                         await authManager.signInWithGoogle()
                     }
                 })
+                .frame(height: 50)
+                .cornerRadius(10)
+                .disabled(authManager.isLoading)
+
+                // Sign in with Apple Button
+                SignInWithAppleButton(
+                    .signIn,
+                    onRequest: { request in
+                        request.requestedScopes = [.fullName, .email]
+                    },
+                    onCompletion: { result in
+                        Task {
+                            _ = await authManager.signInWithApple(result)
+                        }
+                    }
+                )
+                .signInWithAppleButtonStyle(.black)
                 .frame(height: 50)
                 .cornerRadius(10)
                 .disabled(authManager.isLoading)

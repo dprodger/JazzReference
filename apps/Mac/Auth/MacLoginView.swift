@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import AuthenticationServices
 #if canImport(GoogleSignIn)
 import GoogleSignIn
 import GoogleSignInSwift
@@ -128,6 +129,26 @@ struct MacLoginView: View {
             .controlSize(.large)
             .disabled(true)
             #endif
+
+            // Sign in with Apple button
+            SignInWithAppleButton(
+                .signIn,
+                onRequest: { request in
+                    request.requestedScopes = [.fullName, .email]
+                },
+                onCompletion: { result in
+                    Task {
+                        let success = await authManager.signInWithApple(result)
+                        if success {
+                            dismiss()
+                        }
+                    }
+                }
+            )
+            .signInWithAppleButtonStyle(.black)
+            .frame(height: 44)
+            .cornerRadius(8)
+            .disabled(authManager.isLoading)
 
             // Divider
             HStack {

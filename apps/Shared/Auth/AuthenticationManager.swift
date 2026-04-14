@@ -9,6 +9,7 @@
 import SwiftUI
 import Combine
 import os
+import AuthenticationServices
 #if canImport(GoogleSignIn)
 import GoogleSignIn
 #endif
@@ -672,6 +673,102 @@ class AuthenticationManager: ObservableObject {
             currentUser = authResponse.user
             isAuthenticated = true
             
+            return true
+        } catch {
+            errorMessage = "Authentication failed: \(error.localizedDescription)"
+            return false
+        }
+    }
+
+    // MARK: - Sign in with Apple
+
+    /// Handle the completion of a `SignInWithAppleButton` tap.
+    ///
+    /// Extracts the Apple identity token (and fullName, which Apple only
+    /// provides on the very first sign-in for an app), and forwards them to
+    /// the backend via `/auth/apple`. Subsequent sign-ins for the same user
+    /// will have `fullName == nil` — that's expected.
+    @MainActor
+    func signInWithApple(_ result: Result<ASAuthorization, Error>) async -> Bool {
+        isLoading = true
+        errorMessage = nil
+        defer { isLoading = false }
+
+        switch result {
+        case .failure(let error):
+            // ASAuthorizationError.canceled is user-initiated and not an error
+            // we want to surface.
+            if (error as NSError).code == ASAuthorizationError.canceled.rawValue {
+                return false
+            }
+            Log.auth.error("Apple sign-in failed: \(error.localizedDescription, privacy: .public)")
+            errorMessage = "Apple Sign In failed: \(error.localizedDescription)"
+            return false
+
+        case .success(let authorization):
+            guard let credential = authorization.credential as? ASAuthorizationAppleIDCredential else {
+                errorMessage = "Unexpected credential type from Apple"
+                return false
+            }
+            guard let tokenData = credential.identityToken,
+                  let identityToken = String(data: tokenData, encoding: .utf8) else {
+                errorMessage = "Failed to read Apple identity token"
+                return false
+            }
+
+            // `fullName` is only populated on the very first authorization
+            // for this app + Apple ID pair. On re-auth it's nil and we must
+            // not overwrite what the backend already stored.
+            let fullName: String? = {
+                guard let name = credential.fullName else { return nil }
+                let formatter = PersonNameComponentsFormatter()
+                formatter.style = .long
+                let formatted = formatter.string(from: name).trimmingCharacters(in: .whitespaces)
+                return formatted.isEmpty ? nil : formatted
+            }()
+
+            return await authenticateWithApple(
+                identityToken: identityToken,
+                fullName: fullName
+            )
+        }
+    }
+
+    private func authenticateWithApple(identityToken: String, fullName: String?) async -> Bool {
+        let url = URL.api(path: "/auth/apple")
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        var body: [String: Any] = ["identity_token": identityToken]
+        if let fullName {
+            body["full_name"] = fullName
+        }
+        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
+
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+
+            guard let httpResponse = response as? HTTPURLResponse else {
+                errorMessage = "Invalid response from server"
+                return false
+            }
+
+            if httpResponse.statusCode != 200 {
+                if let errorResponse = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                   let error = errorResponse["error"] as? String {
+                    errorMessage = error
+                } else {
+                    errorMessage = "Authentication failed with status \(httpResponse.statusCode)"
+                }
+                return false
+            }
+
+            let authResponse = try JSONDecoder().decode(AuthResponse.self, from: data)
+            saveTokens(accessToken: authResponse.accessToken,
+                       refreshToken: authResponse.refreshToken)
+            currentUser = authResponse.user
+            isAuthenticated = true
             return true
         } catch {
             errorMessage = "Authentication failed: \(error.localizedDescription)"

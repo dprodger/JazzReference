@@ -7,6 +7,7 @@
 //
 
 import SwiftUI
+import AuthenticationServices
 import GoogleSignInSwift
 
 struct LoginView: View {
@@ -82,6 +83,26 @@ struct LoginView: View {
                             }
                         }
                     })
+                    .frame(height: 50)
+                    .cornerRadius(10)
+                    .disabled(authManager.isLoading)
+
+                    // Sign in with Apple Button
+                    SignInWithAppleButton(
+                        .signIn,
+                        onRequest: { request in
+                            request.requestedScopes = [.fullName, .email]
+                        },
+                        onCompletion: { result in
+                            Task {
+                                let success = await authManager.signInWithApple(result)
+                                if success {
+                                    dismiss()
+                                }
+                            }
+                        }
+                    )
+                    .signInWithAppleButtonStyle(.black)
                     .frame(height: 50)
                     .cornerRadius(10)
                     .disabled(authManager.isLoading)
