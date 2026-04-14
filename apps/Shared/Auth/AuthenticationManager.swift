@@ -135,7 +135,6 @@ class AuthenticationManager: ObservableObject {
                 saveTokens(accessToken: refreshResponse.accessToken,
                           refreshToken: refreshResponse.refreshToken)
 
-                Log.auth.info("Access token refreshed successfully")
                 return true
             } else {
                 Log.auth.error("Token refresh failed with status: \(httpResponse.statusCode)")
@@ -305,7 +304,6 @@ class AuthenticationManager: ObservableObject {
                 let user = try JSONDecoder().decode(User.self, from: data)
                 currentUser = user
                 isAuthenticated = true
-                Log.auth.info("Token valid, user authenticated: \(user.email, privacy: .private)")
             } else if httpResponse.statusCode == 401 {
                 // Access token expired — try refreshing before giving up
                 Log.auth.warning("Access token expired, attempting refresh")

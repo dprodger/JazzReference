@@ -46,7 +46,6 @@ class KeychainHelper {
         let status = SecItemAdd(query as CFDictionary, nil)
         
         if status == errSecSuccess {
-            Log.auth.debug("Keychain: Successfully saved '\(key, privacy: .private)'")
             return true
         } else {
             Log.auth.error("Keychain: Failed to save '\(key, privacy: .private)' with status: \(Int(status))")
@@ -77,8 +76,7 @@ class KeychainHelper {
             }
             return nil
         }
-        
-        Log.auth.debug("Keychain: Successfully loaded '\(key, privacy: .private)'")
+
         return value
     }
     
@@ -98,12 +96,10 @@ class KeychainHelper {
         // Success if deleted or item didn't exist
         let success = status == errSecSuccess || status == errSecItemNotFound
         
-        if success {
-            Log.auth.debug("Keychain: Deleted '\(key, privacy: .private)'")
-        } else {
+        if !success {
             Log.auth.error("Keychain: Failed to delete '\(key, privacy: .private)' with status: \(Int(status))")
         }
-        
+
         return success
     }
     

@@ -63,9 +63,6 @@ class FavoritesService {
             let favorites = try JSONDecoder().decode([FavoriteRecordingResponse].self, from: data)
             APIClient.logRequest("GET /favorites", startTime: startTime)
 
-            if APIClient.diagnosticsEnabled {
-                Log.network.debug("Returned \(favorites.count, privacy: .public) favorites")
-            }
             return favorites
         } catch {
             Log.network.error("Error fetching favorites: \(error)")

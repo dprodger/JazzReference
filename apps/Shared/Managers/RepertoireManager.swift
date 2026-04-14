@@ -39,15 +39,7 @@ class RepertoireManager: ObservableObject {
     private weak var authManager: AuthenticationManager?
     
     init() {
-        // Restore previously selected repertoire from UserDefaults
-        if let savedId = UserDefaults.standard.string(forKey: selectedRepertoireKey) {
-            Log.data.debug("Restored saved repertoire ID: \(savedId, privacy: .private)")
-        }
-        
-        // Restore last used repertoire for adding
-        if let lastUsedId = UserDefaults.standard.string(forKey: lastUsedRepertoireKey) {
-            Log.data.debug("Restored last used repertoire ID: \(lastUsedId, privacy: .private)")
-        }
+        // Repertoire IDs are restored from UserDefaults on demand elsewhere.
     }
     
     /// Connect to AuthenticationManager and load repertoires if authenticated
@@ -78,7 +70,6 @@ class RepertoireManager: ObservableObject {
                 self.repertoires = [.allSongs]
                 self.selectedRepertoire = .allSongs
                 self.isAuthenticated = false
-                Log.data.debug("Not authenticated - showing only All Songs")
             }
             return
         }
@@ -98,18 +89,10 @@ class RepertoireManager: ObservableObject {
             return
         }
         
-        Log.data.debug("Loading repertoires from: \(url.absoluteString, privacy: .private)")
-        
         do {
             // Use AuthenticationManager's method which handles token refresh automatically
             let data = try await authManager.makeAuthenticatedRequest(url: url)
-            
-            // DEBUG: Log response
-            if let responseString = String(data: data, encoding: .utf8) {
-                let preview = String(responseString.prefix(200))
-                Log.data.debug("Response received: \(preview, privacy: .private)...")
-            }
-            
+
             let fetchedRepertoires = try JSONDecoder().decode([Repertoire].self, from: data)
             
             await MainActor.run {
@@ -120,24 +103,18 @@ class RepertoireManager: ObservableObject {
                 if let savedId = UserDefaults.standard.string(forKey: selectedRepertoireKey),
                    let saved = self.repertoires.first(where: { $0.id == savedId }) {
                     self.selectedRepertoire = saved
-                    let savedName = saved.name
-                    Log.data.debug("Restored repertoire: \(savedName, privacy: .public)")
                 } else {
                     self.selectedRepertoire = .allSongs
                 }
-                
+
                 // Restore last used repertoire if it exists
                 if let lastUsedId = UserDefaults.standard.string(forKey: lastUsedRepertoireKey),
                    let lastUsed = fetchedRepertoires.first(where: { $0.id == lastUsedId }) {
                     self.lastUsedRepertoire = lastUsed
-                    let lastUsedName = lastUsed.name
-                    Log.data.debug("Restored last used repertoire: \(lastUsedName, privacy: .public)")
                 }
-                
+
                 self.isLoading = false
                 self.isAuthenticated = true
-                
-                Log.data.info("Loaded \(fetchedRepertoires.count) user repertoires")
             }
         } catch URLError.userAuthenticationRequired {
             // Token refresh failed - user needs to log in again

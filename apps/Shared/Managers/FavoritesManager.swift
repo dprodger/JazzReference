@@ -82,7 +82,6 @@ class FavoritesManager: ObservableObject {
             self.favoriteRecordingIds = Set(favorites.map { $0.id })
             self.isLoading = false
             self.isAuthenticated = true
-            Log.data.info("Loaded \(favorites.count) favorites")
         }
     }
 
