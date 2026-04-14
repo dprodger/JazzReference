@@ -77,11 +77,13 @@ final class RecordingDetailViewModel: ObservableObject {
 
     /// SwiftUI preview loader. Synchronously pulls stub data from RecordingService's
     /// preview helper. Only call this from inside an `XCODE_RUNNING_FOR_PREVIEWS` guard.
+    #if DEBUG
     func loadPreview() {
         recording = recordingService.fetchRecordingDetailSync(id: recordingId)
         autoSelectFirstRelease()
         isLoading = false
     }
+    #endif
 
     // MARK: - Favorites
 

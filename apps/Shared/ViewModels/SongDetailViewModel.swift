@@ -160,6 +160,7 @@ final class SongDetailViewModel: ObservableObject {
 
     /// SwiftUI preview stub loader. Pulls synchronous stub data from SongService.
     /// Only call from inside an `XCODE_RUNNING_FOR_PREVIEWS` guard.
+    #if DEBUG
     func loadPreview(songId: String) {
         song = songService.fetchSongDetailSync(id: songId)
         transcriptions = song?.transcriptions ?? []
@@ -167,6 +168,7 @@ final class SongDetailViewModel: ObservableObject {
         isRecordingsLoading = false
         currentLoadedSongId = songId
     }
+    #endif
 
     // MARK: - Refresh queue (background research)
 
