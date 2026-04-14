@@ -26,6 +26,17 @@ from cache_utils import get_cache_dir
 logger = logging.getLogger(__name__)
 
 
+class CoverArtArchiveError(Exception):
+    """
+    Raised when a CAA request fails in a way that cannot be distinguished
+    from a valid response (network error, unexpected HTTP status, unparseable body).
+
+    Callers should catch this and skip any side effects that assume a successful
+    check — most importantly, do not stamp ``cover_art_checked_at`` on the release,
+    so the standalone backfill will retry it on a later run.
+    """
+
+
 class CoverArtArchiveClient:
     """
     Client for Cover Art Archive API with caching support.
@@ -291,20 +302,30 @@ class CoverArtArchiveClient:
         # Make API request
         self.last_made_api_call = True
         url = f"{self.BASE_URL}/release/{release_mbid}/"
-        
+
         logger.debug(f"Fetching cover art for release: {release_mbid}")
         response = self._make_request(url)
-        
+
         if response is None:
-            return None
-        
+            raise CoverArtArchiveError(
+                f"CAA request failed for release {release_mbid} after retries"
+            )
+
         # No cover art for this release
         if response.status_code == 404:
             # Cache the negative result to avoid repeated lookups
             result = {'no_cover_art': True, 'release_mbid': release_mbid}
             self._save_to_cache(cache_path, result)
             return result
-        
+
+        # Any status other than 200/404 is a failure we can't safely treat
+        # as "no art available" — raise so the caller skips stamping the release
+        # as checked and the backfill can retry later.
+        if response.status_code != 200:
+            raise CoverArtArchiveError(
+                f"Unexpected status {response.status_code} for release {release_mbid}"
+            )
+
         # Parse JSON response
         try:
             data = response.json()
@@ -312,7 +333,9 @@ class CoverArtArchiveClient:
             return data
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse CAA response: {e}")
-            return None
+            raise CoverArtArchiveError(
+                f"Failed to parse CAA response for release {release_mbid}: {e}"
+            ) from e
     
     def get_front_cover_url(self, release_mbid: str) -> Optional[str]:
         """
@@ -325,17 +348,23 @@ class CoverArtArchiveClient:
             release_mbid: MusicBrainz release ID
             
         Returns:
-            URL to the front cover image, or None if not available
+            URL to the front cover image, or None if not available (including
+            when the CAA request failed — this helper is best-effort and
+            callers that need to detect failures should call
+            ``get_release_cover_art`` directly).
         """
-        data = self.get_release_cover_art(release_mbid)
-        
+        try:
+            data = self.get_release_cover_art(release_mbid)
+        except CoverArtArchiveError:
+            return None
+
         if not data or data.get('no_cover_art'):
             return None
-        
+
         for image in data.get('images', []):
             if image.get('front'):
                 return image.get('image')
-        
+
         return None
     
     def _ensure_https(self, url: Optional[str]) -> Optional[str]:
