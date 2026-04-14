@@ -97,7 +97,7 @@ struct RecordingsSection: View {
                                     }
                                 } else {
                                     VStack(spacing: 12) {
-                                        Image(systemName: "music.note.slash")
+                                        Image(systemName: "music.note")
                                             .font(.system(size: 48))
                                             .foregroundColor(JazzTheme.smokeGray.opacity(0.5))
                                         Text("No recordings match the current filters")

@@ -397,7 +397,7 @@ struct PerformerDetailView: View {
                 .padding(.vertical, 40)
             } else if filtered.isEmpty {
                 VStack(spacing: 12) {
-                    Image(systemName: "music.note.slash")
+                    Image(systemName: "music.note")
                         .font(.system(size: 40))
                         .foregroundColor(JazzTheme.smokeGray.opacity(0.5))
                     Text("No recordings match the current filters")
