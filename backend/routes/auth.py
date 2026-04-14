@@ -32,6 +32,7 @@ from rate_limit import (
     LOGIN_LIMIT,
     REGISTER_LIMIT,
     GOOGLE_LOGIN_LIMIT,
+    APPLE_LOGIN_LIMIT,
     REFRESH_TOKEN_LIMIT,
 )
 
@@ -39,11 +40,29 @@ from rate_limit import (
 from google.auth.transport import requests as google_requests
 from google.oauth2 import id_token as google_id_token
 
+# Sign in with Apple: Apple identity tokens are RS256 JWTs signed with
+# rotating public keys published at Apple's JWKS endpoint. PyJWT handles
+# fetching/caching the JWKS and verifying the signature.
+import jwt
+from jwt import PyJWKClient, InvalidTokenError, PyJWKClientError
+
 logger = logging.getLogger(__name__)
 auth_bp = Blueprint('auth', __name__, url_prefix='/auth')
 
 # Google OAuth configuration (NEW - ADD THIS)
 GOOGLE_CLIENT_ID = os.getenv('GOOGLE_CLIENT_ID')
+
+# Sign in with Apple configuration.
+# APPLE_BUNDLE_IDS is a comma-separated list of bundle IDs / Services IDs we
+# accept as the `aud` claim on Apple identity tokens — typically the iOS app
+# bundle and the Mac app bundle.
+APPLE_ISSUER = 'https://appleid.apple.com'
+APPLE_JWKS_URL = 'https://appleid.apple.com/auth/keys'
+APPLE_BUNDLE_IDS = [
+    bid.strip() for bid in os.getenv('APPLE_BUNDLE_IDS', '').split(',') if bid.strip()
+]
+# The JWKS client caches keys in-process; safe to instantiate once.
+_apple_jwk_client = PyJWKClient(APPLE_JWKS_URL, cache_keys=True)
 
 @auth_bp.route('/register', methods=['POST'])
 @limiter.limit(REGISTER_LIMIT)
@@ -528,4 +547,206 @@ def google_login():
         return jsonify({'error': f'Invalid token: {str(e)}'}), 401
     except Exception as e:
         logger.error(f"Google login error: {e}", exc_info=True)
-        return jsonify({'error': 'Authentication failed'}), 500 
+        return jsonify({'error': 'Authentication failed'}), 500
+
+
+@auth_bp.route('/apple', methods=['POST'])
+@limiter.limit(APPLE_LOGIN_LIMIT)
+def apple_login():
+    """
+    Authenticate with a Sign in with Apple identity token.
+
+    Request body:
+        {
+            "identity_token": "eyJraWQiOiJ...",    # required, Apple's JWT
+            "full_name": "Ada Lovelace",            # optional; only sent on first
+                                                    # auth, since Apple only
+                                                    # returns fullName once
+            "authorization_code": "..."             # optional; reserved for
+                                                    # future server-side refresh
+        }
+
+    Returns:
+        200: {user, access_token, refresh_token}  — same shape as /auth/google
+        400: identity_token missing
+        401: token invalid (signature, iss/aud/exp)
+        500: server misconfigured or DB error
+
+    Notes on Apple's quirks:
+    - `email` is only present in the token on the FIRST sign-in. Subsequent
+      tokens for the same user omit it. We look up by `apple_id` primarily.
+    - If a user opts to hide their email we get a `...@privaterelay.appleid.com`
+      relay address; we store it verbatim.
+    - `fullName` is never in the identity token itself; it's in the
+      authorization credential and only present on first auth. The client is
+      responsible for forwarding it via the `full_name` field below.
+    """
+    data = request.get_json() or {}
+    identity_token = data.get('identity_token')
+    client_full_name = data.get('full_name')
+
+    if not identity_token:
+        return jsonify({'error': 'identity_token required'}), 400
+
+    if not APPLE_BUNDLE_IDS:
+        logger.error("APPLE_BUNDLE_IDS not configured")
+        return jsonify({'error': 'Apple authentication not configured'}), 500
+
+    try:
+        # Fetch the signing key matching the token's `kid` header.
+        signing_key = _apple_jwk_client.get_signing_key_from_jwt(identity_token)
+
+        # PyJWT verifies signature, iss, aud, and exp in one pass.
+        claims = jwt.decode(
+            identity_token,
+            signing_key.key,
+            algorithms=['RS256'],
+            audience=APPLE_BUNDLE_IDS,
+            issuer=APPLE_ISSUER,
+        )
+    except (InvalidTokenError, PyJWKClientError) as e:
+        # Includes malformed tokens, bad signatures, expired, wrong iss/aud,
+        # and unknown `kid` (which happens when a forged/malformed token
+        # references a signing key Apple never published).
+        logger.warning(f"Invalid Apple token: {e}")
+        return jsonify({'error': f'Invalid token: {str(e)}'}), 401
+    except Exception as e:
+        logger.error(f"Apple token verification error: {e}", exc_info=True)
+        return jsonify({'error': 'Authentication failed'}), 500
+
+    apple_id = claims.get('sub')
+    token_email = claims.get('email')  # may be None on re-auth
+    email_verified_claim = claims.get('email_verified')
+    # Apple returns email_verified as a bool or the string "true"
+    email_verified = (
+        email_verified_claim is True
+        or str(email_verified_claim).lower() == 'true'
+    )
+
+    if not apple_id:
+        logger.warning("Apple token missing `sub` claim")
+        return jsonify({'error': 'Invalid token: missing subject'}), 401
+
+    logger.info(f"🔐 Apple login attempt for sub: {apple_id} (email: {token_email or 'not provided'})")
+
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                # Primary match on apple_id; fall back to email for linking.
+                # We query on email only if we actually have one (first-auth),
+                # otherwise the OR branch would match NULL = NULL (never).
+                if token_email:
+                    cur.execute(
+                        """
+                        SELECT id, email, display_name, apple_id
+                        FROM users
+                        WHERE apple_id = %s OR email = %s
+                        """,
+                        (apple_id, token_email),
+                    )
+                else:
+                    cur.execute(
+                        """
+                        SELECT id, email, display_name, apple_id
+                        FROM users
+                        WHERE apple_id = %s
+                        """,
+                        (apple_id,),
+                    )
+
+                user = cur.fetchone()
+
+                if user:
+                    user_id = user['id']
+                    if not user.get('apple_id'):
+                        # Linking an existing email/password or Google account.
+                        logger.info(f"🔗 Linking Apple account to existing user: {user.get('email')}")
+                        cur.execute(
+                            """
+                            UPDATE users
+                            SET apple_id = %s,
+                                email_verified = COALESCE(email_verified, %s),
+                                last_login_at = NOW(),
+                                updated_at = CURRENT_TIMESTAMP
+                            WHERE id = %s
+                            """,
+                            (apple_id, email_verified, user_id),
+                        )
+                    else:
+                        cur.execute(
+                            """
+                            UPDATE users
+                            SET last_login_at = NOW()
+                            WHERE id = %s
+                            """,
+                            (user_id,),
+                        )
+                    conn.commit()
+                else:
+                    # Brand-new user. On first auth we should have email; if
+                    # somehow we don't (private-relay edge cases), create
+                    # anyway — email can be recovered later if the user
+                    # re-signs-in with email scope granted.
+                    if not token_email:
+                        logger.warning(
+                            f"Creating Apple user without email for sub: {apple_id}"
+                        )
+                    logger.info(f"✨ Creating new user via Apple: {token_email or apple_id}")
+                    cur.execute(
+                        """
+                        INSERT INTO users (
+                            email, apple_id, display_name,
+                            email_verified, last_login_at
+                        )
+                        VALUES (%s, %s, %s, %s, NOW())
+                        RETURNING id
+                        """,
+                        (
+                            token_email,
+                            apple_id,
+                            client_full_name,
+                            email_verified,
+                        ),
+                    )
+                    user_id = cur.fetchone()['id']
+                    conn.commit()
+
+                # Issue our own tokens (identical to Google flow)
+                access_token = generate_access_token(user_id)
+                refresh_token = generate_refresh_token(user_id)
+
+                cur.execute(
+                    """
+                    INSERT INTO refresh_tokens (user_id, token, expires_at)
+                    VALUES (%s, %s, NOW() + INTERVAL '30 days')
+                    """,
+                    (user_id, refresh_token),
+                )
+                conn.commit()
+
+                cur.execute(
+                    """
+                    SELECT id, email, display_name, profile_image_url, email_verified
+                    FROM users WHERE id = %s
+                    """,
+                    (user_id,),
+                )
+                user_data = cur.fetchone()
+
+                logger.info(f"✅ Apple login successful for: {user_data.get('email') or apple_id}")
+
+                return jsonify({
+                    'user': {
+                        'id': str(user_data['id']),
+                        'email': user_data['email'],
+                        'display_name': user_data['display_name'],
+                        'profile_image_url': user_data.get('profile_image_url'),
+                        'email_verified': user_data.get('email_verified', False),
+                    },
+                    'access_token': access_token,
+                    'refresh_token': refresh_token,
+                }), 200
+
+    except Exception as e:
+        logger.error(f"Apple login error: {e}", exc_info=True)
+        return jsonify({'error': 'Authentication failed'}), 500

@@ -57,6 +57,7 @@ logger = logging.getLogger(__name__)
 LOGIN_LIMIT = "10 per minute"
 REGISTER_LIMIT = "5 per hour"
 GOOGLE_LOGIN_LIMIT = "10 per minute"
+APPLE_LOGIN_LIMIT = "10 per minute"
 REFRESH_TOKEN_LIMIT = "30 per minute"
 FORGOT_PASSWORD_LIMIT = "3 per hour"
 RESET_PASSWORD_LIMIT = "10 per hour"
