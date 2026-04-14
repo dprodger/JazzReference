@@ -227,14 +227,19 @@ class CoverArtArchiveClient:
                     logger.debug(f"No cover art found (404): {url}")
                     return response
                 
-                # Rate limited - back off
-                if response.status_code == 503:
+                # Retry transient server errors (5xx) and rate-limit (429)
+                # with exponential backoff. CAA occasionally returns 500 during
+                # upstream outages; these are almost always transient.
+                if response.status_code >= 500 or response.status_code == 429:
                     delay = self.base_delay * (2 ** attempt)
-                    logger.warning(f"Rate limited (503), retrying in {delay}s...")
+                    logger.warning(
+                        f"Transient status {response.status_code} for {url}, "
+                        f"retrying in {delay}s..."
+                    )
                     time.sleep(delay)
                     continue
-                
-                # Other error
+
+                # Other error (4xx other than 404/429) — don't retry
                 logger.warning(f"Unexpected status {response.status_code} for {url}")
                 return response
                 
