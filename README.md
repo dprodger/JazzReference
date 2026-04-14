@@ -1,2 +1,3 @@
-# JazzReference
-reference app for Jazz Music study
+# ApproachNote
+reference app for the study of Jazz Music
+
