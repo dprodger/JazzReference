@@ -841,7 +841,7 @@ def fetch_artwork_for_track(service: str, track_id: str) -> dict:
     """
     try:
         if service == 'spotify':
-            from spotify_matcher import SpotifyMatcher
+            from integrations.spotify.matcher import SpotifyMatcher
             matcher = SpotifyMatcher()
             track_details = matcher.get_track_details(track_id)
             if track_details and 'album' in track_details:
@@ -857,7 +857,7 @@ def fetch_artwork_for_track(service: str, track_id: str) -> dict:
                         artwork['small'] = image['url']
                 return artwork
         else:  # apple_music
-            from apple_music_client import AppleMusicClient
+            from integrations.apple_music.client import AppleMusicClient
             client = AppleMusicClient()
             track_details = client.lookup_track(track_id)
             if track_details and 'artwork' in track_details:

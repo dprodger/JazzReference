@@ -23,8 +23,8 @@ import time
 from pathlib import Path
 from script_base import ScriptBase, run_script
 from db_utils import get_db_connection
-from mb_utils import MusicBrainzSearcher
-from cache_utils import get_cache_dir
+from integrations.musicbrainz.utils import MusicBrainzSearcher
+from core.cache_utils import get_cache_dir
 
 
 def extract_artists_from_release_cache():

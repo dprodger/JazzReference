@@ -18,7 +18,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # Local imports
 from db_utils import get_db_connection
-from wiki_utils import WikipediaSearcher
+from integrations.wikipedia.utils import WikipediaSearcher
 
 # Configure logging
 logging.basicConfig(

@@ -18,10 +18,10 @@ import json
 import logging
 
 from db_utils import get_db_connection
-from mb_release_importer import MBReleaseImporter
-from mb_performer_importer import PerformerImporter
-from mb_utils import MusicBrainzSearcher
-from spotify_db import is_track_manual_override
+from integrations.musicbrainz.release_importer import MBReleaseImporter
+from integrations.musicbrainz.performer_importer import PerformerImporter
+from integrations.musicbrainz.utils import MusicBrainzSearcher
+from integrations.spotify.db import is_track_manual_override
 
 logger = logging.getLogger(__name__)
 
@@ -1787,7 +1787,7 @@ def apple_matches_review(song_id):
 def run_apple_matcher_for_song(song_id):
     """Run the Apple Music matcher for a specific song."""
     try:
-        from apple_music_matcher import AppleMusicMatcher
+        from integrations.apple_music.matcher import AppleMusicMatcher
 
         with get_db_connection() as db:
             with db.cursor() as cur:
@@ -1863,7 +1863,7 @@ def diagnose_apple_match(song_id):
 
         # Try iTunes API first (returns English names, more reliable for comparison)
         try:
-            from apple_music_client import AppleMusicClient
+            from integrations.apple_music.client import AppleMusicClient
             client = AppleMusicClient()
 
             album_data = client.lookup_album(album_id)
@@ -1906,7 +1906,7 @@ def diagnose_apple_match(song_id):
         # If iTunes API failed, try local catalog as fallback
         if not diagnosis['apple_music_data']:
             try:
-                from apple_music_feed import AppleMusicCatalog
+                from integrations.apple_music.feed import AppleMusicCatalog
                 catalog = AppleMusicCatalog()
 
                 album_data = catalog.get_album_by_id(album_id)
@@ -1977,7 +1977,7 @@ def diagnose_apple_match(song_id):
 
         # Compare if we have both
         if diagnosis['apple_music_data'] and diagnosis['our_release']:
-            from spotify_matching import normalize_for_comparison, is_substring_title_match
+            from integrations.spotify.matching import normalize_for_comparison, is_substring_title_match
 
             am = diagnosis['apple_music_data']
             our = diagnosis['our_release']

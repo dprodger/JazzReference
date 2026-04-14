@@ -15,7 +15,7 @@ import hashlib
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from cache_utils import get_cache_dir
+from core.cache_utils import get_cache_dir
 
 logger = logging.getLogger(__name__)
 

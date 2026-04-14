@@ -26,8 +26,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from db_utils import get_db_connection
-from mb_performer_importer import normalize_group_name, is_performer_leader_of_group
-from cache_utils import get_cache_dir
+from integrations.musicbrainz.performer_importer import normalize_group_name, is_performer_leader_of_group
+from core.cache_utils import get_cache_dir
 
 def get_expected_leader_name(recording_data):
     """

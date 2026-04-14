@@ -21,9 +21,8 @@ os.environ['DB_USE_POOLING'] = 'true'
 
 # Import database tools
 import db_utils as db_tools
-import research_queue
-import song_research
-
+from core import research_queue
+from core import song_research
 logger = configure_logging()
 
 # Create Flask app

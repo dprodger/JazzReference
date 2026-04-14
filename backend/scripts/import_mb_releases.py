@@ -7,7 +7,7 @@ into the database. Creates recordings, releases, and links performers to recordi
 """
 
 from script_base import ScriptBase, run_script
-from mb_release_importer import MBReleaseImporter
+from integrations.musicbrainz.release_importer import MBReleaseImporter
 
 
 def main() -> bool:

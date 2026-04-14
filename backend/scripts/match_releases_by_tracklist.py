@@ -43,15 +43,15 @@ os.environ['DB_USE_POOLING'] = 'true'
 
 from script_base import ScriptBase, run_script
 from db_utils import get_db_connection
-from spotify_client import SpotifyClient, _CACHE_MISS
+from integrations.spotify.client import SpotifyClient, _CACHE_MISS
 from rapidfuzz import fuzz
-from spotify_matching import calculate_similarity, normalize_for_comparison
-from spotify_db import (
+from integrations.spotify.matching import calculate_similarity, normalize_for_comparison
+from integrations.spotify.db import (
     update_release_spotify_data,
     update_recording_default_release,
     update_recording_release_track_id
 )
-from mb_utils import MusicBrainzSearcher
+from integrations.musicbrainz.utils import MusicBrainzSearcher
 from dotenv import load_dotenv
 
 load_dotenv()

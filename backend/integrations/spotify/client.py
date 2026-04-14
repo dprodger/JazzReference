@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import Any, Optional
 import requests
 
-from cache_utils import get_cache_dir
+from core.cache_utils import get_cache_dir
 
 logger = logging.getLogger(__name__)
 

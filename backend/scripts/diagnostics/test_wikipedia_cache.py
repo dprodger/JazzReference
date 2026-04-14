@@ -11,7 +11,7 @@ import time
 from pathlib import Path
 
 # Add parent directory to path if needed
-from wiki_utils import WikipediaSearcher
+from integrations.wikipedia.utils import WikipediaSearcher
 
 # Configure logging
 logging.basicConfig(

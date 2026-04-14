@@ -26,8 +26,8 @@ from script_base import ScriptBase, run_script
 
 # Now we can import our modules
 from db_utils import get_db_connection
-from apple_music_client import AppleMusicClient
-from apple_music_db import upsert_release_imagery
+from integrations.apple_music.client import AppleMusicClient
+from integrations.apple_music.db import upsert_release_imagery
 
 
 def get_releases_missing_artwork(limit: int = None):

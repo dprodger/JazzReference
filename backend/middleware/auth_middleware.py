@@ -14,7 +14,7 @@ import os
 # Add parent directory to path to import auth_utils
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from auth_utils import decode_token
+from core.auth_utils import decode_token
 from db_utils import get_db_connection
 
 

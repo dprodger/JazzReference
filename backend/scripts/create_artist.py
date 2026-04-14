@@ -12,8 +12,8 @@ import json
 # Local imports
 from db_utils import get_db_connection
 from db_utils import normalize_apostrophes
-from wiki_utils import WikipediaSearcher
-from mb_utils import MusicBrainzSearcher
+from integrations.wikipedia.utils import WikipediaSearcher
+from integrations.musicbrainz.utils import MusicBrainzSearcher
 
 # Configure logging
 logging.basicConfig(

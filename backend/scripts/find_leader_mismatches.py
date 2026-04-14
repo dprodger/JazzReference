@@ -26,7 +26,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 import db_utils as db
-from mb_performer_importer import normalize_group_name
+from integrations.musicbrainz.performer_importer import normalize_group_name
 
 def find_potential_mismatches():
     """

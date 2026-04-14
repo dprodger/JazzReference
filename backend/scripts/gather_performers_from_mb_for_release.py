@@ -16,7 +16,7 @@ import requests
 # Import shared database utilities
 sys.path.insert(0, '/mnt/project/scripts')
 from db_utils import get_db_connection
-from mb_performer_importer import PerformerImporter
+from integrations.musicbrainz.performer_importer import PerformerImporter
 
 # Configure logging
 logging.basicConfig(

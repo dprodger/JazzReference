@@ -26,7 +26,7 @@ load_dotenv()
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from mb_utils import MusicBrainzSearcher
+from integrations.musicbrainz.utils import MusicBrainzSearcher
 
 # Configure logging
 logging.basicConfig(

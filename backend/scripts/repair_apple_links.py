@@ -28,9 +28,9 @@ from script_base import ScriptBase, run_script
 
 # Now we can import our modules
 from db_utils import get_db_connection
-from apple_music_client import AppleMusicClient, build_apple_music_album_url
-from apple_music_db import upsert_release_imagery, upsert_release_streaming_link
-from spotify_matching import (
+from integrations.apple_music.client import AppleMusicClient, build_apple_music_album_url
+from integrations.apple_music.db import upsert_release_imagery, upsert_release_streaming_link
+from integrations.spotify.matching import (
     normalize_for_comparison,
     calculate_similarity,
     strip_ensemble_suffix,

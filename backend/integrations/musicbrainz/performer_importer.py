@@ -19,7 +19,7 @@ import re
 from datetime import datetime
 from pathlib import Path
 from db_utils import get_db_connection
-from mb_utils import MusicBrainzSearcher
+from integrations.musicbrainz.utils import MusicBrainzSearcher
 
 
 def normalize_group_name(group_name):

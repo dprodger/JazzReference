@@ -13,7 +13,7 @@ import re
 from datetime import datetime
 from pathlib import Path
 
-from cache_utils import get_cache_dir
+from core.cache_utils import get_cache_dir
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +36,7 @@ import re
 from datetime import datetime
 from pathlib import Path
 
-from cache_utils import get_cache_dir
+from core.cache_utils import get_cache_dir
 
 logger = logging.getLogger(__name__)
 

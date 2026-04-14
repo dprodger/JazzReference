@@ -12,13 +12,12 @@ import logging
 import os
 from typing import Dict, Any
 
-from mb_release_importer import MBReleaseImporter
-from spotify_utils import SpotifyMatcher
-from apple_music_matcher import AppleMusicMatcher
+from integrations.musicbrainz.release_importer import MBReleaseImporter
+from integrations.spotify.utils import SpotifyMatcher
+from integrations.apple_music.matcher import AppleMusicMatcher
 from db_utils import get_db_connection
-from mb_utils import MusicBrainzSearcher, update_song_composer, update_song_wikipedia_url, update_song_composed_year
-import research_queue
-
+from integrations.musicbrainz.utils import MusicBrainzSearcher, update_song_composer, update_song_wikipedia_url, update_song_composed_year
+from core import research_queue
 logger = logging.getLogger(__name__)
 
 # Apple Music matching uses MotherDuck catalog (no rate limits)

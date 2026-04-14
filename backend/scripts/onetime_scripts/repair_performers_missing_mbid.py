@@ -39,7 +39,7 @@ from datetime import datetime
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from db_utils import get_db_connection
-from mb_utils import MusicBrainzSearcher
+from integrations.musicbrainz.utils import MusicBrainzSearcher
 
 # Configure logging
 LOG_DIR = Path(__file__).parent / 'log'

@@ -166,7 +166,7 @@ def main():
         return
 
     # Import matcher here (after arg parsing, so --help is fast)
-    from spotify_matcher import SpotifyMatcher
+    from integrations.spotify.matcher import SpotifyMatcher
 
     logger.info("")
     logger.info("=" * 70)

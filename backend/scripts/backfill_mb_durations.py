@@ -20,7 +20,7 @@ from pathlib import Path
 
 from script_base import ScriptBase, run_script
 from db_utils import get_db_connection
-from cache_utils import get_cache_dir
+from core.cache_utils import get_cache_dir
 
 
 def main():
@@ -161,7 +161,7 @@ Examples:
     if not args.cache_only and remaining_mb_ids:
         script.logger.info(f"Phase 2: Fetching {len(remaining_mb_ids)} recordings from MusicBrainz API...")
 
-        from mb_utils import MusicBrainzSearcher
+        from integrations.musicbrainz.utils import MusicBrainzSearcher
         mb_searcher = MusicBrainzSearcher(force_refresh=True)
 
         batch = []

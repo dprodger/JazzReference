@@ -40,8 +40,8 @@ from typing import List, Dict, Any, Optional
 
 from script_base import ScriptBase, run_script
 from db_utils import get_db_connection
-from caa_utils import CoverArtArchiveClient, CoverArtArchiveError
-from caa_release_importer import save_release_imagery
+from integrations.coverart.utils import CoverArtArchiveClient, CoverArtArchiveError
+from integrations.coverart.release_importer import save_release_imagery
 
 
 def _fetch_candidates(since_days: Optional[int], limit: Optional[int]) -> List[Dict[str, Any]]:

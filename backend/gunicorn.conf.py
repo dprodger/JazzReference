@@ -33,9 +33,8 @@ def post_worker_init(worker):
     
     try:
         # Import modules here (in worker process)
-        import research_queue
-        import song_research
-        
+        from core import research_queue
+        from core import song_research
         # Start the worker thread
         if not research_queue._worker_running:
             research_queue.start_worker(song_research.research_song)
@@ -55,7 +54,7 @@ def worker_exit(server, worker):
     logger.info(f"Worker {worker.pid} exiting - stopping research worker")
     
     try:
-        import research_queue
+        from core import research_queue
         research_queue.stop_worker()
     except Exception as e:
         logger.error(f"Error stopping research worker: {e}")

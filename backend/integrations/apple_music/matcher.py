@@ -26,7 +26,7 @@ from typing import Dict, Any, Optional, List
 from db_utils import get_db_connection
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 
-from apple_music_client import (
+from integrations.apple_music.client import (
     AppleMusicClient,
     AppleMusicRateLimitError,
     _CACHE_MISS,
@@ -34,7 +34,7 @@ from apple_music_client import (
     build_apple_music_track_url,
     SERVICE_NAME,
 )
-from apple_music_db import (
+from integrations.apple_music.db import (
     find_song_by_name,
     find_song_by_id,
     get_releases_for_song,
@@ -47,14 +47,14 @@ from apple_music_db import (
 
 # Optional: Apple Music Feed catalog (much faster, no rate limits)
 try:
-    from apple_music_feed import AppleMusicCatalog, PYARROW_AVAILABLE
+    from integrations.apple_music.feed import AppleMusicCatalog, PYARROW_AVAILABLE
     FEED_AVAILABLE = PYARROW_AVAILABLE
 except ImportError:
     FEED_AVAILABLE = False
     AppleMusicCatalog = None
 
 # Reuse matching utilities from Spotify - they're service-agnostic
-from spotify_matching import (
+from integrations.spotify.matching import (
     strip_ensemble_suffix,
     strip_live_suffix,
     normalize_for_comparison,

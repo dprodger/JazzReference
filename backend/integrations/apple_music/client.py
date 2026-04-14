@@ -24,7 +24,7 @@ from typing import Any, Optional, Dict, List
 from urllib.parse import quote_plus
 import requests
 
-from cache_utils import get_cache_dir
+from core.cache_utils import get_cache_dir
 
 logger = logging.getLogger(__name__)
 

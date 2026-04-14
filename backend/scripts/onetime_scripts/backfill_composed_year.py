@@ -20,7 +20,7 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from db_utils import get_db_connection
-from mb_utils import MusicBrainzSearcher
+from integrations.musicbrainz.utils import MusicBrainzSearcher
 
 logging.basicConfig(
     level=logging.INFO,

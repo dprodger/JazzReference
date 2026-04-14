@@ -5,8 +5,8 @@ Matches Spotify albums to existing releases and updates the database
 """
 
 from script_base import ScriptBase, run_script
-from spotify_utils import SpotifyMatcher
-from spotify_db import get_songs_with_duration_mismatches
+from integrations.spotify.utils import SpotifyMatcher
+from integrations.spotify.db import get_songs_with_duration_mismatches
 from dotenv import load_dotenv
 
 load_dotenv()

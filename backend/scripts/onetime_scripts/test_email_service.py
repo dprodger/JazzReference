@@ -24,8 +24,8 @@ from dotenv import load_dotenv  # ADD THIS LINE
 load_dotenv()  # ADD THIS LINE
 
 
-import email_service
-from auth_utils import generate_reset_token
+from core import email_service
+from core.auth_utils import generate_reset_token
 
 # Configure logging
 logging.basicConfig(

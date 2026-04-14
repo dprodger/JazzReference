@@ -30,10 +30,10 @@ from datetime import datetime
 from typing import Optional, Dict, List, Any, Set, Tuple
 
 from db_utils import get_db_connection
-from mb_performer_importer import PerformerImporter
-from mb_utils import MusicBrainzSearcher
-from caa_utils import CoverArtArchiveClient
-from caa_release_importer import save_release_imagery
+from integrations.musicbrainz.performer_importer import PerformerImporter
+from integrations.musicbrainz.utils import MusicBrainzSearcher
+from integrations.coverart.utils import CoverArtArchiveClient
+from integrations.coverart.release_importer import save_release_imagery
 
 # Module-level logger for helper functions
 _logger = logging.getLogger(__name__)

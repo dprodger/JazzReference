@@ -19,7 +19,7 @@ Rate Limiting:
 
 from script_base import ScriptBase, run_script
 from db_utils import get_db_connection
-from spotify_client import SpotifyClient
+from integrations.spotify.client import SpotifyClient
 
 
 def main():

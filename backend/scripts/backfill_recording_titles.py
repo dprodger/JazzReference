@@ -19,7 +19,7 @@ Rate Limiting:
 
 from script_base import ScriptBase, run_script
 from db_utils import get_db_connection
-from mb_utils import MusicBrainzSearcher
+from integrations.musicbrainz.utils import MusicBrainzSearcher
 
 
 def main():

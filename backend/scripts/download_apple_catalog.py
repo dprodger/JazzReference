@@ -43,7 +43,7 @@ backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 load_dotenv(os.path.join(backend_dir, '.env'))
 
 from script_base import ScriptBase, run_script
-from apple_music_feed import (
+from integrations.apple_music.feed import (
     AppleMusicFeedClient,
     AppleMusicCatalog,
     is_feed_configured,

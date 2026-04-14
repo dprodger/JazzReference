@@ -28,7 +28,7 @@ from typing import Dict, List, Optional, Tuple
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from db_utils import get_db_connection
-from mb_utils import MusicBrainzSearcher
+from integrations.musicbrainz.utils import MusicBrainzSearcher
 
 # Ensure log directory exists
 (Path(__file__).parent / 'log').mkdir(exist_ok=True)

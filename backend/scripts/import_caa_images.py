@@ -7,7 +7,7 @@ them into the release_imagery table.
 """
 
 from script_base import ScriptBase, run_script
-from caa_release_importer import CAAImageImporter
+from integrations.coverart.release_importer import CAAImageImporter
 
 
 def main() -> bool:

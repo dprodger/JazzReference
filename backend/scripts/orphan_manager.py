@@ -27,9 +27,9 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 load_dotenv(Path(__file__).parent.parent / '.env')
 
 from db_utils import get_db_connection
-from mb_utils import MusicBrainzSearcher
-from spotify_matcher import SpotifyMatcher
-from spotify_matching import calculate_similarity, normalize_for_comparison
+from integrations.musicbrainz.utils import MusicBrainzSearcher
+from integrations.spotify.matcher import SpotifyMatcher
+from integrations.spotify.matching import calculate_similarity, normalize_for_comparison
 
 # Ensure log directory exists
 (Path(__file__).parent / 'log').mkdir(exist_ok=True)

@@ -16,7 +16,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # Import the core business logic
-from mb_utils import update_song_composer
+from integrations.musicbrainz.utils import update_song_composer
 from db_utils import find_song_by_name_or_id
 
 # Configure logging for CLI

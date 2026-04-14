@@ -28,8 +28,8 @@ import requests
 
 from db_utils import get_db_connection
 
-from spotify_client import SpotifyClient, SpotifyRateLimitError, _CACHE_MISS
-from spotify_matching import (
+from integrations.spotify.client import SpotifyClient, SpotifyRateLimitError, _CACHE_MISS
+from integrations.spotify.matching import (
     strip_ensemble_suffix,
     strip_live_suffix,
     normalize_for_comparison,
@@ -40,7 +40,7 @@ from spotify_matching import (
     validate_track_match,
     validate_album_match,
 )
-from spotify_db import (
+from integrations.spotify.db import (
     find_song_by_name,
     find_song_by_id,
     get_recordings_for_song,
@@ -1449,8 +1449,8 @@ class SpotifyMatcher:
             Dict with mb_track_count, spotify_track_count, matched_count,
             match_ratio, and matched_titles (list of (mb_title, sp_title, similarity)).
         """
-        from mb_utils import MusicBrainzSearcher
-        from spotify_matching import normalize_for_comparison
+        from integrations.musicbrainz.utils import MusicBrainzSearcher
+        from integrations.spotify.matching import normalize_for_comparison
         from rapidfuzz import fuzz
 
         result = {
@@ -1634,7 +1634,7 @@ class SpotifyMatcher:
         # Build set of blocked track IDs for this song (more efficient than per-track DB calls)
         blocked_track_ids = set()
         if song_id:
-            from spotify_db import get_blocked_tracks_for_song
+            from integrations.spotify.db import get_blocked_tracks_for_song
             blocked_track_ids = set(get_blocked_tracks_for_song(song_id, conn=conn))
             if blocked_track_ids:
                 self.logger.debug(f"      Found {len(blocked_track_ids)} blocked track(s) for this song")

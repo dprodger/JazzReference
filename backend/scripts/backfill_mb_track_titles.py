@@ -17,7 +17,7 @@ Usage:
 
 from script_base import ScriptBase, run_script
 from db_utils import get_db_connection
-from mb_utils import MusicBrainzSearcher
+from integrations.musicbrainz.utils import MusicBrainzSearcher
 
 
 BATCH_SIZE = 500  # Flush DB updates every N releases

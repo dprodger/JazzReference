@@ -15,8 +15,8 @@ Run after applying migration 001_add_recording_date_tracking.sql
 """
 
 from script_base import ScriptBase, run_script
-from mb_release_importer import extract_recording_date_from_mb
-from mb_utils import MusicBrainzSearcher
+from integrations.musicbrainz.release_importer import extract_recording_date_from_mb
+from integrations.musicbrainz.utils import MusicBrainzSearcher
 from db_utils import get_db_connection, find_song_by_name_or_id
 
 

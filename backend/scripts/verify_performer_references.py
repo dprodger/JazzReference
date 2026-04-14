@@ -28,7 +28,7 @@ import requests
 
 
 # Local imports
-from wiki_utils import WikipediaSearcher
+from integrations.wikipedia.utils import WikipediaSearcher
 from db_utils import get_db_connection
 
 # Configure logging

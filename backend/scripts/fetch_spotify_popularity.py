@@ -24,7 +24,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from db_utils import get_db_connection
-from spotify_matcher import SpotifyMatcher
+from integrations.spotify.matcher import SpotifyMatcher
 
 logging.basicConfig(
     level=logging.INFO,

@@ -2,8 +2,7 @@
 from flask import Blueprint, jsonify, request
 import logging
 import db_utils as db_tools
-import research_queue
-
+from core import research_queue
 logger = logging.getLogger(__name__)
 research_bp = Blueprint('research', __name__)
 

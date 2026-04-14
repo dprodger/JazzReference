@@ -38,34 +38,42 @@ Open `apps/Approach Note.xcodeproj` in Xcode. The app targets iOS and macOS, usi
 
 ```
 backend/
-├── app.py              # Flask app entry point, blueprint registration
-├── config.py           # Logging and app configuration
-├── db_utils.py         # PostgreSQL connection pooling (psycopg3)
-├── routes/             # API route blueprints
-│   ├── songs.py        # /api/songs endpoints
-│   ├── recordings.py   # /api/recordings endpoints
-│   ├── performers.py   # /api/performers endpoints
-│   ├── repertoires.py  # /api/repertoires (auth-protected)
+├── app.py                      # Flask app entry point, blueprint registration
+├── config.py                   # Logging and app configuration
+├── db_utils.py                 # PostgreSQL connection pooling (psycopg3)
+├── rate_limit.py               # Rate-limiting helpers
+├── monitor.py                  # Process/health monitoring utilities
+├── routes/                     # API route blueprints
+│   ├── songs.py                # /api/songs endpoints
+│   ├── recordings.py           # /api/recordings endpoints
+│   ├── performers.py           # /api/performers endpoints
+│   ├── repertoires.py          # /api/repertoires (auth-protected)
 │   ├── transcriptions.py
-│   ├── auth.py         # JWT authentication
-│   ├── password.py     # Password reset flow
+│   ├── auth.py                 # JWT authentication
+│   ├── password.py             # Password reset flow
 │   └── ...
-├── research_queue.py   # Background worker queue for data enrichment
-├── song_research.py    # Orchestrates MusicBrainz + Spotify + Apple Music imports
-├── mb_*.py             # MusicBrainz API utilities and importers
-├── spotify_*.py        # Spotify API utilities and matching
-├── apple_music_*.py    # Apple Music API/Feed utilities and matching
-├── caa_*.py            # Cover Art Archive utilities
-├── wiki_utils.py       # Wikipedia data extraction
-└── scripts/            # Data import/maintenance scripts
+├── core/                       # Cross-cutting modules
+│   ├── research_queue.py       # Background worker queue for data enrichment
+│   ├── song_research.py        # Orchestrates MusicBrainz + Spotify + Apple Music imports
+│   ├── auth_utils.py           # JWT auth helpers (@token_required decorator)
+│   ├── email_service.py        # Password-reset email delivery
+│   └── cache_utils.py          # Shared caching helpers
+├── integrations/               # Per-source API clients and importers
+│   ├── spotify/                # client, matcher, matching, db, utils
+│   ├── apple_music/            # client, matcher, feed, db
+│   ├── musicbrainz/            # utils, release_importer, performer_importer
+│   ├── coverart/               # Cover Art Archive: release_importer, utils
+│   └── wikipedia/              # utils
+└── scripts/                    # Data import/maintenance scripts
 ```
 
 ### Key Backend Patterns
 
 - **Blueprint Registration**: All routes in `routes/__init__.py` via `register_blueprints()`
 - **Connection Pooling**: Uses psycopg3 connection pool; set `DB_USE_POOLING=true` before importing `db_utils`
-- **Background Worker**: `research_queue` runs in-process thread for async data enrichment
-- **JWT Auth**: `auth_utils.py` provides `@token_required` decorator for protected endpoints
+- **Background Worker**: `core.research_queue` runs in-process thread for async data enrichment
+- **JWT Auth**: `core.auth_utils` provides `@token_required` decorator for protected endpoints
+- **Import paths**: Modules are imported as `from integrations.spotify import matcher` / `from core import research_queue`. `backend/` itself is not a package; `backend/scripts/script_base.py` adds it to `sys.path` so both `core.*` and `integrations.*` resolve.
 
 ### Apps Structure
 

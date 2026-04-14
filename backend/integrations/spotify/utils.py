@@ -28,11 +28,11 @@ REFACTORED: This module is now a facade that re-exports from:
 """
 
 # Re-export main class and exception
-from spotify_matcher import SpotifyMatcher
-from spotify_client import SpotifyRateLimitError
+from integrations.spotify.matcher import SpotifyMatcher
+from integrations.spotify.client import SpotifyRateLimitError
 
 # Re-export commonly used utilities
-from spotify_matching import (
+from integrations.spotify.matching import (
     ENSEMBLE_SUFFIXES,
     strip_ensemble_suffix,
     normalize_for_comparison,
@@ -42,7 +42,7 @@ from spotify_matching import (
 )
 
 # For any code that imports the _CACHE_MISS sentinel
-from spotify_client import _CACHE_MISS
+from integrations.spotify.client import _CACHE_MISS
 
 __all__ = [
     'SpotifyMatcher',

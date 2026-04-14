@@ -21,7 +21,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 os.environ['DB_USE_POOLING'] = 'true'
 from db_utils import get_db_connection
-from spotify_matching import strip_live_suffix
+from integrations.spotify.matching import strip_live_suffix
 
 
 def get_cache_filename(song_title, album_title, artist_name, year=None):

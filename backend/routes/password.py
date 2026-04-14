@@ -17,9 +17,9 @@ from datetime import datetime, timedelta, timezone
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from db_utils import get_db_connection
-from auth_utils import hash_password, verify_password, generate_reset_token
+from core.auth_utils import hash_password, verify_password, generate_reset_token
 from middleware.auth_middleware import require_auth
-from email_service import send_password_reset_email
+from core.email_service import send_password_reset_email
 from rate_limit import (
     limiter,
     FORGOT_PASSWORD_LIMIT,

@@ -16,7 +16,7 @@ import requests
 from db_utils import get_db_connection
 from db_utils import normalize_apostrophes
 
-from mb_utils import MusicBrainzSearcher
+from integrations.musicbrainz.utils import MusicBrainzSearcher
 
 # Configure logging
 logging.basicConfig(

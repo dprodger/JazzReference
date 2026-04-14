@@ -6,8 +6,8 @@ MusicBrainz API routes for searching and importing works
 from flask import Blueprint, jsonify, request, g
 import logging
 import db_utils as db_tools
-import research_queue
-from mb_utils import MusicBrainzSearcher
+from core import research_queue
+from integrations.musicbrainz.utils import MusicBrainzSearcher
 from middleware.auth_middleware import require_auth
 
 logger = logging.getLogger(__name__)

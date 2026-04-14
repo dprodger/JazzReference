@@ -57,8 +57,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from db_utils import get_db_connection
-from spotify_matcher import SpotifyMatcher
-from spotify_matching import calculate_similarity, normalize_for_comparison
+from integrations.spotify.matcher import SpotifyMatcher
+from integrations.spotify.matching import calculate_similarity, normalize_for_comparison
 
 logging.basicConfig(
     level=logging.INFO,

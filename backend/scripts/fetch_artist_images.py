@@ -47,7 +47,7 @@ from db_utils import (
 )
 
 # Import Wikipedia utilities with caching
-from wiki_utils import WikipediaSearcher
+from integrations.wikipedia.utils import WikipediaSearcher
 
 # Configure logging
 logging.basicConfig(

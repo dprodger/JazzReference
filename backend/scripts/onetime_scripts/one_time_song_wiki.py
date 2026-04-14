@@ -17,7 +17,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from db_utils import get_db_connection
-from mb_utils import MusicBrainzSearcher, update_song_wikipedia_url
+from integrations.musicbrainz.utils import MusicBrainzSearcher, update_song_wikipedia_url
 
 # Configure logging
 logging.basicConfig(

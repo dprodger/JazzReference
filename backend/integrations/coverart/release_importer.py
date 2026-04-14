@@ -23,7 +23,7 @@ from datetime import datetime
 from typing import Optional, Dict, List, Any, Set
 
 from db_utils import get_db_connection
-from caa_utils import CoverArtArchiveClient
+from integrations.coverart.utils import CoverArtArchiveClient
 
 # Module-level logger for shared functions
 _logger = logging.getLogger(__name__)
