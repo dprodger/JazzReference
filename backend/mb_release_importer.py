@@ -756,7 +756,7 @@ class MBReleaseImporter:
                     is_canonical, musicbrainz_id, source_mb_work_id, title, duration_ms
                 )
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                ON CONFLICT (musicbrainz_id, song_id) DO UPDATE
+                ON CONFLICT (musicbrainz_id, song_id) WHERE musicbrainz_id IS NOT NULL DO UPDATE
                     SET updated_at = CURRENT_TIMESTAMP
                 RETURNING id, (xmax = 0) AS inserted
             """, (
@@ -1053,7 +1053,7 @@ class MBReleaseImporter:
                     is_canonical, musicbrainz_id, source_mb_work_id
                 )
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-                ON CONFLICT (musicbrainz_id, song_id) DO UPDATE
+                ON CONFLICT (musicbrainz_id, song_id) WHERE musicbrainz_id IS NOT NULL DO UPDATE
                     SET updated_at = CURRENT_TIMESTAMP
                 RETURNING id, (xmax = 0) AS inserted
             """, (
