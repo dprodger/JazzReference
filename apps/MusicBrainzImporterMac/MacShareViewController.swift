@@ -1051,7 +1051,7 @@ class MacShareViewController: NSViewController {
 
         if let runningApp = runningApps.first {
             NSLog("📱 App is already running, activating existing instance")
-            runningApp.activate(options: [.activateIgnoringOtherApps])
+            runningApp.activate()
 
             // Open the URL to trigger the deep link handler
             let configuration = NSWorkspace.OpenConfiguration()
