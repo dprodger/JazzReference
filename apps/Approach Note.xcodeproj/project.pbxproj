@@ -9,6 +9,11 @@
 /* Begin PBXBuildFile section */
 		B400E2022F1D9C69004B7557 /* SharedDataManagers.swift in Sources */ = {isa = PBXBuildFile; fileRef = B400E2002F1D9C69004B7557 /* SharedDataManagers.swift */; };
 		B41016D52F34D2960002828A /* MacResearchStatusBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = B41016D42F34D2960002828A /* MacResearchStatusBanner.swift */; };
+		B4108A022F46D5000002828A /* RecordingCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4108A012F46D5000002828A /* RecordingCard.swift */; };
+		B4108A042F46D5000002828A /* FeaturedRecordingCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4108A032F46D5000002828A /* FeaturedRecordingCard.swift */; };
+		B4108A062F46D5000002828A /* TranscriptionRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4108A052F46D5000002828A /* TranscriptionRow.swift */; };
+		B4108A082F46D5000002828A /* BackingTrackRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4108A072F46D5000002828A /* BackingTrackRow.swift */; };
+		B4108A0A2F46D5000002828A /* StreamingButtons.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4108A092F46D5000002828A /* StreamingButtons.swift */; };
 		B41D0FAE2EE633EE00DB427C /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B41D0FA22EE633EE00DB427C /* Assets.xcassets */; };
 		B41D0FB02EE633EE00DB427C /* JazzReferenceMacApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B41D0FA62EE633EE00DB427C /* JazzReferenceMacApp.swift */; };
 		B41D0FB12EE633EE00DB427C /* PerformerDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B41D0FA82EE633EE00DB427C /* PerformerDetailView.swift */; };
@@ -103,6 +108,11 @@
 /* Begin PBXFileReference section */
 		B400E2002F1D9C69004B7557 /* SharedDataManagers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedDataManagers.swift; sourceTree = "<group>"; };
 		B41016D42F34D2960002828A /* MacResearchStatusBanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacResearchStatusBanner.swift; sourceTree = "<group>"; };
+		B4108A012F46D5000002828A /* RecordingCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingCard.swift; sourceTree = "<group>"; };
+		B4108A032F46D5000002828A /* FeaturedRecordingCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeaturedRecordingCard.swift; sourceTree = "<group>"; };
+		B4108A052F46D5000002828A /* TranscriptionRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptionRow.swift; sourceTree = "<group>"; };
+		B4108A072F46D5000002828A /* BackingTrackRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackingTrackRow.swift; sourceTree = "<group>"; };
+		B4108A092F46D5000002828A /* StreamingButtons.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamingButtons.swift; sourceTree = "<group>"; };
 		B41D0F972EE6337400DB427C /* Approach Note.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Approach Note.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		B41D0FA22EE633EE00DB427C /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Assets.xcassets; path = Mac/Assets.xcassets; sourceTree = "<group>"; };
 		B41D0FA32EE633EE00DB427C /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -330,9 +340,14 @@
 		B47FCC1E2F16C937006281D7 /* Components */ = {
 			isa = PBXGroup;
 			children = (
+				B4108A072F46D5000002828A /* BackingTrackRow.swift */,
+				B4108A032F46D5000002828A /* FeaturedRecordingCard.swift */,
 				B41016D42F34D2960002828A /* MacResearchStatusBanner.swift */,
 				B47FCC1C2F16C937006281D7 /* MacCommunityDataSection.swift */,
 				B47FCC1D2F16C937006281D7 /* MacRecordingContributionEditView.swift */,
+				B4108A012F46D5000002828A /* RecordingCard.swift */,
+				B4108A092F46D5000002828A /* StreamingButtons.swift */,
+				B4108A052F46D5000002828A /* TranscriptionRow.swift */,
 			);
 			name = Components;
 			path = ../Components;
@@ -643,6 +658,11 @@
 				B400E2022F1D9C69004B7557 /* SharedDataManagers.swift in Sources */,
 				B45A16B02F08876C00259452 /* MacAddToRepertoireSheet.swift in Sources */,
 				B41016D52F34D2960002828A /* MacResearchStatusBanner.swift in Sources */,
+				B4108A022F46D5000002828A /* RecordingCard.swift in Sources */,
+				B4108A042F46D5000002828A /* FeaturedRecordingCard.swift in Sources */,
+				B4108A062F46D5000002828A /* TranscriptionRow.swift in Sources */,
+				B4108A082F46D5000002828A /* BackingTrackRow.swift in Sources */,
+				B4108A0A2F46D5000002828A /* StreamingButtons.swift in Sources */,
 				B4201ACB2F19551400CEA2CF /* CommunitySettingsView.swift in Sources */,
 				B4C4EF572F3133D7000B5EF8 /* MacAddStreamingLinkSheet.swift in Sources */,
 				B45A16B12F08876C00259452 /* MacCreateRepertoireView.swift in Sources */,
