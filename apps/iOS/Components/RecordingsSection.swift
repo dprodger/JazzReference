@@ -256,162 +256,24 @@ struct RecordingsSection: View {
     }
 
     // MARK: - Computed Properties
-    
-    // Extract unique instrument families from recordings
+    // Filtering and grouping logic lives in Shared/Support/RecordingGrouping.swift
+    // so iOS and Mac stay in sync. These wrappers let in-body call sites stay unchanged.
+
     private var availableInstruments: [InstrumentFamily] {
-        var families = Set<InstrumentFamily>()
-        for recording in recordings {
-            if let performers = recording.performers {
-                for performer in performers {
-                    if let instrument = performer.instrument,
-                       let family = InstrumentFamily.family(for: instrument) {
-                        families.insert(family)
-                    }
-                }
-            }
-        }
-        
-        return families.sorted { $0.rawValue < $1.rawValue }
+        RecordingGrouping.availableInstruments(in: recordings)
     }
-    
-    // Apply filters in order: first instrument family, then Spotify
+
     private var filteredRecordings: [Recording] {
-        var result = recordings
-        
-        // First, apply instrument family filter if selected
-        if let family = selectedInstrument {
-            result = result.filter { recording in
-                guard let performers = recording.performers else { return false }
-                return performers.contains { performer in
-                    guard let instrument = performer.instrument else { return false }
-                    return InstrumentFamily.family(for: instrument) == family
-                }
-            }
-        }
-
-        // Apply vocal/instrumental filter
-        switch selectedVocalFilter {
-        case .all:
-            break
-        case .instrumental:
-            result = result.filter { recording in
-                recording.communityData?.consensus.isInstrumental == true
-            }
-        case .vocal:
-            result = result.filter { recording in
-                recording.communityData?.consensus.isInstrumental == false
-            }
-        }
-
-        // Then, apply streaming service filter
-        switch selectedFilter {
-        case .all:
-            break
-        case .playable:
-            result = result.filter { $0.isPlayable }
-        case .withSpotify:
-            result = result.filter { $0.hasSpotifyAvailable }
-        case .withAppleMusic:
-            result = result.filter { $0.hasAppleMusicAvailable }
-        case .withYoutube:
-            result = result.filter { $0.hasYoutubeAvailable }
-        }
-        
-        return result
+        RecordingGrouping.filter(
+            recordings,
+            instrument: selectedInstrument,
+            vocal: selectedVocalFilter,
+            streaming: selectedFilter
+        )
     }
-    
-    // Group recordings based on sort order with smart consolidation
-    // - Year sort: Group by decade (1960s, 1970s, etc.)
-    // - Name sort: Featured artists (2+ recordings) + "More Recordings" (singles, alphabetical)
+
     private var groupedRecordings: [(groupKey: String, recordings: [Recording])] {
-        switch recordingSortOrder {
-        case .year:
-            return groupByDecade()
-        case .name:
-            return groupByArtistWithConsolidation()
-        }
-    }
-
-    // MARK: - Decade Grouping (for Year sort)
-    private func groupByDecade() -> [(groupKey: String, recordings: [Recording])] {
-        var decadeOrder: [String] = []
-        var decades: [String: [Recording]] = [:]
-
-        for recording in filteredRecordings {
-            let decadeKey: String
-            if let year = recording.recordingYear {
-                let decade = (year / 10) * 10
-                decadeKey = "\(decade)s"
-            } else {
-                decadeKey = "Unknown Year"
-            }
-
-            if decades[decadeKey] == nil {
-                decadeOrder.append(decadeKey)
-            }
-            decades[decadeKey, default: []].append(recording)
-        }
-
-        return decadeOrder.compactMap { key in
-            guard let recordings = decades[key] else { return nil }
-            return (groupKey: key, recordings: recordings)
-        }
-    }
-
-    // MARK: - Artist Grouping with Consolidation (for Name sort)
-    // Artists with 2+ recordings get their own section
-    // Artists with 1 recording are combined into "More Recordings", sorted alphabetically
-    private func groupByArtistWithConsolidation() -> [(groupKey: String, recordings: [Recording])] {
-        // First pass: count recordings per artist
-        var artistCounts: [String: Int] = [:]
-        for recording in filteredRecordings {
-            let artist = recording.performers?.first { $0.role == "leader" }?.name ?? "Unknown"
-            artistCounts[artist, default: 0] += 1
-        }
-
-        // Second pass: separate featured artists from singles
-        var featuredOrder: [String] = []
-        var featuredGroups: [String: [Recording]] = [:]
-        var moreRecordings: [Recording] = []
-
-        for recording in filteredRecordings {
-            let artist = recording.performers?.first { $0.role == "leader" }?.name ?? "Unknown"
-
-            if artistCounts[artist, default: 0] >= 2 {
-                // Featured artist - gets own section
-                if featuredGroups[artist] == nil {
-                    featuredOrder.append(artist)
-                }
-                featuredGroups[artist, default: []].append(recording)
-            } else {
-                // Single recording - goes to "More Recordings"
-                moreRecordings.append(recording)
-            }
-        }
-
-        // Build result: featured artists first (in original order)
-        var result: [(groupKey: String, recordings: [Recording])] = []
-
-        for artist in featuredOrder {
-            if let recordings = featuredGroups[artist] {
-                result.append((groupKey: artist, recordings: recordings))
-            }
-        }
-
-        // Add "More Recordings" section if there are any singles
-        if !moreRecordings.isEmpty {
-            // Sort alphabetically by artist sort_name (falling back to name)
-            let sortedMore = moreRecordings.sorted { rec1, rec2 in
-                let leader1 = rec1.performers?.first { $0.role == "leader" }
-                let leader2 = rec2.performers?.first { $0.role == "leader" }
-                let sortKey1 = leader1?.sortName ?? leader1?.name ?? "Unknown"
-                let sortKey2 = leader2?.sortName ?? leader2?.name ?? "Unknown"
-                return sortKey1.localizedCaseInsensitiveCompare(sortKey2) == .orderedAscending
-            }
-            result.append((groupKey: "More Recordings", recordings: sortedMore))
-        }
-
-        return result
+        RecordingGrouping.grouped(filteredRecordings, sortOrder: recordingSortOrder)
     }
 }
 

@@ -473,157 +473,16 @@ struct SongDetailView: View {
         .cornerRadius(10)
     }
 
-    // MARK: - Available Instruments
-    private func availableInstruments(_ recordings: [Recording]) -> [InstrumentFamily] {
-        var families = Set<InstrumentFamily>()
-        for recording in recordings {
-            if let performers = recording.performers {
-                for performer in performers {
-                    if let instrument = performer.instrument,
-                       let family = InstrumentFamily.family(for: instrument) {
-                        families.insert(family)
-                    }
-                }
-            }
-        }
-        return families.sorted { $0.rawValue < $1.rawValue }
-    }
-
-    // MARK: - Filtered Recordings
-    private func filteredRecordings(_ recordings: [Recording]) -> [Recording] {
-        var result = recordings
-
-        // First, apply instrument family filter if selected
-        if let family = selectedInstrument {
-            result = result.filter { recording in
-                guard let performers = recording.performers else { return false }
-                return performers.contains { performer in
-                    guard let instrument = performer.instrument else { return false }
-                    return InstrumentFamily.family(for: instrument) == family
-                }
-            }
-        }
-
-        // Then, apply streaming service filter
-        switch selectedFilter {
-        case .all:
-            break
-        case .playable:
-            result = result.filter { $0.isPlayable }
-        case .withSpotify:
-            result = result.filter { $0.hasSpotifyAvailable }
-        case .withAppleMusic:
-            result = result.filter { $0.hasAppleMusicAvailable }
-        case .withYoutube:
-            result = result.filter { $0.hasYoutubeAvailable }
-        }
-
-        // Apply vocal/instrumental filter
-        switch selectedVocalFilter {
-        case .all:
-            break
-        case .instrumental:
-            result = result.filter { recording in
-                recording.communityData?.consensus.isInstrumental == true
-            }
-        case .vocal:
-            result = result.filter { recording in
-                recording.communityData?.consensus.isInstrumental == false
-            }
-        }
-
-        return result
-    }
-
-    // MARK: - Grouped Recordings
-    private func groupedRecordings(_ recordings: [Recording]) -> [(groupKey: String, recordings: [Recording])] {
-        let filtered = filteredRecordings(recordings)
-        switch sortOrder {
-        case .year:
-            return groupByDecade(filtered)
-        case .name:
-            return groupByArtistWithConsolidation(filtered)
-        }
-    }
-
-    private func groupByDecade(_ recordings: [Recording]) -> [(groupKey: String, recordings: [Recording])] {
-        var decadeOrder: [String] = []
-        var decades: [String: [Recording]] = [:]
-
-        for recording in recordings {
-            let decadeKey: String
-            if let year = recording.recordingYear {
-                let decade = (year / 10) * 10
-                decadeKey = "\(decade)s"
-            } else {
-                decadeKey = "Unknown Year"
-            }
-
-            if decades[decadeKey] == nil {
-                decadeOrder.append(decadeKey)
-            }
-            decades[decadeKey, default: []].append(recording)
-        }
-
-        return decadeOrder.compactMap { key in
-            guard let recs = decades[key] else { return nil }
-            return (groupKey: key, recordings: recs)
-        }
-    }
-
-    private func groupByArtistWithConsolidation(_ recordings: [Recording]) -> [(groupKey: String, recordings: [Recording])] {
-        // First pass: count recordings per artist
-        var artistCounts: [String: Int] = [:]
-        for recording in recordings {
-            let artist = recording.performers?.first { $0.role == "leader" }?.name ?? "Unknown"
-            artistCounts[artist, default: 0] += 1
-        }
-
-        // Second pass: separate featured artists from singles
-        var featuredOrder: [String] = []
-        var featuredGroups: [String: [Recording]] = [:]
-        var moreRecordings: [Recording] = []
-
-        for recording in recordings {
-            let artist = recording.performers?.first { $0.role == "leader" }?.name ?? "Unknown"
-
-            if artistCounts[artist, default: 0] >= 2 {
-                if featuredGroups[artist] == nil {
-                    featuredOrder.append(artist)
-                }
-                featuredGroups[artist, default: []].append(recording)
-            } else {
-                moreRecordings.append(recording)
-            }
-        }
-
-        // Build result
-        var result: [(groupKey: String, recordings: [Recording])] = []
-
-        for artist in featuredOrder {
-            if let recs = featuredGroups[artist] {
-                result.append((groupKey: artist, recordings: recs))
-            }
-        }
-
-        if !moreRecordings.isEmpty {
-            let sortedMore = moreRecordings.sorted { rec1, rec2 in
-                let leader1 = rec1.performers?.first { $0.role == "leader" }
-                let leader2 = rec2.performers?.first { $0.role == "leader" }
-                let sortKey1 = leader1?.sortName ?? leader1?.name ?? "Unknown"
-                let sortKey2 = leader2?.sortName ?? leader2?.name ?? "Unknown"
-                return sortKey1.localizedCaseInsensitiveCompare(sortKey2) == .orderedAscending
-            }
-            result.append((groupKey: "More Recordings", recordings: sortedMore))
-        }
-
-        return result
-    }
 
     @ViewBuilder
     private func recordingsSection(_ recordings: [Recording]) -> some View {
-        let filtered = filteredRecordings(recordings)
-        let grouped = groupedRecordings(recordings)
+        let filtered = RecordingGrouping.filter(
+            recordings,
+            instrument: selectedInstrument,
+            vocal: selectedVocalFilter,
+            streaming: selectedFilter
+        )
+        let grouped = RecordingGrouping.grouped(filtered, sortOrder: sortOrder)
 
         VStack(alignment: .leading, spacing: 12) {
             // Header with count, filter, and sort
@@ -718,7 +577,7 @@ struct SongDetailView: View {
                 }
 
                 // Instrument filter menu (only show if instruments are available)
-                let instruments = availableInstruments(recordings)
+                let instruments = RecordingGrouping.availableInstruments(in: recordings)
                 if !instruments.isEmpty {
                     Menu {
                         Button(action: { selectedInstrument = nil }) {
