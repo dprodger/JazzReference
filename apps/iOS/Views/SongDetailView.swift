@@ -2,11 +2,11 @@
 //  SongDetailView.swift
 //  JazzReference
 //
-//  UPDATED: Added visual swipe navigation cues with parallax and arrows
 //  UPDATED: Replaced alert with toast notification for song queue confirmation
 //  FIXED: Broken up body to avoid type-checker timeout
 //  UPDATED: Grouped Structure, Learn More, and References into collapsible Summary Information section
 //  FIXED: Recording sort order now consistently passed to all API calls
+//  UPDATED: Replaced horizontal swipe navigation with explicit prev/next buttons (#109)
 //
 
 import SwiftUI
@@ -16,16 +16,12 @@ import Combine
 struct SongDetailView: View {
     let songId: String
     let allSongs: [Song]
-    let repertoireId: String
 
     // Shared data + network state lives on the view model; layout/presentation
     // state stays here.
     @StateObject private var viewModel = SongDetailViewModel()
 
     @State private var currentSongId: String
-
-    // NEW: Drag gesture state for visual feedback
-    @GestureState private var dragOffset: CGFloat = 0
 
     // NEW: Repertoire management
     @EnvironmentObject var repertoireManager: RepertoireManager
@@ -61,15 +57,48 @@ struct SongDetailView: View {
     @Environment(\.openURL) private var openURL
 
     // MARK: - Initializer
-    init(songId: String, allSongs: [Song] = [], repertoireId: String = "all") {
+    init(songId: String, allSongs: [Song] = []) {
         self.songId = songId
         self.allSongs = allSongs
-        self.repertoireId = repertoireId
         self._currentSongId = State(initialValue: songId)
     }
     
+    // MARK: - Pager Row
+
+    /// Previous / position / Next row shown above the song title when navigating
+    /// within a list of songs. Hidden when there is only one (e.g. deep link).
+    @ViewBuilder
+    private var pagerRow: some View {
+        if allSongs.count > 1, let index = currentIndex {
+            HStack {
+                Button(action: navigateToPrevious) {
+                    Image(systemName: "chevron.left.circle.fill")
+                        .font(.title2)
+                        .foregroundColor(canNavigatePrevious ? JazzTheme.burgundy : JazzTheme.smokeGray.opacity(0.4))
+                }
+                .disabled(!canNavigatePrevious)
+
+                Spacer()
+
+                Text("\(index + 1) of \(allSongs.count)")
+                    .font(JazzTheme.subheadline())
+                    .foregroundColor(JazzTheme.smokeGray)
+
+                Spacer()
+
+                Button(action: navigateToNext) {
+                    Image(systemName: "chevron.right.circle.fill")
+                        .font(.title2)
+                        .foregroundColor(canNavigateNext ? JazzTheme.burgundy : JazzTheme.smokeGray.opacity(0.4))
+                }
+                .disabled(!canNavigateNext)
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
     // MARK: - Navigation Helpers
-    
+
     private var currentIndex: Int? {
         allSongs.firstIndex { $0.id == currentSongId }
     }
@@ -208,6 +237,7 @@ struct SongDetailView: View {
             VStack(alignment: .leading, spacing: 16) {
             // Song Information Header
             VStack(alignment: .leading, spacing: 12) {
+                pagerRow
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text(song.title)
                         .font(JazzTheme.largeTitle())
@@ -423,15 +453,6 @@ struct SongDetailView: View {
     private var contentView: some View {
         mainScrollView
             .background(JazzTheme.backgroundLight)
-            // NEW: Visual feedback for swipe gestures
-            .offset(x: dragOffset * 0.3) // Parallax effect - subtle movement
-            .opacity(1 - abs(dragOffset) / 1000.0) // Subtle fade during drag
-            .overlay(alignment: .leading) {
-                navigationArrow(direction: .left, isVisible: dragOffset > 50 && canNavigatePrevious)
-            }
-            .overlay(alignment: .trailing) {
-                navigationArrow(direction: .right, isVisible: dragOffset < -50 && canNavigateNext)
-            }
             .jazzNavigationBar(title: song?.title ?? "")
             .toolbar {
                 toolbarContent
@@ -453,7 +474,6 @@ struct SongDetailView: View {
                     Task { await viewModel.refreshBackingTracks(songId: currentSongId) }
                 }
             }
-            .highPriorityGesture(swipeGesture)
             .sheet(isPresented: $showAddToRepertoireSheet) {
                 repertoireSheet
             }
@@ -480,9 +500,6 @@ struct SongDetailView: View {
             .toast($toast)
             .onDisappear {
                 viewModel.stopResearchStatusPolling()
-            }
-            .overlay(alignment: .bottom) {
-                pageIndicatorView
             }
     }
     
@@ -529,31 +546,6 @@ struct SongDetailView: View {
         .frame(maxWidth: .infinity, minHeight: 300)
     }
     
-    // MARK: - Swipe Gesture
-    
-    private var swipeGesture: some Gesture {
-        DragGesture(minimumDistance: 50)
-            .updating($dragOffset) { value, state, _ in
-                // Only update state if navigation is possible in that direction
-                if value.translation.width > 0 && canNavigatePrevious {
-                    state = value.translation.width
-                } else if value.translation.width < 0 && canNavigateNext {
-                    state = value.translation.width
-                }
-            }
-            .onEnded { value in
-                let threshold: CGFloat = 100
-                
-                if value.translation.width > threshold && canNavigatePrevious {
-                    // Swipe right - go to previous
-                    navigateToPrevious()
-                } else if value.translation.width < -threshold && canNavigateNext {
-                    // Swipe left - go to next
-                    navigateToNext()
-                }
-            }
-    }
-    
     // MARK: - Toolbar Content
 
     @ToolbarContentBuilder
@@ -586,24 +578,6 @@ struct SongDetailView: View {
         return service.brandColor
     }
     
-    // MARK: - Navigation Arrow
-    
-    private func navigationArrow(direction: NavigationDirection, isVisible: Bool) -> some View {
-        Image(systemName: direction == .left ? "chevron.left" : "chevron.right")
-            .font(.system(size: 40, weight: .bold))
-            .foregroundColor(JazzTheme.burgundy)
-            .opacity(isVisible ? 0.8 : 0)
-            .scaleEffect(isVisible ? 1.2 : 0.8)
-            .padding(.horizontal, 20)
-            .animation(.spring(response: 0.3), value: isVisible)
-    }
-    
-    // MARK: - Navigation Direction Enum
-    
-    private enum NavigationDirection {
-        case left, right
-    }
-    
     private var repertoireSheet: some View {
         AddToRepertoireSheet(
             songId: currentSongId,
@@ -620,58 +594,6 @@ struct SongDetailView: View {
         )
     }
     
-    @ViewBuilder
-    private var pageIndicatorView: some View {
-        if !allSongs.isEmpty && allSongs.count > 1 && !isLoading, let index = currentIndex {
-            HStack(spacing: 6) {
-                let visibleRange = calculateVisibleDotRange(current: index, total: allSongs.count)
-                
-                ForEach(visibleRange, id: \.self) { dotIndex in
-                    Circle()
-                        .fill(dotIndex == index ? JazzTheme.burgundy : JazzTheme.smokeGray.opacity(0.3))
-                        .frame(width: dotIndex == index ? 8 : 6, height: dotIndex == index ? 8 : 6)
-                        .animation(.easeInOut(duration: 0.2), value: index)
-                }
-            }
-            .padding(.vertical, 8)
-            .padding(.horizontal, 12)
-            .background(.ultraThinMaterial)
-            .cornerRadius(12)
-            .padding(.bottom, 12)
-        }
-    }
-    
-    // MARK: - Helper for Page Dots
-    
-    private func calculateVisibleDotRange(current: Int, total: Int) -> Range<Int> {
-        let maxDots = 5
-        
-        if total <= maxDots {
-            return 0..<total
-        }
-        
-        // Try to center the current dot
-        let halfDots = maxDots / 2
-        var start = current - halfDots
-        var end = current + halfDots + 1
-        
-        // Adjust if we're near the beginning
-        if start < 0 {
-            end += abs(start)
-            start = 0
-        }
-        
-        // Adjust if we're near the end
-        if end > total {
-            start -= (end - total)
-            end = total
-        }
-        
-        // Ensure we don't go below 0
-        start = max(0, start)
-        
-        return start..<end
-    }
 }
 
 // MARK: - Authoritative Recording Card

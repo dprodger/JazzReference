@@ -258,8 +258,7 @@ struct SongsListView: View {
                         ForEach(songs) { song in
                             NavigationLink(destination: SongDetailView(
                                                 songId: song.id,
-                                                allSongs: songService.songs,
-                                                repertoireId: repertoireManager.selectedRepertoire.id
+                                                allSongs: songService.songs
                                             )
                                                 .environmentObject(repertoireManager)) {
                                 songRowView(song: song)
