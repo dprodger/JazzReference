@@ -182,9 +182,22 @@ def main() -> bool:
         'images_created': 0,
     }
 
+    # Log ~20 progress lines per run regardless of size, always the first/last.
+    progress_every = max(1, total // 20)
+
     for idx, release in enumerate(releases, 1):
-        if idx % 100 == 1 or args.debug:
-            script.logger.info(f"[{idx}/{total}] {release['title'] or '<unknown>'}")
+        is_progress_tick = (
+            args.debug
+            or idx == 1
+            or idx == total
+            or idx % progress_every == 0
+        )
+        if is_progress_tick:
+            script.logger.info(
+                f"[{idx}/{total}] rescued={totals['rescued']} "
+                f"no_art={totals['no_art']} errors={totals['api_errors']} — "
+                f"{(release['title'] or '<unknown>')[:60]}"
+            )
         try:
             delta = _process_release(client, release, args.dry_run, script.logger)
             for k, v in delta.items():
