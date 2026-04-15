@@ -1,0 +1,82 @@
+name: Backend pytest
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - 'sql/**'
+      - '.github/workflows/pytest.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - 'sql/**'
+      - '.github/workflows/pytest.yml'
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: jazztest
+          POSTGRES_PASSWORD: jazztest
+          POSTGRES_DB: jazz_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: 'pip'
+          cache-dependency-path: |
+            backend/requirements.txt
+            backend/requirements-dev.txt
+
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y libxml2-dev libxslt-dev postgresql-client
+
+      - name: Install Python dependencies
+        working-directory: backend
+        run: |
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+
+      - name: Bootstrap database schema
+        env:
+          PGPASSWORD: jazztest
+        run: |
+          psql -h localhost -U jazztest -d jazz_test -f sql/jazz-db-schema.sql
+          # Replay numbered migrations on top so tests run against the same
+          # schema as production. `|| true` per file so an idempotent
+          # migration that fails because the change is already in the
+          # bootstrap doesn't fail the build. Replace with `alembic
+          # upgrade head` once #115 (P3 #1) lands.
+          for f in sql/migrations/[0-9]*.sql; do
+            echo "Applying $f"
+            psql -h localhost -U jazztest -d jazz_test -v ON_ERROR_STOP=0 -f "$f" || true
+          done
+
+      - name: Run pytest
+        working-directory: backend
+        env:
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_NAME: jazz_test
+          DB_USER: jazztest
+          DB_PASSWORD: jazztest
+          JWT_SECRET: pytest-test-secret
+          RATELIMIT_ENABLED: 'false'
+        run: pytest tests/ -v

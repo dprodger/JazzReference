@@ -75,6 +75,13 @@ backend/
 - **JWT Auth**: `core.auth_utils` provides `@token_required` decorator for protected endpoints
 - **Import paths**: Modules are imported as `from integrations.spotify import matcher` / `from core import research_queue`. `backend/` itself is not a package; `backend/scripts/script_base.py` adds it to `sys.path` so both `core.*` and `integrations.*` resolve.
 
+### Backend tests
+
+Pytest suite under `backend/tests/`. See `backend/tests/README.md` for local
+setup. CI runs them in `.github/workflows/pytest.yml` against a Postgres
+`services:` container. Auth flow is covered today; matchers / research queue
+/ rate-limit smoke are follow-up issues.
+
 ### Apps Structure
 
 The `apps/` directory contains iOS, macOS, and shared code:
