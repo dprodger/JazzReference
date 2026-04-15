@@ -58,11 +58,15 @@ DB_CONFIG = {
     'port': os.environ.get('DB_PORT')
 }
 
-# Connection string for pooling
+# Connection string for pooling. SSL mode is configurable so that local
+# dev / CI / docker can use plaintext while production keeps `require`.
+# Defaults to 'require' to preserve prior behavior.
+DB_SSLMODE = os.environ.get('DB_SSLMODE', 'require')
+
 CONNECTION_STRING = (
     f"postgresql://{DB_CONFIG['user']}:{DB_CONFIG['password']}"
     f"@{DB_CONFIG['host']}:{DB_CONFIG['port']}/{DB_CONFIG['dbname']}"
-    f"?sslmode=require"
+    f"?sslmode={DB_SSLMODE}"
 )
 
 
