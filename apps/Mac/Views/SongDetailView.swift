@@ -702,7 +702,13 @@ struct SongDetailView: View {
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(alignment: .top, spacing: 16) {
                                 ForEach(group.recordings) { recording in
-                                    RecordingCard(recording: recording, showArtistName: sortOrder == .year || group.groupKey == "More Recordings")
+                                    RecordingCard(
+                                        recording: recording,
+                                        showArtistName: sortOrder == .year || group.groupKey == "More Recordings",
+                                        onVisible: { [weak viewModel] id in
+                                            viewModel?.requestHydration(for: id)
+                                        }
+                                    )
                                         .contentShape(Rectangle())
                                         .onTapGesture {
                                             selectedRecordingId = recording.id

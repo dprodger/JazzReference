@@ -617,6 +617,169 @@ def get_song_recordings(song_id):
         return jsonify({'error': 'Failed to fetch recordings', 'detail': str(e)}), 500
 
 
+@songs_bp.route('/songs/<song_id>/recordings/shell', methods=['GET'])
+def get_song_recordings_shell(song_id):
+    """
+    Shell (metadata-only) payload for a song's recordings list.
+
+    This is the "first paint" half of the shell+hydrate pattern described in
+    backend/tests/test_song_recordings_shell.py. The iOS/Mac app loads this
+    to render group headers (by decade or by artist), run the vocal /
+    instrumental / instrument / streaming-service filters, and show skeleton
+    rows; it then calls POST /api/recordings/batch with the IDs of rows that
+    scroll into view to fill in cover art and full performer data.
+
+    Compared to GET /api/songs/<id>/recordings, this endpoint omits
+    everything that's only needed to render a row *visually*:
+      * cover art URLs (front + back, 3 sizes each) + source/source_url
+      * sidemen in performers[] (leader only, 1 object)
+      * community_data jsonb (just the is_instrumental consensus as a bool)
+      * streaming_services array (has_* flags are enough for filters)
+      * authority_sources array (authority_count is enough for the badge)
+      * has_back_cover, best_spotify_url
+
+    The trade-off: ~150 bytes/row vs ~1.5KB/row on the existing endpoint.
+    For "Ain't Misbehavin'" (759 recordings) that's ~110KB raw vs ~750KB —
+    about 7x smaller gzipped.
+
+    See backend/tests/test_song_recordings_shell.py for the field contract.
+    """
+    try:
+        sort_by = request.args.get('sort', 'year')
+
+        # Shell does not need the CTEs the full endpoint uses for cover art
+        # or full streaming link details — a much simpler query suffices.
+        #
+        # Leader: DISTINCT ON picks a single leader per recording and
+        # exposes leader_sort_name so the sort=name branch can ORDER BY it
+        # without the correlated subquery the full endpoint uses.
+        #
+        # instruments_present: flat array of all instruments on the
+        # recording. The iOS instrument-family filter reads this, so we
+        # need *every* performer's instrument — not just the leader's.
+        #
+        # is_instrumental: most-common consensus value (same tiebreaker
+        # as the full endpoint's community CTE), but surfaced as a plain
+        # bool column rather than wrapped in a community_data jsonb.
+
+        if sort_by == 'name':
+            shell_order = """
+                COALESCE(l.leader_sort_name, l.leader_name) ASC NULLS LAST,
+                r.recording_year ASC NULLS LAST
+            """
+        else:
+            shell_order = "r.recording_year ASC NULLS LAST"
+
+        shell_query = f"""
+            WITH
+            leader AS (
+                SELECT DISTINCT ON (rp.recording_id)
+                    rp.recording_id,
+                    p.name as leader_name,
+                    p.sort_name as leader_sort_name,
+                    json_build_array(
+                        json_build_object(
+                            'id', p.id,
+                            'name', p.name,
+                            'sort_name', p.sort_name,
+                            'instrument', i.name,
+                            'role', 'leader'
+                        )
+                    ) as performers
+                FROM recording_performers rp
+                JOIN performers p ON rp.performer_id = p.id
+                LEFT JOIN instruments i ON rp.instrument_id = i.id
+                WHERE rp.recording_id IN (SELECT id FROM recordings WHERE song_id = %s)
+                  AND rp.role = 'leader'
+                ORDER BY rp.recording_id, COALESCE(p.sort_name, p.name)
+            ),
+            instruments_present AS (
+                SELECT
+                    rp.recording_id,
+                    array_agg(DISTINCT i.name) FILTER (WHERE i.name IS NOT NULL) as instruments
+                FROM recording_performers rp
+                LEFT JOIN instruments i ON rp.instrument_id = i.id
+                WHERE rp.recording_id IN (SELECT id FROM recordings WHERE song_id = %s)
+                GROUP BY rp.recording_id
+            ),
+            streaming AS (
+                SELECT
+                    rr.recording_id,
+                    bool_or(TRUE) as has_streaming,
+                    bool_or(rrsl.service = 'spotify') as has_spotify,
+                    bool_or(rrsl.service = 'apple_music') as has_apple_music,
+                    bool_or(rrsl.service = 'youtube') as has_youtube
+                FROM recording_releases rr
+                JOIN recording_release_streaming_links rrsl ON rrsl.recording_release_id = rr.id
+                WHERE rr.recording_id IN (SELECT id FROM recordings WHERE song_id = %s)
+                GROUP BY rr.recording_id
+            ),
+            community_vocal AS (
+                SELECT DISTINCT
+                    rc.recording_id,
+                    (
+                        SELECT is_instrumental FROM recording_contributions rc2
+                        WHERE rc2.recording_id = rc.recording_id
+                          AND rc2.is_instrumental IS NOT NULL
+                        GROUP BY is_instrumental
+                        ORDER BY COUNT(*) DESC, MAX(updated_at) DESC
+                        LIMIT 1
+                    ) as is_instrumental
+                FROM recording_contributions rc
+                WHERE rc.recording_id IN (SELECT id FROM recordings WHERE song_id = %s)
+            ),
+            -- authority_count as a pre-aggregated CTE so the main query needs
+            -- no GROUP BY (json performers has no equality operator and so
+            -- can't appear in a GROUP BY clause).
+            authority AS (
+                SELECT recording_id, COUNT(*) as authority_count
+                FROM song_authority_recommendations
+                WHERE recording_id IN (SELECT id FROM recordings WHERE song_id = %s)
+                GROUP BY recording_id
+            )
+            SELECT
+                r.id,
+                r.title,
+                def_rel.title as album_title,
+                def_rel.artist_credit as artist_credit,
+                r.recording_year,
+                r.is_canonical,
+                COALESCE(l.performers, '[]'::json) as performers,
+                COALESCE(ip.instruments, ARRAY[]::text[]) as instruments_present,
+                cv.is_instrumental,
+                COALESCE(st.has_streaming, FALSE) as has_streaming,
+                COALESCE(st.has_spotify, FALSE) as has_spotify,
+                COALESCE(st.has_apple_music, FALSE) as has_apple_music,
+                COALESCE(st.has_youtube, FALSE) as has_youtube,
+                COALESCE(a.authority_count, 0) as authority_count
+            FROM recordings r
+            LEFT JOIN releases def_rel ON r.default_release_id = def_rel.id
+            LEFT JOIN leader l ON l.recording_id = r.id
+            LEFT JOIN instruments_present ip ON ip.recording_id = r.id
+            LEFT JOIN streaming st ON st.recording_id = r.id
+            LEFT JOIN community_vocal cv ON cv.recording_id = r.id
+            LEFT JOIN authority a ON a.recording_id = r.id
+            WHERE r.song_id = %s
+            ORDER BY {shell_order}
+        """
+
+        # 5 CTEs use song_id once each + main WHERE uses it once = 6 params
+        recordings = db_tools.execute_query(
+            shell_query,
+            (song_id, song_id, song_id, song_id, song_id, song_id)
+        )
+
+        return jsonify({
+            'song_id': song_id,
+            'recordings': recordings if recordings else [],
+            'recording_count': len(recordings) if recordings else 0
+        })
+
+    except Exception as e:
+        logger.error(f"Error fetching song recordings shell: {e}", exc_info=True)
+        return jsonify({'error': 'Failed to fetch shell', 'detail': str(e)}), 500
+
+
 @songs_bp.route('/songs/<song_id>', methods=['GET'])
 def get_song_detail(song_id):
     """

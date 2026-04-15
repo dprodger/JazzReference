@@ -63,6 +63,13 @@ struct Song: Identifiable, Codable {
 }
 
 // MARK: - Song Recordings Response (from /api/songs/{id}/recordings)
+//
+// The same envelope shape is returned by both
+//   GET /api/songs/<id>/recordings         (full list, legacy)
+//   GET /api/songs/<id>/recordings/shell   (shell+hydrate first-paint)
+// so one Codable covers both. Rows inside differ — the shell-only fields
+// on `Recording` (`instrumentsPresent`, `isInstrumentalConsensus`) are
+// populated on shell responses and nil on full responses.
 
 struct SongRecordingsResponse: Codable {
     let songId: String
@@ -74,6 +81,16 @@ struct SongRecordingsResponse: Codable {
         case recordings
         case recordingCount = "recording_count"
     }
+}
+
+// MARK: - Recordings Batch Response (from POST /api/recordings/batch)
+//
+// The hydration half of the shell+hydrate pattern. No `song_id` — the
+// batch is song-agnostic, and the client already knows which rows it
+// asked for. Missing IDs are silently omitted (stale client safe).
+
+struct RecordingsBatchResponse: Codable {
+    let recordings: [Recording]
 }
 
 // MARK: - Recording Sort Order Enum

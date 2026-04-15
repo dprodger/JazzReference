@@ -127,7 +127,9 @@ extension Recording {
             FavoriteUser(id: "user-2", displayName: "Jane Smith")
         ],
         communityData: CommunityData.preview,
-        userContribution: UserContribution.preview
+        userContribution: UserContribution.preview,
+        instrumentsPresent: ["piano", "alto saxophone", "bass", "drums"],
+        isInstrumentalConsensus: true
     )
 
     static let preview2 = Recording(
@@ -194,7 +196,9 @@ extension Recording {
             consensus: CommunityConsensus.previewPartial,
             counts: ContributionCounts(key: 3, tempo: 0, instrumental: 0)
         ),
-        userContribution: nil
+        userContribution: nil,
+        instrumentsPresent: ["piano", "alto saxophone"],
+        isInstrumentalConsensus: nil
     )
 
     static let previewMinimal = Recording(
@@ -244,7 +248,9 @@ extension Recording {
         isFavorited: nil,
         favoritedBy: nil,
         communityData: nil,
-        userContribution: nil
+        userContribution: nil,
+        instrumentsPresent: nil,
+        isInstrumentalConsensus: nil
     )
 }
 

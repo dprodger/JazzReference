@@ -28,6 +28,12 @@ struct RecordingsSection: View {
     // Callback when community data changes (for parent to reload recordings)
     var onCommunityDataChanged: (() -> Void)?
 
+    // Callback fired when a recording row appears. Forwarded to
+    // RecordingRowView's `onVisible` so SongDetailViewModel can drive
+    // the shell+hydrate pattern. Nil means "don't hydrate" — useful for
+    // any callers that already pass fully-loaded recordings.
+    var onRequestHydration: ((String) -> Void)?
+
     @State private var selectedFilter: SongRecordingFilter = .playable
     @State private var selectedVocalFilter: VocalFilter = .all
     @State private var selectedInstrument: InstrumentFamily? = nil
@@ -84,7 +90,8 @@ struct RecordingsSection: View {
                                                             )) {
                                                                 RecordingRowView(
                                                                     recording: recording,
-                                                                    showArtistName: recordingSortOrder == .year || group.groupKey == "More Recordings"
+                                                                    showArtistName: recordingSortOrder == .year || group.groupKey == "More Recordings",
+                                                                    onVisible: onRequestHydration
                                                                 )
                                                             }
                                                             .buttonStyle(.plain)

@@ -12,6 +12,13 @@ import SwiftUI
 struct RecordingRowView: View {
     let recording: Recording
     var showArtistName: Bool = false
+    /// Called once when the row appears on screen. SongDetailView passes
+    /// a closure that forwards the recording ID to
+    /// `SongDetailViewModel.requestHydration(for:)`, which drives the
+    /// shell+hydrate pattern (rows start as skeletons, gain cover art +
+    /// full performers when hydrated). Other call sites that already
+    /// pass a fully-loaded recording leave this nil.
+    var onVisible: ((String) -> Void)? = nil
 
     @State private var showingBackCover = false
 
@@ -208,6 +215,13 @@ struct RecordingRowView: View {
             }
         }
         .frame(width: 150)
+        .onAppear {
+            // Shell+hydrate hook: tell the ViewModel that this row just
+            // became visible so it queues a batch hydration. No-op on
+            // call sites that don't pass onVisible (rows rendered outside
+            // the song recordings list, which already receive full data).
+            onVisible?(recording.id)
+        }
     }
 }
 

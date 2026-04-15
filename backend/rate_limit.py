@@ -63,6 +63,12 @@ FORGOT_PASSWORD_LIMIT = "3 per hour"
 RESET_PASSWORD_LIMIT = "10 per hour"
 CHANGE_PASSWORD_LIMIT = "5 per hour"
 
+# POST /api/recordings/batch — shell+hydrate pattern for the song recordings
+# list. A typical SongDetailView generates ~5-15 batches per tap as the user
+# scrolls through decades; 120/min gives a healthy headroom for that pattern
+# while capping sustained abuse at ~2 requests/sec.
+BATCH_RECORDINGS_LIMIT = "120 per minute"
+
 
 # ============================================================================
 # KEY FUNCTIONS

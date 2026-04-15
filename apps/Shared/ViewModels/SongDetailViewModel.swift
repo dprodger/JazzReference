@@ -17,6 +17,22 @@
 //        viewModel.stopResearchStatusPolling()
 //    }
 //
+//  Recordings loading — shell + hydrate
+//  ------------------------------------
+//  Phase 2 of `load(songId:)` used to fetch the full per-row payload for
+//  every recording in one shot. That's ~120 KB gzipped for "Ain't
+//  Misbehavin'" (759 rows) and scales badly for popular standards.
+//
+//  The new flow:
+//   1. Fetch the shell (~18 KB) — enough to render group headers, run
+//      filters, and show skeleton rows. UI renders immediately.
+//   2. Kick off an initial hydration batch for the first N shell rows,
+//      so the top-of-scroll has cover art by the time the user looks.
+//   3. As each row's `.onAppear` fires, the view calls
+//      `requestHydration(for:)` to enqueue that ID. The ViewModel
+//      debounces the queue by 100ms, drains up to 50 IDs per batch, and
+//      replaces the shell Recording with the hydrated Recording in
+//      `song.recordings` — so SwiftUI diffing redraws only that row.
 
 import SwiftUI
 import Combine
@@ -46,6 +62,31 @@ final class SongDetailViewModel: ObservableObject {
     /// to skip re-fetching when the view re-appears with the same song (e.g.
     /// coming back from a child RecordingDetailView).
     private var currentLoadedSongId: String?
+
+    // MARK: - Hydration state
+    //
+    // IDs we've already replaced with fully-hydrated Recording instances.
+    // Skip re-requesting them when a row re-appears during scroll.
+    private var hydratedIDs: Set<String> = []
+    // IDs that a row has asked us to hydrate but we haven't sent to the
+    // batch endpoint yet. Drained by `flushHydration()`.
+    private var pendingHydrationIDs: Set<String> = []
+    // Debounced task that eventually calls `flushHydration`. Reset every
+    // time a new ID arrives, so we don't fire a batch for every onAppear
+    // when a user scrolls quickly.
+    private var hydrationDebounceTask: Task<Void, Never>?
+    // How many shell rows to hydrate eagerly after the shell arrives,
+    // before any row's .onAppear has fired. Sized to cover roughly one
+    // screenful on iOS plus a little lookahead.
+    private let eagerHydrationCount = 50
+    // Cap per batch request. Matches server-side BATCH_MAX_IDS, but the
+    // server enforces 100; we go lower so a single batch doesn't take
+    // too long and blocks the next one.
+    private let hydrationBatchSize = 50
+    // Debounce window: long enough to coalesce onAppear events fired in
+    // a burst (e.g. a DisclosureGroup expanding), short enough that
+    // hydration doesn't lag visibly.
+    private let hydrationDebounceNanos: UInt64 = 100_000_000  // 100ms
 
     // MARK: - Derived helpers
 
@@ -83,7 +124,8 @@ final class SongDetailViewModel: ObservableObject {
 
     // MARK: - Loading
 
-    /// Two-phase load: summary (fast) + backing tracks + recordings.
+    /// Two-phase load: summary (fast) + backing tracks + recordings shell
+    /// + eager first-screen hydration.
     /// Guards against redundant reloads when the view re-appears with the
     /// same song already in state; pass `force: true` to override.
     func load(songId: String, force: Bool = false) async {
@@ -95,6 +137,7 @@ final class SongDetailViewModel: ObservableObject {
         isLoading = true
         isRecordingsLoading = true
         currentLoadedSongId = songId
+        resetHydrationState()
 
         // Reset research state before starting the new song.
         researchStatus = .notInQueue
@@ -112,17 +155,26 @@ final class SongDetailViewModel: ObservableObject {
         // Backing tracks.
         await refreshBackingTracks(songId: songId)
 
-        // Phase 2: all recordings with streaming data.
-        if let recordings = await songService.fetchSongRecordings(id: songId, sortBy: sortOrder) {
-            song?.recordings = recordings
+        // Phase 2: shell (fast, skeleton rows + group headers + filters).
+        if let shellRecordings = await songService.fetchSongRecordingsShell(id: songId, sortBy: sortOrder) {
+            song?.recordings = shellRecordings
+            // Once the shell is in, the rest of the UI can render. Rows
+            // will drive their own hydration via `requestHydration(for:)`
+            // as they appear.
+            isRecordingsLoading = false
+            kickOffEagerHydration()
+        } else {
+            // Shell failed. Clear loading state so UI can show an empty
+            // or error state instead of spinning forever.
+            isRecordingsLoading = false
         }
-        isRecordingsLoading = false
     }
 
     /// Pull-to-refresh variant: does NOT set `isLoading`, so content stays visible.
     /// Only updates state on success.
     func forceRefresh(songId: String) async {
         isRecordingsLoading = true
+        resetHydrationState()
 
         if let fetchedSong = await songService.fetchSongSummary(id: songId) {
             song = fetchedSong
@@ -131,8 +183,9 @@ final class SongDetailViewModel: ObservableObject {
 
         await refreshBackingTracks(songId: songId)
 
-        if let recordings = await songService.fetchSongRecordings(id: songId, sortBy: sortOrder) {
-            song?.recordings = recordings
+        if let shellRecordings = await songService.fetchSongRecordingsShell(id: songId, sortBy: sortOrder) {
+            song?.recordings = shellRecordings
+            kickOffEagerHydration()
         }
         isRecordingsLoading = false
     }
@@ -141,10 +194,96 @@ final class SongDetailViewModel: ObservableObject {
     /// Used when the sort order changes or when a child view edits community data.
     func reloadRecordings(songId: String) async {
         isRecordingsReloading = true
-        if let recordings = await songService.fetchSongRecordings(id: songId, sortBy: sortOrder) {
-            song?.recordings = recordings
+        resetHydrationState()
+        if let shellRecordings = await songService.fetchSongRecordingsShell(id: songId, sortBy: sortOrder) {
+            song?.recordings = shellRecordings
+            kickOffEagerHydration()
         }
         isRecordingsReloading = false
+    }
+
+    // MARK: - Hydration — called by row views
+
+    /// A recording row became visible in the list. Queue its ID for the
+    /// next batch hydration, unless we've already hydrated it or already
+    /// have it pending. The debounced task flushes every 100ms so a burst
+    /// of onAppear events (typical when a DisclosureGroup expands) turns
+    /// into a single batch request.
+    func requestHydration(for recordingID: String) {
+        guard !hydratedIDs.contains(recordingID),
+              !pendingHydrationIDs.contains(recordingID) else {
+            return
+        }
+        pendingHydrationIDs.insert(recordingID)
+        scheduleHydrationFlush()
+    }
+
+    // MARK: - Hydration — private
+
+    private func resetHydrationState() {
+        hydrationDebounceTask?.cancel()
+        hydrationDebounceTask = nil
+        hydratedIDs.removeAll()
+        pendingHydrationIDs.removeAll()
+    }
+
+    /// After the shell arrives, eagerly request hydration for the first N
+    /// rows so the top-of-scroll has cover art by the time the user
+    /// looks at it. Without this the user would see skeleton rows until
+    /// they scroll (which triggers onAppear + viewport-driven hydration).
+    private func kickOffEagerHydration() {
+        guard let recordings = song?.recordings else { return }
+        for row in recordings.prefix(eagerHydrationCount) {
+            requestHydration(for: row.id)
+        }
+    }
+
+    private func scheduleHydrationFlush() {
+        hydrationDebounceTask?.cancel()
+        hydrationDebounceTask = Task { [weak self] in
+            guard let self else { return }
+            try? await Task.sleep(nanoseconds: self.hydrationDebounceNanos)
+            if Task.isCancelled { return }
+            await self.flushHydration()
+        }
+    }
+
+    private func flushHydration() async {
+        // Take up to `hydrationBatchSize` IDs for this call; any extras
+        // stay in `pendingHydrationIDs` and get picked up by the next
+        // flush scheduled at the end of this method.
+        let idsToHydrate = Array(pendingHydrationIDs.prefix(hydrationBatchSize))
+        guard !idsToHydrate.isEmpty else { return }
+        pendingHydrationIDs.subtract(idsToHydrate)
+
+        guard let hydrated = await songService.fetchRecordingsBatch(ids: idsToHydrate) else {
+            // Batch failed. Don't re-queue — a real failure is likely
+            // systemic (e.g. offline), retries would just pile up.
+            // User can pull-to-refresh to retry the whole list.
+            return
+        }
+
+        // Merge hydrated rows into song.recordings. Each hydrated row
+        // replaces the shell version wholesale — RecordingGrouping's
+        // filters read from either shape so the swap is transparent.
+        guard var recordings = song?.recordings else { return }
+        var hydratedByID: [String: Recording] = [:]
+        for row in hydrated {
+            hydratedByID[row.id] = row
+        }
+        for idx in recordings.indices {
+            if let replacement = hydratedByID[recordings[idx].id] {
+                recordings[idx] = replacement
+                hydratedIDs.insert(replacement.id)
+            }
+        }
+        song?.recordings = recordings
+
+        // If more IDs accumulated while we were awaiting the batch, flush
+        // again. The next call is debounced so this doesn't hot-loop.
+        if !pendingHydrationIDs.isEmpty {
+            scheduleHydrationFlush()
+        }
     }
 
     /// Reload backing tracks. Called on initial load and by the `.videoCreated`

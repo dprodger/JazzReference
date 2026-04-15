@@ -154,6 +154,112 @@ class SongService: ObservableObject {
         }
     }
 
+    // MARK: - Song Recordings — Shell + Hydrate
+    //
+    // The recordings list in SongDetailView used to fetch the entire row
+    // data for every recording in one shot via `fetchSongRecordings` above.
+    // That's ~120 KB gzipped for a song like "Ain't Misbehavin'" (759
+    // recordings) and scales badly for popular standards (p90 = 726
+    // recordings, max = Summertime's 1721).
+    //
+    // The two methods below replace that single fat call with:
+    //   1. `fetchSongRecordingsShell` — a metadata-only response with
+    //      every row (enough for group headers, counts, and filters),
+    //      ~18 KB gzipped.
+    //   2. `fetchRecordingsBatch` — full row data for just the IDs that
+    //      have scrolled into the viewport, batched and debounced by
+    //      SongDetailViewModel.
+    //
+    // The legacy `fetchSongRecordings` is kept for backward compatibility
+    // until the new UI has shipped and soaked.
+
+    /// Fetch the shell (metadata-only) payload for a song's recordings
+    /// list. Rows include the grouping keys (recording_year + leader
+    /// name+sort), filter-input fields (`instrumentsPresent`,
+    /// `isInstrumentalConsensus`, `has*` streaming flags), and just
+    /// enough text for a skeleton row render (title, album_title,
+    /// artist_credit). Cover art URLs, sidemen, community data jsonb,
+    /// and streaming_services array are NOT included — those arrive via
+    /// `fetchRecordingsBatch`.
+    func fetchSongRecordingsShell(
+        id: String,
+        sortBy: RecordingSortOrder = .year
+    ) async -> [Recording]? {
+        let startTime = Date()
+        let url = URL.api(path: "/songs/\(id)/recordings/shell?sort=\(sortBy.rawValue)")
+
+        do {
+            let (data, response) = try await URLSession.shared.data(from: url)
+
+            if let httpResponse = response as? HTTPURLResponse {
+                guard (200...299).contains(httpResponse.statusCode) else {
+                    Log.network.error("HTTP error fetching shell: \(httpResponse.statusCode, privacy: .public)")
+                    return nil
+                }
+            }
+
+            let resp = try JSONDecoder().decode(SongRecordingsResponse.self, from: data)
+            APIClient.logRequest("GET /songs/\(id)/recordings/shell", startTime: startTime)
+
+            if APIClient.diagnosticsEnabled {
+                Log.network.debug("Shell: \(resp.recordingCount, privacy: .public) rows")
+            }
+            return resp.recordings
+        } catch {
+            Log.network.error("Error fetching shell: \(error)")
+            if let decodingError = error as? DecodingError {
+                Log.network.error("Decoding error details: \(decodingError)")
+            }
+            return nil
+        }
+    }
+
+    /// Hydrate a batch of recordings by ID. Returned rows match the shape
+    /// of `/songs/<id>/recordings` per-row output, so the caller can
+    /// swap a shell Recording for a hydrated one wholesale — no merge
+    /// needed. RecordingGrouping's filters fall back from shell fields
+    /// to equivalent hydrated fields, so the swap is transparent.
+    ///
+    /// Missing IDs (e.g. deleted server-side since the shell loaded) are
+    /// silently omitted from the response rather than returning a 404.
+    /// Caller is responsible for splitting > 100-id requests (the server
+    /// caps each batch at 100 to bound query cost).
+    func fetchRecordingsBatch(ids: [String]) async -> [Recording]? {
+        guard !ids.isEmpty else { return [] }
+        let startTime = Date()
+        let url = URL.api(path: "/recordings/batch")
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        do {
+            request.httpBody = try JSONSerialization.data(withJSONObject: ["ids": ids])
+            let (data, response) = try await URLSession.shared.data(for: request)
+
+            if let httpResponse = response as? HTTPURLResponse {
+                guard (200...299).contains(httpResponse.statusCode) else {
+                    Log.network.error("HTTP error hydrating batch: \(httpResponse.statusCode, privacy: .public)")
+                    return nil
+                }
+            }
+
+            let resp = try JSONDecoder().decode(RecordingsBatchResponse.self, from: data)
+            APIClient.logRequest("POST /recordings/batch (\(ids.count) ids)", startTime: startTime)
+
+            if APIClient.diagnosticsEnabled {
+                Log.network.debug("Hydrated \(resp.recordings.count, privacy: .public) of \(ids.count, privacy: .public) rows")
+            }
+            return resp.recordings
+        } catch {
+            Log.network.error("Error hydrating batch: \(error)")
+            if let decodingError = error as? DecodingError {
+                Log.network.error("Decoding error details: \(decodingError)")
+            }
+            return nil
+        }
+    }
+
     // MARK: - Transcriptions
 
     func fetchSongTranscriptions(songId: String) async -> [SoloTranscription] {

@@ -307,6 +307,9 @@ struct SongDetailView: View {
                     },
                     onCommunityDataChanged: {
                         Task { await viewModel.reloadRecordings(songId: currentSongId) }
+                    },
+                    onRequestHydration: { [weak viewModel] id in
+                        viewModel?.requestHydration(for: id)
                     }
                 )
             // MARK: - TRANSCRIPTIONS SECTION

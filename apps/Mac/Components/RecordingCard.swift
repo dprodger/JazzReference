@@ -12,6 +12,11 @@ import SwiftUI
 struct RecordingCard: View {
     let recording: Recording
     var showArtistName: Bool = true
+    /// Shell+hydrate viewport hook. SongDetailView passes a closure that
+    /// forwards to `SongDetailViewModel.requestHydration(for:)`; other
+    /// call sites leave this nil and render fully-loaded recordings.
+    var onVisible: ((String) -> Void)? = nil
+
     @State private var isHovering = false
     @State private var showingBackCover = false
 
@@ -222,5 +227,11 @@ struct RecordingCard: View {
             isHovering = hovering
         }
         .animation(.easeInOut(duration: 0.15), value: isHovering)
+        .onAppear {
+            // Shell+hydrate viewport hook — tells the parent ViewModel
+            // this recording is now in the viewport, so it can queue a
+            // batch hydration request for it.
+            onVisible?(recording.id)
+        }
     }
 }

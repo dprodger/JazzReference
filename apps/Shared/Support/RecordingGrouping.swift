@@ -11,19 +11,45 @@ import Foundation
 
 enum RecordingGrouping {
 
+    // MARK: - Shell ↔ hydrated field helpers
+    //
+    // For instrument filter / vocal filter: shell rows carry dedicated
+    // top-level fields (`instrumentsPresent`, `isInstrumentalConsensus`)
+    // while hydrated rows expose the same info via `performers[]` and
+    // `communityData.consensus`. The helpers below pick whichever is
+    // available so filters work before, during, and after hydration —
+    // without the caller having to know which shape a row is in.
+
+    /// All instrument names appearing anywhere on a recording (leader +
+    /// sidemen). Prefers the shell's pre-computed flat array when
+    /// present; falls back to scanning `performers[].instrument`.
+    private static func instrumentNames(for recording: Recording) -> [String] {
+        if let shellList = recording.instrumentsPresent {
+            return shellList
+        }
+        return recording.performers?.compactMap(\.instrument) ?? []
+    }
+
+    /// The community-consensus "is this an instrumental track" value.
+    /// Prefers the shell's flat bool when present; falls back to the
+    /// hydrated `community_data.consensus.is_instrumental` path.
+    private static func consensusIsInstrumental(for recording: Recording) -> Bool? {
+        if let shellBool = recording.isInstrumentalConsensus {
+            return shellBool
+        }
+        return recording.communityData?.consensus.isInstrumental
+    }
+
     // MARK: - Available Instruments
 
-    /// Distinct instrument families present in the given recordings' performers,
+    /// Distinct instrument families present across the given recordings,
     /// sorted by `InstrumentFamily.rawValue`.
     static func availableInstruments(in recordings: [Recording]) -> [InstrumentFamily] {
         var families = Set<InstrumentFamily>()
         for recording in recordings {
-            if let performers = recording.performers {
-                for performer in performers {
-                    if let instrument = performer.instrument,
-                       let family = InstrumentFamily.family(for: instrument) {
-                        families.insert(family)
-                    }
+            for instrument in instrumentNames(for: recording) {
+                if let family = InstrumentFamily.family(for: instrument) {
+                    families.insert(family)
                 }
             }
         }
@@ -45,10 +71,8 @@ enum RecordingGrouping {
 
         if let family = instrument {
             result = result.filter { recording in
-                guard let performers = recording.performers else { return false }
-                return performers.contains { performer in
-                    guard let instrument = performer.instrument else { return false }
-                    return InstrumentFamily.family(for: instrument) == family
+                instrumentNames(for: recording).contains { name in
+                    InstrumentFamily.family(for: name) == family
                 }
             }
         }
@@ -57,13 +81,9 @@ enum RecordingGrouping {
         case .all:
             break
         case .instrumental:
-            result = result.filter { recording in
-                recording.communityData?.consensus.isInstrumental == true
-            }
+            result = result.filter { consensusIsInstrumental(for: $0) == true }
         case .vocal:
-            result = result.filter { recording in
-                recording.communityData?.consensus.isInstrumental == false
-            }
+            result = result.filter { consensusIsInstrumental(for: $0) == false }
         }
 
         switch streaming {

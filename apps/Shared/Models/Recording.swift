@@ -85,6 +85,25 @@ struct Recording: Codable, Identifiable {
     let communityData: CommunityData?
     let userContribution: UserContribution?
 
+    // MARK: - Shell-only fields
+    //
+    // Present on rows returned by GET /api/songs/<id>/recordings/shell
+    // (first-paint payload for the song recordings list). They're flat
+    // conveniences derived from data that is also reachable through
+    // `performers[]` / `communityData` on hydrated rows — so row-level
+    // render code never needs them, but RecordingGrouping's filters use
+    // them to keep working on shell rows that haven't been hydrated yet
+    // (no performers sidemen, no communityData jsonb yet).
+    //
+    // When a row is hydrated by POST /api/recordings/batch, the hydrated
+    // response does NOT include these fields (the batch returns the same
+    // shape as the list endpoint). That's intentional: the hydrated row
+    // carries the full `performers[]` + `communityData` that the filter
+    // can derive from directly, so the shell fields stop mattering for
+    // that row. The fallback logic in RecordingGrouping handles both.
+    let instrumentsPresent: [String]?
+    let isInstrumentalConsensus: Bool?
+
     enum CodingKeys: String, CodingKey {
         case id, title, label, notes, composer, performers, releases, transcriptions
         case songId = "song_id"
@@ -128,6 +147,8 @@ struct Recording: Codable, Identifiable {
         case favoritedBy = "favorited_by"
         case communityData = "community_data"
         case userContribution = "user_contribution"
+        case instrumentsPresent = "instruments_present"
+        case isInstrumentalConsensus = "is_instrumental"
     }
 
     // MARK: - Helper computed properties
