@@ -1,5 +1,5 @@
 """
-Contract tests for POST /api/recordings/batch.
+Contract tests for GET /api/recordings/batch.
 
 Why these tests exist
 ---------------------
@@ -23,8 +23,11 @@ Key invariants:
   batch is song-agnostic by design.
 * Missing IDs are silently omitted (not a 404). A stale client with a
   deleted recording's ID should still be able to hydrate the rest.
-* ID validation happens BEFORE the DB round-trip: malformed UUIDs,
-  non-string elements, empty body all return 400.
+* ID validation happens BEFORE the DB round-trip: missing query string,
+  empty ids list, malformed UUID, oversize all return 400.
+* IDs travel in the query string as a comma-separated list
+  (``?ids=uuid1,uuid2,…``). Tests construct that string via helper
+  rather than spelling it out in every call.
 
 Fixture strategy mirrors the other tests: deterministic UUIDs with a
 distinct prefix range, self-cleaning before and after each test.
@@ -34,7 +37,7 @@ import pytest
 
 
 # ---------------------------------------------------------------------------
-# The contract — each row returned by POST /api/recordings/batch has exactly
+# The contract — each row returned by GET /api/recordings/batch has exactly
 # this top-level key set. Keep this in sync with EXPECTED_LIST_FIELDS in
 # test_song_recordings.py: the list endpoint and the batch endpoint return
 # the same per-row shape so a single Swift ``Recording`` decoder handles
@@ -215,15 +218,23 @@ def batch_fixture(db):
 # Happy-path contract tests
 # ---------------------------------------------------------------------------
 
+def _batch_url(ids):
+    """Helper: build ``/api/recordings/batch?ids=<comma-joined>``.
+
+    Tests spell the URL this way everywhere so the format is obvious in
+    diffs, and so swapping to a different encoding (e.g. repeated
+    ``?ids=a&ids=b``) would be a one-line change here rather than a
+    sweep across every test.
+    """
+    return f"/recordings/batch?ids={','.join(ids)}"
+
+
 def test_response_envelope_is_recordings_array(client, batch_fixture):
     """Response top-level key is ``recordings`` and nothing else. No
     ``song_id`` (the batch is song-agnostic). No ``recording_count``
     either — the client already knows how many IDs it sent.
     """
-    resp = client.post(
-        "/api/recordings/batch",
-        json={"ids": [batch_fixture["populated_recording_id"]]},
-    )
+    resp = client.get(_batch_url([batch_fixture["populated_recording_id"]]))
     assert resp.status_code == 200, resp.get_json()
     body = resp.get_json()
 
@@ -238,13 +249,10 @@ def test_each_row_has_exact_expected_fields(client, batch_fixture):
     intentionally — the Swift ``Recording`` decoder has to handle both
     endpoints with one type.
     """
-    resp = client.post(
-        "/api/recordings/batch",
-        json={"ids": [
-            batch_fixture["populated_recording_id"],
-            batch_fixture["bare_recording_id"],
-        ]},
-    )
+    resp = client.get(_batch_url([
+        batch_fixture["populated_recording_id"],
+        batch_fixture["bare_recording_id"],
+    ]))
     assert resp.status_code == 200
     body = resp.get_json()
     assert len(body["recordings"]) == 2
@@ -268,10 +276,7 @@ def test_populated_row_surfaces_full_data(client, batch_fixture):
     with instrument, streaming flag, and everything else a list row
     needs to render — the whole point of the batch endpoint.
     """
-    resp = client.post(
-        "/api/recordings/batch",
-        json={"ids": [batch_fixture["populated_recording_id"]]},
-    )
+    resp = client.get(_batch_url([batch_fixture["populated_recording_id"]]))
     body = resp.get_json()
     rec = body["recordings"][0]
 
@@ -297,10 +302,7 @@ def test_bare_row_fallthrough(client, batch_fixture):
     every contract field with the expected null / false / empty sentinel.
     Same INNER-JOIN protection as the list endpoint's CTE fall-through.
     """
-    resp = client.post(
-        "/api/recordings/batch",
-        json={"ids": [batch_fixture["bare_recording_id"]]},
-    )
+    resp = client.get(_batch_url([batch_fixture["bare_recording_id"]]))
     body = resp.get_json()
     rec = body["recordings"][0]
 
@@ -323,14 +325,11 @@ def test_unknown_ids_are_silently_omitted(client, batch_fixture):
     """
     import uuid
     unknown = str(uuid.uuid4())
-    resp = client.post(
-        "/api/recordings/batch",
-        json={"ids": [
-            batch_fixture["populated_recording_id"],
-            unknown,
-            batch_fixture["bare_recording_id"],
-        ]},
-    )
+    resp = client.get(_batch_url([
+        batch_fixture["populated_recording_id"],
+        unknown,
+        batch_fixture["bare_recording_id"],
+    ]))
     assert resp.status_code == 200
     body = resp.get_json()
     assert len(body["recordings"]) == 2
@@ -340,45 +339,50 @@ def test_unknown_ids_are_silently_omitted(client, batch_fixture):
     assert unknown not in returned_ids
 
 
+def test_whitespace_around_ids_is_tolerated(client, batch_fixture):
+    """Clients that get sloppy with URL construction (extra spaces, a
+    trailing comma) should still succeed. Guards against a fragile
+    split-and-strip regression on the server side.
+    """
+    populated = batch_fixture["populated_recording_id"]
+    bare = batch_fixture["bare_recording_id"]
+    # Leading/trailing spaces, a trailing comma, and a duplicate empty
+    # field from a double comma — all should be cleaned up server-side.
+    resp = client.get(f"/recordings/batch?ids=  {populated} ,, {bare} ,")
+    assert resp.status_code == 200, resp.get_json()
+    body = resp.get_json()
+    assert len(body["recordings"]) == 2
+
+
 # ---------------------------------------------------------------------------
 # Request validation
 # ---------------------------------------------------------------------------
 
-def test_missing_body_returns_400(client):
-    """No body at all → 400. Don't let an empty POST hit the DB."""
-    resp = client.post("/api/recordings/batch")
+def test_missing_ids_param_returns_400(client):
+    """No ``ids`` at all → 400. Don't let an empty request hit the DB."""
+    resp = client.get("/recordings/batch")
     assert resp.status_code == 400
     assert "ids" in resp.get_json()["error"].lower()
 
 
-def test_empty_ids_list_returns_400(client):
-    """``{"ids": []}`` → 400. Same reason: no useful work to do, and it
-    hides bugs where the client meant to send something.
-    """
-    resp = client.post("/api/recordings/batch", json={"ids": []})
+def test_empty_ids_value_returns_400(client):
+    """``?ids=`` with no value → 400."""
+    resp = client.get("/recordings/batch?ids=")
     assert resp.status_code == 400
 
 
-def test_non_list_ids_returns_400(client):
-    """``{"ids": "single"}`` or ``{"ids": null}`` → 400."""
-    resp = client.post("/api/recordings/batch", json={"ids": "not-a-list"})
-    assert resp.status_code == 400
-
-
-def test_non_string_id_element_returns_400(client):
-    """``{"ids": [1, 2, 3]}`` → 400 before the DB call."""
-    resp = client.post("/api/recordings/batch", json={"ids": [1, 2]})
+def test_only_separators_returns_400(client):
+    """``?ids=,,,`` (all commas, no real IDs) → 400 after the strip pass."""
+    resp = client.get("/recordings/batch?ids=,,,")
     assert resp.status_code == 400
 
 
 def test_malformed_uuid_returns_400(client):
-    """A non-UUID string → 400 with a message naming the bad value.
+    """A non-UUID entry → 400 with a message naming the bad value.
     Client-side bugs that construct bad IDs should surface clearly rather
     than as a cryptic psycopg error.
     """
-    resp = client.post(
-        "/api/recordings/batch", json={"ids": ["not-a-uuid"]}
-    )
+    resp = client.get("/recordings/batch?ids=not-a-uuid")
     assert resp.status_code == 400
     assert "uuid" in resp.get_json()["error"].lower()
 
@@ -390,6 +394,6 @@ def test_too_many_ids_returns_400(client):
     import uuid
     from routes.recordings import BATCH_MAX_IDS
     ids = [str(uuid.uuid4()) for _ in range(BATCH_MAX_IDS + 1)]
-    resp = client.post("/api/recordings/batch", json={"ids": ids})
+    resp = client.get(_batch_url(ids))
     assert resp.status_code == 400
     assert "too many" in resp.get_json()["error"].lower()

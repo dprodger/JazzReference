@@ -24,7 +24,7 @@ from rate_limit import limiter, BATCH_RECORDINGS_LIMIT
 logger = logging.getLogger(__name__)
 recordings_bp = Blueprint('recordings', __name__)
 
-# Maximum IDs per POST /api/recordings/batch request. Keeps the query
+# Maximum IDs per GET /api/recordings/batch request. Keeps the query
 # bounded and prevents clients (accidentally or maliciously) from asking
 # for a whole catalog in one shot.
 BATCH_MAX_IDS = 100
@@ -722,15 +722,15 @@ def get_recording_detail(recording_id):
         return jsonify({'error': 'Failed to fetch recording details', 'detail': str(e)}), 500
 
 
-@recordings_bp.route('/recordings/batch', methods=['POST'])
+@recordings_bp.route('/recordings/batch', methods=['GET'])
 @limiter.limit(BATCH_RECORDINGS_LIMIT)
 def get_recordings_batch():
     """
     Bulk-hydrate recording rows by ID — the second half of the shell+hydrate
     pattern that powers the song recordings list.
 
-    Request body:
-        {"ids": ["<uuid>", "<uuid>", ...]}   (1 to BATCH_MAX_IDS entries)
+    Query parameters:
+        ids=<uuid>,<uuid>,...   (1 to BATCH_MAX_IDS comma-separated entries)
 
     Response:
         {"recordings": [<row>, ...]}
@@ -747,15 +747,30 @@ def get_recordings_batch():
     omitted from the response (not a 404) so a partially stale client can
     still hydrate whatever is still on the server.
 
+    GET was chosen over POST so responses are idempotent/cacheable and so
+    requests show up cleanly in proxy/server logs. At BATCH_MAX_IDS = 100,
+    a full query string with 36-char UUIDs is ~3.7KB — well within the
+    default URL-length limit on every proxy in our stack (Render's is 8KB).
+
     See backend/tests/test_recordings_batch.py for the field contract.
     """
     try:
-        body = request.get_json(silent=True) or {}
-        ids = body.get('ids')
+        raw_ids = request.args.get('ids', '').strip()
 
-        if not isinstance(ids, list) or not ids:
+        if not raw_ids:
             return jsonify({
-                'error': 'Request body must include a non-empty "ids" array.'
+                'error': 'Query string must include a non-empty "ids" parameter '
+                         '(comma-separated UUIDs).'
+            }), 400
+
+        # Split, strip, and drop empties. Handles trailing commas,
+        # accidental double-commas, whitespace around entries.
+        ids = [part.strip() for part in raw_ids.split(',')]
+        ids = [rid for rid in ids if rid]
+
+        if not ids:
+            return jsonify({
+                'error': 'Query string must include a non-empty "ids" parameter.'
             }), 400
 
         if len(ids) > BATCH_MAX_IDS:
@@ -768,8 +783,6 @@ def get_recordings_batch():
         # a 400 here gives a clearer error to misbehaving clients.
         validated_ids = []
         for rid in ids:
-            if not isinstance(rid, str):
-                return jsonify({'error': 'All IDs must be strings.'}), 400
             try:
                 validated_ids.append(str(uuid.UUID(rid)))
             except (ValueError, TypeError):

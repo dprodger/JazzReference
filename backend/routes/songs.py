@@ -626,7 +626,7 @@ def get_song_recordings_shell(song_id):
     backend/tests/test_song_recordings_shell.py. The iOS/Mac app loads this
     to render group headers (by decade or by artist), run the vocal /
     instrumental / instrument / streaming-service filters, and show skeleton
-    rows; it then calls POST /api/recordings/batch with the IDs of rows that
+    rows; it then calls GET /api/recordings/batch with the IDs of rows that
     scroll into view to fill in cover art and full performer data.
 
     Compared to GET /api/songs/<id>/recordings, this endpoint omits

@@ -223,19 +223,20 @@ class SongService: ObservableObject {
     /// Missing IDs (e.g. deleted server-side since the shell loaded) are
     /// silently omitted from the response rather than returning a 404.
     /// Caller is responsible for splitting > 100-id requests (the server
-    /// caps each batch at 100 to bound query cost).
+    /// caps each batch at 100 to bound query cost). The IDs travel as a
+    /// comma-separated query string; 100 UUIDs work out to ~3.7KB of URL,
+    /// well within Render's 8KB limit.
     func fetchRecordingsBatch(ids: [String]) async -> [Recording]? {
         guard !ids.isEmpty else { return [] }
         let startTime = Date()
-        let url = URL.api(path: "/recordings/batch")
-
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        // UUIDs contain only hex + dashes so a raw comma-joined string
+        // is URL-safe without percent-encoding. `URL.api(path:)` handles
+        // the rest of the URL construction.
+        let joinedIds = ids.joined(separator: ",")
+        let url = URL.api(path: "/recordings/batch?ids=\(joinedIds)")
 
         do {
-            request.httpBody = try JSONSerialization.data(withJSONObject: ["ids": ids])
-            let (data, response) = try await URLSession.shared.data(for: request)
+            let (data, response) = try await URLSession.shared.data(from: url)
 
             if let httpResponse = response as? HTTPURLResponse {
                 guard (200...299).contains(httpResponse.statusCode) else {
@@ -245,7 +246,7 @@ class SongService: ObservableObject {
             }
 
             let resp = try JSONDecoder().decode(RecordingsBatchResponse.self, from: data)
-            APIClient.logRequest("POST /recordings/batch (\(ids.count) ids)", startTime: startTime)
+            APIClient.logRequest("GET /recordings/batch (\(ids.count) ids)", startTime: startTime)
 
             if APIClient.diagnosticsEnabled {
                 Log.network.debug("Hydrated \(resp.recordings.count, privacy: .public) of \(ids.count, privacy: .public) rows")
