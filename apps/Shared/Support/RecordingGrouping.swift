@@ -40,6 +40,26 @@ enum RecordingGrouping {
         return recording.communityData?.consensus.isInstrumental
     }
 
+    /// The artist label that RecordingRowView (iOS) and RecordingCard (Mac)
+    /// show on the card: `artist_credit` if present, else the leader's
+    /// display name, else the first performer's name. Kept in sync with
+    /// both card views so the "More Recordings" section sorts in the same
+    /// order the user reads.
+    private static func displayArtistName(for recording: Recording) -> String {
+        if let credit = recording.artistCredit, !credit.isEmpty {
+            return credit
+        }
+        if let performers = recording.performers {
+            if let leader = performers.first(where: { $0.role?.lowercased() == "leader" }) {
+                return leader.name
+            }
+            if let first = performers.first {
+                return first.name
+            }
+        }
+        return "Unknown Artist"
+    }
+
     // MARK: - Available Instruments
 
     /// Distinct instrument families present across the given recordings,
@@ -180,9 +200,10 @@ enum RecordingGrouping {
             }
         }
 
-        // Build result: featured artists first (in original order), then
+        // Build result: featured artists first (in original order, which
+        // follows the server's sort=name ORDER BY leader sort-name), then
         // a "More Recordings" group of singles sorted alphabetically by
-        // leader sort-name.
+        // the same artist label the card displays.
         var result: [(groupKey: String, recordings: [Recording])] = []
 
         for artist in featuredOrder {
@@ -192,12 +213,13 @@ enum RecordingGrouping {
         }
 
         if !moreRecordings.isEmpty {
+            // Sort by the artist label the card actually shows — otherwise
+            // the user sees cards labeled "Nat King Cole" / "Tommy Dorsey"
+            // arranged in last-name order, which reads as unsorted (#93).
             let sortedMore = moreRecordings.sorted { rec1, rec2 in
-                let leader1 = rec1.performers?.first { $0.role == "leader" }
-                let leader2 = rec2.performers?.first { $0.role == "leader" }
-                let sortKey1 = leader1?.sortName ?? leader1?.name ?? "Unknown"
-                let sortKey2 = leader2?.sortName ?? leader2?.name ?? "Unknown"
-                return sortKey1.localizedCaseInsensitiveCompare(sortKey2) == .orderedAscending
+                let key1 = displayArtistName(for: rec1)
+                let key2 = displayArtistName(for: rec2)
+                return key1.localizedCaseInsensitiveCompare(key2) == .orderedAscending
             }
             result.append((groupKey: "More Recordings", recordings: sortedMore))
         }
