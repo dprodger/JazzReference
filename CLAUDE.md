@@ -169,6 +169,20 @@ Core tables (see `sql/jazz-db-schema.sql`):
 - `users` - Authentication (email/password, Google, Apple)
 - `repertoires` / `repertoire_songs` - User song collections
 
+#### Dual MusicBrainz work IDs on `songs`
+
+`songs` carries both `musicbrainz_id` (primary MB work ID) and `second_mb_id`
+(secondary MB work ID). Some standards exist as multiple works in MusicBrainz
+— for example a tune split across two work entries, or an alternate version
+merged into a separate work. When `second_mb_id` is populated, the importer
+pulls recordings from both works and tags each recording's
+`recordings.source_mb_work_id` with the MB work it came from, so admin tools
+can review which recordings originated from the secondary work.
+
+The columns carry `COMMENT ON COLUMN` documentation in the database itself —
+see `sql/migrations/002_add_second_mb_id.sql` (introduction) and
+`sql/migrations/011_drop_redundant_recording_releases_unique.sql` (refresh).
+
 ### External Data Sources
 
 - **MusicBrainz**: Work IDs, recording metadata, performer credits, releases

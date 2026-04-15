@@ -172,8 +172,10 @@ CREATE TABLE recording_releases (
     track_artist_credit VARCHAR(500),
     track_length_ms INTEGER,                    -- Duration on this specific release
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE (recording_id, release_id, disc_number, track_number),
     UNIQUE (recording_id, release_id)
+    -- Track/disc lookup is served by idx_recording_releases_disc_track below;
+    -- a separate UNIQUE on (recording_id, release_id, disc_number, track_number)
+    -- would be redundant with the (recording_id, release_id) constraint above.
 );
 
 -- Recording <-> Performer junction
@@ -755,3 +757,18 @@ CREATE INDEX idx_content_reports_entity_id ON content_reports (entity_id);
 CREATE INDEX idx_content_reports_status ON content_reports (status) WHERE status IN ('pending', 'reviewing');
 CREATE INDEX idx_content_reports_external_source ON content_reports (external_source);
 CREATE INDEX idx_content_reports_created_at ON content_reports (created_at DESC);
+
+-- ============================================================================
+-- COLUMN DOCUMENTATION
+-- ============================================================================
+
+COMMENT ON COLUMN songs.second_mb_id IS
+    'Secondary MusicBrainz work ID for songs that exist as multiple works in MB '
+    '(e.g., a standard split across two work entries, or an alternate version '
+    'merged into a separate work). When set, recordings can be imported from '
+    'either MB work and tracked via recordings.source_mb_work_id.';
+
+COMMENT ON COLUMN recordings.source_mb_work_id IS
+    'The MusicBrainz work ID this recording was imported from — either '
+    'songs.musicbrainz_id or songs.second_mb_id. Used to assess which '
+    'recordings came from the secondary MB work for review.';
