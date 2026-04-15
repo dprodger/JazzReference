@@ -253,66 +253,71 @@ class PerformerImporter:
         if not recording_data:
             logger.debug("  No recording data provided")
             return 0
-        
+
         # Extract performers from recording data
         performers_to_add = self._extract_performers_from_recording(recording_data)
-        
+
         if not performers_to_add:
             logger.debug("  No performers found in recording data")
-            return 0
-        
+            # Even when MB has no performer relations for this recording, the
+            # artist-credit still tells us who the leader is. Try the fallback
+            # below so we don't leak another leaderless recording into the DB.
+            return self._ensure_leader_from_artist_credit(
+                conn, recording_id, recording_data
+            ) if (conn and recording_id) else 0
+
         # Get leader information from artist credits
         leader_mbids, leader_names = self._extract_leader_info_from_recording(recording_data)
-        
+
         if self.dry_run:
             self._log_performers_dry_run(performers_to_add, leader_mbids, leader_names)
             return len(performers_to_add)
-        
+
         if not conn or not recording_id:
             return 0
-        
+
         # Check how many performers already exist for this recording
         existing_performer_count = self._get_recording_performer_count(conn, recording_id)
-        
+
         # =======================================================================
         # PERFORMANCE OPTIMIZATION: Batch lookup all performers at once
         # =======================================================================
-        
+
         # Collect all MBIDs and names to look up
         mbids_to_lookup = [p.get('mbid') for p in performers_to_add if p.get('mbid')]
         names_to_lookup = [p.get('name') for p in performers_to_add if p.get('name')]
-        
+
         # Batch fetch existing performers (single query for MBIDs, single for names)
         performer_cache = self._batch_get_performers(conn, mbids_to_lookup, names_to_lookup)
-        
+
         # Batch fetch existing performer links for this recording (single query)
         existing_links = self._batch_get_recording_performer_links(
             conn, recording_id, list(performer_cache.values())
         )
-        
+
         # =======================================================================
         # Now process performers using cached data
         # =======================================================================
-        
+
         new_performers_added = 0
         new_performer_names = []
-        
+
         with conn.cursor() as cur:
             for performer_data in performers_to_add:
                 performer_mbid = performer_data.get('mbid')
                 performer_name = performer_data.get('name')
-                
+
                 # Try to get from cache first
                 performer_id = None
                 cache_key = None
-                
+
                 if performer_mbid and f"mbid:{performer_mbid}" in performer_cache:
                     cache_key = f"mbid:{performer_mbid}"
                     performer_id = performer_cache[cache_key]
                 elif performer_name and f"name:{performer_name.lower()}" in performer_cache:
                     cache_key = f"name:{performer_name.lower()}"
                     performer_id = performer_cache[cache_key]
-                
+
                 if not performer_id:
                     # Need to create this performer (not in DB)
                     performer_id = self._create_performer(
@@ -329,23 +334,23 @@ class PerformerImporter:
                             performer_cache[f"mbid:{performer_mbid}"] = performer_id
                         if performer_name:
                             performer_cache[f"name:{performer_name.lower()}"] = performer_id
-                
+
                 if not performer_id:
                     continue
-                
+
                 # Check if already linked (using pre-fetched data)
                 if performer_id in existing_links:
                     logger.debug(f"  Skipping {performer_name} - already linked")
                     continue
-                
+
                 # This is a NEW performer for this recording
                 db_role = self._determine_role(performer_data, leader_mbids, leader_names)
                 instruments = performer_data.get('instruments') or []
-                
+
                 if instruments:
                     for instrument_name in instruments:
                         instrument_id = self.get_or_create_instrument(conn, instrument_name)
-                        
+
                         if instrument_id:
                             cur.execute("""
                                 INSERT INTO recording_performers (
@@ -354,7 +359,7 @@ class PerformerImporter:
                                 VALUES (%s, %s, %s, %s)
                                 ON CONFLICT DO NOTHING
                             """, (recording_id, performer_id, instrument_id, db_role))
-                            
+
                             self.link_performer_instrument(conn, performer_id, instrument_id)
                             new_performers_added += 1
                             new_performer_names.append(f"{performer_name} ({instrument_name})")
@@ -371,11 +376,24 @@ class PerformerImporter:
                     new_performers_added += 1
                     new_performer_names.append(performer_name)
                     existing_links.add(performer_id)
-            
+
             # Ensure at least one leader
             if new_performers_added > 0:
                 self._ensure_leader_exists(cur, recording_id, 'recording_performers')
-        
+
+        # Artist-credit leader fallback (#93 follow-up). If the ingest above
+        # produced only role='other' rows (common for pop/crossover tracks
+        # where MB has producer/engineer credits but no performance
+        # relations), `_ensure_leader_exists` leaves the recording with no
+        # leader — it explicitly won't promote 'other' rows. Synthesize one
+        # from artist-credit in that case. No-op when a leader already
+        # exists, so safe to call unconditionally.
+        leaders_from_credit = self._ensure_leader_from_artist_credit(
+            conn, recording_id, recording_data
+        )
+        if leaders_from_credit:
+            new_performers_added += leaders_from_credit
+
         # SPECIAL LOGGING: If we added performers to a recording that already had some
         if new_performers_added > 0 and existing_performer_count > 0:
             self._log_performer_addition(
@@ -806,15 +824,15 @@ class PerformerImporter:
         Ensure at least one leader exists for a recording
         """
         id_column = 'recording_id' if table_name == 'recording_performers' else 'release_id'
-        
+
         cur.execute(f"""
             SELECT COUNT(*) as leader_count
             FROM {table_name}
             WHERE {id_column} = %s AND role = 'leader'
         """, (entity_id,))
-        
+
         leader_count = cur.fetchone()['leader_count']
-        
+
         if leader_count == 0:
             logger.debug(f"      No leaders assigned - marking first performer as leader")
             cur.execute(f"""
@@ -828,6 +846,112 @@ class PerformerImporter:
                     LIMIT 1
                 )
             """, (entity_id,))
+
+    def _ensure_leader_from_artist_credit(self, conn, recording_id, recording_data):
+        """
+        Synthesize a leader row from the recording's artist-credit when the
+        normal performer ingest didn't produce one.
+
+        Background: MusicBrainz stores the billed artist in the recording's
+        ``artist-credit`` field (e.g. ``[{artist: {id: ..., name: "Ray
+        Charles"}}]``). Performance credits (instrument/vocal relations) are
+        stored separately in ``relations``. For jazz sessions these usually
+        line up — the leader shows up in both places — and ``_determine_role``
+        picks them out correctly. For a lot of pop/crossover recordings,
+        though, only production credits (producer, engineer, arranger, mix)
+        made it onto MB, with no performance relation for the billed artist.
+        Those recordings end up with only ``role='other'`` rows and no
+        leader at all, which is what #93's backfill diagnosis surfaced.
+
+        This fallback fixes that specific case: when no leader row exists,
+        insert one per entry in ``artist-credit`` with no instrument (since
+        artist-credit doesn't carry instrument info). Idempotent — both the
+        up-front leader check and ``ON CONFLICT DO NOTHING`` keep re-runs a
+        no-op.
+
+        Returns:
+            Number of leader rows inserted (0 if a leader already existed or
+            the recording had no artist-credit).
+        """
+        if not recording_data or not conn or not recording_id:
+            return 0
+
+        artist_credits = recording_data.get('artist-credit') or []
+        if not artist_credits:
+            return 0
+
+        artists = self.parse_artist_credits(artist_credits)
+        if not artists:
+            return 0
+
+        if self.dry_run:
+            names = ', '.join(a['name'] for a in artists if a.get('name'))
+            logger.info(f"  [DRY RUN] Would synthesize leader from artist-credit: {names}")
+            return 0
+
+        with conn.cursor() as cur:
+            # Bail if a leader is already present (handles both cases:
+            # normal ingest just created one, or a prior run of this
+            # fallback did).
+            cur.execute("""
+                SELECT 1 FROM recording_performers
+                WHERE recording_id = %s AND role = 'leader'
+                LIMIT 1
+            """, (recording_id,))
+            if cur.fetchone():
+                return 0
+
+            inserted = 0
+            for artist in artists:
+                name = artist.get('name')
+                if not name:
+                    continue
+                mbid = artist.get('mbid')
+
+                performer_id = None
+                if mbid:
+                    cur.execute(
+                        "SELECT id FROM performers WHERE musicbrainz_id = %s",
+                        (mbid,),
+                    )
+                    row = cur.fetchone()
+                    if row:
+                        performer_id = row['id']
+
+                if not performer_id:
+                    cur.execute(
+                        "SELECT id FROM performers WHERE LOWER(name) = LOWER(%s) LIMIT 1",
+                        (name,),
+                    )
+                    row = cur.fetchone()
+                    if row:
+                        performer_id = row['id']
+
+                if not performer_id:
+                    performer_id = self._create_performer(
+                        conn,
+                        name,
+                        mbid,
+                        sort_name=artist.get('sort_name'),
+                        artist_type=artist.get('artist_type'),
+                        disambiguation=artist.get('disambiguation'),
+                    )
+
+                if not performer_id:
+                    continue
+
+                cur.execute("""
+                    INSERT INTO recording_performers (recording_id, performer_id, role)
+                    VALUES (%s, %s, 'leader')
+                    ON CONFLICT DO NOTHING
+                """, (recording_id, performer_id))
+                if cur.rowcount > 0:
+                    inserted += 1
+                    logger.debug(
+                        f"      Added leader from artist-credit: {name}"
+                    )
+
+            return inserted
     
     def _log_performers_dry_run(self, performers, leader_mbids, leader_names):
         """Log performer info in dry-run mode"""
