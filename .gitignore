@@ -16,6 +16,9 @@ scripts/cache/*
 backend/scripts/log
 backend/scripts/cache
 
+# Claude Code local state (agent memory, worktrees, per-user settings)
+.claude/
+
 ### Xcode Patch ###
 *.xcodeproj/*
 !*.xcodeproj/project.pbxproj
