@@ -524,15 +524,18 @@ def get_song_recordings(song_id):
                 GROUP BY rc.recording_id
             )
             -- Main query: JOIN pre-computed CTEs instead of correlated subqueries
+            -- Fields deliberately excluded from this LIST-VIEW payload because
+            -- no list-row view reads them (recording detail re-fetches via
+            -- /api/recordings/<id>, which carries the full payload):
+            --   r.musicbrainz_id, r.default_release_id, r.recording_date,
+            --   r.label, r.notes
+            -- See backend/tests/test_song_recordings.py for the field contract.
             SELECT
                 r.id,
                 r.title,
                 def_rel.title as album_title,
                 def_rel.artist_credit as artist_credit,
-                r.recording_date,
                 r.recording_year,
-                r.label,
-                r.default_release_id,
                 su.best_spotify_url,
                 fa.image_url_small as best_cover_art_small,
                 fa.image_url_medium as best_cover_art_medium,
@@ -545,9 +548,7 @@ def get_song_recordings(song_id):
                 COALESCE(ba.has_back_cover, FALSE) as has_back_cover,
                 ba.source as back_cover_source,
                 ba.source_url as back_cover_source_url,
-                r.musicbrainz_id,
                 r.is_canonical,
-                r.notes,
                 COALESCE(
                     json_agg(
                         json_build_object(
@@ -589,9 +590,8 @@ def get_song_recordings(song_id):
             LEFT JOIN spotify_urls su ON su.recording_id = r.id
             LEFT JOIN community cm ON cm.recording_id = r.id
             WHERE r.song_id = %s
-            GROUP BY r.id, def_rel.title, def_rel.artist_credit, r.recording_date, r.recording_year,
-                     r.label, r.default_release_id,
-                     r.musicbrainz_id, r.is_canonical, r.notes,
+            GROUP BY r.id, def_rel.title, def_rel.artist_credit, r.recording_year,
+                     r.is_canonical,
                      su.best_spotify_url,
                      fa.image_url_small, fa.image_url_medium, fa.image_url_large, fa.source, fa.source_url,
                      ba.image_url_small, ba.image_url_medium, ba.image_url_large, ba.has_back_cover, ba.source, ba.source_url,
