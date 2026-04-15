@@ -16,6 +16,7 @@ Provides endpoints for listing, searching, and creating songs.
 from flask import Blueprint, jsonify, request, g
 import logging
 import json
+import time
 import db_utils as db_tools
 from utils.helpers import safe_strip
 from middleware.auth_middleware import require_auth
@@ -763,17 +764,37 @@ def get_song_recordings_shell(song_id):
             ORDER BY {shell_order}
         """
 
+        # Timing breakdown: the client log currently shows ~2-3s for this
+        # endpoint on Render's Starter tier (0.5 shared CPU) while the raw
+        # SQL is well under 100ms in EXPLAIN ANALYZE. Instrument the two
+        # server-side phases we can measure so a Render log line tells us
+        # which one is eating the wall time (query vs. Python-side JSON
+        # serialization). If both are small and responseTimeMS is still
+        # high, the remaining time is in Flask/gunicorn/Render ingress.
+        t_start = time.perf_counter()
+
         # 5 CTEs use song_id once each + main WHERE uses it once = 6 params
         recordings = db_tools.execute_query(
             shell_query,
             (song_id, song_id, song_id, song_id, song_id, song_id)
         )
+        t_query_done = time.perf_counter()
 
-        return jsonify({
+        response = jsonify({
             'song_id': song_id,
             'recordings': recordings if recordings else [],
             'recording_count': len(recordings) if recordings else 0
         })
+        t_serialize_done = time.perf_counter()
+
+        row_count = len(recordings) if recordings else 0
+        query_ms = (t_query_done - t_start) * 1000
+        serialize_ms = (t_serialize_done - t_query_done) * 1000
+        logger.info(
+            f"shell song={song_id} rows={row_count} "
+            f"query_ms={query_ms:.0f} serialize_ms={serialize_ms:.0f}"
+        )
+        return response
 
     except Exception as e:
         logger.error(f"Error fetching song recordings shell: {e}", exc_info=True)

@@ -16,6 +16,7 @@ Provides endpoints for listing and searching recordings, including releases.
 from flask import Blueprint, jsonify, request, g
 import logging
 import re
+import time
 import uuid
 import db_utils as db_tools
 from middleware.auth_middleware import optional_auth, require_auth
@@ -944,6 +945,13 @@ def get_recordings_batch():
                      cm.community_data
         """
 
+        # See the shell handler in routes/songs.py for why we log query vs.
+        # serialize timing separately — same reasoning applies here. The
+        # batch endpoint shares Python-side cost characteristics with
+        # shell, and correlating the two log lines for one page-load
+        # makes it obvious if the bottleneck is CPU-bound serialization.
+        t_start = time.perf_counter()
+
         # 6 occurrences of the IDs array: 2 in front_art CTE, 1 in back_art,
         # 1 in streaming, 1 in spotify_urls, 1 in community, 1 in main WHERE
         # = 7 params.
@@ -951,10 +959,21 @@ def get_recordings_batch():
             batch_query,
             (validated_ids,) * 7
         )
+        t_query_done = time.perf_counter()
 
-        return jsonify({
+        response = jsonify({
             'recordings': rows if rows else []
         })
+        t_serialize_done = time.perf_counter()
+
+        row_count = len(rows) if rows else 0
+        query_ms = (t_query_done - t_start) * 1000
+        serialize_ms = (t_serialize_done - t_query_done) * 1000
+        logger.info(
+            f"batch ids={len(validated_ids)} rows={row_count} "
+            f"query_ms={query_ms:.0f} serialize_ms={serialize_ms:.0f}"
+        )
+        return response
 
     except Exception as e:
         logger.error(f"Error in recordings batch: {e}", exc_info=True)

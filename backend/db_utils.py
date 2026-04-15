@@ -481,20 +481,26 @@ def execute_query(query, params=None, fetch_one=False, fetch_all=True):
     try:
         with get_db_connection() as conn:
             with conn.cursor() as cur:
-                # Set a 30s statement timeout for each query
-                cur.execute("SET statement_timeout = '30s'")
+                # Statement timeout is already set via the pool's
+                # `options='-c statement_timeout=30000'` at connection
+                # creation time (see init_connection_pool above) and via
+                # `options='-c statement_timeout=300000'` for simple
+                # connections, so we don't need to re-issue SET per
+                # query — that was an extra round-trip to the DB on
+                # every call, noticeable on cross-region (Render →
+                # Supabase) connections.
                 cur.execute(query, params)
-                
+
                 if fetch_one:
                     result = cur.fetchone()
                 elif fetch_all:
                     result = cur.fetchall()
                 else:
                     result = None
-                
+
                 duration = time.time() - start_time
                 logger.debug(f"Query executed in {duration:.3f}s")
-                
+
                 return result
                 
     except psycopg.OperationalError as e:
