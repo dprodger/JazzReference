@@ -476,10 +476,18 @@ def execute_query(query, params=None, fetch_one=False, fetch_all=True):
     Returns:
         Query results or None
     """
-    start_time = time.time()
+    # Fine-grained phase timings. Aggregated at DEBUG normally; promoted
+    # to INFO on any single-query duration >= 500ms so slow prod queries
+    # stand out in Render logs without drowning them in per-query noise.
+    # Helps us tell pool-checkout stalls apart from slow PGWire streaming.
+    t_fn_start = time.perf_counter()
+    t_pool_checkout = None
+    t_exec_done = None
+    t_fetch_done = None
 
     try:
         with get_db_connection() as conn:
+            t_pool_checkout = time.perf_counter()
             with conn.cursor() as cur:
                 # Statement timeout is already set via the pool's
                 # `options='-c statement_timeout=30000'` at connection
@@ -490,6 +498,7 @@ def execute_query(query, params=None, fetch_one=False, fetch_all=True):
                 # every call, noticeable on cross-region (Render →
                 # Supabase) connections.
                 cur.execute(query, params)
+                t_exec_done = time.perf_counter()
 
                 if fetch_one:
                     result = cur.fetchone()
@@ -497,17 +506,31 @@ def execute_query(query, params=None, fetch_one=False, fetch_all=True):
                     result = cur.fetchall()
                 else:
                     result = None
+                t_fetch_done = time.perf_counter()
 
-                duration = time.time() - start_time
-                logger.debug(f"Query executed in {duration:.3f}s")
+                total_ms = (t_fetch_done - t_fn_start) * 1000
+                checkout_ms = (t_pool_checkout - t_fn_start) * 1000
+                exec_ms = (t_exec_done - t_pool_checkout) * 1000
+                fetch_ms = (t_fetch_done - t_exec_done) * 1000
+                summary = (
+                    f"q checkout_ms={checkout_ms:.0f} "
+                    f"exec_ms={exec_ms:.0f} fetch_ms={fetch_ms:.0f} "
+                    f"total_ms={total_ms:.0f}"
+                )
+                if total_ms >= 500:
+                    logger.info(summary)
+                else:
+                    logger.debug(summary)
 
                 return result
                 
     except psycopg.OperationalError as e:
-        logger.error(f"Database operational error after {time.time() - start_time:.3f}s: {e}")
+        elapsed_ms = (time.perf_counter() - t_fn_start) * 1000
+        logger.error(f"Database operational error after {elapsed_ms:.0f}ms: {e}")
         raise
     except Exception as e:
-        logger.error(f"Query error after {time.time() - start_time:.3f}s: {e}")
+        elapsed_ms = (time.perf_counter() - t_fn_start) * 1000
+        logger.error(f"Query error after {elapsed_ms:.0f}ms: {e}")
         raise
 
 
