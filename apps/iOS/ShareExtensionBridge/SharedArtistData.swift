@@ -23,7 +23,7 @@ struct ImportedArtistData: Codable, Identifiable {
 /// USE THIS CLASS IN THE MAIN APP TO RETRIEVE IMPORTED DATA
 class SharedArtistDataManager {
     
-    private static let appGroupIdentifier = "group.me.rodger.david.JazzReference"
+    private static let appGroupIdentifier = "group.com.approachnote.shared"
     private static let sharedDataKey = "pendingArtistImport"
     
     /// Retrieve artist data in the main app
@@ -186,7 +186,7 @@ enum YouTubeVideoType: String, Codable {
 /// Manager for handling shared YouTube data between extension and main app
 class SharedYouTubeDataManager {
 
-    private static let appGroupIdentifier = "group.me.rodger.david.JazzReference"
+    private static let appGroupIdentifier = "group.com.approachnote.shared"
     private static let sharedDataKey = "pendingYouTubeImport"
 
     /// Retrieve YouTube data in the main app

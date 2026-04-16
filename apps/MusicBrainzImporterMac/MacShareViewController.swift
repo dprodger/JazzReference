@@ -21,7 +21,7 @@ class MacShareViewController: NSViewController {
     private var youtubeData: YouTubeData?
     private var isSongImport: Bool = false
     private var isYouTubeImport: Bool = false
-    private let appGroupIdentifier = "group.me.rodger.david.JazzReference"
+    private let appGroupIdentifier = "group.com.approachnote.shared"
 
     // MARK: - Lifecycle
     override func loadView() {

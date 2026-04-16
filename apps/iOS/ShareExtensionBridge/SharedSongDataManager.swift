@@ -34,7 +34,7 @@ struct ImportedSongData: Identifiable {
 /// Manager for handling shared song data between extension and main app
 class SharedSongDataManager {
     
-    private static let appGroupIdentifier = "group.me.rodger.david.JazzReference"
+    private static let appGroupIdentifier = "group.com.approachnote.shared"
     private static let sharedDataKey = "pendingSongImport"
     
     /// Retrieve song data in the main app

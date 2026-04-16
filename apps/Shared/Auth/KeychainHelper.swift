@@ -15,7 +15,7 @@ class KeychainHelper {
     static let shared = KeychainHelper()
 
     /// Service identifier for keychain items (required for sandboxed Mac apps)
-    private let service = "me.rodger.david.JazzReference"
+    private let service = "com.approachnote"
 
     private init() {}
     

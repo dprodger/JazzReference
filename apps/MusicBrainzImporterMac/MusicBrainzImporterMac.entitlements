@@ -4,7 +4,7 @@
 <dict>
 	<key>com.apple.security.application-groups</key>
 	<array>
-		<string>group.me.rodger.david.JazzReference</string>
+		<string>group.com.approachnote.shared</string>
 	</array>
 </dict>
 </plist>
