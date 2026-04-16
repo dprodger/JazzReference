@@ -157,7 +157,7 @@ Log.network.debug("Status: \(statusCode, privacy: .public)")
 
 For the `MusicBrainzImporter` target (separate target, can't access `Log`), create a local `Logger`:
 ```swift
-private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.jazzreference", category: "data")
+private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.approachnote.MusicBrainzImporter", category: "data")
 ```
 
 **Services architecture**: API calls live in per-domain services under `Shared/Services/` (not in views or view models):

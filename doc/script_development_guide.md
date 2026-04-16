@@ -414,7 +414,7 @@ class APIIntegration:
     def __init__(self):
         self.session = requests.Session()
         self.session.headers.update({
-            'User-Agent': 'JazzReference/1.0 (https://github.com/youruser/jazzreference)',
+            'User-Agent': 'ApproachNote/1.0 (+support@approachnote.com)',
             'Accept': 'application/json'
         })
 ```
@@ -621,7 +621,7 @@ class MyProcessor:
         self.dry_run = dry_run
         self.session = requests.Session()
         self.session.headers.update({
-            'User-Agent': 'JazzReference/1.0 (Educational)',
+            'User-Agent': 'ApproachNote/1.0 (+support@approachnote.com)',
             'Accept': 'application/json'
         })
         self.stats = {

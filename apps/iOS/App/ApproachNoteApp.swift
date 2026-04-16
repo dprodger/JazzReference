@@ -60,8 +60,8 @@ struct ApproachNoteApp: App {
                 .onOpenURL { url in
                     NSLog("🔗 Received deep link: \(url)")
                     
-                    // Handle password reset: jazzreference://auth/reset-password?token=xyz
-                    if url.scheme == "jazzreference" && url.host == "auth" && url.path == "/reset-password" {
+                    // Handle password reset: approachnote://auth/reset-password?token=xyz
+                    if url.scheme == "approachnote" && url.host == "auth" && url.path == "/reset-password" {
                         NSLog("🔑 Password reset deep link detected")
                         
                         // Extract token from query parameters
@@ -75,23 +75,23 @@ struct ApproachNoteApp: App {
                             NSLog("❌ No token found in reset password deep link")
                         }
                     }
-                    // Handle artist import: jazzreference://import-artist
-                    else if url.scheme == "jazzreference" && url.host == "import-artist" {
+                    // Handle artist import: approachnote://import-artist
+                    else if url.scheme == "approachnote" && url.host == "import-artist" {
                         NSLog("🎵 Artist import deep link detected")
                         checkForImportedArtist()
                     }
-                    // Handle song import: jazzreference://import-song
-                    else if url.scheme == "jazzreference" && url.host == "import-song" {
+                    // Handle song import: approachnote://import-song
+                    else if url.scheme == "approachnote" && url.host == "import-song" {
                         NSLog("🎵 Song import deep link detected")
                         checkForImportedSong()
                     }
-                    // Handle YouTube import: jazzreference://import-youtube
-                    else if url.scheme == "jazzreference" && url.host == "import-youtube" {
+                    // Handle YouTube import: approachnote://import-youtube
+                    else if url.scheme == "approachnote" && url.host == "import-youtube" {
                         NSLog("🎬 YouTube import deep link detected")
                         checkForImportedYouTube()
                     }
-                    // Handle song view: jazzreference://song/{songId}
-                    else if url.scheme == "jazzreference" && url.host == "song" {
+                    // Handle song view: approachnote://song/{songId}
+                    else if url.scheme == "approachnote" && url.host == "song" {
                         let songId = url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
                         NSLog("🎵 Song deep link detected: %@", songId)
                         if !songId.isEmpty {
@@ -101,8 +101,8 @@ struct ApproachNoteApp: App {
                             deepLinkSongId = songId
                         }
                     }
-                    // Handle artist view: jazzreference://artist/{artistId}
-                    else if url.scheme == "jazzreference" && url.host == "artist" {
+                    // Handle artist view: approachnote://artist/{artistId}
+                    else if url.scheme == "approachnote" && url.host == "artist" {
                         let artistId = url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
                         NSLog("🎵 Artist deep link detected: %@", artistId)
                         if !artistId.isEmpty {

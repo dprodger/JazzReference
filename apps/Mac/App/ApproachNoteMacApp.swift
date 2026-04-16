@@ -39,7 +39,7 @@ struct ApproachNoteMacApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
-                .handlesExternalEvents(preferring: ["jazzreference"], allowing: ["*"])
+                .handlesExternalEvents(preferring: ["approachnote"], allowing: ["*"])
                 .environmentObject(authManager)
                 .environmentObject(repertoireManager)
                 .environmentObject(favoritesManager)
@@ -132,7 +132,7 @@ struct ApproachNoteMacApp: App {
                     MacPerformerDetailSheet(performerId: data.id)
                 }
         }
-        .handlesExternalEvents(matching: ["jazzreference", "*"]) // Route URLs to existing window
+        .handlesExternalEvents(matching: ["approachnote", "*"]) // Route URLs to existing window
         .windowStyle(.automatic)
         .defaultSize(width: 1200, height: 800)
         .commands {
@@ -178,9 +178,9 @@ struct ApproachNoteMacApp: App {
         }
         #endif
 
-        guard url.scheme == "jazzreference" else { return }
+        guard url.scheme == "approachnote" else { return }
 
-        // Handle password reset: jazzreference://auth/reset-password?token=xyz
+        // Handle password reset: approachnote://auth/reset-password?token=xyz
         if url.host == "auth" && url.path == "/reset-password" {
             if let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
                let token = components.queryItems?.first(where: { $0.name == "token" })?.value {
@@ -190,28 +190,28 @@ struct ApproachNoteMacApp: App {
             return
         }
 
-        // Handle artist import: jazzreference://import-artist
+        // Handle artist import: approachnote://import-artist
         if url.host == "import-artist" {
             NSLog("🎵 Artist import deep link detected")
             checkForImportedArtist()
             return
         }
 
-        // Handle song import: jazzreference://import-song
+        // Handle song import: approachnote://import-song
         if url.host == "import-song" {
             NSLog("🎵 Song import deep link detected")
             checkForImportedSong()
             return
         }
 
-        // Handle YouTube import: jazzreference://import-youtube
+        // Handle YouTube import: approachnote://import-youtube
         if url.host == "import-youtube" {
             NSLog("🎬 YouTube import deep link detected")
             checkForImportedYouTube()
             return
         }
 
-        // Handle song view: jazzreference://song/{songId}
+        // Handle song view: approachnote://song/{songId}
         if url.host == "song" {
             let songId = url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
             NSLog("🎵 Song deep link detected: %@", songId)
@@ -223,7 +223,7 @@ struct ApproachNoteMacApp: App {
             return
         }
 
-        // Handle artist view: jazzreference://artist/{artistId}
+        // Handle artist view: approachnote://artist/{artistId}
         if url.host == "artist" {
             let artistId = url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
             NSLog("🎵 Artist deep link detected: %@", artistId)

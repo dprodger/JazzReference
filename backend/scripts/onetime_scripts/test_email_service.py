@@ -157,8 +157,8 @@ Examples:
 Configuration:
   Set these environment variables:
   - SENDGRID_API_KEY: Your SendGrid API key (required)
-  - FROM_EMAIL: Sender email address (default: noreply@jazzreference.com)
-  - FRONTEND_URL: Frontend URL for links (default: jazzreference://auth)
+  - FROM_EMAIL: Sender email address (default: noreply@approachnote.com)
+  - FRONTEND_URL: Frontend URL for links (default: approachnote://auth)
         """
     )
     

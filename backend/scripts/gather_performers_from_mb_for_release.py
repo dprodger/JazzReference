@@ -34,7 +34,7 @@ class SingleRecordingImporter:
         self.dry_run = dry_run
         self.session = requests.Session()
         self.session.headers.update({
-            'User-Agent': 'JazzReference/1.0 (https://github.com/yourusername/jazzreference)',
+            'User-Agent': 'ApproachNote/1.0 (+support@approachnote.com)',
             'Accept': 'application/json'
         })
         self.performer_importer = PerformerImporter(dry_run=dry_run)

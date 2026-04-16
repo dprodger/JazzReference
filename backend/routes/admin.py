@@ -1288,7 +1288,7 @@ def diagnose_mb_recording(song_id):
                 # ===== CHECK 1: Fetch from MusicBrainz =====
                 mb_session = requests.Session()
                 mb_session.headers.update({
-                    'User-Agent': 'JazzReferenceAdmin/1.0 (diagnostic tool)'
+                    'User-Agent': 'ApproachNote/1.0 (+support@approachnote.com)'
                 })
 
                 # Fetch recording with work-rels and releases

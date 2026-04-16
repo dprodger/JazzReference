@@ -9,7 +9,7 @@ import time
 import json
 from datetime import datetime
 
-API_URL = "https://jazzreference.onrender.com/api/health"
+API_URL = "https://api.approachnote.com/api/health"
 CHECK_INTERVAL = 60  # seconds
 
 def check_health():

@@ -1036,7 +1036,7 @@ class MacShareViewController: NSViewController {
     private func openMainApp(path: String) {
         NSLog("🔗 Opening main app with path: %@", path)
 
-        guard let url = URL(string: "jazzreference://\(path)") else {
+        guard let url = URL(string: "approachnote://\(path)") else {
             NSLog("❌ Invalid URL scheme")
             fallbackToManualOpen(path: path)
             return

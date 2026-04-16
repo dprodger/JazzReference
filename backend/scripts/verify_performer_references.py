@@ -67,7 +67,7 @@ class PerformerReferenceVerifier:
         
         self.session = requests.Session()
         self.session.headers.update({
-            'User-Agent': 'JazzReference/1.0 (Educational)',
+            'User-Agent': 'ApproachNote/1.0 (+support@approachnote.com)',
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
             'Accept-Language': 'en-US,en;q=0.5'
         })

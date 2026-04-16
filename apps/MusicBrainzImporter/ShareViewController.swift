@@ -1045,7 +1045,7 @@ class ShareViewController: UIViewController {
     private func openMainApp(path: String) {
         logger.debug("Opening main app with path: \(path, privacy: .public)")
 
-        guard let url = URL(string: "jazzreference://\(path)") else {
+        guard let url = URL(string: "approachnote://\(path)") else {
             logger.error("Invalid URL scheme")
             fallbackToManualOpen(path: path)
             return

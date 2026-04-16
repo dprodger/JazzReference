@@ -8,7 +8,7 @@
 	<string>icon</string>
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
-		<string>jazzreference</string>
+		<string>approachnote</string>
 	</array>
 	<key>NSExtension</key>
 	<dict>

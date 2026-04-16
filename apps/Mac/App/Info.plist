@@ -41,7 +41,7 @@
 			<string>me.rodger.david.JazzReferenceMac</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>jazzreference</string>
+				<string>approachnote</string>
 			</array>
 		</dict>
 		<dict>

@@ -34,7 +34,7 @@
             <string>me.rodger.david.JazzReference</string>
             <key>CFBundleURLSchemes</key>
             <array>
-                <string>jazzreference</string>
+                <string>approachnote</string>
             </array>
         </dict>
         <!-- Google Sign In URL scheme -->

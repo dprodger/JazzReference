@@ -8,7 +8,7 @@
 	<string>Import to Approach Note</string>
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
-		<string>jazzreference</string>
+		<string>approachnote</string>
 	</array>
 	<key>CFBundleIdentifier</key>
 	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>

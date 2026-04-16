@@ -425,7 +425,7 @@ Examples:
   python scripts/test_auth_endpoints.py http://localhost:5001
   
   # Test against production
-  python scripts/test_auth_endpoints.py https://jazzreference.onrender.com
+  python scripts/test_auth_endpoints.py https://api.approachnote.com
   
   # Dry run to see what would be tested
   python scripts/test_auth_endpoints.py http://localhost:5001 --dry-run

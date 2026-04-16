@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 # Configuration from environment variables
 SENDGRID_API_KEY = os.getenv('SENDGRID_API_KEY')
 FROM_EMAIL = os.getenv('FROM_EMAIL', 'noreply@approachnote.com')
-FRONTEND_URL = os.getenv('FRONTEND_URL', 'jazzreference://auth')
+FRONTEND_URL = os.getenv('FRONTEND_URL', 'approachnote://auth')
 API_BASE_URL = os.getenv('API_BASE_URL', 'https://api.approachnote.com')
 
 # Check if SendGrid is configured

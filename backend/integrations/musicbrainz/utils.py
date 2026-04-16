@@ -54,7 +54,7 @@ class MusicBrainzSearcher:
         """
         self.session = requests.Session()
         self.session.headers.update({
-            'User-Agent': 'ApproachNote/1.0 (https://github.com/dprodger/JazzReference)',
+            'User-Agent': 'ApproachNote/1.0 (+support@approachnote.com)',
             'Accept': 'application/json'
         })
         
