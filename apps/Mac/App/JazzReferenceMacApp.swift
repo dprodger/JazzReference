@@ -241,7 +241,6 @@ struct JazzReferenceMacApp: App {
     // MARK: - Import Checking
 
     private func checkForImportedArtist() {
-        NSLog("🔍 Checking for imported artist data...")
         if let data = SharedArtistDataManager.retrieveSharedData() {
             NSLog("✅ Imported artist data detected: %@", data.name)
             importedArtistData = data
@@ -249,7 +248,6 @@ struct JazzReferenceMacApp: App {
     }
 
     private func checkForImportedSong() {
-        NSLog("🔍 Checking for imported song data...")
         if let data = SharedSongDataManager.retrieveSharedData() {
             NSLog("✅ Imported song data detected: %@", data.title)
             importedSongData = data
@@ -257,7 +255,6 @@ struct JazzReferenceMacApp: App {
     }
 
     private func checkForImportedYouTube() {
-        NSLog("🔍 Checking for imported YouTube data...")
         guard importedYouTubeData == nil else {
             NSLog("ℹ️ YouTube import already in progress, skipping check")
             return
@@ -268,8 +265,6 @@ struct JazzReferenceMacApp: App {
             SharedYouTubeDataManager.clearSharedData()
             importedYouTubeData = data
             NSLog("✅ Set importedYouTubeData, sheet should show")
-        } else {
-            NSLog("❌ No YouTube data found")
         }
     }
 }
