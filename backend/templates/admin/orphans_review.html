@@ -845,6 +845,7 @@
             color: #666;
         }
     </style>
+    <script src="/static/js/admin.js"></script>
 </head>
 <body>
     {% set pending = orphans|selectattr('status', 'equalto', 'pending')|list|length %}

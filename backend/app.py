@@ -104,9 +104,13 @@ def enforce_host_routing():
     if path.startswith('/static/'):
         return None
 
-    # Allow admin routes from any host (for now)
+    # Admin routes are only served from API hosts and localhost. The admin
+    # session cookie is scoped to a single host, so letting /admin resolve
+    # anywhere would cause inconsistent sessions.
     if path.startswith('/admin'):
-        return None
+        if host_normalized in ['localhost', '127.0.0.1'] or 'api.' in host_normalized:
+            return None
+        return jsonify({'error': 'Not found'}), 404
 
     # Allow all routes on localhost (development)
     if host_normalized in ['localhost', '127.0.0.1']:
@@ -129,6 +133,19 @@ def enforce_host_routing():
         return jsonify({'error': 'Not found', 'message': 'Use api.approachnote.com for API'}), 404
 
     return None
+
+# Admin-auth gate. Runs for every URL under /admin/ regardless of which
+# blueprint registered the route (notably routes/research.py also registers
+# an /admin/* path). The hook is a no-op for /admin/login and /admin/logout
+# so the login page stays reachable.
+from middleware.admin_middleware import check_admin_or_respond  # noqa: E402
+
+@app.before_request
+def gate_admin_paths():
+    if request.path.startswith('/admin'):
+        return check_admin_or_respond()
+    return None
+
 
 # Request/response logging
 @app.before_request

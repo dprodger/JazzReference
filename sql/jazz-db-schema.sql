@@ -344,9 +344,17 @@ CREATE TABLE users (
     failed_login_attempts INTEGER DEFAULT 0,
     last_failed_login_at TIMESTAMP WITH TIME ZONE,
     last_login_at TIMESTAMP WITH TIME ZONE,
+    is_admin BOOLEAN NOT NULL DEFAULT false,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+
+COMMENT ON COLUMN users.is_admin IS
+    'True if user may access /admin web pages. Granted via backend/scripts/grant_admin.py.';
+
+CREATE INDEX IF NOT EXISTS idx_users_is_admin
+    ON users(is_admin)
+    WHERE is_admin = true;
 
 CREATE TABLE admin_users (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),

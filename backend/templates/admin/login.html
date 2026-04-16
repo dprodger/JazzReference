@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Sign In - Approach Note</title>
+    {% if google_client_id %}
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    {% endif %}
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f7;
+            color: #333;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .card {
+            background: #fff;
+            border-radius: 12px;
+            padding: 40px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+            max-width: 420px;
+            width: 100%;
+        }
+        h1 {
+            color: #1d1d1f;
+            font-size: 1.5em;
+            margin-bottom: 8px;
+        }
+        .subtitle {
+            color: #666;
+            font-size: 0.95em;
+            margin-bottom: 28px;
+        }
+        .error {
+            background: #fff1f1;
+            color: #b91c1c;
+            border: 1px solid #fecaca;
+            padding: 10px 12px;
+            border-radius: 8px;
+            font-size: 0.9em;
+            margin-bottom: 20px;
+        }
+        form { display: flex; flex-direction: column; gap: 12px; }
+        label {
+            font-size: 0.85em;
+            color: #555;
+            margin-bottom: -6px;
+        }
+        input[type="email"], input[type="password"] {
+            padding: 10px 12px;
+            border: 1px solid #d2d2d7;
+            border-radius: 8px;
+            font-size: 1em;
+            font-family: inherit;
+            background: #fff;
+        }
+        input[type="email"]:focus, input[type="password"]:focus {
+            outline: none;
+            border-color: #0071e3;
+            box-shadow: 0 0 0 3px rgba(0,113,227,0.15);
+        }
+        button.primary {
+            padding: 10px 16px;
+            border: none;
+            border-radius: 8px;
+            background: #0071e3;
+            color: #fff;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 4px;
+        }
+        button.primary:hover { background: #0062c2; }
+        .divider {
+            display: flex;
+            align-items: center;
+            color: #888;
+            font-size: 0.8em;
+            margin: 24px 0 16px;
+        }
+        .divider::before, .divider::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: #e0e0e0;
+        }
+        .divider::before { margin-right: 12px; }
+        .divider::after { margin-left: 12px; }
+        .oauth-btn-wrap {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            align-items: center;
+        }
+        #appleid-signin {
+            width: 100%;
+            max-width: 360px;
+            height: 44px;
+        }
+        .note {
+            font-size: 0.75em;
+            color: #999;
+            margin-top: 20px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>Admin Sign In</h1>
+        <p class="subtitle">Sign in with your Approach Note account. Admin access is required.</p>
+
+        {% if error %}
+        <div class="error">{{ error }}</div>
+        {% endif %}
+
+        <form method="POST" action="/admin/login{% if request.args.get('next') %}?next={{ request.args.get('next') }}{% endif %}">
+            <label for="email">Email</label>
+            <input id="email" name="email" type="email" autocomplete="email" required autofocus>
+            <label for="password">Password</label>
+            <input id="password" name="password" type="password" autocomplete="current-password" required>
+            <input type="hidden" name="csrf_token" id="csrf_token">
+            <button type="submit" class="primary">Sign in</button>
+        </form>
+
+        {% if google_client_id or apple_services_id %}
+        <div class="divider">or</div>
+        <div class="oauth-btn-wrap">
+            {% if google_client_id %}
+            <div id="g_id_onload"
+                data-client_id="{{ google_client_id }}"
+                data-callback="handleGoogleCredential"
+                data-auto_prompt="false"
+                data-context="signin"
+                data-ux_mode="popup"></div>
+            <div class="g_id_signin"
+                data-type="standard"
+                data-size="large"
+                data-theme="outline"
+                data-text="sign_in_with"
+                data-shape="rectangular"
+                data-logo_alignment="left"></div>
+            {% endif %}
+            {% if apple_services_id %}
+            <div id="appleid-signin"
+                data-client-id="{{ apple_services_id }}"
+                data-color="black"
+                data-border="true"
+                data-type="sign in"></div>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        <p class="note">Non-admins will not be granted access.</p>
+    </div>
+
+    <script>
+        // Read admin_csrf cookie once and stamp the hidden field so the form
+        // POST carries it even though SameSite=Lax already covers us.
+        (function () {
+            var m = document.cookie.match(/(?:^|; )admin_csrf=([^;]*)/);
+            var csrf = m ? decodeURIComponent(m[1]) : '';
+            document.getElementById('csrf_token').value = csrf;
+            window.__adminCsrf = csrf;
+        })();
+
+        async function postJson(payload) {
+            var nextParam = new URLSearchParams(window.location.search).get('next');
+            var url = '/admin/login' + (nextParam ? ('?next=' + encodeURIComponent(nextParam)) : '');
+            var resp = await fetch(url, {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-Token': window.__adminCsrf || ''
+                },
+                body: JSON.stringify(payload)
+            });
+            var data = {};
+            try { data = await resp.json(); } catch (_e) {}
+            if (resp.ok && data.next) {
+                window.location.href = data.next;
+            } else {
+                alert(data.error || 'Sign in failed');
+            }
+        }
+
+        // Google Identity Services callback.
+        window.handleGoogleCredential = function (response) {
+            postJson({ id_token: response.credential });
+        };
+
+        // Sign in with Apple — loaded lazily so the page renders without it.
+        (function loadAppleJs() {
+            var appleDiv = document.getElementById('appleid-signin');
+            if (!appleDiv || !appleDiv.dataset.clientId) return;
+            var s = document.createElement('script');
+            s.src = 'https://appleid.cdn-apple.com/appleauth/static/jsapi/appleid/1/en_US/appleid.auth.js';
+            s.async = true;
+            s.onload = function () {
+                if (!window.AppleID) return;
+                window.AppleID.auth.init({
+                    clientId: appleDiv.dataset.clientId,
+                    scope: 'email',
+                    redirectURI: window.location.origin + '/admin/login',
+                    usePopup: true
+                });
+                document.addEventListener('AppleIDSignInOnSuccess', function (ev) {
+                    var idToken = ev.detail && ev.detail.authorization && ev.detail.authorization.id_token;
+                    if (idToken) postJson({ identity_token: idToken });
+                });
+                document.addEventListener('AppleIDSignInOnFailure', function (ev) {
+                    console.warn('Apple sign-in failed', ev.detail && ev.detail.error);
+                });
+            };
+            document.head.appendChild(s);
+        })();
+    </script>
+</body>
+</html>

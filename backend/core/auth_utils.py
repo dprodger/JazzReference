@@ -25,6 +25,12 @@ ACCESS_TOKEN_EXPIRY = timedelta(minutes=15)
 
 REFRESH_TOKEN_EXPIRY = timedelta(days=30)
 
+# Admin browser sessions use a longer-lived JWT stored in an HttpOnly cookie.
+# Reuses JWT_SECRET; consumers MUST validate `type == 'admin_session'`.
+ADMIN_SESSION_EXPIRY = timedelta(hours=int(os.getenv('ADMIN_SESSION_EXPIRY_HOURS', '8')))
+ADMIN_SESSION_COOKIE = 'admin_session'
+ADMIN_CSRF_COOKIE = 'admin_csrf'
+
 
 def hash_password(password: str) -> str:
     """
@@ -92,6 +98,22 @@ def generate_refresh_token(user_id: str) -> str:
         'iat': datetime.now(timezone.utc),
         'type': 'refresh',
         'jti': secrets.token_hex(16)  # Unique token ID to prevent duplicates
+    }
+    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+
+def generate_admin_session_token(user_id: str) -> str:
+    """
+    Generate a JWT for an admin browser session.
+
+    Claims include `type='admin_session'` so the access/refresh/admin-session
+    token spaces stay distinct even though they share JWT_SECRET.
+    """
+    payload = {
+        'user_id': str(user_id),
+        'exp': datetime.now(timezone.utc) + ADMIN_SESSION_EXPIRY,
+        'iat': datetime.now(timezone.utc),
+        'type': 'admin_session',
     }
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
 

@@ -16,6 +16,9 @@ def register_blueprints(app):
     from routes.reports import reports_bp
     from routes.authority import authorities_bp
     from routes.admin import admin_bp
+    # Registers /admin/login and /admin/logout onto admin_bp. Import for
+    # side effects — the module has no public symbols we need here.
+    import routes.admin_auth  # noqa: F401
     from routes.videos import videos_bp
     from routes.favorites import favorites_bp
     from routes.contributions import contributions_bp

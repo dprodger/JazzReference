@@ -6,6 +6,10 @@ backend/client-google-client
 backend/scripts/.env.spotify2_jazzlinernotes
 backend/scripts/.env.spotify_jazzlinernotes
 
+# OAuth client-secret JSON downloads (Google Cloud Console etc.)
+*client_secret*.json
+*oauth*.json
+
 cache
 cache/*
 
