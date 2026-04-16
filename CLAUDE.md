@@ -112,7 +112,7 @@ apps/
 │   └── Views/                   # iOS views
 ├── Mac/                         # macOS-specific code
 │   ├── App/
-│   │   └── JazzReferenceMacApp.swift
+│   │   └── ApproachNoteMacApp.swift
 │   ├── Auth/                    # Mac auth views
 │   └── Views/                   # Mac views
 └── MusicBrainzImporter/         # Share extension

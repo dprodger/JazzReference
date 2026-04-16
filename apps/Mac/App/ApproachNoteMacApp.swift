@@ -1,8 +1,8 @@
 //
-//  JazzReferenceMacApp.swift
+//  ApproachNoteMacApp.swift
 //  Approach Note
 //
-//  macOS app entry point for Jazz Reference
+//  macOS app entry point
 //
 
 import SwiftUI
@@ -12,7 +12,7 @@ import GoogleSignIn
 #endif
 
 @main
-struct JazzReferenceMacApp: App {
+struct ApproachNoteMacApp: App {
     @StateObject private var authManager = AuthenticationManager()
     @StateObject private var repertoireManager = RepertoireManager()
     @StateObject private var favoritesManager = FavoritesManager()

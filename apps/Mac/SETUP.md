@@ -6,7 +6,7 @@ This document explains how to add the macOS app target to your existing Xcode pr
 
 The macOS app shares code with the iOS app via the `Shared/` directory:
 - **Shared files** (in `Shared/`): Models, NetworkManager, ApproachNoteTheme, AuthenticationManager, etc.
-- **macOS-specific files** (in `Mac/`): JazzReferenceMacApp.swift, Views/*, Auth/*
+- **macOS-specific files** (in `Mac/`): ApproachNoteMacApp.swift, Views/*, Auth/*
 
 ## Step-by-Step Setup
 
@@ -170,7 +170,7 @@ apps/
 │   ├── App/
 │   │   ├── Info.plist
 │   │   ├── JazzReferenceMac.entitlements
-│   │   └── JazzReferenceMacApp.swift
+│   │   └── ApproachNoteMacApp.swift
 │   ├── Auth/                    # Mac auth views
 │   ├── Assets.xcassets/
 │   └── Views/
