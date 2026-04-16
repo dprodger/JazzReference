@@ -848,6 +848,7 @@
     <script src="/static/js/admin.js"></script>
 </head>
 <body>
+    {% include 'admin/_nav.html' %}
     {% set pending = orphans|selectattr('status', 'equalto', 'pending')|list|length %}
     {% set approved = orphans|selectattr('status', 'equalto', 'approved')|list|length %}
     {% set rejected = orphans|selectattr('status', 'equalto', 'rejected')|list|length %}
