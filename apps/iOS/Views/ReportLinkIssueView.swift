@@ -1,6 +1,6 @@
 //
 //  ReportLinkIssueView.swift
-//  JazzReference
+//  Approach Note
 //
 //  Created by Dave Rodger on 10/24/25.
 //

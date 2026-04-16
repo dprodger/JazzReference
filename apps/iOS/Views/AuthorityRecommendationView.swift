@@ -1,6 +1,6 @@
 //
 //  AuthorityRecommendation.swift
-//  JazzReference
+//  Approach Note
 //
 //  Created by Dave Rodger on 11/28/25.
 //  View and manage authority recommendations for a recording

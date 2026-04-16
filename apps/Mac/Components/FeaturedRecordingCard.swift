@@ -1,6 +1,6 @@
 //
 //  FeaturedRecordingCard.swift
-//  JazzReferenceMac
+//  Approach Note
 //
 //  Larger card view used in the featured-recordings carousel in Mac SongDetailView
 //

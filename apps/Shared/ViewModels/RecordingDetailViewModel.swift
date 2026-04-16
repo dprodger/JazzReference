@@ -1,6 +1,6 @@
 //
 //  RecordingDetailViewModel.swift
-//  JazzReference
+//  Approach Note
 //
 //  Shared view model for RecordingDetailView (iOS) and RecordingDetailView (Mac).
 //  Owns the data-loading, release-auto-selection, and favorite-toggle logic

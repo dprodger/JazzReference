@@ -1,6 +1,6 @@
 //
 //  RecordingsListView.swift
-//  JazzReferenceMac
+//  Approach Note
 //
 //  macOS-specific recordings list view with master-detail layout and advanced filtering
 //

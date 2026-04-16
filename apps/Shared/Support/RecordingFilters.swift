@@ -1,6 +1,6 @@
 //
 //  RecordingFilters.swift
-//  JazzReference
+//  Approach Note
 //
 //  Shared filter enums used by both iOS and Mac recording views
 //

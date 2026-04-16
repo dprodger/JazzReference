@@ -1,5 +1,5 @@
 -- ============================================================================
--- Jazz Reference Application - Starter Data SQL Script
+-- Approach Note - Starter Data SQL Script
 -- ============================================================================
 -- This script populates the database with jazz standards from Ted Gioia's
 -- "The Jazz Standards: A Guide to the Repertoire" and additional metadata

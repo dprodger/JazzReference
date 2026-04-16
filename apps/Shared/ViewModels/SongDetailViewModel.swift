@@ -1,6 +1,6 @@
 //
 //  SongDetailViewModel.swift
-//  JazzReference
+//  Approach Note
 //
 //  Shared view model for SongDetailView (iOS) and SongDetailView (Mac).
 //  Owns the two-phase song loading, research-status polling, sort/reload,

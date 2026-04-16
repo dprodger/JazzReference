@@ -1,6 +1,6 @@
 //
 //  SongDetailView.swift
-//  JazzReference
+//  Approach Note
 //
 //  UPDATED: Replaced alert with toast notification for song queue confirmation
 //  FIXED: Broken up body to avoid type-checker timeout

@@ -1,6 +1,6 @@
 //
 //  PerformerDetailView.swift
-//  JazzReference
+//  Approach Note
 //
 //  Updated with JazzTheme color palette and ExternalReferencesPanel
 //

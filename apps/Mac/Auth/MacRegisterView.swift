@@ -1,6 +1,6 @@
 //
 //  MacRegisterView.swift
-//  JazzReferenceMac
+//  Approach Note
 //
 //  Registration view for macOS
 //

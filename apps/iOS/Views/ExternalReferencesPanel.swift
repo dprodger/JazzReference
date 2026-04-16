@@ -1,6 +1,6 @@
 //
 //  ExternalReferencesPanel.swift
-//  JazzReference
+//  Approach Note
 //
 //  Reusable panel for displaying external references (Wikipedia, Jazz Standards, MusicBrainz)
 //

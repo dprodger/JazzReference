@@ -1,6 +1,6 @@
 //
 //  MacAddStreamingLinkSheet.swift
-//  JazzReferenceMac
+//  Approach Note
 //
 //  Sheet for adding manual Spotify/Apple Music/YouTube streaming links
 //

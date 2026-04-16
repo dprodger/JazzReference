@@ -1,6 +1,6 @@
 //
 //  LoginViewModel.swift
-//  JazzReference
+//  Approach Note
 //
 //  Shared view model for LoginView (iOS) and MacLoginView (Mac).
 //  Owns form state and the trim-and-submit logic so platform views only

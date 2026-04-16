@@ -1,6 +1,6 @@
 //
 //  AuthenticationManager.swift
-//  JazzReference
+//  Approach Note
 //
 //  Created by Dave Rodger on 11/14/25.
 //  Manages user authentication state and operations

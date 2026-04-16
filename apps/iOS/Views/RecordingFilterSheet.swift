@@ -1,6 +1,6 @@
 //
 //  RecordingFilterSheet.swift
-//  JazzReference
+//  Approach Note
 //
 //  Bottom sheet for filtering recordings by availability and instrument
 //

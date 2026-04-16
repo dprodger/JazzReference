@@ -1,6 +1,6 @@
 //
 //  SharedDataManagers.swift
-//  JazzReference
+//  Approach Note
 //
 //  Created by Dave Rodger on 11/1/25.
 //
@@ -8,7 +8,7 @@
 import Foundation
 import os
 
-private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.jazzreference.MusicBrainzImporter", category: "data")
+private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.approachnote.MusicBrainzImporter", category: "data")
 
 // MARK: - Shared Data Manager
 

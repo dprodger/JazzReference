@@ -1,6 +1,6 @@
 //
 //  ToastModifier.swift
-//  JazzReference
+//  Approach Note
 //
 //  Created by Dave Rodger on 11/13/25.
 //  View modifier for adding toast notifications to any view

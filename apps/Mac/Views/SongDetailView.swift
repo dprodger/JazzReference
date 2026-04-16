@@ -1,6 +1,6 @@
 //
 //  SongDetailView.swift
-//  JazzReferenceMac
+//  Approach Note
 //
 //  macOS-specific song detail view
 //

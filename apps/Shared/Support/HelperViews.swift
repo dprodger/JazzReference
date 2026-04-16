@@ -1,6 +1,6 @@
 //
 //  HelperViews.swift
-//  JazzReference
+//  Approach Note
 //
 //  Updated with JazzTheme color palette
 //

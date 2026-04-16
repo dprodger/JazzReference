@@ -1,6 +1,6 @@
 //
 //  RecordingContributionEditView.swift
-//  JazzReference
+//  Approach Note
 //
 //  Form for editing user's contribution to recording metadata (key, tempo, instrumental/vocal)
 //

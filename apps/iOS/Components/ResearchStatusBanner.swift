@@ -1,6 +1,6 @@
 //
 //  ResearchStatusBanner.swift
-//  JazzReference
+//  Approach Note
 //
 //  Visual indicator showing research queue status for a song
 //

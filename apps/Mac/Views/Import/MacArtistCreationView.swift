@@ -1,6 +1,6 @@
 //
 //  MacArtistCreationView.swift
-//  JazzReferenceMac
+//  Approach Note
 //
 //  Artist creation view for importing from the Share Extension
 //

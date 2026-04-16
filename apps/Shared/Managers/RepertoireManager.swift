@@ -1,6 +1,6 @@
 //
 //  RepertoireManager.swift
-//  JazzReference
+//  Approach Note
 //
 //  Manages repertoire selection and persistence across app launches
 //  UPDATED FOR AUTOMATIC TOKEN REFRESH: Uses AuthenticationManager for all API calls

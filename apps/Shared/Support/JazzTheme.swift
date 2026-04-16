@@ -1,6 +1,6 @@
 //
 //  JazzTheme.swift
-//  JazzReference
+//  Approach Note
 //
 //  Centralized color theme inspired by jazz nightclubs and speakeasies
 //

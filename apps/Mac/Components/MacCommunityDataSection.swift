@@ -1,6 +1,6 @@
 //
 //  MacCommunityDataSection.swift
-//  JazzReferenceMac
+//  Approach Note
 //
 //  Displays community-contributed metadata for a recording (key, tempo, instrumental/vocal)
 //  Shows consensus values calculated from all user contributions

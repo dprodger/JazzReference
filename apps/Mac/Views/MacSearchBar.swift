@@ -1,6 +1,6 @@
 //
 //  MacSearchBar.swift
-//  JazzReferenceMac
+//  Approach Note
 //
 //  Reusable search bar component for Mac list views
 //

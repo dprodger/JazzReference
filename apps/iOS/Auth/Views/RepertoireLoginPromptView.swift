@@ -1,6 +1,6 @@
 //
 //  RepertoireLoginPromptView.swift
-//  JazzReference
+//  Approach Note
 //
 //  Created by Dave Rodger on 11/14/25.
 //  Inline login prompt shown when unauthenticated users access the

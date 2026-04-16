@@ -13,7 +13,7 @@ import os
 
 // MARK: - Share View Controller
 
-private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.jazzreference.MusicBrainzImporter", category: "data")
+private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.approachnote.MusicBrainzImporter", category: "data")
 
 class ShareViewController: UIViewController {
 

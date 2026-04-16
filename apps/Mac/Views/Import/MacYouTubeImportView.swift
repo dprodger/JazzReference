@@ -1,6 +1,6 @@
 //
 //  MacYouTubeImportView.swift
-//  JazzReferenceMac
+//  Approach Note
 //
 //  View for completing YouTube video import by selecting a song
 //

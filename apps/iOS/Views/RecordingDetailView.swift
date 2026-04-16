@@ -1,6 +1,6 @@
 //
 //  RecordingDetailView.swift
-//  JazzReference
+//  Approach Note
 //
 //  Updated with JazzTheme color palette and consistent styling
 //  UPDATED: Added back cover flip support with 3D animation

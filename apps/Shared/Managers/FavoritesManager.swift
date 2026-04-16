@@ -1,6 +1,6 @@
 //
 //  FavoritesManager.swift
-//  JazzReference
+//  Approach Note
 //
 //  Manages user's favorite recordings with automatic token refresh
 //

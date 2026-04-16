@@ -5,7 +5,7 @@
 	<key>CFBundleExecutable</key>
 	<string></string>
 	<key>CFBundleDisplayName</key>
-	<string>Import to JazzReference</string>
+	<string>Import to Approach Note</string>
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
 		<string>jazzreference</string>

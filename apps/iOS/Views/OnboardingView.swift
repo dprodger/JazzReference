@@ -1,6 +1,6 @@
 //
 //  OnboardingView.swift
-//  JazzReference
+//  Approach Note
 //
 //  Created by Dave Rodger on 12/4/25.
 //  Onboarding flow for first-time users explaining Songs, Recordings, and Releases

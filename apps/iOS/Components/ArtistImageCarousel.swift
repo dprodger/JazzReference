@@ -1,6 +1,6 @@
 //
 //  ArtistImageCarousel.swift
-//  JazzReference
+//  Approach Note
 //
 //  Simple horizontal scrolling image carousel with source watermarks
 //

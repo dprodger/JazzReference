@@ -1,6 +1,6 @@
 //
 //  LoginFormBody.swift
-//  JazzReference
+//  Approach Note
 //
 //  Shared login form used by both LoginView (sheet) and RepertoireLoginPromptView
 //  (inline). Owns the email/password fields, all three sign-in buttons

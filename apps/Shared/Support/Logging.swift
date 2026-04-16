@@ -1,7 +1,7 @@
 import Foundation
 import os
 
-/// Structured logging categories for the JazzReference app.
+/// Structured logging categories for the Approach Note app.
 ///
 /// Usage:
 ///   Log.network.debug("Fetching songs")
@@ -12,7 +12,7 @@ import os
 ///   Log.auth.debug("Login for \(email, privacy: .private)")
 ///   Log.network.debug("GET \(endpoint, privacy: .public)")
 enum Log {
-    private static let subsystem = Bundle.main.bundleIdentifier ?? "com.jazzreference"
+    private static let subsystem = Bundle.main.bundleIdentifier ?? "com.approachnote"
 
     /// API calls, HTTP responses, request timing
     static let network  = Logger(subsystem: subsystem, category: "network")

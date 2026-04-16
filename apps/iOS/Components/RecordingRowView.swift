@@ -1,6 +1,6 @@
 //
 //  RecordingRowView.swift
-//  JazzReference
+//  Approach Note
 //
 //  Updated with album artwork and authority badge support
 //  UPDATED: Added optional artist name display for year-based sorting

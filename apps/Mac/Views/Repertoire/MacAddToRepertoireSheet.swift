@@ -1,6 +1,6 @@
 //
 //  MacAddToRepertoireSheet.swift
-//  JazzReferenceMac
+//  Approach Note
 //
 //  Sheet for adding songs to repertoires on macOS
 //

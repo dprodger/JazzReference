@@ -1,6 +1,6 @@
 //
 //  PerformerDetailView.swift
-//  JazzReferenceMac
+//  Approach Note
 //
 //  macOS-specific performer/artist detail view
 //  Updated to match iOS layout with collapsible Biographical Information section

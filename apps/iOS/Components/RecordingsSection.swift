@@ -1,6 +1,6 @@
 //
 //  RecordingsSection.swift
-//  JazzReference
+//  Approach Note
 //
 //  Collapsible section displaying filtered recordings with filter chips + sheet pattern
 //  UPDATED: Replaced nested disclosure groups with filter chips and bottom sheet

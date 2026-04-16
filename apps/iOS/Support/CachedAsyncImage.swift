@@ -1,6 +1,6 @@
 //
 //  CachedAsyncImage.swift
-//  JazzReference
+//  Approach Note
 //
 //  A drop-in replacement for AsyncImage that caches loaded images in memory
 //  to prevent re-fetching when scrolling back to previously loaded images.

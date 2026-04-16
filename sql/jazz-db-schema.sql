@@ -1,4 +1,4 @@
--- Jazz Reference Application - PostgreSQL Database Schema
+-- Approach Note - PostgreSQL Database Schema
 -- Generated from live Supabase database on 2026-03-19
 
 -- Enable UUID extension for generating unique IDs

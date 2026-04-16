@@ -1,6 +1,6 @@
 //
 //  ArtistsListView.swift
-//  JazzReference
+//  Approach Note
 //
 //  Enhanced with custom scrollable alphabet index (iOS Contacts-style)
 //  Updated to handle non-Latin characters better

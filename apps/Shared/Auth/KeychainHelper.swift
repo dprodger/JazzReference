@@ -1,6 +1,6 @@
 //
 //  KeychainHelper.swift
-//  JazzReference
+//  Approach Note
 //
 //  Created by Dave Rodger on 11/14/25.
 //  Secure storage for authentication tokens using iOS Keychain

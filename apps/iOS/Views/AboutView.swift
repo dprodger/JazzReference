@@ -1,6 +1,6 @@
 //
 //  AboutView.swift
-//  JazzReference
+//  Approach Note
 //
 //  About screen with splash screen background and visible navigation bar
 //

@@ -1,6 +1,6 @@
 //
 //  TranscriptionsSection.swift
-//  JazzReference
+//  Approach Note
 //
 //  Collapsible section displaying solo transcriptions
 //  Uses a single shared YouTube player presented in a sheet for better performance

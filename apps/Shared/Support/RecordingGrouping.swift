@@ -1,6 +1,6 @@
 //
 //  RecordingGrouping.swift
-//  JazzReference
+//  Approach Note
 //
 //  Shared filtering, sorting, and grouping logic for recordings lists.
 //  Used by iOS RecordingsSection and Mac SongDetailView to keep their

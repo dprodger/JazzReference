@@ -1,6 +1,6 @@
 //
 //  PerformerRecordingsSection.swift
-//  JazzReference
+//  Approach Note
 //
 //  Recordings section for PerformerDetailView that mirrors the RecordingsSection UI
 //  Displays recordings with album art in horizontal scrolling rows, grouped by decade or song title

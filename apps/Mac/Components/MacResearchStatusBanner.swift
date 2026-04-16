@@ -1,6 +1,6 @@
 //
 //  MacResearchStatusBanner.swift
-//  JazzReferenceMac
+//  Approach Note
 //
 //  Visual indicator showing research queue status for a song (macOS version)
 //

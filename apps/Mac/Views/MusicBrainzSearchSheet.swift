@@ -1,6 +1,6 @@
 //
 //  MusicBrainzSearchSheet.swift
-//  JazzReferenceMac
+//  Approach Note
 //
 //  Search MusicBrainz for songs and import them into the database (macOS version)
 //

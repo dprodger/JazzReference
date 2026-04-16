@@ -1,6 +1,6 @@
 //
 //  ContentView.swift
-//  JazzReferenceMac
+//  Approach Note
 //
 //  Main content view with tab navigation for macOS
 //

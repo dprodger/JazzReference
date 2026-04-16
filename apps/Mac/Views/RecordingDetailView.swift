@@ -1,6 +1,6 @@
 //
 //  RecordingDetailView.swift
-//  JazzReferenceMac
+//  Approach Note
 //
 //  macOS-specific recording detail view
 //

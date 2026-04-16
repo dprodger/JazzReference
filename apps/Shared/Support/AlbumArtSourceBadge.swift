@@ -1,6 +1,6 @@
 //
 //  AlbumArtSourceBadge.swift
-//  JazzReference
+//  Approach Note
 //
 //  Watermark badge overlay for album art showing the image source
 //  with tap-to-view source details and attribution link.

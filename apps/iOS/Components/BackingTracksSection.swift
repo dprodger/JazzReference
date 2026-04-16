@@ -1,6 +1,6 @@
 //
 //  BackingTracksSection.swift
-//  JazzReference
+//  Approach Note
 //
 //  Collapsible section displaying backing track videos
 //  Uses a single shared YouTube player presented in a sheet for better performance

@@ -1,6 +1,6 @@
 //
 //  BackingTrackRow.swift
-//  JazzReferenceMac
+//  Approach Note
 //
 //  Row view for a single backing-track video in Mac SongDetailView
 //

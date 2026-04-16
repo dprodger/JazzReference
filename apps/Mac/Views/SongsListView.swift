@@ -1,6 +1,6 @@
 //
 //  SongsListView.swift
-//  JazzReferenceMac
+//  Approach Note
 //
 //  macOS-specific songs list view with master-detail layout
 //

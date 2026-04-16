@@ -1,6 +1,6 @@
 //
 //  RegisterView.swift
-//  JazzReference
+//  Approach Note
 //
 //  Created by Dave Rodger on 11/14/25.
 //  Registration screen for creating new accounts

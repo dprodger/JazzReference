@@ -1,6 +1,6 @@
 //
 //  MacLoginView.swift
-//  JazzReferenceMac
+//  Approach Note
 //
 //  Login view for macOS with email/password and Google Sign-In support
 //

@@ -1,6 +1,6 @@
 //
 //  CommunitySettingsView.swift
-//  JazzReferenceMac
+//  Approach Note
 //
 //  Displays the user's community contributions in Settings
 //

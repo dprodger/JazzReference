@@ -1,6 +1,6 @@
 //
 //  JazzReferenceMacApp.swift
-//  JazzReferenceMac
+//  Approach Note
 //
 //  macOS app entry point for Jazz Reference
 //

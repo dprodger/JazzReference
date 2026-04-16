@@ -1,6 +1,6 @@
 //
 //  OnboardingPages.swift
-//  JazzReference
+//  Approach Note
 //
 //  Shared onboarding page content for iOS and Mac
 //

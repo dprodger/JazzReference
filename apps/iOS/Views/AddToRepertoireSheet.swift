@@ -1,6 +1,6 @@
 //
 //  AddToRepertoireSheet.swift
-//  JazzReference
+//  Approach Note
 //
 //  Created by Dave Rodger on 11/12/25.
 //  UPDATED FOR PHASE 5: Added authentication check

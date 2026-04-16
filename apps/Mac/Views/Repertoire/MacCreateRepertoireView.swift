@@ -1,6 +1,6 @@
 //
 //  MacCreateRepertoireView.swift
-//  JazzReferenceMac
+//  Approach Note
 //
 //  View for creating new repertoires on macOS
 //

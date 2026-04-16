@@ -1,6 +1,6 @@
 //
 //  MacForgotPasswordView.swift
-//  JazzReferenceMac
+//  Approach Note
 //
 //  Password reset request view for macOS
 //

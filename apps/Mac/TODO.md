@@ -1,4 +1,4 @@
-# JazzReferenceMac - Future Enhancements
+# Approach Note (Mac) - Future Enhancements
 
 Potential improvements for the macOS app.
 

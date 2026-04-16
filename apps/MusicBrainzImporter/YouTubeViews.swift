@@ -8,7 +8,7 @@
 import SwiftUI
 import os
 
-private let uiLogger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.jazzreference.MusicBrainzImporter", category: "ui")
+private let uiLogger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.approachnote.MusicBrainzImporter", category: "ui")
 
 // MARK: - YouTube Type Selection View
 

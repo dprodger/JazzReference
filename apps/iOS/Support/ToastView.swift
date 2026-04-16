@@ -1,6 +1,6 @@
 //
 //  ToastView.swift
-//  JazzReference
+//  Approach Note
 //
 //  Created by Dave Rodger on 11/13/25.
 //  Reusable toast notification component

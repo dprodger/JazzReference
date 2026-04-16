@@ -1,6 +1,6 @@
 //
 //  SharedDataManagers.swift
-//  JazzReferenceMac
+//  Approach Note
 //
 //  Handles shared data from the MusicBrainz Safari Share Extension
 //  THIS FILE GOES IN THE MAC APP TARGET ONLY

@@ -1,6 +1,6 @@
 //
 //  SongsListView.swift
-//  JazzReference
+//  Approach Note
 //
 //  Enhanced with repertoire filtering support
 //

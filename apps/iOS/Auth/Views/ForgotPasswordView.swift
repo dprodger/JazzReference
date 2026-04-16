@@ -1,6 +1,6 @@
 //
 //  ForgotPasswordView.swift
-//  JazzReference
+//  Approach Note
 //
 //  Created by Dave Rodger on 11/14/25.
 //  Password reset request screen

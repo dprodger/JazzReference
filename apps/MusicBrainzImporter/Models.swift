@@ -1,6 +1,6 @@
 //
 //  Models.swift
-//  JazzReference
+//  Approach Note
 //
 //  Created by Dave Rodger on 11/1/25.
 //

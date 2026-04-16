@@ -1,6 +1,6 @@
 //
 //  ArtistCreationView.swift
-//  JazzReference
+//  Approach Note
 //
 //  Simple artist creation view that works with imported MusicBrainz data
 //  SIMPLIFIED VERSION - Only name, MusicBrainz ID, and Wikipedia URL

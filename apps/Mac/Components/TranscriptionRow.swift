@@ -1,6 +1,6 @@
 //
 //  TranscriptionRow.swift
-//  JazzReferenceMac
+//  Approach Note
 //
 //  Row view for a single solo transcription in Mac SongDetailView
 //

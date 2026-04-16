@@ -1,6 +1,6 @@
 //
 //  SharedArtistData.swift
-//  JazzReference
+//  Approach Note
 //
 //  Handles artist data shared from the MusicBrainz Safari Share Extension
 //  THIS FILE GOES IN THE MAIN APP TARGET ONLY

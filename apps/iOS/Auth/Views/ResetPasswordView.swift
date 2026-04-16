@@ -1,6 +1,6 @@
 //
 //  ResetPasswordView.swift
-//  JazzReference
+//  Approach Note
 //
 //  Created by Dave Rodger on 11/18/25.
 //  Password reset screen with token

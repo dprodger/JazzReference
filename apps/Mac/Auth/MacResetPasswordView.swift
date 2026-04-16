@@ -1,6 +1,6 @@
 //
 //  MacResetPasswordView.swift
-//  JazzReferenceMac
+//  Approach Note
 //
 //  Password reset view (with token from deep link) for macOS
 //

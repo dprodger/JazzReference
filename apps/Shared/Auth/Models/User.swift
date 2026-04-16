@@ -1,6 +1,6 @@
 //
 //  User.swift
-//  JazzReference
+//  Approach Note
 //
 //  Created by Dave Rodger on 11/14/25.
 //  Authentication user models

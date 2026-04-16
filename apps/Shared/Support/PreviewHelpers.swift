@@ -1,6 +1,6 @@
 //
 //  PreviewHelpers.swift
-//  JazzReference
+//  Approach Note
 //
 //  Preview mock data for SwiftUI previews
 //

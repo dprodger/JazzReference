@@ -1,6 +1,6 @@
 //
 //  RecordingCard.swift
-//  JazzReferenceMac
+//  Approach Note
 //
 //  Card view for a single recording in the Mac SongDetailView grid
 //

@@ -1,6 +1,6 @@
 //
 //  StreamingButtons.swift
-//  JazzReferenceMac
+//  Approach Note
 //
 //  Inline Spotify / Apple Music / YouTube link buttons for a recording (macOS)
 //

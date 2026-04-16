@@ -1,6 +1,6 @@
 //
 //  ArtistsListView.swift
-//  JazzReferenceMac
+//  Approach Note
 //
 //  macOS-specific artists list view with master-detail layout
 //  Now uses lightweight performer index for faster loading

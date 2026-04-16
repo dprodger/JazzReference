@@ -1,6 +1,6 @@
 //
 //  LoginView.swift
-//  JazzReference
+//  Approach Note
 //
 //  Created by Dave Rodger on 11/14/25.
 //  Sheet-style login entry point (used from flows like YouTube import).

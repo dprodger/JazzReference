@@ -1,6 +1,6 @@
 //
 //  SongBulkEditRecordingsView.swift
-//  JazzReferenceMac
+//  Approach Note
 //
 //  Spreadsheet-like view for bulk editing community data (key, tempo, vocal/instrumental)
 //  across all recordings for a song.

@@ -1,6 +1,6 @@
 //
 //  MacOnboardingView.swift
-//  JazzReferenceMac
+//  Approach Note
 //
 //  Onboarding flow for first-time Mac users explaining Songs, Recordings, and Releases
 //
