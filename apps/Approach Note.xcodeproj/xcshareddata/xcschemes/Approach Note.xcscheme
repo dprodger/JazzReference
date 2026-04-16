@@ -50,8 +50,8 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "B4C1604C2E91B03700EB8D2C"
-               BuildableName = "JazzReferenceTests.xctest"
-               BlueprintName = "JazzReferenceTests"
+               BuildableName = "ApproachNoteTests.xctest"
+               BlueprintName = "ApproachNoteTests"
                ReferencedContainer = "container:Approach Note.xcodeproj">
             </BuildableReference>
          </TestableReference>
@@ -61,8 +61,8 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "B4C160562E91B03700EB8D2C"
-               BuildableName = "JazzReferenceUITests.xctest"
-               BlueprintName = "JazzReferenceUITests"
+               BuildableName = "ApproachNoteUITests.xctest"
+               BlueprintName = "ApproachNoteUITests"
                ReferencedContainer = "container:Approach Note.xcodeproj">
             </BuildableReference>
          </TestableReference>

@@ -62,14 +62,14 @@
 			containerPortal = B4C160382E91B03600EB8D2C /* Project object */;
 			proxyType = 1;
 			remoteGlobalIDString = B4C1603F2E91B03600EB8D2C;
-			remoteInfo = JazzReference;
+			remoteInfo = "Approach Note";
 		};
 		B4C160582E91B03700EB8D2C /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = B4C160382E91B03600EB8D2C /* Project object */;
 			proxyType = 1;
 			remoteGlobalIDString = B4C1603F2E91B03600EB8D2C;
-			remoteInfo = JazzReference;
+			remoteInfo = "Approach Note";
 		};
 		B4EE328D2EB3F95000C643D1 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -144,8 +144,8 @@
 		B4B9C4BF2F1AEC0100159A28 /* MusicBrainzSearchSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusicBrainzSearchSheet.swift; sourceTree = "<group>"; };
 		B4BE01002F3600000000BE01 /* SongBulkEditRecordingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SongBulkEditRecordingsView.swift; sourceTree = "<group>"; };
 		B4C160402E91B03600EB8D2C /* Approach Note.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Approach Note.app"; sourceTree = BUILT_PRODUCTS_DIR; };
-		B4C1604D2E91B03700EB8D2C /* JazzReferenceTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = JazzReferenceTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		B4C160572E91B03700EB8D2C /* JazzReferenceUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = JazzReferenceUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		B4C1604D2E91B03700EB8D2C /* ApproachNoteTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ApproachNoteTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		B4C160572E91B03700EB8D2C /* ApproachNoteUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ApproachNoteUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		B4C4EF562F3133D7000B5EF8 /* MacAddStreamingLinkSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacAddStreamingLinkSheet.swift; sourceTree = "<group>"; };
 		B4D3BAB02F0D7983007CB0DD /* MacSearchBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacSearchBar.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -380,8 +380,8 @@
 			isa = PBXGroup;
 			children = (
 				B4C160402E91B03600EB8D2C /* Approach Note.app */,
-				B4C1604D2E91B03700EB8D2C /* JazzReferenceTests.xctest */,
-				B4C160572E91B03700EB8D2C /* JazzReferenceUITests.xctest */,
+				B4C1604D2E91B03700EB8D2C /* ApproachNoteTests.xctest */,
+				B4C160572E91B03700EB8D2C /* ApproachNoteUITests.xctest */,
 				B4911D2A2EB316F600326CA7 /* MusicBrainzImporter.appex */,
 				B41D0F972EE6337400DB427C /* Approach Note.app */,
 				B486B2F22F1D922B005E6644 /* MusicBrainzImporterMac.appex */,
@@ -486,13 +486,13 @@
 				B4C535832ECE5FFF0030A127 /* GoogleSignIn */,
 				B4C535852ECE5FFF0030A127 /* GoogleSignInSwift */,
 			);
-			productName = JazzReference;
+			productName = "Approach Note";
 			productReference = B4C160402E91B03600EB8D2C /* Approach Note.app */;
 			productType = "com.apple.product-type.application";
 		};
-		B4C1604C2E91B03700EB8D2C /* JazzReferenceTests */ = {
+		B4C1604C2E91B03700EB8D2C /* ApproachNoteTests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = B4C160642E91B03700EB8D2C /* Build configuration list for PBXNativeTarget "JazzReferenceTests" */;
+			buildConfigurationList = B4C160642E91B03700EB8D2C /* Build configuration list for PBXNativeTarget "ApproachNoteTests" */;
 			buildPhases = (
 				B4C160492E91B03700EB8D2C /* Sources */,
 				B4C1604A2E91B03700EB8D2C /* Frameworks */,
@@ -503,16 +503,16 @@
 			dependencies = (
 				B4C1604F2E91B03700EB8D2C /* PBXTargetDependency */,
 			);
-			name = JazzReferenceTests;
+			name = ApproachNoteTests;
 			packageProductDependencies = (
 			);
-			productName = JazzReferenceTests;
-			productReference = B4C1604D2E91B03700EB8D2C /* JazzReferenceTests.xctest */;
+			productName = ApproachNoteTests;
+			productReference = B4C1604D2E91B03700EB8D2C /* ApproachNoteTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
-		B4C160562E91B03700EB8D2C /* JazzReferenceUITests */ = {
+		B4C160562E91B03700EB8D2C /* ApproachNoteUITests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = B4C160672E91B03700EB8D2C /* Build configuration list for PBXNativeTarget "JazzReferenceUITests" */;
+			buildConfigurationList = B4C160672E91B03700EB8D2C /* Build configuration list for PBXNativeTarget "ApproachNoteUITests" */;
 			buildPhases = (
 				B4C160532E91B03700EB8D2C /* Sources */,
 				B4C160542E91B03700EB8D2C /* Frameworks */,
@@ -523,11 +523,11 @@
 			dependencies = (
 				B4C160592E91B03700EB8D2C /* PBXTargetDependency */,
 			);
-			name = JazzReferenceUITests;
+			name = ApproachNoteUITests;
 			packageProductDependencies = (
 			);
-			productName = JazzReferenceUITests;
-			productReference = B4C160572E91B03700EB8D2C /* JazzReferenceUITests.xctest */;
+			productName = ApproachNoteUITests;
+			productReference = B4C160572E91B03700EB8D2C /* ApproachNoteUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
 /* End PBXNativeTarget section */
@@ -581,8 +581,8 @@
 			projectRoot = "";
 			targets = (
 				B4C1603F2E91B03600EB8D2C /* Approach Note */,
-				B4C1604C2E91B03700EB8D2C /* JazzReferenceTests */,
-				B4C160562E91B03700EB8D2C /* JazzReferenceUITests */,
+				B4C1604C2E91B03700EB8D2C /* ApproachNoteTests */,
+				B4C160562E91B03700EB8D2C /* ApproachNoteUITests */,
 				B4911D292EB316F600326CA7 /* MusicBrainzImporter */,
 				B41D0F962EE6337400DB427C /* Approach Note Mac */,
 				B486B2F12F1D922B005E6644 /* MusicBrainzImporterMac */,
@@ -1181,7 +1181,7 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/JazzReference.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/JazzReference";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Approach Note.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Approach Note";
 			};
 			name = Debug;
 		};
@@ -1202,7 +1202,7 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/JazzReference.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/JazzReference";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Approach Note.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Approach Note";
 			};
 			name = Release;
 		};
@@ -1221,7 +1221,7 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_TARGET_NAME = JazzReference;
+				TEST_TARGET_NAME = "Approach Note";
 			};
 			name = Debug;
 		};
@@ -1240,7 +1240,7 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_TARGET_NAME = JazzReference;
+				TEST_TARGET_NAME = "Approach Note";
 			};
 			name = Release;
 		};
@@ -1292,7 +1292,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		B4C160642E91B03700EB8D2C /* Build configuration list for PBXNativeTarget "JazzReferenceTests" */ = {
+		B4C160642E91B03700EB8D2C /* Build configuration list for PBXNativeTarget "ApproachNoteTests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				B4C160652E91B03700EB8D2C /* Debug */,
@@ -1301,7 +1301,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		B4C160672E91B03700EB8D2C /* Build configuration list for PBXNativeTarget "JazzReferenceUITests" */ = {
+		B4C160672E91B03700EB8D2C /* Build configuration list for PBXNativeTarget "ApproachNoteUITests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				B4C160682E91B03700EB8D2C /* Debug */,
