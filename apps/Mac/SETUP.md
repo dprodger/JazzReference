@@ -112,7 +112,7 @@ Select the `JazzReferenceMac` target and configure:
 
 3. **Build Settings:**
    - Search for `INFOPLIST_FILE` and set to: `Mac/App/Info.plist`
-   - Search for `CODE_SIGN_ENTITLEMENTS` and set to: `Mac/App/JazzReferenceMac.entitlements`
+   - Search for `CODE_SIGN_ENTITLEMENTS` and set to: `Mac/App/ApproachNoteMac.entitlements`
    - Search for `ASSETCATALOG_COMPILER_APPICON_NAME` and set to: `AppIcon`
 
 ### Step 8: Fix Any Compilation Errors
@@ -169,7 +169,7 @@ apps/
 ├── Mac/                         # macOS-specific
 │   ├── App/
 │   │   ├── Info.plist
-│   │   ├── JazzReferenceMac.entitlements
+│   │   ├── ApproachNoteMac.entitlements
 │   │   └── ApproachNoteMacApp.swift
 │   ├── Auth/                    # Mac auth views
 │   ├── Assets.xcassets/
