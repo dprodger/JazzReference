@@ -78,18 +78,20 @@ _apple_jwk_client = PyJWKClient(APPLE_JWKS_URL, cache_keys=True)
 
 
 def _safe_next(next_param: str | None) -> str:
-    """Only allow relative /admin/* targets. Anything else collapses to /admin/."""
+    """Only allow relative /admin or /admin/... targets. Anything else
+    (open-redirect attempts, /adminfoo, /admin=) collapses to /admin/."""
     if not next_param:
         return '/admin/'
     parsed = urlparse(next_param)
     if parsed.scheme or parsed.netloc:
         return '/admin/'
-    if not parsed.path.startswith('/admin'):
+    path = parsed.path
+    if path != '/admin' and not path.startswith('/admin/'):
         return '/admin/'
     # Re-attach query string if present (e.g. /admin/orphans?foo=bar)
     if parsed.query:
-        return f"{parsed.path}?{parsed.query}"
-    return parsed.path
+        return f"{path}?{parsed.query}"
+    return path
 
 
 def _set_admin_cookies(resp, user_id: str):

@@ -142,7 +142,10 @@ from middleware.admin_middleware import check_admin_or_respond  # noqa: E402
 
 @app.before_request
 def gate_admin_paths():
-    if request.path.startswith('/admin'):
+    # Match only real admin paths. /adminfoo or /admin= must fall through to
+    # Flask's routing (which will 404), otherwise they'd loop through login.
+    path = request.path
+    if path == '/admin' or path.startswith('/admin/'):
         return check_admin_or_respond()
     return None
 

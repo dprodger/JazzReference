@@ -75,8 +75,11 @@ def _login_redirect():
     # full_path is used. Keeps the URL clean.
     if target.endswith('?'):
         target = target[:-1]
-    # Only allow relative paths starting with /admin to avoid open-redirect.
-    if not target.startswith('/admin'):
+    # Only allow /admin or /admin/... as the bounce-back target. Anything
+    # like /admin= or /adminfoo gets scrubbed to /admin/ so we never hand
+    # the browser a URL the admin_session cookie (Path=/admin) won't match.
+    path_only = target.split('?', 1)[0]
+    if path_only != '/admin' and not path_only.startswith('/admin/'):
         target = '/admin/'
     return redirect(f"/admin/login?next={quote(target, safe='/')}", code=302)
 

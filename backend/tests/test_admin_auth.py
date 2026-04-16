@@ -249,3 +249,21 @@ def test_admin_not_served_from_public_web_host(client, admin_user):
         },
     )
     assert resp.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# Invalid admin-ish paths don't loop through login
+# ---------------------------------------------------------------------------
+
+def test_admin_prefix_near_miss_does_not_loop(client):
+    """/admin= looks admin-ish but can never receive the admin_session cookie
+    (Path=/admin won't match), so the gate must NOT intercept it — otherwise
+    we'd loop back to login forever after a successful login."""
+    resp = client.get("/admin=", headers={"Accept": "text/html"})
+    # Should reach Flask routing and 404 instead of 302-ing to login.
+    assert resp.status_code == 404
+
+
+def test_adminfoo_does_not_hit_admin_gate(client):
+    resp = client.get("/adminfoo", headers={"Accept": "text/html"})
+    assert resp.status_code == 404
