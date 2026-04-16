@@ -35,23 +35,23 @@ struct MacForgotPasswordView: View {
         VStack(spacing: 16) {
             Image(systemName: "envelope.circle.fill")
                 .font(.system(size: 60))
-                .foregroundColor(JazzTheme.burgundy)
+                .foregroundColor(ApproachNoteTheme.burgundy)
 
             Text("Check Your Email")
-                .font(JazzTheme.title2())
-                .foregroundColor(JazzTheme.charcoal)
+                .font(ApproachNoteTheme.title2())
+                .foregroundColor(ApproachNoteTheme.charcoal)
 
             Text("We've sent password reset instructions to:")
-                .font(JazzTheme.subheadline())
+                .font(ApproachNoteTheme.subheadline())
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
 
             Text(email)
-                .font(JazzTheme.subheadline(weight: .semibold))
-                .foregroundColor(JazzTheme.charcoal)
+                .font(ApproachNoteTheme.subheadline(weight: .semibold))
+                .foregroundColor(ApproachNoteTheme.charcoal)
 
             Text("Please check your email and follow the link to reset your password.")
-                .font(JazzTheme.subheadline())
+                .font(ApproachNoteTheme.subheadline())
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
                 .padding(.top, 8)
@@ -60,7 +60,7 @@ struct MacForgotPasswordView: View {
                 dismiss()
             }
             .buttonStyle(.borderedProminent)
-            .tint(JazzTheme.burgundy)
+            .tint(ApproachNoteTheme.burgundy)
             .controlSize(.large)
             .padding(.top, 16)
         }
@@ -73,11 +73,11 @@ struct MacForgotPasswordView: View {
             // Header
             VStack(spacing: 8) {
                 Text("Reset Password")
-                    .font(JazzTheme.title())
-                    .foregroundColor(JazzTheme.charcoal)
+                    .font(ApproachNoteTheme.title())
+                    .foregroundColor(ApproachNoteTheme.charcoal)
 
                 Text("Enter your email address and we'll send you instructions to reset your password.")
-                    .font(JazzTheme.subheadline())
+                    .font(ApproachNoteTheme.subheadline())
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
             }
@@ -86,7 +86,7 @@ struct MacForgotPasswordView: View {
             // Email field
             VStack(alignment: .leading, spacing: 6) {
                 Text("Email")
-                    .font(JazzTheme.subheadline())
+                    .font(ApproachNoteTheme.subheadline())
                     .foregroundColor(.secondary)
 
                 TextField("your@email.com", text: $email)
@@ -98,7 +98,7 @@ struct MacForgotPasswordView: View {
             // Error message
             if let error = authManager.errorMessage {
                 Text(error)
-                    .font(JazzTheme.caption())
+                    .font(ApproachNoteTheme.caption())
                     .foregroundColor(.red)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal)
@@ -116,7 +116,7 @@ struct MacForgotPasswordView: View {
                 }
             }
             .buttonStyle(.borderedProminent)
-            .tint(JazzTheme.burgundy)
+            .tint(ApproachNoteTheme.burgundy)
             .controlSize(.large)
             .disabled(email.isEmpty || authManager.isLoading)
 

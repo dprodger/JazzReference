@@ -20,52 +20,52 @@ struct BackingTrackRow: View {
                 // Play button thumbnail
                 ZStack {
                     RoundedRectangle(cornerRadius: 8)
-                        .fill(JazzTheme.green.opacity(0.15))
+                        .fill(ApproachNoteTheme.green.opacity(0.15))
                         .frame(width: 80, height: 45)
 
                     Image(systemName: "play.fill")
                         .font(.system(size: 20))
-                        .foregroundColor(JazzTheme.green)
+                        .foregroundColor(ApproachNoteTheme.green)
                 }
 
                 // Video info
                 VStack(alignment: .leading, spacing: 4) {
                     Text(video.title ?? "Backing Track")
-                        .font(JazzTheme.headline())
-                        .foregroundColor(JazzTheme.charcoal)
+                        .font(ApproachNoteTheme.headline())
+                        .foregroundColor(ApproachNoteTheme.charcoal)
                         .lineLimit(2)
 
                     HStack(spacing: 8) {
                         if let duration = video.durationSeconds {
                             HStack(spacing: 4) {
                                 Image(systemName: "clock")
-                                    .foregroundColor(JazzTheme.brass)
-                                    .font(JazzTheme.caption())
+                                    .foregroundColor(ApproachNoteTheme.brass)
+                                    .font(ApproachNoteTheme.caption())
                                 Text(formatDuration(duration))
-                                    .font(JazzTheme.subheadline())
-                                    .foregroundColor(JazzTheme.smokeGray)
+                                    .font(ApproachNoteTheme.subheadline())
+                                    .foregroundColor(ApproachNoteTheme.smokeGray)
                             }
                         }
 
                         if let tempo = video.tempo {
                             HStack(spacing: 4) {
                                 Image(systemName: "metronome")
-                                    .foregroundColor(JazzTheme.brass)
-                                    .font(JazzTheme.caption())
+                                    .foregroundColor(ApproachNoteTheme.brass)
+                                    .font(ApproachNoteTheme.caption())
                                 Text("\(tempo) BPM")
-                                    .font(JazzTheme.subheadline())
-                                    .foregroundColor(JazzTheme.smokeGray)
+                                    .font(ApproachNoteTheme.subheadline())
+                                    .foregroundColor(ApproachNoteTheme.smokeGray)
                             }
                         }
 
                         if let key = video.keySignature {
                             HStack(spacing: 4) {
                                 Image(systemName: "music.note")
-                                    .foregroundColor(JazzTheme.brass)
-                                    .font(JazzTheme.caption())
+                                    .foregroundColor(ApproachNoteTheme.brass)
+                                    .font(ApproachNoteTheme.caption())
                                 Text(key)
-                                    .font(JazzTheme.subheadline())
-                                    .foregroundColor(JazzTheme.smokeGray)
+                                    .font(ApproachNoteTheme.subheadline())
+                                    .foregroundColor(ApproachNoteTheme.smokeGray)
                             }
                         }
                     }
@@ -81,11 +81,11 @@ struct BackingTrackRow: View {
                 }
             }
             .padding()
-            .background(isHovering ? JazzTheme.backgroundLight : Color.white)
+            .background(isHovering ? ApproachNoteTheme.backgroundLight : Color.white)
             .cornerRadius(10)
             .overlay(
                 RoundedRectangle(cornerRadius: 10)
-                    .stroke(isHovering ? JazzTheme.green.opacity(0.5) : Color.clear, lineWidth: 2)
+                    .stroke(isHovering ? ApproachNoteTheme.green.opacity(0.5) : Color.clear, lineWidth: 2)
             )
         }
         .buttonStyle(.plain)

@@ -51,14 +51,14 @@ struct AboutView: View {
                 Spacer()
 
                 Text("Approach Note")
-                    .font(JazzTheme.largeTitle(size: 48))
+                    .font(ApproachNoteTheme.largeTitle(size: 48))
                     .foregroundColor(.white)
                     .shadow(color: .black.opacity(0.7), radius: 10, x: 0, y: 5)
                     .minimumScaleFactor(0.7)
                     .lineLimit(1)
 
                 Text("Your comprehensive guide to jazz recordings")
-                    .font(JazzTheme.title3())
+                    .font(ApproachNoteTheme.title3())
                     .foregroundColor(.white)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 40)
@@ -69,15 +69,15 @@ struct AboutView: View {
                 
                 VStack(spacing: 12) {
                     Text("Explore thousands of jazz standards")
-                        .font(JazzTheme.body())
+                        .font(ApproachNoteTheme.body())
                         .foregroundColor(.white)
 
                     Text("Discover legendary artists and recordings")
-                        .font(JazzTheme.body())
+                        .font(ApproachNoteTheme.body())
                         .foregroundColor(.white)
 
                     Text("Build your jazz knowledge")
-                        .font(JazzTheme.body())
+                        .font(ApproachNoteTheme.body())
                         .foregroundColor(.white)
                 }
                 .padding(.horizontal, 40)
@@ -93,8 +93,8 @@ struct AboutView: View {
                         Image(systemName: "book.fill")
                         Text("View Tutorial")
                     }
-                    .font(JazzTheme.headline())
-                    .foregroundColor(JazzTheme.burgundy)
+                    .font(ApproachNoteTheme.headline())
+                    .foregroundColor(ApproachNoteTheme.burgundy)
                     .padding(.horizontal, 24)
                     .padding(.vertical, 12)
                     .background(
@@ -115,11 +115,11 @@ struct AboutView: View {
                         HStack(spacing: 6) {
                             Image(systemName: workerActive ? "arrow.triangle.2.circlepath" : "clock")
                                 .foregroundColor(.white.opacity(0.9))
-                                .font(JazzTheme.body())
+                                .font(ApproachNoteTheme.body())
                                 .rotationEffect(.degrees(isRefreshing ? rotationAngle : 0))
 
                             Text("Research Queue: \(queueSize)")
-                                .font(JazzTheme.body())
+                                .font(ApproachNoteTheme.body())
                                 .foregroundColor(.white.opacity(0.9))
 
                             if isRefreshing {
@@ -132,14 +132,14 @@ struct AboutView: View {
                         if workerActive {
                             if let songName = currentSongName {
                                 Text("Processing: \(songName)")
-                                    .font(JazzTheme.caption())
+                                    .font(ApproachNoteTheme.caption())
                                     .foregroundColor(.white.opacity(0.9))
                                     .fontWeight(.medium)
                                     .lineLimit(1)
                                     .truncationMode(.tail)
                             } else {
                                 Text("Processing...")
-                                    .font(JazzTheme.caption())
+                                    .font(ApproachNoteTheme.caption())
                                     .foregroundColor(.white.opacity(0.7))
                                     .italic()
                             }
@@ -150,12 +150,12 @@ struct AboutView: View {
                                     // Phase label with progress count
                                     HStack(spacing: 4) {
                                         Text(progress.phaseLabel)
-                                            .font(JazzTheme.caption())
+                                            .font(ApproachNoteTheme.caption())
                                             .foregroundColor(.white.opacity(0.7))
                                             .lineLimit(1)
 
                                         Text("\(progress.current)/\(progress.total)")
-                                            .font(JazzTheme.caption())
+                                            .font(ApproachNoteTheme.caption())
                                             .foregroundColor(.white.opacity(0.9))
                                             .fontWeight(.medium)
                                     }
@@ -180,7 +180,7 @@ struct AboutView: View {
 
                         // Tap to refresh hint
                         Text("Tap to refresh")
-                            .font(JazzTheme.caption())
+                            .font(ApproachNoteTheme.caption())
                             .foregroundColor(.white.opacity(0.5))
                             .padding(.top, 2)
                     }
@@ -206,23 +206,23 @@ struct AboutView: View {
                 Spacer()
                 
                 Text(appVersion)
-                    .font(JazzTheme.caption())
+                    .font(ApproachNoteTheme.caption())
                     .foregroundColor(.white.opacity(0.8))
 
                 Text("Written by Dave Rodger")
-                    .font(JazzTheme.caption())
+                    .font(ApproachNoteTheme.caption())
                     .foregroundColor(.white.opacity(0.8))
                     .padding(.bottom, 10)
 
                 Link("www.approachnote.com", destination: URL(string: "https://www.approachnote.com")!)
-                    .font(JazzTheme.caption())
+                    .font(ApproachNoteTheme.caption())
                     .tint(.white.opacity(0.8))
                     .padding(.bottom, 40)
             }
             .dynamicTypeSize(...DynamicTypeSize.large)
         }
         .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(JazzTheme.burgundy, for: .navigationBar)
+        .toolbarBackground(ApproachNoteTheme.burgundy, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
         .toolbarColorScheme(.dark, for: .navigationBar)
         .task {

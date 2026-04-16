@@ -57,7 +57,7 @@ struct MacAddStreamingLinkSheet: View {
             footerView
         }
         .frame(width: 500, height: 400)
-        .background(JazzTheme.backgroundLight)
+        .background(ApproachNoteTheme.backgroundLight)
     }
 
     // MARK: - Header
@@ -66,12 +66,12 @@ struct MacAddStreamingLinkSheet: View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Add Streaming Link")
-                    .font(JazzTheme.title2())
-                    .foregroundColor(JazzTheme.charcoal)
+                    .font(ApproachNoteTheme.title2())
+                    .foregroundColor(ApproachNoteTheme.charcoal)
 
                 Text(releaseTitle)
-                    .font(JazzTheme.subheadline())
-                    .foregroundColor(JazzTheme.smokeGray)
+                    .font(ApproachNoteTheme.subheadline())
+                    .foregroundColor(ApproachNoteTheme.smokeGray)
                     .lineLimit(1)
             }
 
@@ -82,7 +82,7 @@ struct MacAddStreamingLinkSheet: View {
             } label: {
                 Image(systemName: "xmark.circle.fill")
                     .font(.title2)
-                    .foregroundColor(JazzTheme.smokeGray)
+                    .foregroundColor(ApproachNoteTheme.smokeGray)
             }
             .buttonStyle(.plain)
         }
@@ -94,8 +94,8 @@ struct MacAddStreamingLinkSheet: View {
     private var instructionsView: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Paste a streaming service URL")
-                .font(JazzTheme.headline())
-                .foregroundColor(JazzTheme.charcoal)
+                .font(ApproachNoteTheme.headline())
+                .foregroundColor(ApproachNoteTheme.charcoal)
 
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 8) {
@@ -103,8 +103,8 @@ struct MacAddStreamingLinkSheet: View {
                         .foregroundColor(.green)
                         .font(.caption)
                     Text("Spotify: https://open.spotify.com/track/...")
-                        .font(JazzTheme.caption())
-                        .foregroundColor(JazzTheme.smokeGray)
+                        .font(ApproachNoteTheme.caption())
+                        .foregroundColor(ApproachNoteTheme.smokeGray)
                 }
 
                 HStack(spacing: 8) {
@@ -112,8 +112,8 @@ struct MacAddStreamingLinkSheet: View {
                         .foregroundColor(.green)
                         .font(.caption)
                     Text("Apple Music: https://music.apple.com/.../song/...")
-                        .font(JazzTheme.caption())
-                        .foregroundColor(JazzTheme.smokeGray)
+                        .font(ApproachNoteTheme.caption())
+                        .foregroundColor(ApproachNoteTheme.smokeGray)
                 }
 
                 HStack(spacing: 8) {
@@ -121,21 +121,21 @@ struct MacAddStreamingLinkSheet: View {
                         .foregroundColor(.green)
                         .font(.caption)
                     Text("YouTube: https://youtube.com/watch?v=...")
-                        .font(JazzTheme.caption())
-                        .foregroundColor(JazzTheme.smokeGray)
+                        .font(ApproachNoteTheme.caption())
+                        .foregroundColor(ApproachNoteTheme.smokeGray)
                 }
 
                 HStack(spacing: 8) {
                     Image(systemName: "info.circle")
-                        .foregroundColor(JazzTheme.brass)
+                        .foregroundColor(ApproachNoteTheme.brass)
                         .font(.caption)
                     Text("This link will be preserved during automatic re-matching")
-                        .font(JazzTheme.caption())
-                        .foregroundColor(JazzTheme.smokeGray)
+                        .font(ApproachNoteTheme.caption())
+                        .foregroundColor(ApproachNoteTheme.smokeGray)
                 }
             }
             .padding(12)
-            .background(JazzTheme.cardBackground)
+            .background(ApproachNoteTheme.cardBackground)
             .cornerRadius(8)
         }
     }
@@ -145,13 +145,13 @@ struct MacAddStreamingLinkSheet: View {
     private var urlInputView: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Track URL or ID")
-                .font(JazzTheme.subheadline(weight: .medium))
-                .foregroundColor(JazzTheme.charcoal)
+                .font(ApproachNoteTheme.subheadline(weight: .medium))
+                .foregroundColor(ApproachNoteTheme.charcoal)
 
             HStack {
                 TextField("Paste URL here...", text: $urlInput)
                     .textFieldStyle(.roundedBorder)
-                    .font(JazzTheme.body())
+                    .font(ApproachNoteTheme.body())
                     .disabled(isSaving)
 
                 // Paste button
@@ -161,7 +161,7 @@ struct MacAddStreamingLinkSheet: View {
                     }
                 } label: {
                     Image(systemName: "doc.on.clipboard")
-                        .foregroundColor(JazzTheme.brass)
+                        .foregroundColor(ApproachNoteTheme.brass)
                 }
                 .buttonStyle(.plain)
                 .help("Paste from clipboard")
@@ -184,20 +184,20 @@ struct MacAddStreamingLinkSheet: View {
                 Image(systemName: "checkmark.circle.fill")
                     .foregroundColor(.green)
                 Text("Detected: \(serviceName(for: service))")
-                    .font(JazzTheme.caption())
+                    .font(ApproachNoteTheme.caption())
                     .foregroundColor(.green)
             case .wrongType(let message):
                 Image(systemName: "exclamationmark.triangle.fill")
                     .foregroundColor(.orange)
                 Text(message)
-                    .font(JazzTheme.caption())
+                    .font(ApproachNoteTheme.caption())
                     .foregroundColor(.orange)
             case .unknown:
                 if urlInput.count > 5 {
                     Image(systemName: "questionmark.circle")
                         .foregroundColor(.orange)
                     Text("Could not detect service - will validate on save")
-                        .font(JazzTheme.caption())
+                        .font(ApproachNoteTheme.caption())
                         .foregroundColor(.orange)
                 }
             }
@@ -270,7 +270,7 @@ struct MacAddStreamingLinkSheet: View {
             Image(systemName: "exclamationmark.triangle.fill")
                 .foregroundColor(.red)
             Text(message)
-                .font(JazzTheme.subheadline())
+                .font(ApproachNoteTheme.subheadline())
                 .foregroundColor(.red)
         }
         .padding(12)
@@ -284,7 +284,7 @@ struct MacAddStreamingLinkSheet: View {
             Image(systemName: "checkmark.circle.fill")
                 .foregroundColor(.green)
             Text(message)
-                .font(JazzTheme.subheadline())
+                .font(ApproachNoteTheme.subheadline())
                 .foregroundColor(.green)
         }
         .padding(12)
@@ -318,7 +318,7 @@ struct MacAddStreamingLinkSheet: View {
                 }
             }
             .buttonStyle(.borderedProminent)
-            .tint(JazzTheme.burgundy)
+            .tint(ApproachNoteTheme.burgundy)
             .disabled(urlInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSaving)
             .keyboardShortcut(.defaultAction)
         }

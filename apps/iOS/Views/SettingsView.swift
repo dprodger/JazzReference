@@ -22,7 +22,7 @@ struct SettingsView: View {
                     VStack(spacing: 16) {
                         // Profile Icon
                         Circle()
-                            .fill(JazzTheme.burgundy.gradient)
+                            .fill(ApproachNoteTheme.burgundy.gradient)
                             .frame(width: 80, height: 80)
                             .overlay {
                                 Image(systemName: "person.fill")
@@ -33,16 +33,16 @@ struct SettingsView: View {
                         // Name
                         if let displayName = authManager.currentUser?.displayName {
                             Text(displayName)
-                                .font(JazzTheme.title2())
+                                .font(ApproachNoteTheme.title2())
                                 .fontWeight(.semibold)
-                                .foregroundColor(JazzTheme.charcoal)
+                                .foregroundColor(ApproachNoteTheme.charcoal)
                         }
 
                         // Email
                         if let email = authManager.currentUser?.email {
                             Text(email)
-                                .font(JazzTheme.body())
-                                .foregroundColor(JazzTheme.smokeGray)
+                                .font(ApproachNoteTheme.body())
+                                .foregroundColor(ApproachNoteTheme.smokeGray)
                         }
                     }
                     .padding(.top, 32)
@@ -53,17 +53,17 @@ struct SettingsView: View {
                     // Playback Settings Section
                     VStack(alignment: .leading, spacing: 12) {
                         Text("Playback")
-                            .font(JazzTheme.headline())
-                            .foregroundColor(JazzTheme.charcoal)
+                            .font(ApproachNoteTheme.headline())
+                            .foregroundColor(ApproachNoteTheme.charcoal)
                             .padding(.horizontal)
 
                         VStack(spacing: 0) {
                             HStack {
                                 Image(systemName: "play.circle.fill")
-                                    .foregroundColor(JazzTheme.burgundy)
+                                    .foregroundColor(ApproachNoteTheme.burgundy)
                                 Text("Preferred Service")
-                                    .font(JazzTheme.body())
-                                    .foregroundColor(JazzTheme.charcoal)
+                                    .font(ApproachNoteTheme.body())
+                                    .foregroundColor(ApproachNoteTheme.charcoal)
                                 Spacer()
                                 Picker("", selection: $preferredStreamingService) {
                                     ForEach(StreamingService.allCases) { service in
@@ -71,17 +71,17 @@ struct SettingsView: View {
                                     }
                                 }
                                 .pickerStyle(.menu)
-                                .tint(JazzTheme.burgundy)
+                                .tint(ApproachNoteTheme.burgundy)
                             }
                             .padding()
-                            .background(JazzTheme.cardBackground)
+                            .background(ApproachNoteTheme.cardBackground)
                             .cornerRadius(8)
                         }
                         .padding(.horizontal)
 
                         Text("Play buttons will open this service when available")
-                            .font(JazzTheme.caption())
-                            .foregroundColor(JazzTheme.smokeGray)
+                            .font(ApproachNoteTheme.caption())
+                            .foregroundColor(ApproachNoteTheme.smokeGray)
                             .padding(.horizontal)
                     }
 
@@ -94,8 +94,8 @@ struct SettingsView: View {
                             Image(systemName: "heart.fill")
                                 .foregroundColor(.red)
                             Text("Favorites")
-                                .font(JazzTheme.headline())
-                                .foregroundColor(JazzTheme.charcoal)
+                                .font(ApproachNoteTheme.headline())
+                                .foregroundColor(ApproachNoteTheme.charcoal)
                         }
                         .padding(.horizontal)
 
@@ -103,14 +103,14 @@ struct SettingsView: View {
                             HStack {
                                 Spacer()
                                 ProgressView()
-                                    .tint(JazzTheme.brass)
+                                    .tint(ApproachNoteTheme.brass)
                                 Spacer()
                             }
                             .padding()
                         } else if favoritesManager.favoriteRecordings.isEmpty {
                             Text("No favorite recordings yet")
-                                .font(JazzTheme.body())
-                                .foregroundColor(JazzTheme.smokeGray)
+                                .font(ApproachNoteTheme.body())
+                                .foregroundColor(ApproachNoteTheme.smokeGray)
                                 .padding(.horizontal)
                         } else {
                             ScrollView(.horizontal, showsIndicators: false) {
@@ -132,27 +132,27 @@ struct SettingsView: View {
                                                         },
                                                         placeholder: {
                                                             Rectangle()
-                                                                .fill(JazzTheme.cardBackground)
+                                                                .fill(ApproachNoteTheme.cardBackground)
                                                                 .frame(width: 80, height: 80)
                                                                 .cornerRadius(8)
                                                         }
                                                     )
                                                 } else {
                                                     Rectangle()
-                                                        .fill(JazzTheme.cardBackground)
+                                                        .fill(ApproachNoteTheme.cardBackground)
                                                         .frame(width: 80, height: 80)
                                                         .cornerRadius(8)
                                                         .overlay(
                                                             Image(systemName: "opticaldisc")
-                                                                .foregroundColor(JazzTheme.smokeGray)
+                                                                .foregroundColor(ApproachNoteTheme.smokeGray)
                                                         )
                                                 }
 
                                                 // Song title
                                                 Text(recording.songTitle ?? "Unknown")
-                                                    .font(JazzTheme.caption())
+                                                    .font(ApproachNoteTheme.caption())
                                                     .fontWeight(.medium)
-                                                    .foregroundColor(JazzTheme.charcoal)
+                                                    .foregroundColor(ApproachNoteTheme.charcoal)
                                                     .lineLimit(2)
                                                     .multilineTextAlignment(.center)
                                             }
@@ -167,8 +167,8 @@ struct SettingsView: View {
 
                         if favoritesManager.favoriteCount > 0 {
                             Text("\(favoritesManager.favoriteCount) \(favoritesManager.favoriteCount == 1 ? "recording" : "recordings")")
-                                .font(JazzTheme.caption())
-                                .foregroundColor(JazzTheme.smokeGray)
+                                .font(ApproachNoteTheme.caption())
+                                .foregroundColor(ApproachNoteTheme.smokeGray)
                                 .padding(.horizontal)
                         }
                     }
@@ -180,10 +180,10 @@ struct SettingsView: View {
                     VStack(alignment: .leading, spacing: 12) {
                         HStack {
                             Image(systemName: "person.3.fill")
-                                .foregroundColor(JazzTheme.brass)
+                                .foregroundColor(ApproachNoteTheme.brass)
                             Text("Your Contributions")
-                                .font(JazzTheme.headline())
-                                .foregroundColor(JazzTheme.charcoal)
+                                .font(ApproachNoteTheme.headline())
+                                .foregroundColor(ApproachNoteTheme.charcoal)
                         }
                         .padding(.horizontal)
 
@@ -191,7 +191,7 @@ struct SettingsView: View {
                             HStack {
                                 Spacer()
                                 ProgressView()
-                                    .tint(JazzTheme.brass)
+                                    .tint(ApproachNoteTheme.brass)
                                 Spacer()
                             }
                             .padding()
@@ -199,7 +199,7 @@ struct SettingsView: View {
                             VStack(spacing: 0) {
                                 ContributionStatRow(
                                     icon: "music.note.list",
-                                    iconColor: JazzTheme.burgundy,
+                                    iconColor: ApproachNoteTheme.burgundy,
                                     label: "Transcriptions",
                                     count: stats.transcriptions
                                 )
@@ -219,7 +219,7 @@ struct SettingsView: View {
 
                                 ContributionStatRow(
                                     icon: "metronome",
-                                    iconColor: JazzTheme.brass,
+                                    iconColor: ApproachNoteTheme.brass,
                                     label: "Tempo Markings",
                                     count: stats.tempoMarkings
                                 )
@@ -245,14 +245,14 @@ struct SettingsView: View {
                                 )
                             }
                             .padding(.horizontal)
-                            .background(JazzTheme.cardBackground)
+                            .background(ApproachNoteTheme.cardBackground)
                             .cornerRadius(8)
                             .padding(.horizontal)
 
                             if stats.totalContributions > 0 {
                                 Text("Total: \(stats.totalContributions) contribution\(stats.totalContributions == 1 ? "" : "s")")
-                                    .font(JazzTheme.caption())
-                                    .foregroundColor(JazzTheme.brass)
+                                    .font(ApproachNoteTheme.caption())
+                                    .foregroundColor(ApproachNoteTheme.brass)
                                     .fontWeight(.medium)
                                     .padding(.horizontal)
                             }
@@ -261,15 +261,15 @@ struct SettingsView: View {
                                 Image(systemName: "exclamationmark.triangle")
                                     .foregroundColor(.orange)
                                 Text(error)
-                                    .font(JazzTheme.body())
-                                    .foregroundColor(JazzTheme.smokeGray)
+                                    .font(ApproachNoteTheme.body())
+                                    .foregroundColor(ApproachNoteTheme.smokeGray)
                             }
                             .padding(.horizontal)
                         }
 
                         Text("Thank you for helping improve the community!")
-                            .font(JazzTheme.caption())
-                            .foregroundColor(JazzTheme.smokeGray)
+                            .font(ApproachNoteTheme.caption())
+                            .foregroundColor(ApproachNoteTheme.smokeGray)
                             .padding(.horizontal)
                     }
 
@@ -284,13 +284,13 @@ struct SettingsView: View {
                         }) {
                             HStack {
                                 Image(systemName: "rectangle.portrait.and.arrow.right")
-                                    .foregroundColor(JazzTheme.burgundy)
+                                    .foregroundColor(ApproachNoteTheme.burgundy)
                                 Text("Log Out")
-                                    .foregroundColor(JazzTheme.charcoal)
+                                    .foregroundColor(ApproachNoteTheme.charcoal)
                                 Spacer()
                             }
                             .padding()
-                            .background(JazzTheme.cardBackground)
+                            .background(ApproachNoteTheme.cardBackground)
                             .cornerRadius(8)
                         }
                         .padding(.horizontal)
@@ -299,7 +299,7 @@ struct SettingsView: View {
                     Spacer()
                 }
             }
-            .background(JazzTheme.backgroundLight)
+            .background(ApproachNoteTheme.backgroundLight)
             .jazzNavigationBar(title: "Settings")
             .task {
                 await loadContributionStats()
@@ -344,15 +344,15 @@ private struct ContributionStatRow: View {
                 .frame(width: 24)
 
             Text(label)
-                .font(JazzTheme.body())
-                .foregroundColor(JazzTheme.charcoal)
+                .font(ApproachNoteTheme.body())
+                .foregroundColor(ApproachNoteTheme.charcoal)
 
             Spacer()
 
             Text("\(count)")
-                .font(JazzTheme.title3())
+                .font(ApproachNoteTheme.title3())
                 .fontWeight(.semibold)
-                .foregroundColor(count > 0 ? JazzTheme.charcoal : JazzTheme.smokeGray.opacity(0.5))
+                .foregroundColor(count > 0 ? ApproachNoteTheme.charcoal : ApproachNoteTheme.smokeGray.opacity(0.5))
         }
         .padding(.vertical, 12)
         .padding(.horizontal, 12)

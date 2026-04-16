@@ -23,8 +23,8 @@ struct RecordingFilterSheet: View {
                     // MARK: - Availability Section
                     VStack(alignment: .leading, spacing: 12) {
                         Text("Availability")
-                            .font(JazzTheme.headline())
-                            .foregroundColor(JazzTheme.charcoal)
+                            .font(ApproachNoteTheme.headline())
+                            .foregroundColor(ApproachNoteTheme.charcoal)
 
                         VStack(spacing: 0) {
                             ForEach(Array(SongRecordingFilter.allCases.enumerated()), id: \.element) { index, filter in
@@ -50,8 +50,8 @@ struct RecordingFilterSheet: View {
                     // MARK: - Vocal/Instrumental Section
                     VStack(alignment: .leading, spacing: 12) {
                         Text("Performance Type")
-                            .font(JazzTheme.headline())
-                            .foregroundColor(JazzTheme.charcoal)
+                            .font(ApproachNoteTheme.headline())
+                            .foregroundColor(ApproachNoteTheme.charcoal)
 
                         VStack(spacing: 0) {
                             ForEach(Array(VocalFilter.allCases.enumerated()), id: \.element) { index, filter in
@@ -78,12 +78,12 @@ struct RecordingFilterSheet: View {
                     if !availableInstruments.isEmpty {
                         VStack(alignment: .leading, spacing: 12) {
                             Text("By Instrument")
-                                .font(JazzTheme.headline())
-                                .foregroundColor(JazzTheme.charcoal)
+                                .font(ApproachNoteTheme.headline())
+                                .foregroundColor(ApproachNoteTheme.charcoal)
 
                             Text("Filter to recordings featuring a specific instrument")
-                                .font(JazzTheme.subheadline())
-                                .foregroundColor(JazzTheme.smokeGray)
+                                .font(ApproachNoteTheme.subheadline())
+                                .foregroundColor(ApproachNoteTheme.smokeGray)
 
                             LazyVGrid(columns: [
                                 GridItem(.flexible()),
@@ -101,7 +101,7 @@ struct RecordingFilterSheet: View {
                 }
                 .padding()
             }
-            .background(JazzTheme.backgroundLight)
+            .background(ApproachNoteTheme.backgroundLight)
             .navigationTitle("Filter Recordings")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -110,7 +110,7 @@ struct RecordingFilterSheet: View {
                         Button("Clear All") {
                             clearAllFilters()
                         }
-                        .foregroundColor(JazzTheme.burgundy)
+                        .foregroundColor(ApproachNoteTheme.burgundy)
                     }
                 }
 
@@ -119,7 +119,7 @@ struct RecordingFilterSheet: View {
                         dismiss()
                     }
                     .fontWeight(.semibold)
-                    .foregroundColor(JazzTheme.burgundy)
+                    .foregroundColor(ApproachNoteTheme.burgundy)
                 }
             }
         }
@@ -141,21 +141,21 @@ struct RecordingFilterSheet: View {
         Button(action: action) {
             HStack(spacing: 12) {
                 Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                    .font(JazzTheme.title2())
-                    .foregroundColor(isSelected ? JazzTheme.burgundy : JazzTheme.smokeGray.opacity(0.5))
+                    .font(ApproachNoteTheme.title2())
+                    .foregroundColor(isSelected ? ApproachNoteTheme.burgundy : ApproachNoteTheme.smokeGray.opacity(0.5))
 
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 6) {
                         Image(systemName: icon)
-                            .font(JazzTheme.caption())
+                            .font(ApproachNoteTheme.caption())
                             .foregroundColor(iconColor)
                         Text(title)
-                            .font(JazzTheme.body())
-                            .foregroundColor(JazzTheme.charcoal)
+                            .font(ApproachNoteTheme.body())
+                            .foregroundColor(ApproachNoteTheme.charcoal)
                     }
                     Text(subtitle)
-                        .font(JazzTheme.caption())
-                        .foregroundColor(JazzTheme.smokeGray)
+                        .font(ApproachNoteTheme.caption())
+                        .foregroundColor(ApproachNoteTheme.smokeGray)
                 }
 
                 Spacer()
@@ -180,21 +180,21 @@ struct RecordingFilterSheet: View {
         }) {
             HStack(spacing: 6) {
                 Image(systemName: iconForInstrument(family))
-                    .font(JazzTheme.caption())
+                    .font(ApproachNoteTheme.caption())
                 Text(family.rawValue)
-                    .font(JazzTheme.subheadline())
+                    .font(ApproachNoteTheme.subheadline())
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 10)
             .padding(.horizontal, 8)
-            .background(isSelected ? JazzTheme.brass : Color.white)
-            .foregroundColor(isSelected ? .white : JazzTheme.charcoal)
+            .background(isSelected ? ApproachNoteTheme.brass : Color.white)
+            .foregroundColor(isSelected ? .white : ApproachNoteTheme.charcoal)
             .cornerRadius(8)
             .overlay(
                 RoundedRectangle(cornerRadius: 8)
-                    .stroke(isSelected ? Color.clear : JazzTheme.smokeGray.opacity(0.5), lineWidth: 1)
+                    .stroke(isSelected ? Color.clear : ApproachNoteTheme.smokeGray.opacity(0.5), lineWidth: 1)
             )
         }
         .buttonStyle(.plain)

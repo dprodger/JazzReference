@@ -56,7 +56,7 @@ struct RecordingsSection: View {
                                 filterChipsBar
                                     .padding(.vertical, 8)
                                     .padding(.horizontal, 4)
-                                    .background(JazzTheme.cardBackground)
+                                    .background(ApproachNoteTheme.cardBackground)
                                     .cornerRadius(8)
                                     .padding(.horizontal)
                             }
@@ -67,8 +67,8 @@ struct RecordingsSection: View {
                                     ForEach(groupedRecordings, id: \.groupKey) { group in
                                         VStack(alignment: .leading, spacing: 8) {
                                             Text("\(group.groupKey) (\(group.recordings.count))")
-                                                .font(JazzTheme.headline())
-                                                .foregroundColor(JazzTheme.burgundy)
+                                                .font(ApproachNoteTheme.headline())
+                                                .foregroundColor(ApproachNoteTheme.burgundy)
                                                 .padding(.horizontal)
                                                 .padding(.top, 8)
 
@@ -79,7 +79,7 @@ struct RecordingsSection: View {
                                                             // Divider before item (except first)
                                                             if index > 0 {
                                                                 Rectangle()
-                                                                    .fill(JazzTheme.burgundy.opacity(0.4))
+                                                                    .fill(ApproachNoteTheme.burgundy.opacity(0.4))
                                                                     .frame(width: 2, height: 150)
                                                                     .padding(.horizontal, 8)
                                                             }
@@ -106,10 +106,10 @@ struct RecordingsSection: View {
                                     VStack(spacing: 12) {
                                         Image(systemName: "music.note")
                                             .font(.system(size: 48))
-                                            .foregroundColor(JazzTheme.smokeGray.opacity(0.5))
+                                            .foregroundColor(ApproachNoteTheme.smokeGray.opacity(0.5))
                                         Text("No recordings match the current filters")
-                                            .font(JazzTheme.subheadline())
-                                            .foregroundColor(JazzTheme.smokeGray)
+                                            .font(ApproachNoteTheme.subheadline())
+                                            .foregroundColor(ApproachNoteTheme.smokeGray)
                                             .multilineTextAlignment(.center)
                                     }
                                     .frame(maxWidth: .infinity)
@@ -121,10 +121,10 @@ struct RecordingsSection: View {
                                 if isReloading {
                                     HStack(spacing: 8) {
                                         ProgressView()
-                                            .tint(JazzTheme.burgundy)
+                                            .tint(ApproachNoteTheme.burgundy)
                                         Text("Reloading...")
-                                            .font(JazzTheme.subheadline())
-                                            .foregroundColor(JazzTheme.smokeGray)
+                                            .font(ApproachNoteTheme.subheadline())
+                                            .foregroundColor(ApproachNoteTheme.smokeGray)
                                     }
                                     .padding(.horizontal, 16)
                                     .padding(.vertical, 10)
@@ -141,17 +141,17 @@ struct RecordingsSection: View {
                     label: {
                         HStack(alignment: .center) {
                             Image(systemName: "music.note.list")
-                                .foregroundColor(JazzTheme.burgundy)
+                                .foregroundColor(ApproachNoteTheme.burgundy)
 
                             Text("Recordings")
-                                .font(JazzTheme.title2())
+                                .font(ApproachNoteTheme.title2())
                                 .bold()
-                                .foregroundColor(JazzTheme.charcoal)
+                                .foregroundColor(ApproachNoteTheme.charcoal)
 
                             // Recording count in header
                             Text("(\(filteredRecordings.count))")
-                                .font(JazzTheme.subheadline())
-                                .foregroundColor(JazzTheme.smokeGray)
+                                .font(ApproachNoteTheme.subheadline())
+                                .foregroundColor(ApproachNoteTheme.smokeGray)
 
                             Spacer()
 
@@ -175,26 +175,26 @@ struct RecordingsSection: View {
                             } label: {
                                 HStack(spacing: 3) {
                                     Text(recordingSortOrder.displayName)
-                                        .font(JazzTheme.caption())
+                                        .font(ApproachNoteTheme.caption())
                                     Image(systemName: "chevron.down")
                                         .font(.caption2)
                                 }
-                                .foregroundColor(JazzTheme.burgundy)
+                                .foregroundColor(ApproachNoteTheme.burgundy)
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 5)
-                                .background(JazzTheme.burgundy.opacity(0.1))
+                                .background(ApproachNoteTheme.burgundy.opacity(0.1))
                                 .cornerRadius(6)
                             }
                         }
                         .padding(.vertical, 12)
                     }
                 )
-                .tint(JazzTheme.burgundy)
+                .tint(ApproachNoteTheme.burgundy)
             }
             
             Spacer().frame(width: 16)
         }
-        .background(JazzTheme.backgroundLight)
+        .background(ApproachNoteTheme.backgroundLight)
         .sheet(isPresented: $showFilterSheet) {
             RecordingFilterSheet(
                 selectedFilter: $selectedFilter,
@@ -244,12 +244,12 @@ struct RecordingsSection: View {
                     Image(systemName: hasActiveFilters ? "slider.horizontal.3" : "plus")
                         .font(.caption.weight(.medium))
                     Text(hasActiveFilters ? "Edit" : "Filter")
-                        .font(JazzTheme.subheadline())
+                        .font(ApproachNoteTheme.subheadline())
                 }
-                .foregroundColor(JazzTheme.burgundy)
+                .foregroundColor(ApproachNoteTheme.burgundy)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 5)
-                .background(JazzTheme.burgundy.opacity(0.15))
+                .background(ApproachNoteTheme.burgundy.opacity(0.15))
                 .cornerRadius(14)
             }
             .buttonStyle(.plain)
@@ -297,12 +297,12 @@ struct FilterChip: View {
         HStack(spacing: 4) {
             if let icon = icon {
                 Image(systemName: icon)
-                    .font(JazzTheme.caption())
+                    .font(ApproachNoteTheme.caption())
                     .foregroundColor(iconColor ?? .white)
             }
 
             Text(label)
-                .font(JazzTheme.subheadline())
+                .font(ApproachNoteTheme.subheadline())
 
             Button(action: onRemove) {
                 Image(systemName: "xmark")
@@ -313,7 +313,7 @@ struct FilterChip: View {
         .foregroundColor(.white)
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
-        .background(backgroundColor ?? JazzTheme.brass)
+        .background(backgroundColor ?? ApproachNoteTheme.brass)
         .cornerRadius(16)
     }
 }
@@ -340,7 +340,7 @@ struct FilterChip: View {
 
 #Preview("Filter Chips") {
     VStack(spacing: 12) {
-        FilterChip(label: "Playable", icon: "play.circle", iconColor: JazzTheme.burgundy) {}
+        FilterChip(label: "Playable", icon: "play.circle", iconColor: ApproachNoteTheme.burgundy) {}
         FilterChip(label: "Spotify", icon: "music.note.list", iconColor: .green) {}
         FilterChip(label: "Piano", icon: nil) {}
     }

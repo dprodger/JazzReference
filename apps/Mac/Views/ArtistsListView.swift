@@ -84,7 +84,7 @@ struct ArtistsListView: View {
             MacSearchBar(
                 text: $searchText,
                 placeholder: "Search artists...",
-                backgroundColor: JazzTheme.amber
+                backgroundColor: ApproachNoteTheme.amber
             )
 
             List(selection: $selectedPerformerId) {
@@ -95,8 +95,8 @@ struct ArtistsListView: View {
                                 .tag(performer.id)
                                 .listRowBackground(
                                     selectedPerformerId == performer.id
-                                        ? JazzTheme.burgundy
-                                        : JazzTheme.backgroundLight
+                                        ? ApproachNoteTheme.burgundy
+                                        : ApproachNoteTheme.backgroundLight
                                 )
                         }
                     }
@@ -104,7 +104,7 @@ struct ArtistsListView: View {
             }
             .listStyle(.plain)
             .scrollContentBackground(.hidden)
-            .background(JazzTheme.backgroundLight)
+            .background(ApproachNoteTheme.backgroundLight)
             .listSectionSeparator(.hidden)
         }
         .frame(minWidth: 200, idealWidth: 250, maxWidth: 300)
@@ -114,7 +114,7 @@ struct ArtistsListView: View {
     private func sectionHeader(letter: String) -> some View {
         HStack {
             Text(letter)
-                .font(JazzTheme.headline())
+                .font(ApproachNoteTheme.headline())
                 .foregroundColor(.white)
             Spacer()
         }
@@ -122,7 +122,7 @@ struct ArtistsListView: View {
         .padding(.vertical, 6)
         .frame(maxWidth: .infinity)
         .background(
-            JazzTheme.amber
+            ApproachNoteTheme.amber
                 .padding(.horizontal, -20)
                 .padding(.vertical, -4)
         )
@@ -138,13 +138,13 @@ struct ArtistsListView: View {
             VStack {
                 Image(systemName: "person.2")
                     .font(.system(size: 60))
-                    .foregroundColor(JazzTheme.smokeGray.opacity(0.5))
+                    .foregroundColor(ApproachNoteTheme.smokeGray.opacity(0.5))
                 Text("Select an artist")
-                    .font(JazzTheme.title2())
-                    .foregroundColor(JazzTheme.smokeGray)
+                    .font(ApproachNoteTheme.title2())
+                    .foregroundColor(ApproachNoteTheme.smokeGray)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(JazzTheme.backgroundLight)
+            .background(ApproachNoteTheme.backgroundLight)
         }
     }
 
@@ -189,13 +189,13 @@ struct ArtistRowView: View {
 
     /// Build formatted name with sort key bolded
     private func formattedName(for performer: Performer) -> Text {
-        let textColor = isSelected ? Color.white : JazzTheme.charcoal
+        let textColor = isSelected ? Color.white : ApproachNoteTheme.charcoal
 
         guard let key = sortKey(for: performer),
               let range = performer.name.range(of: key, options: .caseInsensitive) else {
             // No sort key or not found in name - just return plain name
             return Text(performer.name)
-                .font(JazzTheme.headline())
+                .font(ApproachNoteTheme.headline())
                 .foregroundColor(textColor)
         }
 
@@ -206,13 +206,13 @@ struct ArtistRowView: View {
 
         // Use regular weight for non-sort parts, semibold for sort key
         return Text(before)
-            .font(JazzTheme.headline(weight: .regular))
+            .font(ApproachNoteTheme.headline(weight: .regular))
             .foregroundColor(textColor)
         + Text(keyText)
-            .font(JazzTheme.headline(weight: .semibold))
+            .font(ApproachNoteTheme.headline(weight: .semibold))
             .foregroundColor(textColor)
         + Text(after)
-            .font(JazzTheme.headline(weight: .regular))
+            .font(ApproachNoteTheme.headline(weight: .regular))
             .foregroundColor(textColor)
     }
 
@@ -221,8 +221,8 @@ struct ArtistRowView: View {
             formattedName(for: performer)
             if let instrument = performer.instrument {
                 Text(instrument)
-                    .font(JazzTheme.subheadline())
-                    .foregroundStyle(isSelected ? Color.white.opacity(0.85) : JazzTheme.smokeGray)
+                    .font(ApproachNoteTheme.subheadline())
+                    .foregroundStyle(isSelected ? Color.white.opacity(0.85) : ApproachNoteTheme.smokeGray)
             }
         }
         .padding(.vertical, 4)

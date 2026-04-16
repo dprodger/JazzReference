@@ -99,7 +99,7 @@ apps/
 │   └── Support/
 │       ├── Models.swift         # Data models
 │       ├── NetworkManager.swift # API client (async/await)
-│       ├── JazzTheme.swift      # UI theming
+│       ├── ApproachNoteTheme.swift      # UI theming
 │       ├── HelperViews.swift
 │       └── PreviewHelpers.swift # SwiftUI preview data
 ├── iOS/                         # iOS-specific code

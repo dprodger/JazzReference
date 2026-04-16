@@ -20,10 +20,10 @@ struct MacCommunityDataSection: View {
             // Header
             HStack {
                 Image(systemName: "person.3.fill")
-                    .foregroundColor(JazzTheme.brass)
+                    .foregroundColor(ApproachNoteTheme.brass)
                 Text("Community Data")
-                    .font(JazzTheme.headline())
-                    .foregroundColor(JazzTheme.charcoal)
+                    .font(ApproachNoteTheme.headline())
+                    .foregroundColor(ApproachNoteTheme.charcoal)
 
                 Spacer()
 
@@ -36,10 +36,10 @@ struct MacCommunityDataSection: View {
                             Image(systemName: userContribution != nil ? "pencil" : "plus")
                             Text(userContribution != nil ? "Edit" : "Contribute")
                         }
-                        .font(JazzTheme.caption())
+                        .font(ApproachNoteTheme.caption())
                     }
                     .buttonStyle(.borderedProminent)
-                    .tint(JazzTheme.burgundy)
+                    .tint(ApproachNoteTheme.burgundy)
                 }
             }
 
@@ -78,28 +78,28 @@ struct MacCommunityDataSection: View {
                     )
                 }
                 .padding()
-                .background(JazzTheme.cardBackground)
+                .background(ApproachNoteTheme.cardBackground)
                 .cornerRadius(8)
             } else {
                 // No data yet
                 VStack(alignment: .center, spacing: 8) {
                     Text("No community data yet")
-                        .font(JazzTheme.body())
-                        .foregroundColor(JazzTheme.smokeGray)
+                        .font(ApproachNoteTheme.body())
+                        .foregroundColor(ApproachNoteTheme.smokeGray)
 
                     if isAuthenticated {
                         Text("Be the first to contribute!")
-                            .font(JazzTheme.caption())
-                            .foregroundColor(JazzTheme.brass)
+                            .font(ApproachNoteTheme.caption())
+                            .foregroundColor(ApproachNoteTheme.brass)
                     } else {
                         Text("Sign in to contribute data")
-                            .font(JazzTheme.caption())
-                            .foregroundColor(JazzTheme.burgundy)
+                            .font(ApproachNoteTheme.caption())
+                            .foregroundColor(ApproachNoteTheme.burgundy)
                     }
                 }
                 .frame(maxWidth: .infinity)
                 .padding()
-                .background(JazzTheme.cardBackground)
+                .background(ApproachNoteTheme.cardBackground)
                 .cornerRadius(8)
             }
         }
@@ -136,12 +136,12 @@ struct MacCommunityDataRow: View {
     var body: some View {
         HStack(alignment: .center, spacing: 12) {
             Image(systemName: icon)
-                .foregroundColor(isEmpty ? JazzTheme.smokeGray.opacity(0.5) : JazzTheme.brass)
+                .foregroundColor(isEmpty ? ApproachNoteTheme.smokeGray.opacity(0.5) : ApproachNoteTheme.brass)
                 .frame(width: 20)
 
             Text(label)
-                .font(JazzTheme.subheadline())
-                .foregroundColor(JazzTheme.smokeGray)
+                .font(ApproachNoteTheme.subheadline())
+                .foregroundColor(ApproachNoteTheme.smokeGray)
                 .frame(width: 50, alignment: .leading)
 
             Spacer()
@@ -149,28 +149,28 @@ struct MacCommunityDataRow: View {
             VStack(alignment: .trailing, spacing: 2) {
                 if let help = helpText {
                     Text(value)
-                        .font(JazzTheme.body())
+                        .font(ApproachNoteTheme.body())
                         .fontWeight(isEmpty ? .regular : .medium)
-                        .foregroundColor(isEmpty ? JazzTheme.smokeGray.opacity(0.5) : JazzTheme.charcoal)
+                        .foregroundColor(isEmpty ? ApproachNoteTheme.smokeGray.opacity(0.5) : ApproachNoteTheme.charcoal)
                         .help(help)
                 } else {
                     Text(value)
-                        .font(JazzTheme.body())
+                        .font(ApproachNoteTheme.body())
                         .fontWeight(isEmpty ? .regular : .medium)
-                        .foregroundColor(isEmpty ? JazzTheme.smokeGray.opacity(0.5) : JazzTheme.charcoal)
+                        .foregroundColor(isEmpty ? ApproachNoteTheme.smokeGray.opacity(0.5) : ApproachNoteTheme.charcoal)
                 }
 
                 if count > 0 {
                     Text("\(count) \(count == 1 ? "vote" : "votes")")
-                        .font(JazzTheme.caption2())
-                        .foregroundColor(JazzTheme.smokeGray)
+                        .font(ApproachNoteTheme.caption2())
+                        .foregroundColor(ApproachNoteTheme.smokeGray)
                 }
 
                 // Show user's value if different from consensus
                 if let userVal = userValue, !isEmpty, userVal != value {
                     Text("You: \(userVal)")
-                        .font(JazzTheme.caption2())
-                        .foregroundColor(JazzTheme.burgundy)
+                        .font(ApproachNoteTheme.caption2())
+                        .foregroundColor(ApproachNoteTheme.burgundy)
                 }
             }
         }

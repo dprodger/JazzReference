@@ -15,20 +15,20 @@ struct TranscriptionRowView: View {
                 // Play button thumbnail
                 ZStack {
                     RoundedRectangle(cornerRadius: 8)
-                        .fill(JazzTheme.teal.opacity(0.15))
+                        .fill(ApproachNoteTheme.teal.opacity(0.15))
                         .frame(width: 80, height: 45)
 
                     Image(systemName: "play.fill")
                         .font(.system(size: 20))
-                        .foregroundColor(JazzTheme.teal)
+                        .foregroundColor(ApproachNoteTheme.teal)
                 }
 
                 // Transcription info
                 VStack(alignment: .leading, spacing: 4) {
                     // Album/Recording title
                     Text(transcription.albumTitle ?? "Solo Transcription")
-                        .font(JazzTheme.headline())
-                        .foregroundColor(JazzTheme.charcoal)
+                        .font(ApproachNoteTheme.headline())
+                        .foregroundColor(ApproachNoteTheme.charcoal)
                         .lineLimit(2)
                         .multilineTextAlignment(.leading)
 
@@ -37,22 +37,22 @@ struct TranscriptionRowView: View {
                         if let year = transcription.recordingYear {
                             HStack(spacing: 4) {
                                 Image(systemName: "calendar")
-                                    .foregroundColor(JazzTheme.brass)
-                                    .font(JazzTheme.caption())
+                                    .foregroundColor(ApproachNoteTheme.brass)
+                                    .font(ApproachNoteTheme.caption())
                                 Text(String(format: "%d", year))
-                                    .font(JazzTheme.subheadline())
-                                    .foregroundColor(JazzTheme.smokeGray)
+                                    .font(ApproachNoteTheme.subheadline())
+                                    .foregroundColor(ApproachNoteTheme.smokeGray)
                             }
                         }
 
                         if let label = transcription.label {
                             HStack(spacing: 4) {
                                 Image(systemName: "opticaldisc")
-                                    .foregroundColor(JazzTheme.brass)
-                                    .font(JazzTheme.caption())
+                                    .foregroundColor(ApproachNoteTheme.brass)
+                                    .font(ApproachNoteTheme.caption())
                                 Text(label)
-                                    .font(JazzTheme.subheadline())
-                                    .foregroundColor(JazzTheme.smokeGray)
+                                    .font(ApproachNoteTheme.subheadline())
+                                    .foregroundColor(ApproachNoteTheme.smokeGray)
                                     .lineLimit(1)
                             }
                         }
@@ -63,12 +63,12 @@ struct TranscriptionRowView: View {
 
                 // Chevron indicator
                 Image(systemName: "chevron.right")
-                    .font(JazzTheme.subheadline())
-                    .foregroundColor(JazzTheme.smokeGray)
+                    .font(ApproachNoteTheme.subheadline())
+                    .foregroundColor(ApproachNoteTheme.smokeGray)
             }
             .padding()
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(JazzTheme.cardBackground)
+            .background(ApproachNoteTheme.cardBackground)
             .cornerRadius(10)
             .padding(.horizontal)
         }

@@ -90,8 +90,8 @@ struct ContentView: View {
                     .popover(isPresented: $showRepertoirePopover, arrowEdge: .bottom) {
                         VStack(spacing: 16) {
                             Text("Create and select repertoires to focus on a subset of songs.")
-                                .font(JazzTheme.body())
-                                .foregroundColor(JazzTheme.charcoal)
+                                .font(ApproachNoteTheme.body())
+                                .foregroundColor(ApproachNoteTheme.charcoal)
                                 .multilineTextAlignment(.center)
 
                             Button(action: {
@@ -99,12 +99,12 @@ struct ContentView: View {
                                 showLoginSheet = true
                             }) {
                                 Text("Sign In")
-                                    .font(JazzTheme.body())
+                                    .font(ApproachNoteTheme.body())
                                     .foregroundColor(.white)
                                     .frame(minWidth: 100)
                                     .padding(.horizontal, 16)
                                     .padding(.vertical, 8)
-                                    .background(JazzTheme.burgundy)
+                                    .background(ApproachNoteTheme.burgundy)
                                     .cornerRadius(6)
                             }
                             .buttonStyle(.plain)
@@ -204,22 +204,22 @@ struct AccountSettingsView: View {
                             } placeholder: {
                                 Image(systemName: "person.circle.fill")
                                     .font(.system(size: 40))
-                                    .foregroundColor(JazzTheme.smokeGray)
+                                    .foregroundColor(ApproachNoteTheme.smokeGray)
                             }
                             .frame(width: 50, height: 50)
                             .clipShape(Circle())
                         } else {
                             Image(systemName: "person.circle.fill")
                                 .font(.system(size: 50))
-                                .foregroundColor(JazzTheme.smokeGray)
+                                .foregroundColor(ApproachNoteTheme.smokeGray)
                         }
 
                         VStack(alignment: .leading, spacing: 4) {
                             Text(authManager.currentUser?.displayName ?? "User")
-                                .font(JazzTheme.headline())
-                                .foregroundColor(JazzTheme.charcoal)
+                                .font(ApproachNoteTheme.headline())
+                                .foregroundColor(ApproachNoteTheme.charcoal)
                             Text(authManager.currentUser?.email ?? "")
-                                .font(JazzTheme.subheadline())
+                                .font(ApproachNoteTheme.subheadline())
                                 .foregroundColor(.secondary)
                         }
 
@@ -241,13 +241,13 @@ struct AccountSettingsView: View {
                     Image(systemName: "heart.fill")
                         .foregroundColor(.red)
                     Text("Favorite Recordings")
-                        .font(JazzTheme.headline())
-                        .foregroundColor(JazzTheme.charcoal)
+                        .font(ApproachNoteTheme.headline())
+                        .foregroundColor(ApproachNoteTheme.charcoal)
 
                     if !favoritesManager.favoriteRecordings.isEmpty {
                         Text("(\(favoritesManager.favoriteRecordings.count))")
-                            .font(JazzTheme.subheadline())
-                            .foregroundColor(JazzTheme.charcoal.opacity(0.7))
+                            .font(ApproachNoteTheme.subheadline())
+                            .foregroundColor(ApproachNoteTheme.charcoal.opacity(0.7))
                     }
 
                     Spacer()
@@ -263,8 +263,8 @@ struct AccountSettingsView: View {
                     .padding()
                 } else if favoritesManager.favoriteRecordings.isEmpty {
                     Text("No favorite recordings yet")
-                        .font(JazzTheme.body())
-                        .foregroundColor(JazzTheme.charcoal.opacity(0.7))
+                        .font(ApproachNoteTheme.body())
+                        .foregroundColor(ApproachNoteTheme.charcoal.opacity(0.7))
                         .padding(.horizontal)
                 } else {
                     ScrollView(.horizontal, showsIndicators: false) {
@@ -281,7 +281,7 @@ struct AccountSettingsView: View {
                 }
             }
             .padding(.vertical)
-            .background(JazzTheme.backgroundLight)
+            .background(ApproachNoteTheme.backgroundLight)
         }
         .sheet(isPresented: Binding(
             get: { selectedRecordingId != nil },
@@ -315,10 +315,10 @@ struct FavoriteRecordingCard: View {
                     .aspectRatio(contentMode: .fill)
             } placeholder: {
                 Rectangle()
-                    .fill(JazzTheme.cardBackground)
+                    .fill(ApproachNoteTheme.cardBackground)
                     .overlay {
                         Image(systemName: "music.note")
-                            .foregroundColor(JazzTheme.smokeGray)
+                            .foregroundColor(ApproachNoteTheme.smokeGray)
                     }
             }
             .frame(width: 80, height: 80)
@@ -326,13 +326,13 @@ struct FavoriteRecordingCard: View {
 
             // Song title
             Text(recording.songTitle ?? "Unknown")
-                .font(JazzTheme.caption())
-                .foregroundColor(JazzTheme.charcoal)
+                .font(ApproachNoteTheme.caption())
+                .foregroundColor(ApproachNoteTheme.charcoal)
                 .lineLimit(2)
                 .frame(width: 80, alignment: .leading)
         }
         .padding(8)
-        .background(isHovering ? JazzTheme.cardBackground : Color.clear)
+        .background(isHovering ? ApproachNoteTheme.cardBackground : Color.clear)
         .cornerRadius(8)
         .onHover { hovering in
             isHovering = hovering
@@ -381,12 +381,12 @@ struct GeneralSettingsView: View {
                         ProgressView()
                             .scaleEffect(0.7)
                         Text("Loading...")
-                            .foregroundColor(JazzTheme.smokeGray)
+                            .foregroundColor(ApproachNoteTheme.smokeGray)
                     }
                 } else {
                     HStack {
                         Image(systemName: workerActive ? "arrow.triangle.2.circlepath" : "clock")
-                            .foregroundColor(workerActive ? JazzTheme.burgundy : JazzTheme.smokeGray)
+                            .foregroundColor(workerActive ? ApproachNoteTheme.burgundy : ApproachNoteTheme.smokeGray)
 
                         Text("Queue Size: \(queueSize)")
 
@@ -411,7 +411,7 @@ struct GeneralSettingsView: View {
                         if let songName = currentSongName {
                             HStack {
                                 Text("Processing:")
-                                    .foregroundColor(JazzTheme.smokeGray)
+                                    .foregroundColor(ApproachNoteTheme.smokeGray)
                                 Text(songName)
                                     .lineLimit(1)
                                     .truncationMode(.tail)
@@ -422,16 +422,16 @@ struct GeneralSettingsView: View {
                             VStack(alignment: .leading, spacing: 4) {
                                 HStack {
                                     Text(progress.phaseLabel)
-                                        .font(JazzTheme.caption())
-                                        .foregroundColor(JazzTheme.smokeGray)
+                                        .font(ApproachNoteTheme.caption())
+                                        .foregroundColor(ApproachNoteTheme.smokeGray)
                                     Spacer()
                                     Text("\(progress.current)/\(progress.total)")
-                                        .font(JazzTheme.caption())
-                                        .foregroundColor(JazzTheme.charcoal)
+                                        .font(ApproachNoteTheme.caption())
+                                        .foregroundColor(ApproachNoteTheme.charcoal)
                                 }
 
                                 ProgressView(value: progress.progressFraction)
-                                    .tint(JazzTheme.burgundy)
+                                    .tint(ApproachNoteTheme.burgundy)
                             }
                         }
                     }

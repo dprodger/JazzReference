@@ -19,7 +19,7 @@ struct ArtistImageCarousel: View {
             
             if images.isEmpty {
                 Text("No images available")
-                    .foregroundColor(JazzTheme.smokeGray)
+                    .foregroundColor(ApproachNoteTheme.smokeGray)
                     .padding()
             } else {
                 // Carousel with border wrapper
@@ -38,7 +38,7 @@ struct ArtistImageCarousel: View {
                 .frame(height: carouselHeight + 24) // Account for vertical padding
                 .background(
                     RoundedRectangle(cornerRadius: 16)
-                        .strokeBorder(JazzTheme.smokeGray.opacity(0.3), lineWidth: 1.5)
+                        .strokeBorder(ApproachNoteTheme.smokeGray.opacity(0.3), lineWidth: 1.5)
                         .background(
                             RoundedRectangle(cornerRadius: 16)
                                 .fill(Color.white.opacity(0.5))
@@ -92,14 +92,14 @@ private struct ImageThumbnail: View {
                     RoundedRectangle(cornerRadius: 12)
                         .fill(Color.gray.opacity(0.2))
                         .frame(width: cardWidth, height: 280)
-                        .overlay(ProgressView().tint(JazzTheme.amber))
+                        .overlay(ProgressView().tint(ApproachNoteTheme.amber))
                 } else {
                     RoundedRectangle(cornerRadius: 12)
                         .fill(Color.gray.opacity(0.3))
                         .frame(width: cardWidth, height: 280)
                         .overlay(
                             Image(systemName: "photo")
-                                .font(JazzTheme.largeTitle())
+                                .font(ApproachNoteTheme.largeTitle())
                                 .foregroundColor(.gray)
                         )
                 }
@@ -177,7 +177,7 @@ private struct ImageDetailSheet: View {
                     } else {
                         ProgressView()
                             .frame(height: 300)
-                            .tint(JazzTheme.amber)
+                            .tint(ApproachNoteTheme.amber)
                     }
                     
                     // Image info
@@ -191,11 +191,11 @@ private struct ImageDetailSheet: View {
                         if let attribution = image.attribution {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("Attribution")
-                                    .font(JazzTheme.caption())
-                                    .foregroundColor(JazzTheme.smokeGray)
+                                    .font(ApproachNoteTheme.caption())
+                                    .foregroundColor(ApproachNoteTheme.smokeGray)
                                 Text(cleanHTML(attribution))
-                                    .font(JazzTheme.subheadline())
-                                    .foregroundColor(JazzTheme.charcoal)
+                                    .font(ApproachNoteTheme.subheadline())
+                                    .foregroundColor(ApproachNoteTheme.charcoal)
                             }
                         }
                         
@@ -208,11 +208,11 @@ private struct ImageDetailSheet: View {
                             Link(destination: url) {
                                 HStack {
                                     Text("View on \(sourceName)")
-                                        .font(JazzTheme.subheadline())
+                                        .font(ApproachNoteTheme.subheadline())
                                     Image(systemName: "arrow.up.forward.square")
-                                        .font(JazzTheme.caption())
+                                        .font(ApproachNoteTheme.caption())
                                 }
-                                .foregroundColor(JazzTheme.brass)
+                                .foregroundColor(ApproachNoteTheme.brass)
                             }
                         }
                     }
@@ -230,7 +230,7 @@ private struct ImageDetailSheet: View {
                     Button("Done") {
                         dismiss()
                     }
-                    .foregroundColor(JazzTheme.brass)
+                    .foregroundColor(ApproachNoteTheme.brass)
                 }
             }
         }
@@ -275,11 +275,11 @@ private struct InfoRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title)
-                .font(JazzTheme.caption())
-                .foregroundColor(JazzTheme.smokeGray)
+                .font(ApproachNoteTheme.caption())
+                .foregroundColor(ApproachNoteTheme.smokeGray)
             Text(value)
-                .font(JazzTheme.subheadline())
-                .foregroundColor(JazzTheme.charcoal)
+                .font(ApproachNoteTheme.subheadline())
+                .foregroundColor(ApproachNoteTheme.charcoal)
         }
     }
 }

@@ -1,5 +1,5 @@
 //
-//  JazzTheme.swift
+//  ApproachNoteTheme.swift
 //  Approach Note
 //
 //  Centralized color theme inspired by jazz nightclubs and speakeasies
@@ -10,7 +10,7 @@ import SwiftUI
 import UIKit
 #endif
 
-struct JazzTheme {
+struct ApproachNoteTheme {
     // MARK: - Typography
 
     /// Font family for headings (largeTitle, title, title2, title3, headline)
@@ -212,7 +212,7 @@ struct JazzTheme {
 
     // MARK: - Navigation Bar Appearance
 
-    /// Creates a configured UINavigationBarAppearance with JazzTheme fonts
+    /// Creates a configured UINavigationBarAppearance with ApproachNoteTheme fonts
     static func navigationBarAppearance() -> UINavigationBarAppearance {
         let appearance = UINavigationBarAppearance()
         appearance.configureWithOpaqueBackground()
@@ -233,7 +233,7 @@ struct JazzTheme {
         return appearance
     }
 
-    /// Configures the navigation bar appearance to use JazzTheme fonts
+    /// Configures the navigation bar appearance to use ApproachNoteTheme fonts
     /// Call this once at app startup (e.g., in App init or ContentView.onAppear)
     static func configureNavigationBarAppearance() {
         let appearance = navigationBarAppearance()
@@ -257,7 +257,7 @@ struct NavigationBarConfigurator: UIViewControllerRepresentable {
     func updateUIViewController(_ uiViewController: UIViewController, context: Context) {
         DispatchQueue.main.async {
             if let navController = uiViewController.navigationController {
-                let appearance = JazzTheme.navigationBarAppearance()
+                let appearance = ApproachNoteTheme.navigationBarAppearance()
                 navController.navigationBar.standardAppearance = appearance
                 navController.navigationBar.scrollEdgeAppearance = appearance
                 navController.navigationBar.compactAppearance = appearance
@@ -266,13 +266,13 @@ struct NavigationBarConfigurator: UIViewControllerRepresentable {
     }
 }
 
-/// Custom navigation title view with JazzTheme fonts
+/// Custom navigation title view with ApproachNoteTheme fonts
 struct JazzNavigationTitle: View {
     let title: String
 
     var body: some View {
         Text(title)
-            .font(JazzTheme.headline())
+            .font(ApproachNoteTheme.headline())
             .foregroundColor(.white)
     }
 }
@@ -283,18 +283,18 @@ struct JazzLargeNavigationTitle: View {
 
     var body: some View {
         Text(title)
-            .font(JazzTheme.largeTitle())
+            .font(ApproachNoteTheme.largeTitle())
             .foregroundColor(.white)
     }
 }
 
 extension View {
-    /// Applies JazzTheme styling to the navigation bar with custom title font
+    /// Applies ApproachNoteTheme styling to the navigation bar with custom title font
     /// Use this instead of .navigationTitle() for themed headers
     /// - Parameters:
     ///   - title: The navigation bar title
     ///   - color: Background color (defaults to burgundy)
-    func jazzNavigationBar(title: String, color: Color = JazzTheme.burgundy) -> some View {
+    func jazzNavigationBar(title: String, color: Color = ApproachNoteTheme.burgundy) -> some View {
         self
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(color, for: .navigationBar)
@@ -303,7 +303,7 @@ extension View {
             .toolbar {
                 ToolbarItem(placement: .principal) {
                     Text(title)
-                        .font(JazzTheme.headline())
+                        .font(ApproachNoteTheme.headline())
                         .foregroundColor(.white)
                 }
             }
@@ -311,7 +311,7 @@ extension View {
 }
 #endif
 
-extension JazzTheme {
+extension ApproachNoteTheme {
     // MARK: - Primary Colors
     
     /// Deep burgundy - main accent color
@@ -405,15 +405,15 @@ extension JazzTheme {
 // MARK: - View Extension for Easy Access
 
 extension View {
-    func jazzThemedSectionHeader(title: String, type: JazzTheme.SectionHeader) -> some View {
+    func jazzThemedSectionHeader(title: String, type: ApproachNoteTheme.SectionHeader) -> some View {
         HStack {
             Image(systemName: type.icon)
                 .font(.title2)
-                .foregroundColor(JazzTheme.cream)
+                .foregroundColor(ApproachNoteTheme.cream)
             Text(title)
                 .font(.headline)
                 .fontWeight(.semibold)
-                .foregroundColor(JazzTheme.cream)
+                .foregroundColor(ApproachNoteTheme.cream)
             Spacer()
         }
         .padding()
@@ -423,17 +423,17 @@ extension View {
 
 // MARK: - Themed Progress View
 
-/// A progress view with consistent JazzTheme styling
+/// A progress view with consistent ApproachNoteTheme styling
 /// Use this for all loading indicators to ensure consistent typography
 struct ThemedProgressView: View {
     let message: String
-    var tintColor: Color = JazzTheme.brass
+    var tintColor: Color = ApproachNoteTheme.brass
 
     var body: some View {
         ProgressView {
             Text(message)
-                .font(JazzTheme.subheadline())
-                .foregroundColor(JazzTheme.charcoal)
+                .font(ApproachNoteTheme.subheadline())
+                .foregroundColor(ApproachNoteTheme.charcoal)
         }
         .tint(tintColor)
     }
@@ -441,7 +441,7 @@ struct ThemedProgressView: View {
 
 // MARK: - Usage Examples
 
-struct JazzThemePreview: View {
+struct ApproachNoteThemePreview: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
@@ -450,33 +450,33 @@ struct JazzThemePreview: View {
                     Text("SONG")
                         .font(.headline)
                         .fontWeight(.semibold)
-                        .foregroundColor(JazzTheme.cream)
+                        .foregroundColor(ApproachNoteTheme.cream)
                 }
                 .frame(maxWidth: .infinity)
                 .padding()
-                .background(JazzTheme.SectionHeader.song.gradient)
+                .background(ApproachNoteTheme.SectionHeader.song.gradient)
                 
                 // Recording Header
                 VStack {
                     Text("RECORDING")
                         .font(.headline)
                         .fontWeight(.semibold)
-                        .foregroundColor(JazzTheme.cream)
+                        .foregroundColor(ApproachNoteTheme.cream)
                 }
                 .frame(maxWidth: .infinity)
                 .padding()
-                .background(JazzTheme.SectionHeader.recording.gradient)
+                .background(ApproachNoteTheme.SectionHeader.recording.gradient)
                 
                 // Artist Header
                 VStack {
                     Text("ARTIST")
                         .font(.headline)
                         .fontWeight(.semibold)
-                        .foregroundColor(JazzTheme.cream)
+                        .foregroundColor(ApproachNoteTheme.cream)
                 }
                 .frame(maxWidth: .infinity)
                 .padding()
-                .background(JazzTheme.SectionHeader.artist.gradient)
+                .background(ApproachNoteTheme.SectionHeader.artist.gradient)
                 
                 // Color Swatches
                 VStack(alignment: .leading, spacing: 16) {
@@ -484,19 +484,19 @@ struct JazzThemePreview: View {
                         .font(.title2)
                         .bold()
                     
-                    ColorSwatch(name: "Burgundy", color: JazzTheme.burgundy)
-                    ColorSwatch(name: "Amber", color: JazzTheme.amber)
-                    ColorSwatch(name: "Brass", color: JazzTheme.brass)
-                    ColorSwatch(name: "Teal", color: JazzTheme.teal)
-                    ColorSwatch(name: "Gold (Star)", color: JazzTheme.gold)
-                    ColorSwatch(name: "Charcoal", color: JazzTheme.charcoal)
-                    ColorSwatch(name: "Cream", color: JazzTheme.cream, darkBackground: true)
-                    ColorSwatch(name: "Smoke Gray", color: JazzTheme.smokeGray)
+                    ColorSwatch(name: "Burgundy", color: ApproachNoteTheme.burgundy)
+                    ColorSwatch(name: "Amber", color: ApproachNoteTheme.amber)
+                    ColorSwatch(name: "Brass", color: ApproachNoteTheme.brass)
+                    ColorSwatch(name: "Teal", color: ApproachNoteTheme.teal)
+                    ColorSwatch(name: "Gold (Star)", color: ApproachNoteTheme.gold)
+                    ColorSwatch(name: "Charcoal", color: ApproachNoteTheme.charcoal)
+                    ColorSwatch(name: "Cream", color: ApproachNoteTheme.cream, darkBackground: true)
+                    ColorSwatch(name: "Smoke Gray", color: ApproachNoteTheme.smokeGray)
                 }
                 .padding()
             }
         }
-        .background(JazzTheme.backgroundLight)
+        .background(ApproachNoteTheme.backgroundLight)
     }
 }
 
@@ -520,7 +520,7 @@ struct ColorSwatch: View {
                     .font(.headline)
                 Text(darkBackground ? "For dark backgrounds" : "Primary use")
                     .font(.caption)
-                    .foregroundColor(JazzTheme.smokeGray)
+                    .foregroundColor(ApproachNoteTheme.smokeGray)
             }
             Spacer()
         }
@@ -528,5 +528,5 @@ struct ColorSwatch: View {
 }
 
 #Preview {
-    JazzThemePreview()
+    ApproachNoteThemePreview()
 }

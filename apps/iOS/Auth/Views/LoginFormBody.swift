@@ -94,7 +94,7 @@ struct LoginFormBody: View {
                     viewModel.showingForgotPassword = true
                 }
                 .font(.subheadline)
-                .foregroundColor(JazzTheme.burgundy)
+                .foregroundColor(ApproachNoteTheme.burgundy)
             }
 
             // Error message
@@ -123,7 +123,7 @@ struct LoginFormBody: View {
             }
             .frame(maxWidth: .infinity)
             .padding()
-            .background(viewModel.canSubmit ? JazzTheme.burgundy : Color.gray)
+            .background(viewModel.canSubmit ? ApproachNoteTheme.burgundy : Color.gray)
             .foregroundColor(.white)
             .cornerRadius(10)
             .disabled(!viewModel.canSubmit || authManager.isLoading)
@@ -141,7 +141,7 @@ struct LoginFormBody: View {
                     .frame(maxWidth: .infinity)
                     .padding()
                     .background(Color(.systemGray6))
-                    .foregroundColor(JazzTheme.charcoal)
+                    .foregroundColor(ApproachNoteTheme.charcoal)
                     .cornerRadius(10)
             }
         }

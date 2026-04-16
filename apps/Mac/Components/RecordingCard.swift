@@ -60,7 +60,7 @@ struct RecordingCard: View {
                                 switch phase {
                                 case .empty:
                                     Rectangle()
-                                        .fill(JazzTheme.cardBackground)
+                                        .fill(ApproachNoteTheme.cardBackground)
                                         .overlay { ProgressView() }
                                 case .success(let image):
                                     image
@@ -68,11 +68,11 @@ struct RecordingCard: View {
                                         .aspectRatio(contentMode: .fill)
                                 case .failure:
                                     Rectangle()
-                                        .fill(JazzTheme.cardBackground)
+                                        .fill(ApproachNoteTheme.cardBackground)
                                         .overlay {
                                             Image(systemName: "music.note")
                                                 .font(.system(size: 40))
-                                                .foregroundColor(JazzTheme.smokeGray)
+                                                .foregroundColor(ApproachNoteTheme.smokeGray)
                                         }
                                 @unknown default:
                                     EmptyView()
@@ -80,11 +80,11 @@ struct RecordingCard: View {
                             }
                         } else {
                             Rectangle()
-                                .fill(JazzTheme.cardBackground)
+                                .fill(ApproachNoteTheme.cardBackground)
                                 .overlay {
                                     Image(systemName: "music.note")
                                         .font(.system(size: 40))
-                                        .foregroundColor(JazzTheme.smokeGray)
+                                        .foregroundColor(ApproachNoteTheme.smokeGray)
                                 }
                         }
                     }
@@ -98,7 +98,7 @@ struct RecordingCard: View {
                             switch phase {
                             case .empty:
                                 Rectangle()
-                                    .fill(JazzTheme.cardBackground)
+                                    .fill(ApproachNoteTheme.cardBackground)
                                     .overlay { ProgressView() }
                             case .success(let image):
                                 image
@@ -106,7 +106,7 @@ struct RecordingCard: View {
                                     .aspectRatio(contentMode: .fill)
                             case .failure:
                                 Rectangle()
-                                    .fill(JazzTheme.cardBackground)
+                                    .fill(ApproachNoteTheme.cardBackground)
                             @unknown default:
                                 EmptyView()
                             }
@@ -179,8 +179,8 @@ struct RecordingCard: View {
                 // Artist name
                 if showArtistName {
                     Text(artistName)
-                        .font(JazzTheme.subheadline(weight: .semibold))
-                        .foregroundColor(JazzTheme.brass)
+                        .font(ApproachNoteTheme.subheadline(weight: .semibold))
+                        .foregroundColor(ApproachNoteTheme.brass)
                         .lineLimit(1)
                 }
 
@@ -188,40 +188,40 @@ struct RecordingCard: View {
                 HStack(spacing: 4) {
                     if recording.isCanonical == true {
                         Image(systemName: "star.fill")
-                            .foregroundColor(JazzTheme.gold)
-                            .font(JazzTheme.caption())
+                            .foregroundColor(ApproachNoteTheme.gold)
+                            .font(ApproachNoteTheme.caption())
                     }
 
                     Text(recording.albumTitle ?? "Unknown Album")
-                        .font(JazzTheme.body(weight: .medium))
-                        .foregroundColor(JazzTheme.charcoal)
+                        .font(ApproachNoteTheme.body(weight: .medium))
+                        .foregroundColor(ApproachNoteTheme.charcoal)
                         .lineLimit(2)
                 }
 
                 // Recording title (when different from song title)
                 if let recordingTitle = recording.displayTitle {
                     Text("(\(recordingTitle))")
-                        .font(JazzTheme.caption())
+                        .font(ApproachNoteTheme.caption())
                         .italic()
-                        .foregroundColor(JazzTheme.brass)
+                        .foregroundColor(ApproachNoteTheme.brass)
                         .lineLimit(1)
                 }
 
                 // Year
                 if let year = recording.recordingYear {
                     Text(String(year))
-                        .font(JazzTheme.caption())
-                        .foregroundColor(JazzTheme.smokeGray)
+                        .font(ApproachNoteTheme.caption())
+                        .foregroundColor(ApproachNoteTheme.smokeGray)
                 }
             }
             .frame(width: artworkSize, alignment: .leading)
         }
         .padding(12)
-        .background(isHovering ? JazzTheme.backgroundLight : JazzTheme.cardBackground)
+        .background(isHovering ? ApproachNoteTheme.backgroundLight : ApproachNoteTheme.cardBackground)
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .overlay(
             RoundedRectangle(cornerRadius: 12)
-                .stroke(isHovering ? JazzTheme.burgundy.opacity(0.5) : Color.clear, lineWidth: 2)
+                .stroke(isHovering ? ApproachNoteTheme.burgundy.opacity(0.5) : Color.clear, lineWidth: 2)
         )
         .onHover { hovering in
             isHovering = hovering

@@ -26,11 +26,11 @@ struct MacLoginView: View {
             // Header
             VStack(spacing: 8) {
                 Text("Welcome Back")
-                    .font(JazzTheme.title())
-                    .foregroundColor(JazzTheme.charcoal)
+                    .font(ApproachNoteTheme.title())
+                    .foregroundColor(ApproachNoteTheme.charcoal)
 
                 Text("Sign in to access your repertoire")
-                    .font(JazzTheme.subheadline())
+                    .font(ApproachNoteTheme.subheadline())
                     .foregroundColor(.secondary)
             }
             .padding(.top, isInline ? 0 : 20)
@@ -38,7 +38,7 @@ struct MacLoginView: View {
             // Email field
             VStack(alignment: .leading, spacing: 6) {
                 Text("Email")
-                    .font(JazzTheme.subheadline())
+                    .font(ApproachNoteTheme.subheadline())
                     .foregroundColor(.secondary)
 
                 TextField("your@email.com", text: $viewModel.email)
@@ -50,7 +50,7 @@ struct MacLoginView: View {
             // Password field
             VStack(alignment: .leading, spacing: 6) {
                 Text("Password")
-                    .font(JazzTheme.subheadline())
+                    .font(ApproachNoteTheme.subheadline())
                     .foregroundColor(.secondary)
 
                 SecureField("Enter password", text: $viewModel.password)
@@ -64,14 +64,14 @@ struct MacLoginView: View {
                     viewModel.showingForgotPassword = true
                 }
                 .buttonStyle(.link)
-                .foregroundColor(JazzTheme.burgundy)
-                .font(JazzTheme.subheadline())
+                .foregroundColor(ApproachNoteTheme.burgundy)
+                .font(ApproachNoteTheme.subheadline())
             }
 
             // Error message
             if let error = authManager.errorMessage {
                 Text(error)
-                    .font(JazzTheme.caption())
+                    .font(ApproachNoteTheme.caption())
                     .foregroundColor(.red)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal)
@@ -89,7 +89,7 @@ struct MacLoginView: View {
                 }
             }
             .buttonStyle(.borderedProminent)
-            .tint(JazzTheme.burgundy)
+            .tint(ApproachNoteTheme.burgundy)
             .controlSize(.large)
             .disabled(!viewModel.canSubmit || authManager.isLoading)
 
@@ -100,7 +100,7 @@ struct MacLoginView: View {
                     .foregroundColor(.gray.opacity(0.3))
                 Text("or")
                     .foregroundColor(.secondary)
-                    .font(JazzTheme.caption())
+                    .font(ApproachNoteTheme.caption())
                     .padding(.horizontal, 8)
                 Rectangle()
                     .frame(height: 1)
@@ -157,7 +157,7 @@ struct MacLoginView: View {
                     .foregroundColor(.gray.opacity(0.3))
                 Text("or")
                     .foregroundColor(.secondary)
-                    .font(JazzTheme.caption())
+                    .font(ApproachNoteTheme.caption())
                 Rectangle()
                     .frame(height: 1)
                     .foregroundColor(.gray.opacity(0.3))

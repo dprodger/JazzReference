@@ -127,8 +127,8 @@ struct PerformerRecordingsSection: View {
                                     ForEach(groupedRecordings, id: \.groupKey) { group in
                                         VStack(alignment: .leading, spacing: 8) {
                                             Text("\(group.groupKey) (\(group.recordings.count))")
-                                                .font(JazzTheme.headline())
-                                                .foregroundColor(JazzTheme.burgundy)
+                                                .font(ApproachNoteTheme.headline())
+                                                .foregroundColor(ApproachNoteTheme.burgundy)
                                                 .padding(.horizontal)
                                                 .padding(.top, 8)
 
@@ -138,7 +138,7 @@ struct PerformerRecordingsSection: View {
                                                         HStack(alignment: .top, spacing: 0) {
                                                             if index > 0 {
                                                                 Rectangle()
-                                                                    .fill(JazzTheme.burgundy.opacity(0.4))
+                                                                    .fill(ApproachNoteTheme.burgundy.opacity(0.4))
                                                                     .frame(width: 2, height: 150)
                                                                     .padding(.horizontal, 8)
                                                             }
@@ -161,10 +161,10 @@ struct PerformerRecordingsSection: View {
                                     VStack(spacing: 12) {
                                         Image(systemName: "music.note")
                                             .font(.system(size: 48))
-                                            .foregroundColor(JazzTheme.smokeGray.opacity(0.5))
+                                            .foregroundColor(ApproachNoteTheme.smokeGray.opacity(0.5))
                                         Text("No recordings match the current filters")
-                                            .font(JazzTheme.subheadline())
-                                            .foregroundColor(JazzTheme.smokeGray)
+                                            .font(ApproachNoteTheme.subheadline())
+                                            .foregroundColor(ApproachNoteTheme.smokeGray)
                                             .multilineTextAlignment(.center)
                                     }
                                     .frame(maxWidth: .infinity)
@@ -176,10 +176,10 @@ struct PerformerRecordingsSection: View {
                                 if isReloading {
                                     HStack(spacing: 8) {
                                         ProgressView()
-                                            .tint(JazzTheme.burgundy)
+                                            .tint(ApproachNoteTheme.burgundy)
                                         Text("Reloading...")
-                                            .font(JazzTheme.subheadline())
-                                            .foregroundColor(JazzTheme.smokeGray)
+                                            .font(ApproachNoteTheme.subheadline())
+                                            .foregroundColor(ApproachNoteTheme.smokeGray)
                                     }
                                     .padding(.horizontal, 16)
                                     .padding(.vertical, 10)
@@ -196,16 +196,16 @@ struct PerformerRecordingsSection: View {
                     label: {
                         HStack(alignment: .center) {
                             Image(systemName: "music.note.list")
-                                .foregroundColor(JazzTheme.burgundy)
+                                .foregroundColor(ApproachNoteTheme.burgundy)
 
                             Text("Recordings")
-                                .font(JazzTheme.title2())
+                                .font(ApproachNoteTheme.title2())
                                 .bold()
-                                .foregroundColor(JazzTheme.charcoal)
+                                .foregroundColor(ApproachNoteTheme.charcoal)
 
                             Text("(\(filteredRecordings.count))")
-                                .font(JazzTheme.subheadline())
-                                .foregroundColor(JazzTheme.smokeGray)
+                                .font(ApproachNoteTheme.subheadline())
+                                .foregroundColor(ApproachNoteTheme.smokeGray)
 
                             Spacer()
 
@@ -229,26 +229,26 @@ struct PerformerRecordingsSection: View {
                             } label: {
                                 HStack(spacing: 3) {
                                     Text(sortOrder.displayName)
-                                        .font(JazzTheme.caption())
+                                        .font(ApproachNoteTheme.caption())
                                     Image(systemName: "chevron.down")
                                         .font(.caption2)
                                 }
-                                .foregroundColor(JazzTheme.burgundy)
+                                .foregroundColor(ApproachNoteTheme.burgundy)
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 5)
-                                .background(JazzTheme.burgundy.opacity(0.1))
+                                .background(ApproachNoteTheme.burgundy.opacity(0.1))
                                 .cornerRadius(6)
                             }
                         }
                         .padding(.vertical, 12)
                     }
                 )
-                .tint(JazzTheme.burgundy)
+                .tint(ApproachNoteTheme.burgundy)
             }
 
             Spacer().frame(width: 16)
         }
-        .background(JazzTheme.backgroundLight)
+        .background(ApproachNoteTheme.backgroundLight)
     }
 
     // MARK: - Filter Bar
@@ -258,22 +258,22 @@ struct PerformerRecordingsSection: View {
             // Search Field
             HStack {
                 Image(systemName: "magnifyingglass")
-                    .foregroundColor(JazzTheme.smokeGray)
+                    .foregroundColor(ApproachNoteTheme.smokeGray)
                 TextField("Search recordings...", text: $searchText)
                     .textFieldStyle(.plain)
                 if !searchText.isEmpty {
                     Button(action: { searchText = "" }) {
                         Image(systemName: "xmark.circle.fill")
-                            .foregroundColor(JazzTheme.smokeGray)
+                            .foregroundColor(ApproachNoteTheme.smokeGray)
                     }
                 }
             }
             .padding(10)
-            .background(JazzTheme.cardBackground)
+            .background(ApproachNoteTheme.cardBackground)
             .cornerRadius(8)
             .overlay(
                 RoundedRectangle(cornerRadius: 8)
-                    .stroke(JazzTheme.smokeGray.opacity(0.3), lineWidth: 1)
+                    .stroke(ApproachNoteTheme.smokeGray.opacity(0.3), lineWidth: 1)
             )
 
             // Role Filter Picker
@@ -283,7 +283,7 @@ struct PerformerRecordingsSection: View {
                 }
             }
             .pickerStyle(.segmented)
-            .tint(JazzTheme.burgundy)
+            .tint(ApproachNoteTheme.burgundy)
         }
     }
 }
@@ -313,19 +313,19 @@ struct PerformerRecordingCardView: View {
                         },
                         placeholder: {
                             ZStack {
-                                JazzTheme.cardBackground
+                                ApproachNoteTheme.cardBackground
                                 ProgressView()
-                                    .tint(JazzTheme.brass)
+                                    .tint(ApproachNoteTheme.brass)
                             }
                             .frame(width: 150, height: 150)
                         }
                     )
                 } else {
                     Image(systemName: "opticaldisc")
-                        .font(JazzTheme.largeTitle())
-                        .foregroundColor(JazzTheme.smokeGray)
+                        .font(ApproachNoteTheme.largeTitle())
+                        .foregroundColor(ApproachNoteTheme.smokeGray)
                         .frame(width: 150, height: 150)
-                        .background(JazzTheme.cardBackground)
+                        .background(ApproachNoteTheme.cardBackground)
                 }
 
                 // Badges
@@ -333,7 +333,7 @@ struct PerformerRecordingCardView: View {
                     if recording.isCanonical == true {
                         Image(systemName: "star.fill")
                             .foregroundColor(.yellow)
-                            .font(JazzTheme.caption())
+                            .font(ApproachNoteTheme.caption())
                             .padding(6)
                             .background(Color.black.opacity(0.6))
                             .clipShape(Circle())
@@ -345,7 +345,7 @@ struct PerformerRecordingCardView: View {
                             .foregroundColor(.white)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 3)
-                            .background(role.lowercased() == "leader" ? JazzTheme.brass : JazzTheme.smokeGray)
+                            .background(role.lowercased() == "leader" ? ApproachNoteTheme.brass : ApproachNoteTheme.smokeGray)
                             .cornerRadius(4)
                     }
                 }
@@ -356,25 +356,25 @@ struct PerformerRecordingCardView: View {
 
             // Song title
             Text(recording.songTitle)
-                .font(JazzTheme.subheadline())
+                .font(ApproachNoteTheme.subheadline())
                 .fontWeight(.semibold)
-                .foregroundColor(JazzTheme.brass)
+                .foregroundColor(ApproachNoteTheme.brass)
                 .lineLimit(1)
                 .frame(width: 150, alignment: .leading)
 
             // Album title
             Text(recording.albumTitle ?? "Unknown Album")
-                .font(JazzTheme.subheadline())
+                .font(ApproachNoteTheme.subheadline())
                 .fontWeight(.medium)
-                .foregroundColor(JazzTheme.charcoal)
+                .foregroundColor(ApproachNoteTheme.charcoal)
                 .lineLimit(2)
                 .frame(width: 150, alignment: .leading)
 
             // Year
             if let year = recording.recordingYear {
                 Text(String(format: "%d", year))
-                    .font(JazzTheme.caption())
-                    .foregroundColor(JazzTheme.smokeGray)
+                    .font(ApproachNoteTheme.caption())
+                    .foregroundColor(ApproachNoteTheme.smokeGray)
                     .frame(width: 150, alignment: .leading)
             }
         }

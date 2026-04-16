@@ -87,7 +87,7 @@ struct RecordingContributionEditView: View {
                             Spacer()
                         }
                     }
-                    .listRowBackground(hasChanges ? JazzTheme.burgundy : JazzTheme.smokeGray.opacity(0.5))
+                    .listRowBackground(hasChanges ? ApproachNoteTheme.burgundy : ApproachNoteTheme.smokeGray.opacity(0.5))
                     .foregroundColor(.white)
                     .disabled(isSaving || isDeleting || !hasChanges)
                 } footer: {
@@ -120,7 +120,7 @@ struct RecordingContributionEditView: View {
                 }
             }
             .scrollContentBackground(.hidden)
-            .background(JazzTheme.backgroundLight)
+            .background(ApproachNoteTheme.backgroundLight)
             .navigationTitle("Contribute Data")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -128,14 +128,14 @@ struct RecordingContributionEditView: View {
                     Button("Cancel") {
                         dismiss()
                     }
-                    .foregroundColor(JazzTheme.burgundy)
+                    .foregroundColor(ApproachNoteTheme.burgundy)
                     .disabled(isSaving || isDeleting)
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Save") {
                         saveContribution()
                     }
-                    .foregroundColor(JazzTheme.burgundy)
+                    .foregroundColor(ApproachNoteTheme.burgundy)
                     .fontWeight(.semibold)
                     .disabled(isSaving || isDeleting || !hasChanges)
                 }
@@ -177,7 +177,7 @@ struct RecordingContributionEditView: View {
                 ProgressView()
                     .scaleEffect(1.2)
                 Text("Saving...")
-                    .font(JazzTheme.subheadline())
+                    .font(ApproachNoteTheme.subheadline())
                     .foregroundColor(.white)
             }
             .padding(24)

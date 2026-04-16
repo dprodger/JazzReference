@@ -33,7 +33,7 @@ struct ResetPasswordView: View {
                             Text("Password Reset!")
                                 .font(.title2)
                                 .fontWeight(.bold)
-                                .foregroundColor(JazzTheme.charcoal)
+                                .foregroundColor(ApproachNoteTheme.charcoal)
                             
                             Text("Your password has been successfully reset. You can now sign in with your new password.")
                                 .font(.subheadline)
@@ -47,7 +47,7 @@ struct ResetPasswordView: View {
                                     .fontWeight(.semibold)
                                     .frame(maxWidth: .infinity)
                                     .padding()
-                                    .background(JazzTheme.burgundy)
+                                    .background(ApproachNoteTheme.burgundy)
                                     .foregroundColor(.white)
                                     .cornerRadius(10)
                             }
@@ -60,7 +60,7 @@ struct ResetPasswordView: View {
                             Text("Create New Password")
                                 .font(.largeTitle)
                                 .fontWeight(.bold)
-                                .foregroundColor(JazzTheme.charcoal)
+                                .foregroundColor(ApproachNoteTheme.charcoal)
                             
                             Text("Enter your new password below.")
                                 .font(.subheadline)
@@ -152,7 +152,7 @@ struct ResetPasswordView: View {
                         }
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(isFormValid ? JazzTheme.burgundy : Color.gray)
+                        .background(isFormValid ? ApproachNoteTheme.burgundy : Color.gray)
                         .foregroundColor(.white)
                         .cornerRadius(10)
                         .disabled(!isFormValid || authManager.isLoading)
@@ -169,7 +169,7 @@ struct ResetPasswordView: View {
                     Button("Close") {
                         dismiss()
                     }
-                    .foregroundColor(JazzTheme.charcoal)
+                    .foregroundColor(ApproachNoteTheme.charcoal)
                 }
             }
         }

@@ -91,8 +91,8 @@ struct ArtistsListView: View {
     var body: some View {
         NavigationStack {
             contentView
-                .background(JazzTheme.backgroundLight)
-                .jazzNavigationBar(title: "Artists (\(totalArtistsCount.formatted()))", color: JazzTheme.amber)
+                .background(ApproachNoteTheme.backgroundLight)
+                .jazzNavigationBar(title: "Artists (\(totalArtistsCount.formatted()))", color: ApproachNoteTheme.amber)
                 .searchable(text: $searchText, prompt: "Search artists")
                 .onChange(of: searchText) { oldValue, newValue in
                     searchTask?.cancel()
@@ -117,7 +117,7 @@ struct ArtistsListView: View {
                     }
                 }
         }
-        .tint(JazzTheme.amber)
+        .tint(ApproachNoteTheme.amber)
     }
     
     // Break up the body into separate views for compiler
@@ -137,24 +137,24 @@ struct ArtistsListView: View {
     private var loadingView: some View {
         VStack {
             Spacer()
-            ThemedProgressView(message: "Loading artists...", tintColor: JazzTheme.amber)
+            ThemedProgressView(message: "Loading artists...", tintColor: ApproachNoteTheme.amber)
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(JazzTheme.backgroundLight)
+        .background(ApproachNoteTheme.backgroundLight)
     }
     
     private func errorView(error: String) -> some View {
         VStack(spacing: 16) {
             Image(systemName: "exclamationmark.triangle")
                 .font(.system(size: 50))
-                .foregroundColor(JazzTheme.amber)
+                .foregroundColor(ApproachNoteTheme.amber)
             Text("Error")
-                .font(JazzTheme.headline())
-                .foregroundColor(JazzTheme.charcoal)
+                .font(ApproachNoteTheme.headline())
+                .foregroundColor(ApproachNoteTheme.charcoal)
             Text(error)
-                .font(JazzTheme.subheadline())
-                .foregroundColor(JazzTheme.smokeGray)
+                .font(ApproachNoteTheme.subheadline())
+                .foregroundColor(ApproachNoteTheme.smokeGray)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal)
             Button("Retry") {
@@ -163,10 +163,10 @@ struct ArtistsListView: View {
                 }
             }
             .buttonStyle(.borderedProminent)
-            .tint(JazzTheme.amber)
+            .tint(ApproachNoteTheme.amber)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(JazzTheme.backgroundLight)
+        .background(ApproachNoteTheme.backgroundLight)
     }
     
     private var artistsListView: some View {
@@ -178,7 +178,7 @@ struct ArtistsListView: View {
                             NavigationLink(destination: PerformerDetailView(performerId: performer.id)) {
                                 artistRowView(performer: performer)
                             }
-                            .listRowBackground(JazzTheme.cardBackground)
+                            .listRowBackground(ApproachNoteTheme.cardBackground)
                         }
                     }
                     .id(letter) // Anchor for scrolling
@@ -186,12 +186,12 @@ struct ArtistsListView: View {
             }
             .listStyle(.plain)
             .scrollContentBackground(.hidden)
-            .background(JazzTheme.backgroundLight)
+            .background(ApproachNoteTheme.backgroundLight)
             .overlay(alignment: .trailing) {
                 // Custom alphabet index overlay
                 AlphabetIndexView(
                     letters: allSectionLetters,
-                    accentColor: JazzTheme.amber,
+                    accentColor: ApproachNoteTheme.amber,
                     onTap: { letter in
                         // Use short animation to prevent conflicts during rapid scrubbing
                         withAnimation(.easeOut(duration: 0.1)) {
@@ -211,8 +211,8 @@ struct ArtistsListView: View {
               let range = performer.name.range(of: key, options: .caseInsensitive) else {
             // No sort key or not found in name - just return plain name
             return Text(performer.name)
-                .font(JazzTheme.headline())
-                .foregroundColor(JazzTheme.charcoal)
+                .font(ApproachNoteTheme.headline())
+                .foregroundColor(ApproachNoteTheme.charcoal)
         }
 
         // Split name into parts: before, the key, and after
@@ -222,14 +222,14 @@ struct ArtistsListView: View {
 
         // Use regular weight for non-sort parts, semibold (default) for sort key
         return Text(before)
-            .font(JazzTheme.headline(weight: .regular))
-            .foregroundColor(JazzTheme.charcoal)
+            .font(ApproachNoteTheme.headline(weight: .regular))
+            .foregroundColor(ApproachNoteTheme.charcoal)
         + Text(keyText)
-            .font(JazzTheme.headline(weight: .semibold))
-            .foregroundColor(JazzTheme.charcoal)
+            .font(ApproachNoteTheme.headline(weight: .semibold))
+            .foregroundColor(ApproachNoteTheme.charcoal)
         + Text(after)
-            .font(JazzTheme.headline(weight: .regular))
-            .foregroundColor(JazzTheme.charcoal)
+            .font(ApproachNoteTheme.headline(weight: .regular))
+            .foregroundColor(ApproachNoteTheme.charcoal)
     }
 
     private func artistRowView(performer: Performer) -> some View {
@@ -238,8 +238,8 @@ struct ArtistsListView: View {
 
             if let instrument = performer.instrument {
                 Text(instrument)
-                    .font(JazzTheme.subheadline())
-                    .foregroundColor(JazzTheme.smokeGray)
+                    .font(ApproachNoteTheme.subheadline())
+                    .foregroundColor(ApproachNoteTheme.smokeGray)
             }
         }
         .padding(.vertical, 4)
@@ -252,13 +252,13 @@ struct ArtistSectionHeaderView: View {
     
     var body: some View {
         Text(letter)
-            .font(JazzTheme.headline())
+            .font(ApproachNoteTheme.headline())
             .fontWeight(.bold)
-            .foregroundColor(JazzTheme.amber)
+            .foregroundColor(ApproachNoteTheme.amber)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.vertical, 8)
             .padding(.horizontal)
-            .background(JazzTheme.backgroundLight.opacity(0.8))
+            .background(ApproachNoteTheme.backgroundLight.opacity(0.8))
     }
 }
 

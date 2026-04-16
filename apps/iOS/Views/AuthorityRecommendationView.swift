@@ -35,11 +35,11 @@ struct AuthorityRecommendationsView: View {
         NavigationStack {
             Group {
                 if isLoading {
-                    ThemedProgressView(message: "Loading...", tintColor: JazzTheme.brass)
+                    ThemedProgressView(message: "Loading...", tintColor: ApproachNoteTheme.brass)
                 } else if let error = errorMessage {
                     VStack(spacing: 16) {
                         Image(systemName: "exclamationmark.triangle")
-                            .font(JazzTheme.largeTitle())
+                            .font(ApproachNoteTheme.largeTitle())
                             .foregroundColor(.red)
                         Text(error)
                             .foregroundColor(.secondary)
@@ -53,12 +53,12 @@ struct AuthorityRecommendationsView: View {
                     VStack(spacing: 16) {
                         Image(systemName: "doc.badge.plus")
                             .font(.system(size: 48))
-                            .foregroundColor(JazzTheme.smokeGray)
+                            .foregroundColor(ApproachNoteTheme.smokeGray)
                         Text("No Authority References")
-                            .font(JazzTheme.headline())
-                            .foregroundColor(JazzTheme.charcoal)
+                            .font(ApproachNoteTheme.headline())
+                            .foregroundColor(ApproachNoteTheme.charcoal)
                         Text("This recording has no authority recommendations linked to it.")
-                            .font(JazzTheme.subheadline())
+                            .font(ApproachNoteTheme.subheadline())
                             .foregroundColor(.secondary)
                             .multilineTextAlignment(.center)
                             .padding(.horizontal)
@@ -103,7 +103,7 @@ struct AuthorityRecommendationsView: View {
                                             } label: {
                                                 Label("Link", systemImage: "link")
                                             }
-                                            .tint(JazzTheme.teal)
+                                            .tint(ApproachNoteTheme.teal)
                                         }
                                         .onTapGesture {
                                             if let urlString = authority.sourceUrl,
@@ -117,12 +117,12 @@ struct AuthorityRecommendationsView: View {
                                     Text("Unmatched Song Recommendations")
                                     Spacer()
                                     Text("\(unmatchedAuthorities.count)")
-                                        .font(JazzTheme.caption())
+                                        .font(ApproachNoteTheme.caption())
                                         .foregroundColor(.secondary)
                                 }
                             } footer: {
                                 Text("Swipe right to link a recommendation to this recording")
-                                    .font(JazzTheme.caption())
+                                    .font(ApproachNoteTheme.caption())
                             }
                         }
                     }
@@ -361,7 +361,7 @@ struct AuthorityRowView: View {
             HStack {
                 // Source badge
                 Text(authority.sourceDisplayName)
-                    .font(JazzTheme.caption())
+                    .font(ApproachNoteTheme.caption())
                     .fontWeight(.semibold)
                     .foregroundColor(.white)
                     .padding(.horizontal, 8)
@@ -373,7 +373,7 @@ struct AuthorityRowView: View {
                 
                 if authority.sourceUrl != nil {
                     Image(systemName: "arrow.up.right.square")
-                        .font(JazzTheme.caption())
+                        .font(ApproachNoteTheme.caption())
                         .foregroundColor(.secondary)
                 }
             }
@@ -381,28 +381,28 @@ struct AuthorityRowView: View {
             // Artist/Album info
             if let artist = authority.artistName {
                 Text(artist)
-                    .font(JazzTheme.headline())
-                    .foregroundColor(JazzTheme.charcoal)
+                    .font(ApproachNoteTheme.headline())
+                    .foregroundColor(ApproachNoteTheme.charcoal)
             }
             
             if let album = authority.albumTitle {
                 Text(album)
-                    .font(JazzTheme.subheadline())
-                    .foregroundColor(JazzTheme.smokeGray)
+                    .font(ApproachNoteTheme.subheadline())
+                    .foregroundColor(ApproachNoteTheme.smokeGray)
             }
             
             // Year
             if let year = authority.recordingYear {
                 Text("(\(String(year)))")
-                    .font(JazzTheme.caption())
-                    .foregroundColor(JazzTheme.smokeGray)
+                    .font(ApproachNoteTheme.caption())
+                    .foregroundColor(ApproachNoteTheme.smokeGray)
             }
 
             // Recommendation text
             if let text = authority.recommendationText, !text.isEmpty {
                 Text(text)
-                    .font(JazzTheme.caption())
-                    .foregroundColor(JazzTheme.smokeGray)
+                    .font(ApproachNoteTheme.caption())
+                    .foregroundColor(ApproachNoteTheme.smokeGray)
                     .lineLimit(3)
                     .padding(.top, 4)
             }
@@ -422,7 +422,7 @@ struct UnmatchedAuthorityRowView: View {
                 HStack {
                     // Source badge
                     Text(authority.sourceDisplayName)
-                        .font(JazzTheme.caption())
+                        .font(ApproachNoteTheme.caption())
                         .fontWeight(.semibold)
                         .foregroundColor(.white)
                         .padding(.horizontal, 8)
@@ -432,18 +432,18 @@ struct UnmatchedAuthorityRowView: View {
                     
                     // Unmatched indicator
                     Text("Unlinked")
-                        .font(JazzTheme.caption2())
-                        .foregroundColor(JazzTheme.amber)
+                        .font(ApproachNoteTheme.caption2())
+                        .foregroundColor(ApproachNoteTheme.amber)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
-                        .background(JazzTheme.amber.opacity(0.15))
+                        .background(ApproachNoteTheme.amber.opacity(0.15))
                         .cornerRadius(4)
                     
                     Spacer()
                     
                     if authority.sourceUrl != nil {
                         Image(systemName: "arrow.up.right.square")
-                            .font(JazzTheme.caption())
+                            .font(ApproachNoteTheme.caption())
                             .foregroundColor(.secondary)
                     }
                 }
@@ -451,28 +451,28 @@ struct UnmatchedAuthorityRowView: View {
                 // Artist/Album info
                 if let artist = authority.artistName {
                     Text(artist)
-                        .font(JazzTheme.headline())
-                        .foregroundColor(JazzTheme.charcoal)
+                        .font(ApproachNoteTheme.headline())
+                        .foregroundColor(ApproachNoteTheme.charcoal)
                 }
                 
                 if let album = authority.albumTitle {
                     Text(album)
-                        .font(JazzTheme.subheadline())
-                        .foregroundColor(JazzTheme.smokeGray)
+                        .font(ApproachNoteTheme.subheadline())
+                        .foregroundColor(ApproachNoteTheme.smokeGray)
                 }
                 
                 // Year
                 if let year = authority.recordingYear {
                     Text("(\(String(year)))")
-                        .font(JazzTheme.caption())
-                        .foregroundColor(JazzTheme.smokeGray)
+                        .font(ApproachNoteTheme.caption())
+                        .foregroundColor(ApproachNoteTheme.smokeGray)
                 }
             }
 
             // Link hint icon
             Image(systemName: "link.badge.plus")
-                .font(JazzTheme.title3())
-                .foregroundColor(JazzTheme.teal.opacity(0.5))
+                .font(ApproachNoteTheme.title3())
+                .foregroundColor(ApproachNoteTheme.teal.opacity(0.5))
         }
         .padding(.vertical, 4)
     }

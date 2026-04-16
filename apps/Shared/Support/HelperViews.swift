@@ -2,7 +2,7 @@
 //  HelperViews.swift
 //  Approach Note
 //
-//  Updated with JazzTheme color palette
+//  Updated with ApproachNoteTheme color palette
 //
 
 import SwiftUI
@@ -19,17 +19,17 @@ struct DetailRow: View {
         HStack {
             Label {
                 Text(label)
-                    .font(JazzTheme.subheadline())
-                    .foregroundColor(JazzTheme.smokeGray)
+                    .font(ApproachNoteTheme.subheadline())
+                    .foregroundColor(ApproachNoteTheme.smokeGray)
             } icon: {
                 Image(systemName: icon)
-                    .foregroundColor(JazzTheme.brass)
+                    .foregroundColor(ApproachNoteTheme.brass)
             }
             Spacer()
             Text(value)
-                .font(JazzTheme.subheadline())
+                .font(ApproachNoteTheme.subheadline())
                 .bold()
-                .foregroundColor(JazzTheme.charcoal)
+                .foregroundColor(ApproachNoteTheme.charcoal)
         }
     }
 }
@@ -42,15 +42,15 @@ struct StreamingButton: View {
     var body: some View {
         VStack(spacing: 8) {
             Image(systemName: icon)
-                .font(JazzTheme.title2())
-                .foregroundColor(JazzTheme.cream)
+                .font(ApproachNoteTheme.title2())
+                .foregroundColor(ApproachNoteTheme.cream)
                 .frame(width: 60, height: 60)
                 .background(color)
                 .clipShape(Circle())
             
             Text(label)
-                .font(JazzTheme.caption())
-                .foregroundColor(JazzTheme.smokeGray)
+                .font(ApproachNoteTheme.caption())
+                .foregroundColor(ApproachNoteTheme.smokeGray)
         }
     }
 }
@@ -62,13 +62,13 @@ struct PerformerRowView: View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
                 Text(performer.name)
-                    .font(JazzTheme.headline())
-                    .foregroundColor(JazzTheme.charcoal)
+                    .font(ApproachNoteTheme.headline())
+                    .foregroundColor(ApproachNoteTheme.charcoal)
                 
                 if let instrument = performer.instrument {
                     Text(instrument)
-                        .font(JazzTheme.subheadline())
-                        .foregroundColor(JazzTheme.smokeGray)
+                        .font(ApproachNoteTheme.subheadline())
+                        .foregroundColor(ApproachNoteTheme.smokeGray)
                 }
             }
             
@@ -76,16 +76,16 @@ struct PerformerRowView: View {
             
             if let role = performer.role {
                 Text(role.capitalized)
-                    .font(JazzTheme.caption())
-                    .foregroundColor(JazzTheme.cream)
+                    .font(ApproachNoteTheme.caption())
+                    .foregroundColor(ApproachNoteTheme.cream)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
-                    .background(role == "leader" ? JazzTheme.burgundy : JazzTheme.brass.opacity(0.7))
+                    .background(role == "leader" ? ApproachNoteTheme.burgundy : ApproachNoteTheme.brass.opacity(0.7))
                     .cornerRadius(8)
             }
         }
         .padding()
-        .background(JazzTheme.cardBackground)
+        .background(ApproachNoteTheme.cardBackground)
         .cornerRadius(10)
         .padding(.horizontal)
     }
@@ -102,25 +102,25 @@ struct ExternalReferenceRow: View {
             HStack(spacing: 12) {
                 // Icon
                 Image(systemName: reference.iconName)
-                    .font(JazzTheme.title3())
-                    .foregroundColor(JazzTheme.burgundy)
+                    .font(ApproachNoteTheme.title3())
+                    .foregroundColor(ApproachNoteTheme.burgundy)
                     .frame(width: 32)
                 
                 // Source name
                 Text(reference.displayName)
-                    .font(JazzTheme.subheadline())
-                    .foregroundColor(JazzTheme.charcoal)
+                    .font(ApproachNoteTheme.subheadline())
+                    .foregroundColor(ApproachNoteTheme.charcoal)
                 
                 Spacer()
                 
                 // External link indicator
                 Image(systemName: "arrow.up.right.square")
-                    .font(JazzTheme.caption())
-                    .foregroundColor(JazzTheme.smokeGray)
+                    .font(ApproachNoteTheme.caption())
+                    .foregroundColor(ApproachNoteTheme.smokeGray)
             }
             .padding(.horizontal)
             .padding(.vertical, 12)
-            .background(JazzTheme.cardBackground)
+            .background(ApproachNoteTheme.cardBackground)
             .cornerRadius(8)
             .padding(.horizontal)
         }
@@ -140,28 +140,28 @@ struct AuthorityRecordingRow: View {
                         if recording.isCanonical == true {
                             Image(systemName: "star.fill")
                                 .foregroundColor(.yellow)
-                                .font(JazzTheme.caption())
+                                .font(ApproachNoteTheme.caption())
                         }
                         
                         Text(recording.albumTitle ?? "Unknown Album")
-                            .font(JazzTheme.headline())
-                            .foregroundColor(JazzTheme.charcoal)
+                            .font(ApproachNoteTheme.headline())
+                            .foregroundColor(ApproachNoteTheme.charcoal)
                     }
                     
                     // Year and label
                     HStack(spacing: 8) {
                         if let year = recording.recordingYear {
                             Text(String(year))
-                                .font(JazzTheme.subheadline())
-                                .foregroundColor(JazzTheme.smokeGray)
+                                .font(ApproachNoteTheme.subheadline())
+                                .foregroundColor(ApproachNoteTheme.smokeGray)
                         }
                         
                         if let label = recording.label {
                             Text("•")
-                                .foregroundColor(JazzTheme.smokeGray)
+                                .foregroundColor(ApproachNoteTheme.smokeGray)
                             Text(label)
-                                .font(JazzTheme.caption())
-                                .foregroundColor(JazzTheme.smokeGray)
+                                .font(ApproachNoteTheme.caption())
+                                .foregroundColor(ApproachNoteTheme.smokeGray)
                         }
                     }
                 }
@@ -175,7 +175,7 @@ struct AuthorityRecordingRow: View {
             }
         }
         .padding()
-        .background(JazzTheme.cardBackground)
+        .background(ApproachNoteTheme.cardBackground)
         .cornerRadius(10)
         .padding(.horizontal)
     }
@@ -189,9 +189,9 @@ struct AuthorityBadge: View {
     var body: some View {
         HStack(spacing: 4) {
             Image(systemName: "checkmark.seal.fill")
-                .font(JazzTheme.caption2())
+                .font(ApproachNoteTheme.caption2())
             Text(text)
-                .font(JazzTheme.caption2())
+                .font(ApproachNoteTheme.caption2())
                 .fontWeight(.semibold)
         }
         .foregroundColor(.white)
@@ -203,7 +203,7 @@ struct AuthorityBadge: View {
     
     private var badgeColor: Color {
         // Color code by source
-        guard let source = source else { return JazzTheme.burgundy }
+        guard let source = source else { return ApproachNoteTheme.burgundy }
         
         switch source.lowercased() {
         case "jazzstandards.com":
@@ -213,7 +213,7 @@ struct AuthorityBadge: View {
         case "discogs":
             return Color(red: 0.4, green: 0.7, blue: 0.4) // Green
         default:
-            return JazzTheme.burgundy
+            return ApproachNoteTheme.burgundy
         }
     }
 }

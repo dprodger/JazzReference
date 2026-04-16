@@ -48,7 +48,7 @@ struct SongsListView: View {
             MacSearchBar(
                 text: $searchText,
                 placeholder: "Search songs...",
-                backgroundColor: JazzTheme.burgundy
+                backgroundColor: ApproachNoteTheme.burgundy
             )
 
             if songService.songs.isEmpty && !searchText.isEmpty {
@@ -58,7 +58,7 @@ struct SongsListView: View {
             }
         }
         .frame(minWidth: 200, idealWidth: 250, maxWidth: 300)
-        .background(JazzTheme.backgroundLight)
+        .background(ApproachNoteTheme.backgroundLight)
         .sheet(isPresented: $showMusicBrainzSearch) {
             MusicBrainzSearchSheet(
                 searchQuery: searchText,
@@ -80,8 +80,8 @@ struct SongsListView: View {
                             .tag(song.id)
                             .listRowBackground(
                                 selectedSongId == song.id
-                                    ? JazzTheme.burgundy
-                                    : JazzTheme.backgroundLight
+                                    ? ApproachNoteTheme.burgundy
+                                    : ApproachNoteTheme.backgroundLight
                             )
                     }
                 }
@@ -89,14 +89,14 @@ struct SongsListView: View {
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
-        .background(JazzTheme.backgroundLight)
+        .background(ApproachNoteTheme.backgroundLight)
         .listSectionSeparator(.hidden)
     }
 
     private func sectionHeader(letter: String) -> some View {
         HStack {
             Text(letter)
-                .font(JazzTheme.headline())
+                .font(ApproachNoteTheme.headline())
                 .foregroundColor(.white)
             Spacer()
         }
@@ -104,7 +104,7 @@ struct SongsListView: View {
         .padding(.vertical, 6)
         .frame(maxWidth: .infinity)
         .background(
-            JazzTheme.burgundy
+            ApproachNoteTheme.burgundy
                 .padding(.horizontal, -20)
                 .padding(.vertical, -4)
         )
@@ -122,13 +122,13 @@ struct SongsListView: View {
             VStack {
                 Image(systemName: "music.note")
                     .font(.system(size: 60))
-                    .foregroundColor(JazzTheme.smokeGray.opacity(0.5))
+                    .foregroundColor(ApproachNoteTheme.smokeGray.opacity(0.5))
                 Text("Select a song")
-                    .font(JazzTheme.title2())
-                    .foregroundColor(JazzTheme.smokeGray)
+                    .font(ApproachNoteTheme.title2())
+                    .foregroundColor(ApproachNoteTheme.smokeGray)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(JazzTheme.backgroundLight)
+            .background(ApproachNoteTheme.backgroundLight)
         }
     }
 
@@ -167,15 +167,15 @@ struct SongsListView: View {
         VStack(spacing: 12) {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 40))
-                .foregroundColor(JazzTheme.smokeGray.opacity(0.5))
+                .foregroundColor(ApproachNoteTheme.smokeGray.opacity(0.5))
 
             Text("No Results")
-                .font(JazzTheme.headline())
-                .foregroundColor(JazzTheme.charcoal)
+                .font(ApproachNoteTheme.headline())
+                .foregroundColor(ApproachNoteTheme.charcoal)
 
             Text("No songs match \"\(searchText)\"")
-                .font(JazzTheme.subheadline())
-                .foregroundColor(JazzTheme.smokeGray)
+                .font(ApproachNoteTheme.subheadline())
+                .foregroundColor(ApproachNoteTheme.smokeGray)
                 .multilineTextAlignment(.center)
 
             Button(action: {
@@ -185,15 +185,15 @@ struct SongsListView: View {
                     Image(systemName: "waveform")
                     Text("Search MusicBrainz")
                 }
-                .font(JazzTheme.subheadline())
+                .font(ApproachNoteTheme.subheadline())
             }
             .buttonStyle(.borderedProminent)
-            .tint(JazzTheme.burgundy)
+            .tint(ApproachNoteTheme.burgundy)
             .padding(.top, 4)
         }
         .padding()
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(JazzTheme.backgroundLight)
+        .background(ApproachNoteTheme.backgroundLight)
     }
 }
 
@@ -206,12 +206,12 @@ struct SongRowView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(song.title)
-                .font(JazzTheme.headline())
-                .foregroundStyle(isSelected ? Color.white : JazzTheme.charcoal)
+                .font(ApproachNoteTheme.headline())
+                .foregroundStyle(isSelected ? Color.white : ApproachNoteTheme.charcoal)
             if let composer = song.composer {
                 Text(composer)
-                    .font(JazzTheme.subheadline())
-                    .foregroundStyle(isSelected ? Color.white.opacity(0.85) : JazzTheme.smokeGray)
+                    .font(ApproachNoteTheme.subheadline())
+                    .foregroundStyle(isSelected ? Color.white.opacity(0.85) : ApproachNoteTheme.smokeGray)
             }
         }
         .padding(.vertical, 4)

@@ -28,35 +28,35 @@ struct OnboardingWelcomePage: View {
             // Icon
             Image(systemName: "music.note.list")
                 .font(.system(size: 60))
-                .foregroundColor(JazzTheme.burgundy)
+                .foregroundColor(ApproachNoteTheme.burgundy)
 
             Text("Welcome!")
-                .font(JazzTheme.largeTitle())
-                .foregroundColor(JazzTheme.charcoal)
+                .font(ApproachNoteTheme.largeTitle())
+                .foregroundColor(ApproachNoteTheme.charcoal)
 
             VStack(spacing: 16) {
                 Text("Thanks for checking out Approach Note.")
-                    .font(JazzTheme.title3())
+                    .font(ApproachNoteTheme.title3())
                     .multilineTextAlignment(.center)
 
                 Text("I'm going to give you a brief description of what is available here so you can get yourself oriented.")
-                    .font(JazzTheme.body())
-                    .foregroundColor(JazzTheme.smokeGray)
+                    .font(ApproachNoteTheme.body())
+                    .foregroundColor(ApproachNoteTheme.smokeGray)
                     .multilineTextAlignment(.center)
 
                 #if os(iOS)
                 Text("You can always re-run this tutorial by going to the About section and tapping \"View Tutorial\".")
-                    .font(JazzTheme.body())
-                    .foregroundColor(JazzTheme.smokeGray)
+                    .font(ApproachNoteTheme.body())
+                    .foregroundColor(ApproachNoteTheme.smokeGray)
                     .multilineTextAlignment(.center)
                 #else
                 Text("You can always re-run this tutorial from Settings.")
-                    .font(JazzTheme.body())
-                    .foregroundColor(JazzTheme.smokeGray)
+                    .font(ApproachNoteTheme.body())
+                    .foregroundColor(ApproachNoteTheme.smokeGray)
                     .multilineTextAlignment(.center)
                 #endif
             }
-            .foregroundColor(JazzTheme.charcoal)
+            .foregroundColor(ApproachNoteTheme.charcoal)
             .padding(.horizontal, OnboardingLayout.horizontalPadding)
 
             Spacer()
@@ -65,14 +65,14 @@ struct OnboardingWelcomePage: View {
             // Decorative element
             VStack(spacing: 12) {
                 Image(systemName: "info.circle")
-                    .font(JazzTheme.title2())
-                    .foregroundColor(JazzTheme.amber)
+                    .font(ApproachNoteTheme.title2())
+                    .foregroundColor(ApproachNoteTheme.amber)
 
                 Text("When it comes to music, the data are complicated.\nI'll walk you through the definitions.")
-                    .font(JazzTheme.body())
+                    .font(ApproachNoteTheme.body())
                     .italic()
                     .multilineTextAlignment(.center)
-                    .foregroundColor(JazzTheme.smokeGray)
+                    .foregroundColor(ApproachNoteTheme.smokeGray)
             }
             .padding(.horizontal, OnboardingLayout.horizontalPadding)
 
@@ -101,11 +101,11 @@ struct OnboardingSongPage: View {
             VStack(spacing: 8) {
                 Image(systemName: "music.note")
                     .font(.system(size: 50))
-                    .foregroundColor(JazzTheme.burgundy)
+                    .foregroundColor(ApproachNoteTheme.burgundy)
 
                 Text("Song")
-                    .font(JazzTheme.largeTitle())
-                    .foregroundColor(JazzTheme.charcoal)
+                    .font(ApproachNoteTheme.largeTitle())
+                    .foregroundColor(ApproachNoteTheme.charcoal)
             }
 
             VStack(alignment: .leading, spacing: 16) {
@@ -118,13 +118,13 @@ struct OnboardingSongPage: View {
                 + Text(".")
 
                 Text("This can sometimes be called a Work, or a Composition.")
-                    .foregroundColor(JazzTheme.smokeGray)
+                    .foregroundColor(ApproachNoteTheme.smokeGray)
 
                 Text("But it's the basic chords, melody, and (if appropriate) lyrics of a particular written piece of music.")
-                    .foregroundColor(JazzTheme.smokeGray)
+                    .foregroundColor(ApproachNoteTheme.smokeGray)
             }
-            .font(JazzTheme.body())
-            .foregroundColor(JazzTheme.charcoal)
+            .font(ApproachNoteTheme.body())
+            .foregroundColor(ApproachNoteTheme.charcoal)
             .multilineTextAlignment(.leading)
             .padding(.horizontal, OnboardingLayout.horizontalPadding)
 
@@ -136,23 +136,23 @@ struct OnboardingSongPage: View {
                 HStack(spacing: 12) {
                     Image(systemName: "pianokeys")
                     Image(systemName: "plus")
-                        .font(JazzTheme.caption())
+                        .font(ApproachNoteTheme.caption())
                     Image(systemName: "waveform")
                     Image(systemName: "plus")
-                        .font(JazzTheme.caption())
+                        .font(ApproachNoteTheme.caption())
                     Image(systemName: "text.alignleft")
                 }
-                .font(JazzTheme.title2())
-                .foregroundColor(JazzTheme.brass)
+                .font(ApproachNoteTheme.title2())
+                .foregroundColor(ApproachNoteTheme.brass)
 
                 Text("Chords + Melody + Lyrics")
-                    .font(JazzTheme.caption())
-                    .foregroundColor(JazzTheme.smokeGray)
+                    .font(ApproachNoteTheme.caption())
+                    .foregroundColor(ApproachNoteTheme.smokeGray)
             }
             .padding()
             .background(
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(JazzTheme.cardBackground)
+                    .fill(ApproachNoteTheme.cardBackground)
             )
             .padding(.horizontal, OnboardingLayout.horizontalPadding)
 
@@ -181,11 +181,11 @@ struct OnboardingRecordingPage: View {
             VStack(spacing: 8) {
                 Image(systemName: "opticaldisc")
                     .font(.system(size: 50))
-                    .foregroundColor(JazzTheme.brass)
+                    .foregroundColor(ApproachNoteTheme.brass)
 
                 Text("Recording")
-                    .font(JazzTheme.largeTitle())
-                    .foregroundColor(JazzTheme.charcoal)
+                    .font(ApproachNoteTheme.largeTitle())
+                    .foregroundColor(ApproachNoteTheme.charcoal)
             }
 
             VStack(alignment: .leading, spacing: 16) {
@@ -195,10 +195,10 @@ struct OnboardingRecordingPage: View {
                 + Text(".")
 
                 Text("The lineup for this recording is what it was on that date & time.")
-                    .foregroundColor(JazzTheme.smokeGray)
+                    .foregroundColor(ApproachNoteTheme.smokeGray)
             }
-            .font(JazzTheme.body())
-            .foregroundColor(JazzTheme.charcoal)
+            .font(ApproachNoteTheme.body())
+            .foregroundColor(ApproachNoteTheme.charcoal)
             .multilineTextAlignment(.leading)
             .padding(.horizontal, OnboardingLayout.horizontalPadding)
 
@@ -209,26 +209,26 @@ struct OnboardingRecordingPage: View {
             VStack(spacing: 12) {
                 HStack {
                     Image(systemName: "person.3.fill")
-                        .foregroundColor(JazzTheme.amber)
+                        .foregroundColor(ApproachNoteTheme.amber)
                     Text("+")
-                        .foregroundColor(JazzTheme.smokeGray)
+                        .foregroundColor(ApproachNoteTheme.smokeGray)
                     Image(systemName: "music.note")
-                        .foregroundColor(JazzTheme.burgundy)
+                        .foregroundColor(ApproachNoteTheme.burgundy)
                     Text("+")
-                        .foregroundColor(JazzTheme.smokeGray)
+                        .foregroundColor(ApproachNoteTheme.smokeGray)
                     Image(systemName: "calendar")
-                        .foregroundColor(JazzTheme.teal)
+                        .foregroundColor(ApproachNoteTheme.teal)
                 }
-                .font(JazzTheme.title2())
+                .font(ApproachNoteTheme.title2())
 
                 Text("Artists + Song + Date")
-                    .font(JazzTheme.caption())
-                    .foregroundColor(JazzTheme.smokeGray)
+                    .font(ApproachNoteTheme.caption())
+                    .foregroundColor(ApproachNoteTheme.smokeGray)
             }
             .padding()
             .background(
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(JazzTheme.cardBackground)
+                    .fill(ApproachNoteTheme.cardBackground)
             )
             .padding(.horizontal, OnboardingLayout.horizontalPadding)
 
@@ -257,11 +257,11 @@ struct OnboardingReleasesPage: View {
             VStack(spacing: 8) {
                 Image(systemName: "shippingbox")
                     .font(.system(size: 50))
-                    .foregroundColor(JazzTheme.teal)
+                    .foregroundColor(ApproachNoteTheme.teal)
 
                 Text("Releases")
-                    .font(JazzTheme.largeTitle())
-                    .foregroundColor(JazzTheme.charcoal)
+                    .font(ApproachNoteTheme.largeTitle())
+                    .foregroundColor(ApproachNoteTheme.charcoal)
             }
 
             VStack(alignment: .leading, spacing: 12) {
@@ -274,8 +274,8 @@ struct OnboardingReleasesPage: View {
 
                 Text("The same piece of audio often appears on multiple releases.")
             }
-            .font(JazzTheme.body())
-            .foregroundColor(JazzTheme.smokeGray)
+            .font(ApproachNoteTheme.body())
+            .foregroundColor(ApproachNoteTheme.smokeGray)
             .multilineTextAlignment(.leading)
             .padding(.horizontal, OnboardingLayout.horizontalPadding)
 
@@ -283,8 +283,8 @@ struct OnboardingReleasesPage: View {
             HStack(spacing: 16) {
                 ForEach(["opticaldisc", "record.circle", "play.rectangle.fill"], id: \.self) { icon in
                     Image(systemName: icon)
-                        .font(JazzTheme.title())
-                        .foregroundColor(JazzTheme.teal)
+                        .font(ApproachNoteTheme.title())
+                        .foregroundColor(ApproachNoteTheme.teal)
                 }
             }
             .padding(.vertical, 8)
@@ -294,30 +294,30 @@ struct OnboardingReleasesPage: View {
                 Text("If you care about hearing the specific version (or Recording) of that song, it doesn't matter too much what Release it's on — they should sound the same.")
 
                 Text("(Remastering, etc., may be counted as a separate release or may not.)")
-                    .font(JazzTheme.caption())
+                    .font(ApproachNoteTheme.caption())
 
                 Text("Oftentimes, releases are restricted by geographic region; or they may no longer be available at all.")
             }
-            .font(JazzTheme.body())
-            .foregroundColor(JazzTheme.smokeGray)
+            .font(ApproachNoteTheme.body())
+            .foregroundColor(ApproachNoteTheme.smokeGray)
             .padding(.horizontal, OnboardingLayout.horizontalPadding)
             #endif
 
             // Key insight box
             VStack(spacing: 8) {
                 Image(systemName: "lightbulb.fill")
-                    .foregroundColor(JazzTheme.gold)
+                    .foregroundColor(ApproachNoteTheme.gold)
 
                 Text("For our purposes, if we can find any Release of the same Recording, we can treat them interchangeably from a playback and lineup perspective.")
-                    .font(JazzTheme.callout())
+                    .font(ApproachNoteTheme.callout())
                     .italic()
                     .multilineTextAlignment(.center)
-                    .foregroundColor(JazzTheme.charcoal)
+                    .foregroundColor(ApproachNoteTheme.charcoal)
             }
             .padding()
             .background(
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(JazzTheme.cardBackground)
+                    .fill(ApproachNoteTheme.cardBackground)
             )
             .padding(.horizontal, OnboardingLayout.horizontalPadding)
 
@@ -345,25 +345,25 @@ struct OnboardingCompletionPage: View {
 
             Image(systemName: "checkmark.circle.fill")
                 .font(.system(size: 80))
-                .foregroundColor(JazzTheme.burgundy)
+                .foregroundColor(ApproachNoteTheme.burgundy)
 
             Text("You're All Set!")
-                .font(JazzTheme.largeTitle())
-                .foregroundColor(JazzTheme.charcoal)
+                .font(ApproachNoteTheme.largeTitle())
+                .foregroundColor(ApproachNoteTheme.charcoal)
 
             Text("So, there you have it in a nutshell.")
-                .font(JazzTheme.title3())
-                .foregroundColor(JazzTheme.charcoal)
+                .font(ApproachNoteTheme.title3())
+                .foregroundColor(ApproachNoteTheme.charcoal)
 
             Text("Enjoy!")
-                .font(JazzTheme.title2())
-                .foregroundColor(JazzTheme.burgundy)
+                .font(ApproachNoteTheme.title2())
+                .foregroundColor(ApproachNoteTheme.burgundy)
 
             Spacer()
 
             Button(action: onFinish) {
                 Text("Get Started")
-                    .font(JazzTheme.headline())
+                    .font(ApproachNoteTheme.headline())
                     .foregroundColor(.white)
                     #if os(iOS)
                     .frame(maxWidth: .infinity)
@@ -371,7 +371,7 @@ struct OnboardingCompletionPage: View {
                     .frame(width: 200)
                     #endif
                     .padding()
-                    .background(JazzTheme.burgundy)
+                    .background(ApproachNoteTheme.burgundy)
                     .cornerRadius(12)
             }
             #if os(macOS)

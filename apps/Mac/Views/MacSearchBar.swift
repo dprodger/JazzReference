@@ -15,15 +15,15 @@ struct MacSearchBar: View {
     var body: some View {
         HStack {
             Image(systemName: "magnifyingglass")
-                .foregroundColor(JazzTheme.smokeGray)
+                .foregroundColor(ApproachNoteTheme.smokeGray)
             TextField(placeholder, text: $text)
                 .textFieldStyle(.plain)
-                .font(JazzTheme.body())
-                .foregroundColor(JazzTheme.charcoal)
+                .font(ApproachNoteTheme.body())
+                .foregroundColor(ApproachNoteTheme.charcoal)
             if !text.isEmpty {
                 Button(action: { text = "" }) {
                     Image(systemName: "xmark.circle.fill")
-                        .foregroundColor(JazzTheme.smokeGray)
+                        .foregroundColor(ApproachNoteTheme.smokeGray)
                 }
                 .buttonStyle(.plain)
             }
@@ -33,7 +33,7 @@ struct MacSearchBar: View {
         .cornerRadius(8)
         .overlay(
             RoundedRectangle(cornerRadius: 8)
-                .stroke(JazzTheme.smokeGray.opacity(0.3), lineWidth: 1)
+                .stroke(ApproachNoteTheme.smokeGray.opacity(0.3), lineWidth: 1)
         )
         .padding(.horizontal)
         .padding(.vertical, 12)
@@ -46,17 +46,17 @@ struct MacSearchBar: View {
         MacSearchBar(
             text: .constant(""),
             placeholder: "Search songs...",
-            backgroundColor: JazzTheme.burgundy
+            backgroundColor: ApproachNoteTheme.burgundy
         )
         MacSearchBar(
             text: .constant("test"),
             placeholder: "Search artists...",
-            backgroundColor: JazzTheme.amber
+            backgroundColor: ApproachNoteTheme.amber
         )
         MacSearchBar(
             text: .constant(""),
             placeholder: "Search recordings...",
-            backgroundColor: JazzTheme.brass
+            backgroundColor: ApproachNoteTheme.brass
         )
     }
 }

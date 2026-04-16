@@ -41,8 +41,8 @@ enum RecordingAvailabilityFilter: String, CaseIterable, Identifiable {
 
     var iconColor: Color {
         switch self {
-        case .all: return JazzTheme.smokeGray
-        case .playable: return JazzTheme.burgundy
+        case .all: return ApproachNoteTheme.smokeGray
+        case .playable: return ApproachNoteTheme.burgundy
         case .spotify: return .green
         case .appleMusic: return .pink
         case .youtube: return .red
@@ -69,9 +69,9 @@ enum RecordingVocalFilter: String, CaseIterable, Identifiable {
 
     var iconColor: Color {
         switch self {
-        case .all: return JazzTheme.smokeGray
-        case .instrumental: return JazzTheme.brass
-        case .vocal: return JazzTheme.burgundy
+        case .all: return ApproachNoteTheme.smokeGray
+        case .instrumental: return ApproachNoteTheme.brass
+        case .vocal: return ApproachNoteTheme.burgundy
         }
     }
 }
@@ -167,19 +167,19 @@ struct RecordingsListView: View {
                 if !recordingService.recordings.isEmpty && hasActiveFilters {
                     HStack {
                         Text("\(filteredRecordings.count) of \(recordingService.recordings.count) recordings")
-                            .font(JazzTheme.caption())
-                            .foregroundColor(JazzTheme.smokeGray)
+                            .font(ApproachNoteTheme.caption())
+                            .foregroundColor(ApproachNoteTheme.smokeGray)
                         Spacer()
                         Button("Clear Filters") {
                             clearFilters()
                         }
-                        .font(JazzTheme.caption())
-                        .foregroundColor(JazzTheme.burgundy)
+                        .font(ApproachNoteTheme.caption())
+                        .foregroundColor(ApproachNoteTheme.burgundy)
                         .buttonStyle(.plain)
                     }
                     .padding(.horizontal)
                     .padding(.vertical, 8)
-                    .background(JazzTheme.cardBackground)
+                    .background(ApproachNoteTheme.cardBackground)
                 }
 
                 // No results message
@@ -187,10 +187,10 @@ struct RecordingsListView: View {
                     VStack(spacing: 12) {
                         Image(systemName: "magnifyingglass")
                             .font(.system(size: 32))
-                            .foregroundColor(JazzTheme.smokeGray.opacity(0.5))
+                            .foregroundColor(ApproachNoteTheme.smokeGray.opacity(0.5))
                         Text("No recordings match your filters")
-                            .font(JazzTheme.subheadline())
-                            .foregroundColor(JazzTheme.smokeGray)
+                            .font(ApproachNoteTheme.subheadline())
+                            .foregroundColor(ApproachNoteTheme.smokeGray)
                         if hasActiveFilters {
                             Button("Clear Filters") {
                                 clearFilters()
@@ -199,7 +199,7 @@ struct RecordingsListView: View {
                         }
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(JazzTheme.backgroundLight)
+                    .background(ApproachNoteTheme.backgroundLight)
                 } else {
                     ScrollView {
                         LazyVStack(spacing: 0) {
@@ -207,7 +207,7 @@ struct RecordingsListView: View {
                                 RecordingRowView(recording: recording)
                                     .padding(.horizontal, 12)
                                     .padding(.vertical, 6)
-                                    .background(selectedRecordingId == recording.id ? JazzTheme.burgundy.opacity(0.15) : Color.clear)
+                                    .background(selectedRecordingId == recording.id ? ApproachNoteTheme.burgundy.opacity(0.15) : Color.clear)
                                     .contentShape(Rectangle())
                                     .onTapGesture {
                                         selectedRecordingId = recording.id
@@ -221,7 +221,7 @@ struct RecordingsListView: View {
                 }
             }
             .frame(minWidth: 200, idealWidth: 250, maxWidth: 300)
-            .background(JazzTheme.backgroundLight)
+            .background(ApproachNoteTheme.backgroundLight)
             .environment(\.colorScheme, .light)
 
             // Recording detail (right pane)
@@ -232,13 +232,13 @@ struct RecordingsListView: View {
                 VStack {
                     Image(systemName: "opticaldisc")
                         .font(.system(size: 60))
-                        .foregroundColor(JazzTheme.smokeGray.opacity(0.5))
+                        .foregroundColor(ApproachNoteTheme.smokeGray.opacity(0.5))
                     Text("Select a recording")
-                        .font(JazzTheme.title2())
-                        .foregroundColor(JazzTheme.smokeGray)
+                        .font(ApproachNoteTheme.title2())
+                        .foregroundColor(ApproachNoteTheme.smokeGray)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(JazzTheme.backgroundLight)
+                .background(ApproachNoteTheme.backgroundLight)
             }
         }
         .onChange(of: searchText) { _, newValue in
@@ -260,13 +260,13 @@ struct RecordingsListView: View {
             MacSearchBar(
                 text: $searchText,
                 placeholder: "Search recordings...",
-                backgroundColor: JazzTheme.brass
+                backgroundColor: ApproachNoteTheme.brass
             )
 
             // Availability row
             HStack(spacing: 12) {
                 Text("Availability:")
-                    .font(JazzTheme.subheadline())
+                    .font(ApproachNoteTheme.subheadline())
                     .foregroundColor(.white)
 
                 // Availability filter menu
@@ -287,13 +287,13 @@ struct RecordingsListView: View {
                 } label: {
                     HStack(spacing: 4) {
                         Image(systemName: availabilityFilter.icon)
-                            .foregroundColor(availabilityFilter == .all ? JazzTheme.charcoal : availabilityFilter.iconColor)
+                            .foregroundColor(availabilityFilter == .all ? ApproachNoteTheme.charcoal : availabilityFilter.iconColor)
                         Text(availabilityFilter.rawValue)
-                            .font(JazzTheme.subheadline())
-                            .foregroundColor(JazzTheme.charcoal)
+                            .font(ApproachNoteTheme.subheadline())
+                            .foregroundColor(ApproachNoteTheme.charcoal)
                         Image(systemName: "chevron.down")
-                            .font(JazzTheme.caption2())
-                            .foregroundColor(JazzTheme.charcoal)
+                            .font(ApproachNoteTheme.caption2())
+                            .foregroundColor(ApproachNoteTheme.charcoal)
                     }
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
@@ -301,7 +301,7 @@ struct RecordingsListView: View {
                     .cornerRadius(8)
                     .overlay(
                         RoundedRectangle(cornerRadius: 8)
-                            .stroke(JazzTheme.smokeGray.opacity(0.3), lineWidth: 1)
+                            .stroke(ApproachNoteTheme.smokeGray.opacity(0.3), lineWidth: 1)
                     )
                 }
                 .menuStyle(.borderlessButton)
@@ -321,7 +321,7 @@ struct RecordingsListView: View {
 
                 // Vocal/Instrumental filter
                 Text("Type:")
-                    .font(JazzTheme.subheadline())
+                    .font(ApproachNoteTheme.subheadline())
                     .foregroundColor(.white)
 
                 Menu {
@@ -341,13 +341,13 @@ struct RecordingsListView: View {
                 } label: {
                     HStack(spacing: 4) {
                         Image(systemName: vocalFilter.icon)
-                            .foregroundColor(vocalFilter == .all ? JazzTheme.charcoal : vocalFilter.iconColor)
+                            .foregroundColor(vocalFilter == .all ? ApproachNoteTheme.charcoal : vocalFilter.iconColor)
                         Text(vocalFilter.rawValue)
-                            .font(JazzTheme.subheadline())
-                            .foregroundColor(JazzTheme.charcoal)
+                            .font(ApproachNoteTheme.subheadline())
+                            .foregroundColor(ApproachNoteTheme.charcoal)
                         Image(systemName: "chevron.down")
-                            .font(JazzTheme.caption2())
-                            .foregroundColor(JazzTheme.charcoal)
+                            .font(ApproachNoteTheme.caption2())
+                            .foregroundColor(ApproachNoteTheme.charcoal)
                     }
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
@@ -355,7 +355,7 @@ struct RecordingsListView: View {
                     .cornerRadius(8)
                     .overlay(
                         RoundedRectangle(cornerRadius: 8)
-                            .stroke(JazzTheme.smokeGray.opacity(0.3), lineWidth: 1)
+                            .stroke(ApproachNoteTheme.smokeGray.opacity(0.3), lineWidth: 1)
                     )
                 }
                 .menuStyle(.borderlessButton)
@@ -376,7 +376,7 @@ struct RecordingsListView: View {
             // Search scope picker
             HStack(spacing: 12) {
                 Text("Search in:")
-                    .font(JazzTheme.subheadline())
+                    .font(ApproachNoteTheme.subheadline())
                     .foregroundColor(.white)
 
                 Picker("", selection: $searchScope) {
@@ -392,7 +392,7 @@ struct RecordingsListView: View {
             .padding(.horizontal)
             .padding(.bottom, 8)
         }
-        .background(JazzTheme.brass)
+        .background(ApproachNoteTheme.brass)
         .environment(\.colorScheme, .light)
     }
 
@@ -421,15 +421,15 @@ struct RecordingRowView: View {
                             .aspectRatio(contentMode: .fill)
                     } placeholder: {
                         Rectangle()
-                            .fill(JazzTheme.cardBackground)
+                            .fill(ApproachNoteTheme.cardBackground)
                             .overlay { ProgressView().controlSize(.small) }
                     }
                 } else {
                     Rectangle()
-                        .fill(JazzTheme.cardBackground)
+                        .fill(ApproachNoteTheme.cardBackground)
                         .overlay {
                             Image(systemName: "music.note")
-                                .foregroundColor(JazzTheme.smokeGray)
+                                .foregroundColor(ApproachNoteTheme.smokeGray)
                         }
                 }
             }
@@ -438,23 +438,23 @@ struct RecordingRowView: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(recording.albumTitle ?? "Unknown Album")
-                    .font(JazzTheme.headline())
-                    .foregroundColor(JazzTheme.charcoal)
+                    .font(ApproachNoteTheme.headline())
+                    .foregroundColor(ApproachNoteTheme.charcoal)
                     .lineLimit(1)
                     .help("Album: \(recording.albumTitle ?? "Unknown Album")")
 
                 if let songTitle = recording.songTitle {
                     Text(songTitle)
-                        .font(JazzTheme.subheadline())
-                        .foregroundColor(JazzTheme.smokeGray)
+                        .font(ApproachNoteTheme.subheadline())
+                        .foregroundColor(ApproachNoteTheme.smokeGray)
                         .lineLimit(1)
                         .help("Song: \(songTitle)")
                 }
 
                 if let artistCredit = recording.artistCredit {
                     Text(artistCredit)
-                        .font(JazzTheme.caption())
-                        .foregroundColor(JazzTheme.smokeGray)
+                        .font(ApproachNoteTheme.caption())
+                        .foregroundColor(ApproachNoteTheme.smokeGray)
                         .lineLimit(1)
                         .help("Artist: \(artistCredit)")
                 }
@@ -462,17 +462,17 @@ struct RecordingRowView: View {
                 HStack(spacing: 4) {
                     if let year = recording.recordingYear {
                         Text(String(year))
-                            .font(JazzTheme.caption())
-                            .foregroundColor(JazzTheme.smokeGray)
+                            .font(ApproachNoteTheme.caption())
+                            .foregroundColor(ApproachNoteTheme.smokeGray)
                     }
 
                     if let label = recording.label {
                         Text("•")
-                            .font(JazzTheme.caption())
-                            .foregroundColor(JazzTheme.smokeGray)
+                            .font(ApproachNoteTheme.caption())
+                            .foregroundColor(ApproachNoteTheme.smokeGray)
                         Text(label)
-                            .font(JazzTheme.caption())
-                            .foregroundColor(JazzTheme.smokeGray)
+                            .font(ApproachNoteTheme.caption())
+                            .foregroundColor(ApproachNoteTheme.smokeGray)
                             .lineLimit(1)
                     }
                 }
@@ -485,17 +485,17 @@ struct RecordingRowView: View {
                 if recording.hasSpotifyAvailable {
                     Image(systemName: "play.circle.fill")
                         .foregroundColor(.green)
-                        .font(JazzTheme.caption())
+                        .font(ApproachNoteTheme.caption())
                 }
                 if recording.hasAppleMusicAvailable {
                     Image(systemName: "play.circle.fill")
                         .foregroundColor(.pink)
-                        .font(JazzTheme.caption())
+                        .font(ApproachNoteTheme.caption())
                 }
                 if recording.hasYoutubeAvailable {
                     Image(systemName: "play.rectangle.fill")
                         .foregroundColor(.red)
-                        .font(JazzTheme.caption())
+                        .font(ApproachNoteTheme.caption())
                 }
             }
 

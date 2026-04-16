@@ -27,7 +27,7 @@ apps/
 │   └── Support/
 │       ├── Models.swift
 │       ├── NetworkManager.swift
-│       ├── JazzTheme.swift
+│       ├── ApproachNoteTheme.swift
 │       ├── HelperViews.swift
 │       └── PreviewHelpers.swift
 ├── iOS/                     # iOS-specific code
@@ -50,7 +50,7 @@ apps/
 |------|---------|
 | `Support/Models.swift` | All data structures (Song, Recording, Artist, etc.) |
 | `Support/NetworkManager.swift` | API client with async/await |
-| `Support/JazzTheme.swift` | Colors, fonts, styling constants |
+| `Support/ApproachNoteTheme.swift` | Colors, fonts, styling constants |
 | `Auth/AuthenticationManager.swift` | JWT auth, login/register logic |
 | `Auth/KeychainHelper.swift` | Secure credential storage |
 | `Managers/RepertoireManager.swift` | Repertoire state management |
@@ -206,7 +206,7 @@ If pursuing refactoring:
 **Shared Code (in `Shared/`):**
 - `Support/Models.swift`
 - `Support/NetworkManager.swift`
-- `Support/JazzTheme.swift`
+- `Support/ApproachNoteTheme.swift`
 - `Support/HelperViews.swift`
 - `Support/PreviewHelpers.swift`
 - `Auth/AuthenticationManager.swift`

@@ -2,7 +2,7 @@
 //  PerformerDetailView.swift
 //  Approach Note
 //
-//  Updated with JazzTheme color palette and ExternalReferencesPanel
+//  Updated with ApproachNoteTheme color palette and ExternalReferencesPanel
 //
 
 import SwiftUI
@@ -30,33 +30,33 @@ struct PerformerDetailView: View {
             if isLoading {
                 VStack {
                     Spacer()
-                    ThemedProgressView(message: "Loading...", tintColor: JazzTheme.amber)
+                    ThemedProgressView(message: "Loading...", tintColor: ApproachNoteTheme.amber)
                     Spacer()
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(JazzTheme.backgroundLight)
+                .background(ApproachNoteTheme.backgroundLight)
             } else if let performer = performer {
                 VStack(alignment: .leading, spacing: 0) {
                     // Styled Header with Jazz Theme
                     HStack {
                         Image(systemName: "person.fill")
-                            .font(JazzTheme.title2())
-                            .foregroundColor(JazzTheme.cream)
+                            .font(ApproachNoteTheme.title2())
+                            .foregroundColor(ApproachNoteTheme.cream)
                         Text("ARTIST")
-                            .font(JazzTheme.headline())
+                            .font(ApproachNoteTheme.headline())
                             .fontWeight(.semibold)
-                            .foregroundColor(JazzTheme.cream)
+                            .foregroundColor(ApproachNoteTheme.cream)
                         Spacer()
                     }
                     .padding()
-                    .background(JazzTheme.amberGradient)
+                    .background(ApproachNoteTheme.amberGradient)
                     
                     VStack(alignment: .leading, spacing: 20) {
                         // Artist Name - MOVED TO TOP
                         Text(performer.name)
-                            .font(JazzTheme.largeTitle())
+                            .font(ApproachNoteTheme.largeTitle())
                             .bold()
-                            .foregroundColor(JazzTheme.charcoal)
+                            .foregroundColor(ApproachNoteTheme.charcoal)
                             .padding(.horizontal)
                             .padding(.top, 12)
                         
@@ -75,15 +75,15 @@ struct PerformerDetailView: View {
                             }) {
                                 HStack {
                                     Text("Biographical Information")
-                                        .font(JazzTheme.title2())
+                                        .font(ApproachNoteTheme.title2())
                                         .bold()
-                                        .foregroundColor(JazzTheme.charcoal)
+                                        .foregroundColor(ApproachNoteTheme.charcoal)
                                     Spacer()
                                     Image(systemName: isBiographicalInfoExpanded ? "chevron.up" : "chevron.down")
-                                        .foregroundColor(JazzTheme.brass)
+                                        .foregroundColor(ApproachNoteTheme.brass)
                                 }
                                 .padding()
-                                .background(JazzTheme.cardBackground)
+                                .background(ApproachNoteTheme.cardBackground)
                             }
                             .buttonStyle(.plain)
                             
@@ -94,8 +94,8 @@ struct PerformerDetailView: View {
                                     VStack(alignment: .leading, spacing: 12) {
                                         ForEach(Array(paragraphs.enumerated()), id: \.offset) { _, paragraph in
                                             Text(paragraph)
-                                                .font(JazzTheme.body())
-                                                .foregroundColor(JazzTheme.smokeGray)
+                                                .font(ApproachNoteTheme.body())
+                                                .foregroundColor(ApproachNoteTheme.smokeGray)
                                         }
                                     }
                                     .lineLimit(isBiographicalInfoExpanded ? nil : 3)
@@ -109,40 +109,40 @@ struct PerformerDetailView: View {
                                         if let birthDate = performer.birthDate {
                                             HStack {
                                                 Image(systemName: "calendar")
-                                                    .foregroundColor(JazzTheme.brass)
+                                                    .foregroundColor(ApproachNoteTheme.brass)
                                                 Text("Born: \(birthDate)")
-                                                    .font(JazzTheme.subheadline())
-                                                    .foregroundColor(JazzTheme.smokeGray)
+                                                    .font(ApproachNoteTheme.subheadline())
+                                                    .foregroundColor(ApproachNoteTheme.smokeGray)
                                             }
                                         }
 
                                         if let deathDate = performer.deathDate {
                                             HStack {
                                                 Image(systemName: "calendar")
-                                                    .foregroundColor(JazzTheme.brass)
+                                                    .foregroundColor(ApproachNoteTheme.brass)
                                                 Text("Died: \(deathDate)")
-                                                    .font(JazzTheme.subheadline())
-                                                    .foregroundColor(JazzTheme.smokeGray)
+                                                    .font(ApproachNoteTheme.subheadline())
+                                                    .foregroundColor(ApproachNoteTheme.smokeGray)
                                             }
                                         }
                                         
                                         if let instruments = performer.instruments, !instruments.isEmpty {
                                             VStack(alignment: .leading, spacing: 8) {
                                                 Text("Instruments")
-                                                    .font(JazzTheme.headline())
-                                                    .foregroundColor(JazzTheme.charcoal)
+                                                    .font(ApproachNoteTheme.headline())
+                                                    .foregroundColor(ApproachNoteTheme.charcoal)
                                                 
                                                 ForEach(instruments, id: \.name) { instrument in
                                                     HStack {
                                                         Image(systemName: "music.note")
-                                                            .foregroundColor(JazzTheme.brass)
+                                                            .foregroundColor(ApproachNoteTheme.brass)
                                                         Text(instrument.name)
-                                                            .font(JazzTheme.subheadline())
-                                                            .foregroundColor(JazzTheme.charcoal)
+                                                            .font(ApproachNoteTheme.subheadline())
+                                                            .foregroundColor(ApproachNoteTheme.charcoal)
                                                         if instrument.isPrimary == true {
                                                             Text("(Primary)")
-                                                                .font(JazzTheme.caption())
-                                                                .foregroundColor(JazzTheme.smokeGray)
+                                                                .font(ApproachNoteTheme.caption())
+                                                                .foregroundColor(ApproachNoteTheme.smokeGray)
                                                         }
                                                     }
                                                 }
@@ -165,7 +165,7 @@ struct PerformerDetailView: View {
                                 }
                             }
                         }
-                        .background(JazzTheme.cardBackground)
+                        .background(ApproachNoteTheme.cardBackground)
                         .cornerRadius(10)
                         .padding(.horizontal)
                         .padding(.top, 8)
@@ -197,15 +197,15 @@ struct PerformerDetailView: View {
                 VStack {
                     Spacer()
                     Text("Performer not found")
-                        .foregroundColor(JazzTheme.smokeGray)
+                        .foregroundColor(ApproachNoteTheme.smokeGray)
                     Spacer()
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(JazzTheme.backgroundLight)
+                .background(ApproachNoteTheme.backgroundLight)
             }
         }
-        .background(JazzTheme.backgroundLight)
-        .jazzNavigationBar(title: performer?.name ?? "", color: JazzTheme.amber)
+        .background(ApproachNoteTheme.backgroundLight)
+        .jazzNavigationBar(title: performer?.name ?? "", color: ApproachNoteTheme.amber)
         .task {
             #if DEBUG
             if ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1" {

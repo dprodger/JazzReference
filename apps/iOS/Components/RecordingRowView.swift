@@ -71,9 +71,9 @@ struct RecordingRowView: View {
                             },
                             placeholder: {
                                 ZStack {
-                                    JazzTheme.cardBackground
+                                    ApproachNoteTheme.cardBackground
                                     ProgressView()
-                                        .tint(JazzTheme.brass)
+                                        .tint(ApproachNoteTheme.brass)
                                 }
                                 .frame(width: 150, height: 150)
                             }
@@ -81,10 +81,10 @@ struct RecordingRowView: View {
                         .opacity(showingBackCover ? 0 : 1)
                     } else {
                         Image(systemName: "opticaldisc")
-                            .font(JazzTheme.largeTitle())
-                            .foregroundColor(JazzTheme.smokeGray)
+                            .font(ApproachNoteTheme.largeTitle())
+                            .foregroundColor(ApproachNoteTheme.smokeGray)
                             .frame(width: 150, height: 150)
-                            .background(JazzTheme.cardBackground)
+                            .background(ApproachNoteTheme.cardBackground)
                             .opacity(showingBackCover ? 0 : 1)
                     }
 
@@ -101,9 +101,9 @@ struct RecordingRowView: View {
                             },
                             placeholder: {
                                 ZStack {
-                                    JazzTheme.cardBackground
+                                    ApproachNoteTheme.cardBackground
                                     ProgressView()
-                                        .tint(JazzTheme.brass)
+                                        .tint(ApproachNoteTheme.brass)
                                 }
                                 .frame(width: 150, height: 150)
                             }
@@ -140,7 +140,7 @@ struct RecordingRowView: View {
                     if recording.isCanonical == true {
                         Image(systemName: "star.fill")
                             .foregroundColor(.yellow)
-                            .font(JazzTheme.caption())
+                            .font(ApproachNoteTheme.caption())
                             .padding(6)
                             .background(Color.black.opacity(0.6))
                             .clipShape(Circle())
@@ -181,27 +181,27 @@ struct RecordingRowView: View {
             // Artist name (shown when grouping by year)
             if showArtistName {
                 Text(artistName)
-                    .font(JazzTheme.subheadline())
+                    .font(ApproachNoteTheme.subheadline())
                     .fontWeight(.semibold)
-                    .foregroundColor(JazzTheme.brass)
+                    .foregroundColor(ApproachNoteTheme.brass)
                     .lineLimit(1)
                     .frame(width: 150, alignment: .leading)
             }
 
             // Album title
             Text(recording.albumTitle ?? "Unknown Album")
-                .font(JazzTheme.subheadline())
+                .font(ApproachNoteTheme.subheadline())
                 .fontWeight(.medium)
-                .foregroundColor(JazzTheme.charcoal)
+                .foregroundColor(ApproachNoteTheme.charcoal)
                 .lineLimit(2)
                 .frame(width: 150, alignment: .leading)
 
             // Recording title (when different from song title)
             if let recordingTitle = recording.displayTitle {
                 Text("(\(recordingTitle))")
-                    .font(JazzTheme.caption())
+                    .font(ApproachNoteTheme.caption())
                     .italic()
-                    .foregroundColor(JazzTheme.brass)
+                    .foregroundColor(ApproachNoteTheme.brass)
                     .lineLimit(1)
                     .frame(width: 150, alignment: .leading)
             }
@@ -209,8 +209,8 @@ struct RecordingRowView: View {
             // Year
             if let year = recording.recordingYear {
                 Text(String(format: "%d", year))
-                    .font(JazzTheme.caption())
-                    .foregroundColor(JazzTheme.smokeGray)
+                    .font(ApproachNoteTheme.caption())
+                    .foregroundColor(ApproachNoteTheme.smokeGray)
                     .frame(width: 150, alignment: .leading)
             }
         }
@@ -248,7 +248,7 @@ struct CompactAuthorityBadge: View {
 
     private var badgeColor: Color {
         // Color code by source
-        guard let source = source else { return JazzTheme.burgundy }
+        guard let source = source else { return ApproachNoteTheme.burgundy }
 
         switch source.lowercased() {
         case "jazzstandards.com":
@@ -258,7 +258,7 @@ struct CompactAuthorityBadge: View {
         case "discogs":
             return Color(red: 0.4, green: 0.7, blue: 0.4) // Green
         default:
-            return JazzTheme.burgundy
+            return ApproachNoteTheme.burgundy
         }
     }
 }

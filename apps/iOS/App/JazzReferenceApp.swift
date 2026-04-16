@@ -29,8 +29,8 @@ struct JazzReferenceApp: App {
     @State private var showingOnboarding = false
 
     init() {
-        // Configure navigation bar fonts from JazzTheme
-        JazzTheme.configureNavigationBarAppearance()
+        // Configure navigation bar fonts from ApproachNoteTheme
+        ApproachNoteTheme.configureNavigationBarAppearance()
 
         // Restore previous Google Sign-In session (skip in previews)
         #if DEBUG

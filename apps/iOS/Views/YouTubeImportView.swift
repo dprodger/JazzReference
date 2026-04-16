@@ -55,7 +55,7 @@ struct YouTubeImportView: View {
                 }
             }
         }
-        .background(JazzTheme.backgroundLight)
+        .background(ApproachNoteTheme.backgroundLight)
         .navigationTitle("Link to Song")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -166,15 +166,15 @@ struct YouTubeImportView: View {
             VStack(spacing: 24) {
                 Image(systemName: "lock.fill")
                     .font(.system(size: 60))
-                    .foregroundColor(JazzTheme.burgundy.opacity(0.6))
+                    .foregroundColor(ApproachNoteTheme.burgundy.opacity(0.6))
 
                 Text("Sign In Required")
-                    .font(JazzTheme.title2())
+                    .font(ApproachNoteTheme.title2())
                     .fontWeight(.semibold)
-                    .foregroundColor(JazzTheme.charcoal)
+                    .foregroundColor(ApproachNoteTheme.charcoal)
 
                 Text("You need to be signed in to import YouTube videos")
-                    .font(JazzTheme.body())
+                    .font(ApproachNoteTheme.body())
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 32)
@@ -186,7 +186,7 @@ struct YouTubeImportView: View {
                         .fontWeight(.semibold)
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(JazzTheme.burgundy)
+                        .background(ApproachNoteTheme.burgundy)
                         .foregroundColor(.white)
                         .cornerRadius(10)
                 }
@@ -209,13 +209,13 @@ struct YouTubeImportView: View {
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(youtubeData.title)
-                        .font(JazzTheme.headline())
-                        .foregroundColor(JazzTheme.charcoal)
+                        .font(ApproachNoteTheme.headline())
+                        .foregroundColor(ApproachNoteTheme.charcoal)
                         .lineLimit(2)
 
                     HStack(spacing: 8) {
                         Text(youtubeData.videoType.displayName)
-                            .font(JazzTheme.caption())
+                            .font(ApproachNoteTheme.caption())
                             .foregroundColor(.white)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 2)
@@ -224,8 +224,8 @@ struct YouTubeImportView: View {
 
                         if let channel = youtubeData.channelName {
                             Text(channel)
-                                .font(JazzTheme.caption())
-                                .foregroundColor(JazzTheme.smokeGray)
+                                .font(ApproachNoteTheme.caption())
+                                .foregroundColor(ApproachNoteTheme.smokeGray)
                         }
                     }
                 }
@@ -233,7 +233,7 @@ struct YouTubeImportView: View {
         }
         .padding()
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(JazzTheme.cardBackground)
+        .background(ApproachNoteTheme.cardBackground)
     }
 
     // MARK: - Song Search Section
@@ -241,15 +241,15 @@ struct YouTubeImportView: View {
     private var songSearchSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Search for a song to link this video to:")
-                .font(JazzTheme.subheadline())
-                .foregroundColor(JazzTheme.smokeGray)
+                .font(ApproachNoteTheme.subheadline())
+                .foregroundColor(ApproachNoteTheme.smokeGray)
                 .padding(.horizontal)
                 .padding(.top)
 
             // Search field
             HStack {
                 Image(systemName: "magnifyingglass")
-                    .foregroundColor(JazzTheme.smokeGray)
+                    .foregroundColor(ApproachNoteTheme.smokeGray)
 
                 TextField("Search songs...", text: $searchText)
                     .textFieldStyle(.plain)
@@ -263,7 +263,7 @@ struct YouTubeImportView: View {
                         searchResults = []
                     }) {
                         Image(systemName: "xmark.circle.fill")
-                            .foregroundColor(JazzTheme.smokeGray)
+                            .foregroundColor(ApproachNoteTheme.smokeGray)
                     }
                 }
 
@@ -273,7 +273,7 @@ struct YouTubeImportView: View {
                 }
             }
             .padding()
-            .background(JazzTheme.cardBackground)
+            .background(ApproachNoteTheme.cardBackground)
             .cornerRadius(10)
             .padding(.horizontal)
 
@@ -290,15 +290,15 @@ struct YouTubeImportView: View {
                 VStack(spacing: 8) {
                     Image(systemName: "music.note")
                         .font(.largeTitle)
-                        .foregroundColor(JazzTheme.smokeGray)
+                        .foregroundColor(ApproachNoteTheme.smokeGray)
 
                     Text("No songs found")
-                        .font(JazzTheme.body())
-                        .foregroundColor(JazzTheme.smokeGray)
+                        .font(ApproachNoteTheme.body())
+                        .foregroundColor(ApproachNoteTheme.smokeGray)
 
                     Text("Try different keywords")
-                        .font(JazzTheme.caption())
-                        .foregroundColor(JazzTheme.smokeGray)
+                        .font(ApproachNoteTheme.caption())
+                        .foregroundColor(ApproachNoteTheme.smokeGray)
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.top, 40)
@@ -311,23 +311,23 @@ struct YouTubeImportView: View {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(song.title)
-                        .font(JazzTheme.headline())
-                        .foregroundColor(JazzTheme.charcoal)
+                        .font(ApproachNoteTheme.headline())
+                        .foregroundColor(ApproachNoteTheme.charcoal)
 
                     if let composer = song.composer {
                         Text(composer)
-                            .font(JazzTheme.subheadline())
-                            .foregroundColor(JazzTheme.smokeGray)
+                            .font(ApproachNoteTheme.subheadline())
+                            .foregroundColor(ApproachNoteTheme.smokeGray)
                     }
                 }
 
                 Spacer()
 
                 Image(systemName: "chevron.right")
-                    .foregroundColor(JazzTheme.smokeGray)
+                    .foregroundColor(ApproachNoteTheme.smokeGray)
             }
             .padding()
-            .background(selectedSong?.id == song.id ? JazzTheme.burgundy.opacity(0.1) : Color.clear)
+            .background(selectedSong?.id == song.id ? ApproachNoteTheme.burgundy.opacity(0.1) : Color.clear)
             .contentShape(Rectangle())
             .onTapGesture {
                 selectedSong = song
@@ -495,8 +495,8 @@ struct RecordingPickerView: View {
                             .font(.largeTitle)
                             .foregroundColor(.orange)
                         Text(error)
-                            .font(JazzTheme.body())
-                            .foregroundColor(JazzTheme.smokeGray)
+                            .font(ApproachNoteTheme.body())
+                            .foregroundColor(ApproachNoteTheme.smokeGray)
                     }
                     Spacer()
                 } else if recordings.isEmpty {
@@ -504,20 +504,20 @@ struct RecordingPickerView: View {
                     VStack(spacing: 12) {
                         Image(systemName: "opticaldisc")
                             .font(.largeTitle)
-                            .foregroundColor(JazzTheme.smokeGray)
+                            .foregroundColor(ApproachNoteTheme.smokeGray)
                         Text("No recordings found")
-                            .font(JazzTheme.body())
-                            .foregroundColor(JazzTheme.smokeGray)
+                            .font(ApproachNoteTheme.body())
+                            .foregroundColor(ApproachNoteTheme.smokeGray)
                         Text("This song doesn't have any recordings yet")
-                            .font(JazzTheme.caption())
-                            .foregroundColor(JazzTheme.smokeGray)
+                            .font(ApproachNoteTheme.caption())
+                            .foregroundColor(ApproachNoteTheme.smokeGray)
                     }
                     Spacer()
                 } else {
                     // Search field
                     HStack {
                         Image(systemName: "magnifyingglass")
-                            .foregroundColor(JazzTheme.smokeGray)
+                            .foregroundColor(ApproachNoteTheme.smokeGray)
 
                         TextField("Search by artist or album...", text: $searchText)
                             .textFieldStyle(.plain)
@@ -525,24 +525,24 @@ struct RecordingPickerView: View {
                         if !searchText.isEmpty {
                             Button(action: { searchText = "" }) {
                                 Image(systemName: "xmark.circle.fill")
-                                    .foregroundColor(JazzTheme.smokeGray)
+                                    .foregroundColor(ApproachNoteTheme.smokeGray)
                             }
                         }
                     }
                     .padding()
-                    .background(JazzTheme.cardBackground)
+                    .background(ApproachNoteTheme.cardBackground)
 
                     Divider()
 
                     // Results count
                     HStack {
                         Text("\(filteredRecordings.count) recording\(filteredRecordings.count == 1 ? "" : "s")")
-                            .font(JazzTheme.caption())
-                            .foregroundColor(JazzTheme.smokeGray)
+                            .font(ApproachNoteTheme.caption())
+                            .foregroundColor(ApproachNoteTheme.smokeGray)
                         Spacer()
                         Text("Sorted by artist")
-                            .font(JazzTheme.caption())
-                            .foregroundColor(JazzTheme.smokeGray)
+                            .font(ApproachNoteTheme.caption())
+                            .foregroundColor(ApproachNoteTheme.smokeGray)
                     }
                     .padding(.horizontal)
                     .padding(.vertical, 8)
@@ -553,10 +553,10 @@ struct RecordingPickerView: View {
                         VStack(spacing: 8) {
                             Image(systemName: "magnifyingglass")
                                 .font(.largeTitle)
-                                .foregroundColor(JazzTheme.smokeGray)
+                                .foregroundColor(ApproachNoteTheme.smokeGray)
                             Text("No matching recordings")
-                                .font(JazzTheme.body())
-                                .foregroundColor(JazzTheme.smokeGray)
+                                .font(ApproachNoteTheme.body())
+                                .foregroundColor(ApproachNoteTheme.smokeGray)
                         }
                         Spacer()
                     } else {
@@ -612,20 +612,20 @@ struct RecordingPickerView: View {
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(recording.albumTitle ?? "Unknown Album")
-                    .font(JazzTheme.headline())
-                    .foregroundColor(JazzTheme.charcoal)
+                    .font(ApproachNoteTheme.headline())
+                    .foregroundColor(ApproachNoteTheme.charcoal)
 
                 HStack(spacing: 8) {
                     if let artist = recording.artistCredit {
                         Text(artist)
-                            .font(JazzTheme.caption())
-                            .foregroundColor(JazzTheme.smokeGray)
+                            .font(ApproachNoteTheme.caption())
+                            .foregroundColor(ApproachNoteTheme.smokeGray)
                     }
 
                     if let year = recording.recordingYear {
                         Text("(\(String(year)))")
-                            .font(JazzTheme.caption())
-                            .foregroundColor(JazzTheme.smokeGray)
+                            .font(ApproachNoteTheme.caption())
+                            .foregroundColor(ApproachNoteTheme.smokeGray)
                     }
                 }
             }
@@ -633,7 +633,7 @@ struct RecordingPickerView: View {
             Spacer()
 
             Image(systemName: "chevron.right")
-                .foregroundColor(JazzTheme.smokeGray)
+                .foregroundColor(ApproachNoteTheme.smokeGray)
         }
         .padding(.vertical, 4)
     }

@@ -60,7 +60,7 @@ struct SongCreationView: View {
                 
                 Section {
                     Text("Additional details (structure, recordings) can be added later through the app.")
-                        .font(JazzTheme.caption())
+                        .font(ApproachNoteTheme.caption())
                         .foregroundColor(.secondary)
                 }
                 

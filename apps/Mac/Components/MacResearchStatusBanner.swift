@@ -35,12 +35,12 @@ struct MacResearchStatusBanner: View {
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
-                        .font(JazzTheme.subheadline())
+                        .font(ApproachNoteTheme.subheadline())
                         .fontWeight(.semibold)
-                        .foregroundColor(JazzTheme.charcoal)
+                        .foregroundColor(ApproachNoteTheme.charcoal)
                     Text(message)
-                        .font(JazzTheme.caption())
-                        .foregroundColor(JazzTheme.smokeGray)
+                        .font(ApproachNoteTheme.caption())
+                        .foregroundColor(ApproachNoteTheme.smokeGray)
                 }
 
                 Spacer()
@@ -48,7 +48,7 @@ struct MacResearchStatusBanner: View {
                 // Info icon to indicate hoverable
                 Image(systemName: "info.circle")
                     .font(.system(size: 12))
-                    .foregroundColor(JazzTheme.smokeGray)
+                    .foregroundColor(ApproachNoteTheme.smokeGray)
             }
             .padding(10)
             .background(iconColor.opacity(0.1))
@@ -61,8 +61,8 @@ struct MacResearchStatusBanner: View {
             // Show helper text below when hovering (in addition to system tooltip)
             if isHovering {
                 Text(helperText)
-                    .font(JazzTheme.caption())
-                    .foregroundColor(JazzTheme.smokeGray)
+                    .font(ApproachNoteTheme.caption())
+                    .foregroundColor(ApproachNoteTheme.smokeGray)
                     .padding(.horizontal, 10)
                     .transition(.opacity)
             }
@@ -76,7 +76,7 @@ struct MacResearchStatusBanner: View {
     VStack {
         MacResearchStatusBanner(
             icon: "waveform.circle.fill",
-            iconColor: JazzTheme.burgundy,
+            iconColor: ApproachNoteTheme.burgundy,
             title: "Researching Now",
             message: "Importing MusicBrainz recordings (3/10)",
             helperText: "We're scouring the internet to learn more about this song... Check back in a while to see what we've found.",
@@ -93,7 +93,7 @@ struct MacResearchStatusBanner: View {
     VStack {
         MacResearchStatusBanner(
             icon: "clock.fill",
-            iconColor: JazzTheme.amber,
+            iconColor: ApproachNoteTheme.amber,
             title: "In Research Queue",
             message: "Position 3 in queue",
             helperText: "This song is in the queue to get researched... Check back in a while to see what we've found.",

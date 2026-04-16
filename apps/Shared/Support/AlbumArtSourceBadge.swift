@@ -105,21 +105,21 @@ private struct AlbumArtSourceSheet: View {
                 // Source name
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Source")
-                        .font(JazzTheme.caption())
-                        .foregroundColor(JazzTheme.smokeGray)
+                        .font(ApproachNoteTheme.caption())
+                        .foregroundColor(ApproachNoteTheme.smokeGray)
                     Text(source)
-                        .font(JazzTheme.headline())
-                        .foregroundColor(JazzTheme.charcoal)
+                        .font(ApproachNoteTheme.headline())
+                        .foregroundColor(ApproachNoteTheme.charcoal)
                 }
 
                 // License info
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Usage")
-                        .font(JazzTheme.caption())
-                        .foregroundColor(JazzTheme.smokeGray)
+                        .font(ApproachNoteTheme.caption())
+                        .foregroundColor(ApproachNoteTheme.smokeGray)
                     Text(licenseInfo)
-                        .font(JazzTheme.subheadline())
-                        .foregroundColor(JazzTheme.charcoal)
+                        .font(ApproachNoteTheme.subheadline())
+                        .foregroundColor(ApproachNoteTheme.charcoal)
                 }
 
                 // Source link
@@ -129,8 +129,8 @@ private struct AlbumArtSourceSheet: View {
                             Image(systemName: "arrow.up.right.square")
                             Text("View on \(source)")
                         }
-                        .font(JazzTheme.subheadline())
-                        .foregroundColor(JazzTheme.brass)
+                        .font(ApproachNoteTheme.subheadline())
+                        .foregroundColor(ApproachNoteTheme.brass)
                     }
                     .padding(.top, 8)
                 }
@@ -146,7 +146,7 @@ private struct AlbumArtSourceSheet: View {
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
-                        .foregroundColor(JazzTheme.amber)
+                        .foregroundColor(ApproachNoteTheme.amber)
                 }
             }
         }

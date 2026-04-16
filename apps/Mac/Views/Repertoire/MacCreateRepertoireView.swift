@@ -25,8 +25,8 @@ struct MacCreateRepertoireView: View {
         VStack(spacing: 20) {
             // Header
             Text("Create Repertoire")
-                .font(JazzTheme.title())
-                .foregroundColor(JazzTheme.charcoal)
+                .font(ApproachNoteTheme.title())
+                .foregroundColor(ApproachNoteTheme.charcoal)
                 .padding(.top, 20)
 
             // Form
@@ -34,22 +34,22 @@ struct MacCreateRepertoireView: View {
                 // Name field
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Name")
-                        .font(JazzTheme.subheadline())
-                        .foregroundColor(JazzTheme.charcoal.opacity(0.7))
+                        .font(ApproachNoteTheme.subheadline())
+                        .foregroundColor(ApproachNoteTheme.charcoal.opacity(0.7))
 
                     TextField("Repertoire Name", text: $name)
                         .textFieldStyle(.roundedBorder)
 
                     Text("Give your repertoire a descriptive name")
-                        .font(JazzTheme.caption())
-                        .foregroundColor(JazzTheme.charcoal.opacity(0.7))
+                        .font(ApproachNoteTheme.caption())
+                        .foregroundColor(ApproachNoteTheme.charcoal.opacity(0.7))
                 }
 
                 // Description field
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Description (optional)")
-                        .font(JazzTheme.subheadline())
-                        .foregroundColor(JazzTheme.charcoal.opacity(0.7))
+                        .font(ApproachNoteTheme.subheadline())
+                        .foregroundColor(ApproachNoteTheme.charcoal.opacity(0.7))
 
                     TextEditor(text: $description)
                         .frame(height: 80)
@@ -60,8 +60,8 @@ struct MacCreateRepertoireView: View {
                         )
 
                     Text("Add notes about what this repertoire contains")
-                        .font(JazzTheme.caption())
-                        .foregroundColor(JazzTheme.charcoal.opacity(0.7))
+                        .font(ApproachNoteTheme.caption())
+                        .foregroundColor(ApproachNoteTheme.charcoal.opacity(0.7))
                 }
             }
             .padding(.horizontal)
@@ -71,7 +71,7 @@ struct MacCreateRepertoireView: View {
             // Error message
             if let error = repertoireManager.errorMessage, showError {
                 Text(error)
-                    .font(JazzTheme.caption())
+                    .font(ApproachNoteTheme.caption())
                     .foregroundColor(.red)
                     .padding(.horizontal)
             }
@@ -88,7 +88,7 @@ struct MacCreateRepertoireView: View {
                     createRepertoire()
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(JazzTheme.burgundy)
+                .tint(ApproachNoteTheme.burgundy)
                 .controlSize(.large)
                 .disabled(!isFormValid || isCreating)
             }
@@ -104,10 +104,10 @@ struct MacCreateRepertoireView: View {
                         ProgressView()
                             .controlSize(.large)
                         Text("Creating repertoire...")
-                            .font(JazzTheme.subheadline())
+                            .font(ApproachNoteTheme.subheadline())
                     }
                     .padding(24)
-                    .background(JazzTheme.cardBackground)
+                    .background(ApproachNoteTheme.cardBackground)
                     .cornerRadius(12)
                 }
             }

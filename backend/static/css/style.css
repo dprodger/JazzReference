@@ -1,10 +1,10 @@
 /* Jazz Reference - Main Stylesheet
  * Color scheme inspired by jazz nightclubs and speakeasies
- * Matches iOS app JazzTheme
+ * Matches iOS app ApproachNoteTheme
  */
 
 :root {
-    /* Primary Colors - from JazzTheme */
+    /* Primary Colors - from ApproachNoteTheme */
     --burgundy: #731A1A;        /* Deep burgundy - main accent */
     --amber: #D98C3F;           /* Warm amber - secondary accent */
     --brass: #A67F4D;           /* Smoky brass - tertiary accent */

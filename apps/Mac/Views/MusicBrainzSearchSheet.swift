@@ -28,8 +28,8 @@ struct MusicBrainzSearchSheet: View {
             // Header
             HStack {
                 Text("MusicBrainz Search")
-                    .font(JazzTheme.title2())
-                    .foregroundColor(JazzTheme.charcoal)
+                    .font(ApproachNoteTheme.title2())
+                    .foregroundColor(ApproachNoteTheme.charcoal)
                 Spacer()
                 Button("Cancel") {
                     dismiss()
@@ -37,7 +37,7 @@ struct MusicBrainzSearchSheet: View {
                 .keyboardShortcut(.escape)
             }
             .padding()
-            .background(JazzTheme.backgroundLight)
+            .background(ApproachNoteTheme.backgroundLight)
 
             Divider()
 
@@ -51,7 +51,7 @@ struct MusicBrainzSearchSheet: View {
             }
         }
         .frame(width: 500, height: 450)
-        .background(JazzTheme.backgroundLight)
+        .background(ApproachNoteTheme.backgroundLight)
         .task {
             await performSearch()
         }
@@ -106,15 +106,15 @@ struct MusicBrainzSearchSheet: View {
         VStack(spacing: 16) {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 50))
-                .foregroundColor(JazzTheme.smokeGray.opacity(0.5))
+                .foregroundColor(ApproachNoteTheme.smokeGray.opacity(0.5))
 
             Text("No Results Found")
-                .font(JazzTheme.headline())
-                .foregroundColor(JazzTheme.charcoal)
+                .font(ApproachNoteTheme.headline())
+                .foregroundColor(ApproachNoteTheme.charcoal)
 
             Text("No works matching \"\(searchQuery)\" were found on MusicBrainz.")
-                .font(JazzTheme.subheadline())
-                .foregroundColor(JazzTheme.smokeGray)
+                .font(ApproachNoteTheme.subheadline())
+                .foregroundColor(ApproachNoteTheme.smokeGray)
                 .multilineTextAlignment(.center)
 
             if let url = URL(string: "https://musicbrainz.org/search?query=\(searchQuery.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? searchQuery)&type=work") {
@@ -137,20 +137,20 @@ struct MusicBrainzSearchSheet: View {
             // Results header
             HStack {
                 Text("Results for \"\(searchQuery)\"")
-                    .font(JazzTheme.subheadline())
-                    .foregroundColor(JazzTheme.smokeGray)
+                    .font(ApproachNoteTheme.subheadline())
+                    .foregroundColor(ApproachNoteTheme.smokeGray)
                 Spacer()
             }
             .padding(.horizontal)
             .padding(.vertical, 8)
-            .background(JazzTheme.cream.opacity(0.5))
+            .background(ApproachNoteTheme.cream.opacity(0.5))
 
             // Results list
             List(searchResults) { work in
                 workRowView(work: work)
                     .listRowBackground(
                         selectedWork?.id == work.id
-                            ? JazzTheme.burgundy.opacity(0.15)
+                            ? ApproachNoteTheme.burgundy.opacity(0.15)
                             : Color.clear
                     )
                     .contentShape(Rectangle())
@@ -172,7 +172,7 @@ struct MusicBrainzSearchSheet: View {
                                 Image(systemName: "arrow.up.right.square")
                                 Text("View on MusicBrainz")
                             }
-                            .font(JazzTheme.subheadline())
+                            .font(ApproachNoteTheme.subheadline())
                         }
                     }
                 }
@@ -183,11 +183,11 @@ struct MusicBrainzSearchSheet: View {
                     showImportConfirmation = true
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(JazzTheme.burgundy)
+                .tint(ApproachNoteTheme.burgundy)
                 .disabled(selectedWork == nil || isImporting)
             }
             .padding()
-            .background(JazzTheme.backgroundLight)
+            .background(ApproachNoteTheme.backgroundLight)
         }
     }
 
@@ -198,17 +198,17 @@ struct MusicBrainzSearchSheet: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(work.title)
-                    .font(JazzTheme.headline())
-                    .foregroundColor(JazzTheme.charcoal)
+                    .font(ApproachNoteTheme.headline())
+                    .foregroundColor(ApproachNoteTheme.charcoal)
 
                 Text(work.composerDisplay)
-                    .font(JazzTheme.subheadline())
-                    .foregroundColor(JazzTheme.smokeGray)
+                    .font(ApproachNoteTheme.subheadline())
+                    .foregroundColor(ApproachNoteTheme.smokeGray)
 
                 if let type = work.type {
                     Text(type)
-                        .font(JazzTheme.caption())
-                        .foregroundColor(JazzTheme.burgundy)
+                        .font(ApproachNoteTheme.caption())
+                        .foregroundColor(ApproachNoteTheme.burgundy)
                 }
             }
 
@@ -221,8 +221,8 @@ struct MusicBrainzSearchSheet: View {
         let scoreValue = score ?? 0
         let color: Color = {
             if scoreValue >= 90 { return .green }
-            if scoreValue >= 70 { return JazzTheme.amber }
-            return JazzTheme.smokeGray
+            if scoreValue >= 70 { return ApproachNoteTheme.amber }
+            return ApproachNoteTheme.smokeGray
         }()
 
         return VStack(spacing: 2) {

@@ -41,8 +41,8 @@ enum SongRecordingFilter: String, CaseIterable, Identifiable {
 
     var iconColor: Color {
         switch self {
-        case .all: return JazzTheme.smokeGray
-        case .playable: return JazzTheme.burgundy
+        case .all: return ApproachNoteTheme.smokeGray
+        case .playable: return ApproachNoteTheme.burgundy
         case .withSpotify: return StreamingService.spotify.brandColor
         case .withAppleMusic: return StreamingService.appleMusic.brandColor
         case .withYoutube: return StreamingService.youtube.brandColor
@@ -78,9 +78,9 @@ enum VocalFilter: String, CaseIterable, Identifiable {
 
     var iconColor: Color {
         switch self {
-        case .all: return JazzTheme.smokeGray
-        case .instrumental: return JazzTheme.brass
-        case .vocal: return JazzTheme.burgundy
+        case .all: return ApproachNoteTheme.smokeGray
+        case .instrumental: return ApproachNoteTheme.brass
+        case .vocal: return ApproachNoteTheme.burgundy
         }
     }
 }

@@ -30,12 +30,12 @@ struct MacRecordingContributionEditView: View {
             // Header
             HStack {
                 Text("Contribute Data")
-                    .font(JazzTheme.title2())
-                    .foregroundColor(JazzTheme.charcoal)
+                    .font(ApproachNoteTheme.title2())
+                    .foregroundColor(ApproachNoteTheme.charcoal)
                 Spacer()
             }
             .padding()
-            .background(JazzTheme.backgroundLight)
+            .background(ApproachNoteTheme.backgroundLight)
 
             Divider()
 
@@ -44,14 +44,14 @@ struct MacRecordingContributionEditView: View {
                 VStack(alignment: .leading, spacing: 24) {
                     // Recording info
                     Text(recordingTitle)
-                        .font(JazzTheme.headline())
-                        .foregroundColor(JazzTheme.smokeGray)
+                        .font(ApproachNoteTheme.headline())
+                        .foregroundColor(ApproachNoteTheme.smokeGray)
 
                     // Performance Key Section
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Performance Key")
-                            .font(JazzTheme.subheadline(weight: .medium))
-                            .foregroundColor(JazzTheme.charcoal)
+                            .font(ApproachNoteTheme.subheadline(weight: .medium))
+                            .foregroundColor(ApproachNoteTheme.charcoal)
 
                         Picker("Key", selection: $selectedKey) {
                             Text("Not set").tag(nil as MusicalKey?)
@@ -63,15 +63,15 @@ struct MacRecordingContributionEditView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
 
                         Text("The key this performance is played in (may differ from the original composed key)")
-                            .font(JazzTheme.caption())
-                            .foregroundColor(JazzTheme.smokeGray)
+                            .font(ApproachNoteTheme.caption())
+                            .foregroundColor(ApproachNoteTheme.smokeGray)
                     }
 
                     // Tempo Section
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Tempo")
-                            .font(JazzTheme.subheadline(weight: .medium))
-                            .foregroundColor(JazzTheme.charcoal)
+                            .font(ApproachNoteTheme.subheadline(weight: .medium))
+                            .foregroundColor(ApproachNoteTheme.charcoal)
 
                         Picker("Tempo", selection: $selectedTempo) {
                             Text("Not set").tag(nil as TempoMarking?)
@@ -83,15 +83,15 @@ struct MacRecordingContributionEditView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
 
                         Text("Select the general tempo feel of this performance")
-                            .font(JazzTheme.caption())
-                            .foregroundColor(JazzTheme.smokeGray)
+                            .font(ApproachNoteTheme.caption())
+                            .foregroundColor(ApproachNoteTheme.smokeGray)
                     }
 
                     // Instrumental/Vocal Section
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Instrumental or Vocal")
-                            .font(JazzTheme.subheadline(weight: .medium))
-                            .foregroundColor(JazzTheme.charcoal)
+                            .font(ApproachNoteTheme.subheadline(weight: .medium))
+                            .foregroundColor(ApproachNoteTheme.charcoal)
 
                         Picker("Type", selection: $isInstrumental) {
                             Text("Not set").tag(nil as Bool?)
@@ -103,19 +103,19 @@ struct MacRecordingContributionEditView: View {
                         .frame(maxWidth: 300)
 
                         Text("Is this an instrumental recording or does it include vocals?")
-                            .font(JazzTheme.caption())
-                            .foregroundColor(JazzTheme.smokeGray)
+                            .font(ApproachNoteTheme.caption())
+                            .foregroundColor(ApproachNoteTheme.smokeGray)
                     }
 
                     // Info text
                     if !hasChanges {
                         Text("Enter at least one value above to save")
-                            .font(JazzTheme.caption())
-                            .foregroundColor(JazzTheme.smokeGray)
+                            .font(ApproachNoteTheme.caption())
+                            .foregroundColor(ApproachNoteTheme.smokeGray)
                     } else {
                         Text("You can contribute just one field or all three - any contribution helps!")
-                            .font(JazzTheme.caption())
-                            .foregroundColor(JazzTheme.brass)
+                            .font(ApproachNoteTheme.caption())
+                            .foregroundColor(ApproachNoteTheme.brass)
                     }
                 }
                 .padding()
@@ -160,14 +160,14 @@ struct MacRecordingContributionEditView: View {
                 }
                 .keyboardShortcut(.defaultAction)
                 .buttonStyle(.borderedProminent)
-                .tint(JazzTheme.burgundy)
+                .tint(ApproachNoteTheme.burgundy)
                 .disabled(isSaving || isDeleting || !hasChanges)
             }
             .padding()
-            .background(JazzTheme.backgroundLight)
+            .background(ApproachNoteTheme.backgroundLight)
         }
         .frame(width: 450, height: 500)
-        .background(JazzTheme.backgroundLight)
+        .background(ApproachNoteTheme.backgroundLight)
         .onAppear {
             loadCurrentValues()
         }

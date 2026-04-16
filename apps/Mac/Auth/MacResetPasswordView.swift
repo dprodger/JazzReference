@@ -51,11 +51,11 @@ struct MacResetPasswordView: View {
                 .foregroundColor(.green)
 
             Text("Password Reset Complete")
-                .font(JazzTheme.title2())
-                .foregroundColor(JazzTheme.charcoal)
+                .font(ApproachNoteTheme.title2())
+                .foregroundColor(ApproachNoteTheme.charcoal)
 
             Text("Your password has been successfully reset. You can now sign in with your new password.")
-                .font(JazzTheme.subheadline())
+                .font(ApproachNoteTheme.subheadline())
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
 
@@ -63,7 +63,7 @@ struct MacResetPasswordView: View {
                 dismiss()
             }
             .buttonStyle(.borderedProminent)
-            .tint(JazzTheme.burgundy)
+            .tint(ApproachNoteTheme.burgundy)
             .controlSize(.large)
             .padding(.top, 16)
         }
@@ -76,11 +76,11 @@ struct MacResetPasswordView: View {
             // Header
             VStack(spacing: 8) {
                 Text("Set New Password")
-                    .font(JazzTheme.title())
-                    .foregroundColor(JazzTheme.charcoal)
+                    .font(ApproachNoteTheme.title())
+                    .foregroundColor(ApproachNoteTheme.charcoal)
 
                 Text("Enter your new password below.")
-                    .font(JazzTheme.subheadline())
+                    .font(ApproachNoteTheme.subheadline())
                     .foregroundColor(.secondary)
             }
             .padding(.top, 20)
@@ -88,7 +88,7 @@ struct MacResetPasswordView: View {
             // New password
             VStack(alignment: .leading, spacing: 6) {
                 Text("New Password")
-                    .font(JazzTheme.subheadline())
+                    .font(ApproachNoteTheme.subheadline())
                     .foregroundColor(.secondary)
 
                 SecureField("At least 8 characters", text: $newPassword)
@@ -96,7 +96,7 @@ struct MacResetPasswordView: View {
 
                 if !newPassword.isEmpty && newPassword.count < 8 {
                     Text("Password must be at least 8 characters")
-                        .font(JazzTheme.caption())
+                        .font(ApproachNoteTheme.caption())
                         .foregroundColor(.red)
                 }
             }
@@ -104,7 +104,7 @@ struct MacResetPasswordView: View {
             // Confirm password
             VStack(alignment: .leading, spacing: 6) {
                 Text("Confirm Password")
-                    .font(JazzTheme.subheadline())
+                    .font(ApproachNoteTheme.subheadline())
                     .foregroundColor(.secondary)
 
                 SecureField("Re-enter password", text: $confirmPassword)
@@ -112,7 +112,7 @@ struct MacResetPasswordView: View {
 
                 if !confirmPassword.isEmpty && !passwordsMatch {
                     Text("Passwords do not match")
-                        .font(JazzTheme.caption())
+                        .font(ApproachNoteTheme.caption())
                         .foregroundColor(.red)
                 } else if !confirmPassword.isEmpty && passwordsMatch {
                     HStack {
@@ -121,14 +121,14 @@ struct MacResetPasswordView: View {
                         Text("Passwords match")
                             .foregroundColor(.green)
                     }
-                    .font(JazzTheme.caption())
+                    .font(ApproachNoteTheme.caption())
                 }
             }
 
             // Error message
             if let error = authManager.errorMessage {
                 Text(error)
-                    .font(JazzTheme.caption())
+                    .font(ApproachNoteTheme.caption())
                     .foregroundColor(.red)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal)
@@ -146,7 +146,7 @@ struct MacResetPasswordView: View {
                 }
             }
             .buttonStyle(.borderedProminent)
-            .tint(JazzTheme.burgundy)
+            .tint(ApproachNoteTheme.burgundy)
             .controlSize(.large)
             .disabled(!isFormValid || authManager.isLoading)
 

@@ -46,20 +46,20 @@ struct ContentView: View {
             // Set up tab bar appearance with opaque background
             let appearance = UITabBarAppearance()
             appearance.configureWithOpaqueBackground()
-            appearance.backgroundColor = UIColor(JazzTheme.backgroundLight)
+            appearance.backgroundColor = UIColor(ApproachNoteTheme.backgroundLight)
 
             // Set unselected item color (light gray)
             appearance.stackedLayoutAppearance.normal.iconColor = UIColor.lightGray
             appearance.stackedLayoutAppearance.normal.titleTextAttributes = [.foregroundColor: UIColor.lightGray]
 
             // Set selected item color (burgundy)
-            appearance.stackedLayoutAppearance.selected.iconColor = UIColor(JazzTheme.burgundy)
-            appearance.stackedLayoutAppearance.selected.titleTextAttributes = [.foregroundColor: UIColor(JazzTheme.burgundy)]
+            appearance.stackedLayoutAppearance.selected.iconColor = UIColor(ApproachNoteTheme.burgundy)
+            appearance.stackedLayoutAppearance.selected.titleTextAttributes = [.foregroundColor: UIColor(ApproachNoteTheme.burgundy)]
 
             UITabBar.appearance().standardAppearance = appearance
             UITabBar.appearance().scrollEdgeAppearance = appearance
         }
-        .tint(JazzTheme.burgundy) // Sets the active tab color
+        .tint(ApproachNoteTheme.burgundy) // Sets the active tab color
     }
 }
 

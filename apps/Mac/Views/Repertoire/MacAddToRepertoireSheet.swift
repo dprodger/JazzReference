@@ -66,11 +66,11 @@ struct MacAddToRepertoireSheet: View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Add to Repertoire")
-                    .font(JazzTheme.headline())
-                    .foregroundColor(JazzTheme.charcoal)
+                    .font(ApproachNoteTheme.headline())
+                    .foregroundColor(ApproachNoteTheme.charcoal)
                 Text(songTitle)
-                    .font(JazzTheme.subheadline())
-                    .foregroundColor(JazzTheme.charcoal.opacity(0.7))
+                    .font(ApproachNoteTheme.subheadline())
+                    .foregroundColor(ApproachNoteTheme.charcoal.opacity(0.7))
                     .lineLimit(1)
             }
 
@@ -78,13 +78,13 @@ struct MacAddToRepertoireSheet: View {
 
             Button(action: { dismiss() }) {
                 Text("Cancel")
-                    .foregroundColor(JazzTheme.burgundy)
+                    .foregroundColor(ApproachNoteTheme.burgundy)
             }
             .buttonStyle(.plain)
             .disabled(isAdding)
         }
         .padding()
-        .background(JazzTheme.cardBackground)
+        .background(ApproachNoteTheme.cardBackground)
     }
 
     // MARK: - Auth Required View
@@ -93,15 +93,15 @@ struct MacAddToRepertoireSheet: View {
         VStack(spacing: 20) {
             Image(systemName: "lock.fill")
                 .font(.system(size: 48))
-                .foregroundColor(JazzTheme.burgundy.opacity(0.6))
+                .foregroundColor(ApproachNoteTheme.burgundy.opacity(0.6))
 
             Text("Sign In Required")
-                .font(JazzTheme.title2())
-                .foregroundColor(JazzTheme.charcoal)
+                .font(ApproachNoteTheme.title2())
+                .foregroundColor(ApproachNoteTheme.charcoal)
 
             Text("You need to be signed in to add songs to repertoires")
-                .font(JazzTheme.body())
-                .foregroundColor(JazzTheme.charcoal.opacity(0.7))
+                .font(ApproachNoteTheme.body())
+                .foregroundColor(ApproachNoteTheme.charcoal.opacity(0.7))
                 .multilineTextAlignment(.center)
                 .padding(.horizontal)
 
@@ -109,10 +109,10 @@ struct MacAddToRepertoireSheet: View {
                 dismiss()
             }
             .buttonStyle(.borderedProminent)
-            .tint(JazzTheme.burgundy)
+            .tint(ApproachNoteTheme.burgundy)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(JazzTheme.backgroundLight)
+        .background(ApproachNoteTheme.backgroundLight)
     }
 
     // MARK: - Loading View
@@ -122,10 +122,10 @@ struct MacAddToRepertoireSheet: View {
             ProgressView()
                 .controlSize(.large)
             Text("Loading repertoires...")
-                .foregroundColor(JazzTheme.charcoal.opacity(0.7))
+                .foregroundColor(ApproachNoteTheme.charcoal.opacity(0.7))
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(JazzTheme.backgroundLight)
+        .background(ApproachNoteTheme.backgroundLight)
     }
 
     // MARK: - Empty Repertoires View
@@ -134,15 +134,15 @@ struct MacAddToRepertoireSheet: View {
         VStack(spacing: 20) {
             Image(systemName: "music.note.list")
                 .font(.system(size: 48))
-                .foregroundColor(JazzTheme.smokeGray.opacity(0.5))
+                .foregroundColor(ApproachNoteTheme.smokeGray.opacity(0.5))
 
             Text("No Repertoires Yet")
-                .font(JazzTheme.title2())
-                .foregroundColor(JazzTheme.charcoal)
+                .font(ApproachNoteTheme.title2())
+                .foregroundColor(ApproachNoteTheme.charcoal)
 
             Text("Create a repertoire first to start organizing your songs.")
-                .font(JazzTheme.subheadline())
-                .foregroundColor(JazzTheme.charcoal.opacity(0.7))
+                .font(ApproachNoteTheme.subheadline())
+                .foregroundColor(ApproachNoteTheme.charcoal.opacity(0.7))
                 .multilineTextAlignment(.center)
                 .padding(.horizontal)
 
@@ -150,10 +150,10 @@ struct MacAddToRepertoireSheet: View {
                 showCreateRepertoire = true
             }
             .buttonStyle(.borderedProminent)
-            .tint(JazzTheme.burgundy)
+            .tint(ApproachNoteTheme.burgundy)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(JazzTheme.backgroundLight)
+        .background(ApproachNoteTheme.backgroundLight)
     }
 
     // MARK: - Repertoire List
@@ -165,8 +165,8 @@ struct MacAddToRepertoireSheet: View {
                 if let lastUsed = repertoireManager.lastUsedRepertoire {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Quick Add")
-                            .font(JazzTheme.caption())
-                            .foregroundColor(JazzTheme.charcoal.opacity(0.6))
+                            .font(ApproachNoteTheme.caption())
+                            .foregroundColor(ApproachNoteTheme.charcoal.opacity(0.6))
                             .padding(.horizontal)
                             .padding(.top, 12)
 
@@ -174,19 +174,19 @@ struct MacAddToRepertoireSheet: View {
                             HStack {
                                 VStack(alignment: .leading, spacing: 4) {
                                     Text("Add to \(lastUsed.name)")
-                                        .font(JazzTheme.headline())
-                                        .foregroundColor(JazzTheme.charcoal)
+                                        .font(ApproachNoteTheme.headline())
+                                        .foregroundColor(ApproachNoteTheme.charcoal)
                                     Text("Last used")
-                                        .font(JazzTheme.caption())
-                                        .foregroundColor(JazzTheme.charcoal.opacity(0.6))
+                                        .font(ApproachNoteTheme.caption())
+                                        .foregroundColor(ApproachNoteTheme.charcoal.opacity(0.6))
                                 }
                                 Spacer()
                                 Image(systemName: "arrow.right.circle.fill")
                                     .font(.title2)
-                                    .foregroundColor(JazzTheme.amber)
+                                    .foregroundColor(ApproachNoteTheme.amber)
                             }
                             .padding()
-                            .background(JazzTheme.amber.opacity(0.1))
+                            .background(ApproachNoteTheme.amber.opacity(0.1))
                             .cornerRadius(8)
                         }
                         .buttonStyle(.plain)
@@ -198,8 +198,8 @@ struct MacAddToRepertoireSheet: View {
                 // All repertoires section
                 VStack(alignment: .leading, spacing: 8) {
                     Text("All Repertoires")
-                        .font(JazzTheme.caption())
-                        .foregroundColor(JazzTheme.charcoal.opacity(0.6))
+                        .font(ApproachNoteTheme.caption())
+                        .foregroundColor(ApproachNoteTheme.charcoal.opacity(0.6))
                         .padding(.horizontal)
                         .padding(.top, 16)
 
@@ -208,24 +208,24 @@ struct MacAddToRepertoireSheet: View {
                             HStack {
                                 VStack(alignment: .leading, spacing: 4) {
                                     Text(repertoire.name)
-                                        .font(JazzTheme.headline())
-                                        .foregroundColor(JazzTheme.charcoal)
+                                        .font(ApproachNoteTheme.headline())
+                                        .foregroundColor(ApproachNoteTheme.charcoal)
 
                                     if let description = repertoire.description, !description.isEmpty {
                                         Text(description)
-                                            .font(JazzTheme.subheadline())
-                                            .foregroundColor(JazzTheme.charcoal.opacity(0.7))
+                                            .font(ApproachNoteTheme.subheadline())
+                                            .foregroundColor(ApproachNoteTheme.charcoal.opacity(0.7))
                                             .lineLimit(2)
                                     }
 
                                     Text("\(repertoire.songCount) songs")
-                                        .font(JazzTheme.caption())
-                                        .foregroundColor(JazzTheme.burgundy)
+                                        .font(ApproachNoteTheme.caption())
+                                        .foregroundColor(ApproachNoteTheme.burgundy)
                                 }
                                 Spacer()
                             }
                             .padding()
-                            .background(JazzTheme.cardBackground)
+                            .background(ApproachNoteTheme.cardBackground)
                             .cornerRadius(8)
                         }
                         .buttonStyle(.plain)
@@ -238,9 +238,9 @@ struct MacAddToRepertoireSheet: View {
                 Button(action: { showCreateRepertoire = true }) {
                     HStack {
                         Image(systemName: "plus.circle.fill")
-                            .foregroundColor(JazzTheme.burgundy)
+                            .foregroundColor(ApproachNoteTheme.burgundy)
                         Text("Create New Repertoire")
-                            .foregroundColor(JazzTheme.burgundy)
+                            .foregroundColor(ApproachNoteTheme.burgundy)
                         Spacer()
                     }
                     .padding()
@@ -251,7 +251,7 @@ struct MacAddToRepertoireSheet: View {
             }
             .padding(.bottom)
         }
-        .background(JazzTheme.backgroundLight)
+        .background(ApproachNoteTheme.backgroundLight)
     }
 
     // MARK: - Adding Overlay
@@ -264,10 +264,10 @@ struct MacAddToRepertoireSheet: View {
                 ProgressView()
                     .controlSize(.large)
                 Text("Adding to repertoire...")
-                    .font(JazzTheme.headline())
+                    .font(ApproachNoteTheme.headline())
             }
             .padding(30)
-            .background(JazzTheme.cardBackground)
+            .background(ApproachNoteTheme.cardBackground)
             .cornerRadius(12)
         }
     }

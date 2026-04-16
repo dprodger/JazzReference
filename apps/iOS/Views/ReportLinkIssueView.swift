@@ -28,24 +28,24 @@ struct ReportLinkIssueView: View {
                     // Header section with description
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Report a Problem")
-                            .font(JazzTheme.title3())
+                            .font(ApproachNoteTheme.title3())
                             .fontWeight(.semibold)
-                            .foregroundColor(JazzTheme.charcoal)
+                            .foregroundColor(ApproachNoteTheme.charcoal)
                         
                         Text("Help us improve the quality of our external references by reporting broken or incorrect links.")
-                            .font(JazzTheme.subheadline())
-                            .foregroundColor(JazzTheme.smokeGray)
+                            .font(ApproachNoteTheme.subheadline())
+                            .foregroundColor(ApproachNoteTheme.smokeGray)
                     }
                     .padding()
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(JazzTheme.cardBackground)
+                    .background(ApproachNoteTheme.cardBackground)
                     .cornerRadius(10)
                     
                     // Entity Information Card
                     VStack(alignment: .leading, spacing: 12) {
                         Text("About This \(entityType)")
-                            .font(JazzTheme.headline())
-                            .foregroundColor(JazzTheme.charcoal)
+                            .font(ApproachNoteTheme.headline())
+                            .foregroundColor(ApproachNoteTheme.charcoal)
                         
                         VStack(alignment: .leading, spacing: 8) {
                             IssueInfoRow(label: "Name", value: entityName)
@@ -55,41 +55,41 @@ struct ReportLinkIssueView: View {
                     }
                     .padding()
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(JazzTheme.cardBackground)
+                    .background(ApproachNoteTheme.cardBackground)
                     .cornerRadius(10)
                     
                     // External Reference Card
                     VStack(alignment: .leading, spacing: 12) {
                         Text("External Link")
-                            .font(JazzTheme.headline())
-                            .foregroundColor(JazzTheme.charcoal)
+                            .font(ApproachNoteTheme.headline())
+                            .foregroundColor(ApproachNoteTheme.charcoal)
                         
                         VStack(alignment: .leading, spacing: 8) {
                             IssueInfoRow(label: "Source", value: externalSource)
                             
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("URL")
-                                    .font(JazzTheme.caption())
+                                    .font(ApproachNoteTheme.caption())
                                     .fontWeight(.medium)
-                                    .foregroundColor(JazzTheme.smokeGray)
+                                    .foregroundColor(ApproachNoteTheme.smokeGray)
                                 
                                 Text(externalUrl)
                                     .font(.system(.caption, design: .monospaced))
-                                    .foregroundColor(JazzTheme.charcoal)
+                                    .foregroundColor(ApproachNoteTheme.charcoal)
                                     .lineLimit(3)
                             }
                         }
                     }
                     .padding()
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(JazzTheme.cardBackground)
+                    .background(ApproachNoteTheme.cardBackground)
                     .cornerRadius(10)
                     
                     // Explanation Input
                     VStack(alignment: .leading, spacing: 12) {
                         Text("What's Wrong?")
-                            .font(JazzTheme.headline())
-                            .foregroundColor(JazzTheme.charcoal)
+                            .font(ApproachNoteTheme.headline())
+                            .foregroundColor(ApproachNoteTheme.charcoal)
                         
                         TextEditor(text: $explanation)
                             .frame(minHeight: 120)
@@ -98,17 +98,17 @@ struct ReportLinkIssueView: View {
                             .cornerRadius(8)
                             .overlay(
                                 RoundedRectangle(cornerRadius: 8)
-                                    .stroke(JazzTheme.smokeGray.opacity(0.3), lineWidth: 1)
+                                    .stroke(ApproachNoteTheme.smokeGray.opacity(0.3), lineWidth: 1)
                             )
                         
                         Text("Examples: broken link, incorrect information, wrong page, outdated content")
-                            .font(JazzTheme.caption())
-                            .foregroundColor(JazzTheme.smokeGray)
+                            .font(ApproachNoteTheme.caption())
+                            .foregroundColor(ApproachNoteTheme.smokeGray)
                             .italic()
                     }
                     .padding()
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(JazzTheme.cardBackground)
+                    .background(ApproachNoteTheme.cardBackground)
                     .cornerRadius(10)
                 }
                 .padding()
@@ -144,13 +144,13 @@ struct IssueInfoRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(label)
-                .font(JazzTheme.caption())
+                .font(ApproachNoteTheme.caption())
                 .fontWeight(.medium)
-                .foregroundColor(JazzTheme.smokeGray)
+                .foregroundColor(ApproachNoteTheme.smokeGray)
             
             Text(value)
                 .font(isMonospace ? .system(.body, design: .monospaced) : .body)
-                .foregroundColor(JazzTheme.charcoal)
+                .foregroundColor(ApproachNoteTheme.charcoal)
         }
     }
 }

@@ -41,31 +41,31 @@ struct TranscriptionsSection: View {
                     label: {
                         HStack {
                             Image(systemName: "music.quarternote.3")
-                                .foregroundColor(JazzTheme.teal)
+                                .foregroundColor(ApproachNoteTheme.teal)
                             Text("Solo Transcriptions")
-                                .font(JazzTheme.title2())
+                                .font(ApproachNoteTheme.title2())
                                 .bold()
-                                .foregroundColor(JazzTheme.charcoal)
+                                .foregroundColor(ApproachNoteTheme.charcoal)
 
                             Spacer()
 
                             Text("\(transcriptions.count)")
-                                .font(JazzTheme.subheadline())
-                                .foregroundColor(JazzTheme.smokeGray)
+                                .font(ApproachNoteTheme.subheadline())
+                                .foregroundColor(ApproachNoteTheme.smokeGray)
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 4)
-                                .background(JazzTheme.teal.opacity(0.1))
+                                .background(ApproachNoteTheme.teal.opacity(0.1))
                                 .cornerRadius(6)
                         }
                         .padding(.vertical, 12)
                     }
                 )
-                .tint(JazzTheme.teal)
+                .tint(ApproachNoteTheme.teal)
             }
 
             Spacer().frame(width: 16)
             }
-            .background(JazzTheme.backgroundLight)
+            .background(ApproachNoteTheme.backgroundLight)
             .sheet(item: $selectedTranscription) { transcription in
                 TranscriptionPlayerSheet(transcription: transcription)
             }
@@ -120,20 +120,20 @@ struct TranscriptionPlayerSheet: View {
                         if let year = transcription.recordingYear {
                             HStack(spacing: 4) {
                                 Image(systemName: "calendar")
-                                    .foregroundColor(JazzTheme.brass)
+                                    .foregroundColor(ApproachNoteTheme.brass)
                                 Text(String(format: "%d", year))
-                                    .font(JazzTheme.subheadline())
-                                    .foregroundColor(JazzTheme.smokeGray)
+                                    .font(ApproachNoteTheme.subheadline())
+                                    .foregroundColor(ApproachNoteTheme.smokeGray)
                             }
                         }
 
                         if let label = transcription.label {
                             HStack(spacing: 4) {
                                 Image(systemName: "opticaldisc")
-                                    .foregroundColor(JazzTheme.brass)
+                                    .foregroundColor(ApproachNoteTheme.brass)
                                 Text(label)
-                                    .font(JazzTheme.subheadline())
-                                    .foregroundColor(JazzTheme.smokeGray)
+                                    .font(ApproachNoteTheme.subheadline())
+                                    .foregroundColor(ApproachNoteTheme.smokeGray)
                             }
                         }
                     }
@@ -141,10 +141,10 @@ struct TranscriptionPlayerSheet: View {
                     if let composer = transcription.composer {
                         HStack(spacing: 4) {
                             Image(systemName: "music.note.list")
-                                .foregroundColor(JazzTheme.brass)
+                                .foregroundColor(ApproachNoteTheme.brass)
                             Text("Composed by \(composer)")
-                                .font(JazzTheme.subheadline())
-                                .foregroundColor(JazzTheme.smokeGray)
+                                .font(ApproachNoteTheme.subheadline())
+                                .foregroundColor(ApproachNoteTheme.smokeGray)
                         }
                     }
                 }
@@ -153,7 +153,7 @@ struct TranscriptionPlayerSheet: View {
 
                 Spacer()
             }
-            .background(JazzTheme.backgroundLight)
+            .background(ApproachNoteTheme.backgroundLight)
             .navigationTitle(transcription.albumTitle ?? "Solo Transcription")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

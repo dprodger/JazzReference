@@ -34,11 +34,11 @@ struct MacRegisterView: View {
             // Header
             VStack(spacing: 8) {
                 Text("Create Account")
-                    .font(JazzTheme.title())
-                    .foregroundColor(JazzTheme.charcoal)
+                    .font(ApproachNoteTheme.title())
+                    .foregroundColor(ApproachNoteTheme.charcoal)
 
                 Text("Join Approach Note")
-                    .font(JazzTheme.subheadline())
+                    .font(ApproachNoteTheme.subheadline())
                     .foregroundColor(.secondary)
             }
             .padding(.top, 20)
@@ -46,7 +46,7 @@ struct MacRegisterView: View {
             // Display name
             VStack(alignment: .leading, spacing: 6) {
                 Text("Display Name")
-                    .font(JazzTheme.subheadline())
+                    .font(ApproachNoteTheme.subheadline())
                     .foregroundColor(.secondary)
 
                 TextField("What should we call you?", text: $displayName)
@@ -56,7 +56,7 @@ struct MacRegisterView: View {
             // Email
             VStack(alignment: .leading, spacing: 6) {
                 Text("Email")
-                    .font(JazzTheme.subheadline())
+                    .font(ApproachNoteTheme.subheadline())
                     .foregroundColor(.secondary)
 
                 TextField("your@email.com", text: $email)
@@ -68,7 +68,7 @@ struct MacRegisterView: View {
             // Password
             VStack(alignment: .leading, spacing: 6) {
                 Text("Password")
-                    .font(JazzTheme.subheadline())
+                    .font(ApproachNoteTheme.subheadline())
                     .foregroundColor(.secondary)
 
                 SecureField("At least 8 characters", text: $password)
@@ -76,7 +76,7 @@ struct MacRegisterView: View {
 
                 if !password.isEmpty && password.count < 8 {
                     Text("Password must be at least 8 characters")
-                        .font(JazzTheme.caption())
+                        .font(ApproachNoteTheme.caption())
                         .foregroundColor(.red)
                 }
             }
@@ -84,7 +84,7 @@ struct MacRegisterView: View {
             // Confirm password
             VStack(alignment: .leading, spacing: 6) {
                 Text("Confirm Password")
-                    .font(JazzTheme.subheadline())
+                    .font(ApproachNoteTheme.subheadline())
                     .foregroundColor(.secondary)
 
                 SecureField("Re-enter password", text: $confirmPassword)
@@ -92,7 +92,7 @@ struct MacRegisterView: View {
 
                 if !confirmPassword.isEmpty && !passwordsMatch {
                     Text("Passwords do not match")
-                        .font(JazzTheme.caption())
+                        .font(ApproachNoteTheme.caption())
                         .foregroundColor(.red)
                 }
             }
@@ -100,7 +100,7 @@ struct MacRegisterView: View {
             // Terms agreement
             Toggle(isOn: $agreedToTerms) {
                 Text("I agree to the Terms of Service and Privacy Policy")
-                    .font(JazzTheme.subheadline())
+                    .font(ApproachNoteTheme.subheadline())
                     .foregroundColor(.secondary)
             }
             .toggleStyle(.checkbox)
@@ -108,7 +108,7 @@ struct MacRegisterView: View {
             // Error message
             if let error = authManager.errorMessage {
                 Text(error)
-                    .font(JazzTheme.caption())
+                    .font(ApproachNoteTheme.caption())
                     .foregroundColor(.red)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal)
@@ -126,7 +126,7 @@ struct MacRegisterView: View {
                 }
             }
             .buttonStyle(.borderedProminent)
-            .tint(JazzTheme.burgundy)
+            .tint(ApproachNoteTheme.burgundy)
             .controlSize(.large)
             .disabled(!isFormValid || authManager.isLoading)
 
