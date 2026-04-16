@@ -940,6 +940,36 @@ class PerformerImporter:
                 if not performer_id:
                     continue
 
+                # If this performer is already linked to the recording — even
+                # with role='other' (e.g. they also produced the date, as Ron
+                # Carter famously does on his own records) — promote that
+                # existing row to 'leader' rather than inserting a second row
+                # for the same person. Prefer the row that carries an
+                # instrument so we keep the credit info; otherwise just take
+                # the lowest-id row.
+                cur.execute("""
+                    SELECT id, role, instrument_id
+                    FROM recording_performers
+                    WHERE recording_id = %s AND performer_id = %s
+                    ORDER BY (instrument_id IS NULL), id
+                """, (recording_id, performer_id))
+                existing_rows = cur.fetchall()
+
+                if existing_rows:
+                    target = existing_rows[0]
+                    if target['role'] != 'leader':
+                        cur.execute("""
+                            UPDATE recording_performers
+                            SET role = 'leader'
+                            WHERE id = %s
+                        """, (target['id'],))
+                        inserted += 1
+                        logger.debug(
+                            f"      Promoted existing row to leader: {name}"
+                        )
+                    # If target['role'] is already 'leader', nothing to do.
+                    continue
+
                 cur.execute("""
                     INSERT INTO recording_performers (recording_id, performer_id, role)
                     VALUES (%s, %s, 'leader')
