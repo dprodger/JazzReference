@@ -43,7 +43,7 @@ class LeaderFixer:
         self.request_delay = request_delay
         self.session = requests.Session()
         self.session.headers.update({
-            'User-Agent': 'JazzReferenceApp/1.0 ( https://github.com/your-repo/jazz-reference )',
+            'User-Agent': 'ApproachNote/1.0 (+support@approachnote.com)',
             'Accept': 'application/json'
         })
         self.stats = {

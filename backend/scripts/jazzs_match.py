@@ -59,7 +59,7 @@ class JazzStandardsMatcher:
         # Setup session for HTTP requests
         self.session = requests.Session()
         self.session.headers.update({
-            'User-Agent': 'JazzReferenceApp/1.0 (Educational Research; dave@example.com)'
+            'User-Agent': 'ApproachNote/1.0 (+support@approachnote.com)'
         })
     
     def normalize_title(self, title: str, strip_parentheses: bool = False) -> str:

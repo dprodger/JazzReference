@@ -99,7 +99,7 @@ class AppleMusicClient:
         # HTTP session for connection reuse
         self.session = requests.Session()
         self.session.headers.update({
-            'User-Agent': 'JazzReferenceApp/1.0'
+            'User-Agent': 'ApproachNote/1.0 (+support@approachnote.com)'
         })
 
         # Stats tracking

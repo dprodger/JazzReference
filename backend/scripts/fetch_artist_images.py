@@ -85,7 +85,7 @@ class ImageFetcher:
         self.force_refresh = force_refresh
         self.session = requests.Session()
         self.session.headers.update({
-            'User-Agent': 'JazzReferenceApp/1.0 (Educational; Contact: support@jazzreference.app)'
+            'User-Agent': 'ApproachNote/1.0 (+support@approachnote.com)'
         })
         
         # Initialize Wikipedia searcher with caching

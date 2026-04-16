@@ -83,7 +83,7 @@ class AuthorityRecommendationMatcher:
         # Setup HTTP session for iTunes API calls
         self.session = requests.Session()
         self.session.headers.update({
-            'User-Agent': 'JazzReferenceApp/1.0'
+            'User-Agent': 'ApproachNote/1.0 (+support@approachnote.com)'
         })
         
         # Matching thresholds
