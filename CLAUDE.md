@@ -104,7 +104,7 @@ apps/
 │       └── PreviewHelpers.swift # SwiftUI preview data
 ├── iOS/                         # iOS-specific code
 │   ├── App/
-│   │   └── JazzReferenceApp.swift
+│   │   └── ApproachNoteApp.swift
 │   ├── Auth/Views/              # iOS auth views
 │   ├── Components/              # Reusable UI components
 │   ├── Managers/                # iOS-only managers

@@ -1,4 +1,4 @@
-// JazzReferenceApp.swift
+// ApproachNoteApp.swift
 // Main app entry point with deep link handling
 
 import SwiftUI
@@ -6,7 +6,7 @@ import GoogleSignIn
 import os
 
 @main
-struct JazzReferenceApp: App {
+struct ApproachNoteApp: App {
     @State private var showingArtistCreation = false
     @State private var importedArtistData: ImportedArtistData?
     @Environment(\.scenePhase) var scenePhase
