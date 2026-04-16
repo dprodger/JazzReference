@@ -63,6 +63,13 @@ final class SongDetailViewModel: ObservableObject {
     /// coming back from a child RecordingDetailView).
     private var currentLoadedSongId: String?
 
+    /// The Task running the most recent `load` / `forceRefresh` /
+    /// `reloadRecordings` call. A new load cancels this one first so a
+    /// slower in-flight request for a different song can't overwrite the
+    /// newer state when it finally returns (#110). `nil` when no load is
+    /// currently running.
+    private var currentLoadTask: Task<Void, Never>?
+
     // MARK: - Hydration state
     //
     // IDs we've already replaced with fully-hydrated Recording instances.
@@ -128,12 +135,59 @@ final class SongDetailViewModel: ObservableObject {
     /// + eager first-screen hydration.
     /// Guards against redundant reloads when the view re-appears with the
     /// same song already in state; pass `force: true` to override.
+    ///
+    /// Any prior in-flight `load` / `forceRefresh` / `reloadRecordings` is
+    /// cancelled before this one starts, so a slow response for an older
+    /// song ID can't land after a newer one and overwrite the UI with
+    /// stale data (#110). The cancellation checks inside `performLoad`
+    /// abort mid-flight and leave `currentLoadedSongId` as whatever the
+    /// newer load has set.
     func load(songId: String, force: Bool = false) async {
         // Skip if we already have this song loaded and aren't mid-load.
         if !force, currentLoadedSongId == songId, song != nil, !isLoading {
             return
         }
+        await runCancellingPrior { [weak self] in
+            await self?.performLoad(songId: songId)
+        }
+    }
 
+    /// Pull-to-refresh variant: does NOT set `isLoading`, so content stays
+    /// visible. Only updates state on success. Cancels any in-flight load.
+    func forceRefresh(songId: String) async {
+        await runCancellingPrior { [weak self] in
+            await self?.performForceRefresh(songId: songId)
+        }
+    }
+
+    /// Reload just the recordings list (Phase 2), leaving song metadata/
+    /// transcriptions alone. Used when the sort order changes or when a
+    /// child view edits community data. Cancels any in-flight load.
+    func reloadRecordings(songId: String) async {
+        await runCancellingPrior { [weak self] in
+            await self?.performReloadRecordings(songId: songId)
+        }
+    }
+
+    // MARK: - Load implementations (run inside `currentLoadTask`)
+
+    /// Cancel any prior load Task, then run `work` as the new current load.
+    /// The caller awaits completion so `.task { await vm.load(...) }` call
+    /// sites still see the load finish (or the new cancel-and-restart
+    /// unwind) before returning control to SwiftUI.
+    private func runCancellingPrior(_ work: @escaping @Sendable () async -> Void) async {
+        currentLoadTask?.cancel()
+        let task = Task { await work() }
+        currentLoadTask = task
+        await task.value
+        // If nothing else scheduled a new load while we were running,
+        // clear the handle so we don't hold onto a completed Task.
+        if currentLoadTask == task {
+            currentLoadTask = nil
+        }
+    }
+
+    private func performLoad(songId: String) async {
         isLoading = true
         isRecordingsLoading = true
         currentLoadedSongId = songId
@@ -145,6 +199,7 @@ final class SongDetailViewModel: ObservableObject {
 
         // Phase 1: summary (fast) — song metadata, transcriptions, featured recordings.
         let fetchedSong = await songService.fetchSongSummary(id: songId)
+        if Task.isCancelled { return }
         song = fetchedSong
         transcriptions = fetchedSong?.transcriptions ?? []
         isLoading = false
@@ -154,9 +209,12 @@ final class SongDetailViewModel: ObservableObject {
 
         // Backing tracks.
         await refreshBackingTracks(songId: songId)
+        if Task.isCancelled { return }
 
         // Phase 2: shell (fast, skeleton rows + group headers + filters).
-        if let shellRecordings = await songService.fetchSongRecordingsShell(id: songId, sortBy: sortOrder) {
+        let shellRecordings = await songService.fetchSongRecordingsShell(id: songId, sortBy: sortOrder)
+        if Task.isCancelled { return }
+        if let shellRecordings = shellRecordings {
             song?.recordings = shellRecordings
             // Once the shell is in, the rest of the UI can render. Rows
             // will drive their own hydration via `requestHydration(for:)`
@@ -170,32 +228,35 @@ final class SongDetailViewModel: ObservableObject {
         }
     }
 
-    /// Pull-to-refresh variant: does NOT set `isLoading`, so content stays visible.
-    /// Only updates state on success.
-    func forceRefresh(songId: String) async {
+    private func performForceRefresh(songId: String) async {
         isRecordingsLoading = true
         resetHydrationState()
 
-        if let fetchedSong = await songService.fetchSongSummary(id: songId) {
+        let fetchedSong = await songService.fetchSongSummary(id: songId)
+        if Task.isCancelled { return }
+        if let fetchedSong = fetchedSong {
             song = fetchedSong
             transcriptions = fetchedSong.transcriptions ?? []
         }
 
         await refreshBackingTracks(songId: songId)
+        if Task.isCancelled { return }
 
-        if let shellRecordings = await songService.fetchSongRecordingsShell(id: songId, sortBy: sortOrder) {
+        let shellRecordings = await songService.fetchSongRecordingsShell(id: songId, sortBy: sortOrder)
+        if Task.isCancelled { return }
+        if let shellRecordings = shellRecordings {
             song?.recordings = shellRecordings
             kickOffEagerHydration()
         }
         isRecordingsLoading = false
     }
 
-    /// Reload just the recordings list (Phase 2), leaving song metadata/transcriptions alone.
-    /// Used when the sort order changes or when a child view edits community data.
-    func reloadRecordings(songId: String) async {
+    private func performReloadRecordings(songId: String) async {
         isRecordingsReloading = true
         resetHydrationState()
-        if let shellRecordings = await songService.fetchSongRecordingsShell(id: songId, sortBy: sortOrder) {
+        let shellRecordings = await songService.fetchSongRecordingsShell(id: songId, sortBy: sortOrder)
+        if Task.isCancelled { return }
+        if let shellRecordings = shellRecordings {
             song?.recordings = shellRecordings
             kickOffEagerHydration()
         }

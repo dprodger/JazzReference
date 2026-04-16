@@ -43,6 +43,12 @@ final class RecordingDetailViewModel: ObservableObject {
     /// directly through `authManager.makeAuthenticatedRequest` / `URLSession`.
     private let recordingService = RecordingService()
 
+    /// The Task running the most recent `load` / `refresh`. A new load
+    /// cancels this one first so a slow response for an older recording
+    /// ID can't land after a newer one and overwrite the UI with stale
+    /// data (#110). `nil` when no load is currently running.
+    private var currentLoadTask: Task<Void, Never>?
+
     // MARK: - Configuration
 
     /// Call from the view's `.task` (or `.task(id:)`) to inject dependencies.
@@ -59,17 +65,49 @@ final class RecordingDetailViewModel: ObservableObject {
 
     // MARK: - Data loading
 
-    /// Initial load: sets isLoading, fetches, auto-selects a release, clears isLoading.
+    /// Initial load: sets isLoading, fetches, auto-selects a release, clears
+    /// isLoading. Cancels any prior in-flight load so a slow response for
+    /// an older recording id can't land after a newer one (#110).
     func load() async {
+        await runCancellingPrior { [weak self] in
+            await self?.performLoad()
+        }
+    }
+
+    /// Pull-to-refresh: does NOT set `isLoading`, preserves existing data
+    /// on failure. Cancels any in-flight load.
+    func refresh() async {
+        await runCancellingPrior { [weak self] in
+            await self?.performRefresh()
+        }
+    }
+
+    // MARK: - Load implementations (run inside `currentLoadTask`)
+
+    /// Cancel any prior load Task, then run `work` as the new current load.
+    private func runCancellingPrior(_ work: @escaping @Sendable () async -> Void) async {
+        currentLoadTask?.cancel()
+        let task = Task { await work() }
+        currentLoadTask = task
+        await task.value
+        if currentLoadTask == task {
+            currentLoadTask = nil
+        }
+    }
+
+    private func performLoad() async {
         isLoading = true
-        recording = await fetchRecordingWithAuth()
+        let fetched = await fetchRecordingWithAuth()
+        if Task.isCancelled { return }
+        recording = fetched
         autoSelectFirstRelease()
         isLoading = false
     }
 
-    /// Pull-to-refresh: does NOT set `isLoading`, preserves existing data on failure.
-    func refresh() async {
-        if let fetched = await fetchRecordingWithAuth() {
+    private func performRefresh() async {
+        let fetched = await fetchRecordingWithAuth()
+        if Task.isCancelled { return }
+        if let fetched = fetched {
             recording = fetched
             autoSelectFirstRelease()
         }
