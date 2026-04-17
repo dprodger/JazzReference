@@ -165,8 +165,8 @@ def main():
             logger.info(f"  ... and {len(pending) - 20} more")
         return
 
-    # Import matcher here (after arg parsing, so --help is fast)
-    from integrations.spotify.matcher import SpotifyMatcher
+    # Import helper here (after arg parsing, so --help is fast)
+    from core.spotify_rematch import run_spotify_rematch_for_song
 
     logger.info("")
     logger.info("=" * 70)
@@ -189,29 +189,23 @@ def main():
         logger.info("-" * 50)
 
         try:
-            # Create a fresh matcher per song to reset stats and avoid stale state
-            matcher = SpotifyMatcher(
-                rematch_tracks=True,
-                logger=logger,
-            )
+            run = run_spotify_rematch_for_song(song_id, logger=logger)
 
-            result = matcher.match_releases(song_id)
-
-            if result.get('success'):
-                tracks_matched = result['stats'].get('tracks_matched', 0)
-                tracks_no_match = result['stats'].get('tracks_no_match', 0)
-                tracks_skipped = result['stats'].get('tracks_skipped', 0)
-                releases_with_spotify = result['stats'].get('releases_with_spotify', 0)
+            if run['matcher_success']:
+                tracks_matched = run['stats'].get('tracks_matched', 0)
+                tracks_no_match = run['stats'].get('tracks_no_match', 0)
+                tracks_skipped = run['stats'].get('tracks_skipped', 0)
+                releases_with_spotify = run['stats'].get('releases_with_spotify', 0)
 
                 logger.info(f"  Done: {tracks_matched} matched, {tracks_no_match} no match, "
-                            f"{tracks_skipped} skipped, {releases_with_spotify} releases updated")
+                            f"{tracks_skipped} skipped, {releases_with_spotify} releases updated "
+                            f"({len(run['changes'])} total changes)")
 
                 total_tracks_matched += tracks_matched
                 total_tracks_no_match += tracks_no_match
                 songs_matched += 1
             else:
-                error = result.get('error', 'Unknown error')
-                logger.warning(f"  Failed: {error}")
+                logger.warning(f"  Failed: {run.get('matcher_error', 'Unknown error')}")
                 songs_failed += 1
 
             # Mark as completed regardless of match outcome

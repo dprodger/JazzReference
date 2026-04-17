@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spotify Rematch Run - {{ run.song.title if run else 'Not Found' }}</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f7; color: #333; line-height: 1.6; padding: 20px;
+        }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .header { margin-bottom: 24px; }
+        .header h1 { color: #1d1d1f; margin-bottom: 4px; }
+        .header .subtitle { color: #666; font-size: 14px; }
+        .header .meta { color: #888; font-size: 13px; margin-top: 4px; font-family: 'SF Mono', Monaco, monospace; }
+        .nav-links { margin-top: 10px; }
+        .nav-links a { color: #0066cc; text-decoration: none; margin-right: 20px; }
+        .nav-links a:hover { text-decoration: underline; }
+
+        .card {
+            background: #fff; border-radius: 8px; padding: 20px 24px;
+            border: 1px solid #e0e0e0; margin-bottom: 20px;
+        }
+        .card h2 {
+            font-size: 1.05em; color: #1d1d1f; margin-bottom: 12px;
+            padding-bottom: 8px; border-bottom: 1px solid #eee;
+        }
+        .card h2 .count {
+            color: #888; font-weight: normal; font-size: 0.9em; margin-left: 8px;
+        }
+
+        .stats-grid {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 14px;
+        }
+        .metric .label {
+            font-size: 11px; color: #666; text-transform: uppercase;
+            letter-spacing: 0.03em; margin-bottom: 2px;
+        }
+        .metric .value { font-size: 1.4em; font-weight: 600; color: #1d1d1f; }
+
+        .error-card {
+            background: #fff1f0; border: 1px solid #ffa39e; color: #a8071a;
+            border-radius: 8px; padding: 12px 16px; margin-bottom: 20px;
+        }
+
+        table.changes {
+            width: 100%; border-collapse: collapse; font-size: 14px;
+        }
+        .changes th, .changes td {
+            padding: 10px 12px; text-align: left; border-bottom: 1px solid #eee;
+            vertical-align: top;
+        }
+        .changes th {
+            background: #fafafa; font-weight: 600; font-size: 11px;
+            text-transform: uppercase; color: #666;
+        }
+        .changes tr:last-child td { border-bottom: none; }
+
+        .mono { font-family: 'SF Mono', Monaco, monospace; font-size: 12px; color: #333; }
+        .muted { color: #999; }
+        .arrow { color: #888; margin: 0 6px; }
+
+        .action-badge {
+            display: inline-block; padding: 2px 8px; border-radius: 10px;
+            font-size: 11px; font-weight: 600; text-transform: uppercase;
+        }
+        .action-badge.added { background: #e6f7eb; color: #1DB954; }
+        .action-badge.removed { background: #fff1f0; color: #cf1322; }
+        .action-badge.updated, .action-badge.cleared, .action-badge.set {
+            background: #fffbe6; color: #d4a017;
+        }
+
+        .recording-title { font-weight: 600; color: #1d1d1f; }
+        .recording-leader { font-size: 13px; color: #666; }
+        .release-title { font-weight: 500; color: #1d1d1f; }
+        .release-year { color: #888; font-size: 12px; }
+
+        .empty-state {
+            padding: 20px; text-align: center; color: #888; font-style: italic;
+        }
+
+        /* Post-run buckets */
+        .bucket-release {
+            padding: 12px 0; border-bottom: 1px solid #eee;
+        }
+        .bucket-release:last-child { border-bottom: none; }
+        .bucket-release .head {
+            display: flex; justify-content: space-between; align-items: baseline;
+            gap: 10px; flex-wrap: wrap;
+        }
+        .bucket-release .head .title { font-weight: 600; color: #1d1d1f; }
+        .bucket-release .head .year { color: #888; font-size: 13px; }
+        .bucket-release .ids {
+            font-family: 'SF Mono', Monaco, monospace; font-size: 11px;
+            color: #666; margin-top: 4px;
+        }
+        .bucket-release .ids .field { margin-right: 16px; display: inline-block; }
+        .bucket-release .ids .label { color: #999; margin-right: 4px; }
+        .bucket-release .recordings {
+            margin-top: 8px; padding-left: 16px; border-left: 2px solid #eee;
+            font-size: 13px;
+        }
+        .bucket-release .recordings .heading {
+            font-size: 11px; color: #999; text-transform: uppercase;
+            letter-spacing: 0.04em; margin-bottom: 4px;
+        }
+        .bucket-release .recordings li {
+            list-style: none; padding: 3px 0; color: #555;
+        }
+        .bucket-release .recordings .leader { color: #888; }
+
+        /* External links on IDs */
+        a.ext {
+            color: #0066cc; text-decoration: none;
+            border-bottom: 1px dotted #99c2e6;
+        }
+        a.ext:hover { color: #004999; border-bottom-color: #0066cc; }
+        a.ext.mb { color: #ba478f; border-bottom-color: #e1c5d7; }
+        a.ext.mb:hover { color: #8c3269; border-bottom-color: #ba478f; }
+        a.ext.spotify { color: #1DB954; border-bottom-color: #b4e9c7; }
+        a.ext.spotify:hover { color: #148a3c; border-bottom-color: #1DB954; }
+
+        /* Matcher log */
+        details.log-details {
+            background: transparent;
+        }
+        details.log-details summary {
+            cursor: pointer; padding: 8px 0; font-weight: 600; color: #1d1d1f;
+            outline: none;
+        }
+        details.log-details summary .count {
+            color: #888; font-weight: normal; font-size: 0.9em; margin-left: 8px;
+        }
+        .log-filter {
+            width: 100%; padding: 8px 12px; border: 1px solid #ddd;
+            border-radius: 6px; font-size: 13px; margin: 10px 0;
+            font-family: inherit;
+        }
+        .log-filter:focus { outline: none; border-color: #1DB954; }
+        .log-body {
+            max-height: 420px; overflow-y: auto;
+            background: #1d1d1f; color: #e6e6e6;
+            font-family: 'SF Mono', Monaco, monospace; font-size: 12px;
+            padding: 12px 14px; border-radius: 6px; line-height: 1.5;
+        }
+        .log-body .log-line { white-space: pre-wrap; word-break: break-word; }
+        .log-body .log-line.WARNING { color: #ffd666; }
+        .log-body .log-line.ERROR { color: #ff7875; }
+    </style>
+</head>
+<body>
+    {% include 'admin/_nav.html' %}
+
+    {# ID-to-link helpers. Open in new tabs so the admin page stays put. #}
+    {% macro mb_release_link(mbid) -%}
+        {%- if mbid -%}
+            <a class="ext mb" target="_blank" rel="noopener"
+               href="https://musicbrainz.org/release/{{ mbid }}">{{ mbid }}</a>
+        {%- else -%}
+            <span class="muted">—</span>
+        {%- endif -%}
+    {%- endmacro %}
+
+    {% macro spotify_album_link(album_id) -%}
+        {%- if album_id -%}
+            <a class="ext spotify" target="_blank" rel="noopener"
+               href="https://open.spotify.com/album/{{ album_id }}">{{ album_id }}</a>
+        {%- else -%}
+            <span class="muted">—</span>
+        {%- endif -%}
+    {%- endmacro %}
+
+    {% macro spotify_track_link(track_id) -%}
+        {%- if track_id -%}
+            <a class="ext spotify" target="_blank" rel="noopener"
+               href="https://open.spotify.com/track/{{ track_id }}">{{ track_id }}</a>
+        {%- else -%}
+            <span class="muted">—</span>
+        {%- endif -%}
+    {%- endmacro %}
+
+    <div class="container">
+        {% if not run %}
+        <div class="card">
+            <h1>Run not found</h1>
+            <p>
+                <a href="/admin/spotify-rematch/{{ song_id }}">&larr; Back to song</a> or
+                <a href="/admin/spotify-rematch">song list</a>.
+            </p>
+        </div>
+        {% else %}
+        <div class="header">
+            <h1>{{ run.song.title }}</h1>
+            <div class="subtitle">
+                {% if run.song.composer %}{{ run.song.composer }} &middot; {% endif %}
+                Rematch run
+            </div>
+            <div class="meta">
+                Run at {{ run.ran_at }} &middot; run_id {{ run.run_id }}
+            </div>
+            <div class="nav-links">
+                <a href="/admin/spotify-rematch/{{ run.song.id }}">&larr; Song detail</a>
+                <a href="/admin/spotify-rematch">Song list</a>
+            </div>
+        </div>
+
+        {% if not run.matcher_success %}
+        <div class="error-card">
+            <strong>Matcher reported failure:</strong>
+            {{ run.matcher_error or 'Unknown error' }}
+        </div>
+        {% endif %}
+
+        <div class="card">
+            <h2>Matcher stats</h2>
+            <div class="stats-grid">
+                {% for key, value in run.stats.items() %}
+                <div class="metric">
+                    <div class="label">{{ key.replace('_', ' ') }}</div>
+                    <div class="value">{{ value }}</div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        {% set unresolved = run.get('unresolved_releases', []) %}
+        <div class="card">
+            <h2>
+                Unresolved releases
+                <span class="count">({{ unresolved|length }})</span>
+            </h2>
+            <p style="color: #666; font-size: 13px; margin-bottom: 12px;">
+                Releases that have a Spotify album ID but <strong>no</strong> Spotify
+                track link on any of their recording-releases for this song.
+                Roughly what the matcher counts as <code>releases_no_match</code>.
+            </p>
+            {% if unresolved %}
+            {% for entry in unresolved %}
+            <div class="bucket-release">
+                <div class="head">
+                    <span>
+                        <span class="title">Release: {{ entry.release.title or '(unknown release)' }}</span>
+                        {% if entry.release.year %}<span class="year">({{ entry.release.year }})</span>{% endif %}
+                    </span>
+                </div>
+                <div class="ids">
+                    <span class="field"><span class="label">MB release:</span>{{ mb_release_link(entry.release.musicbrainz_id) }}</span>
+                    <span class="field"><span class="label">Spotify album:</span>{{ spotify_album_link(entry.spotify_album_id) }}</span>
+                    <span class="field"><span class="label">Release UUID:</span>{{ entry.release.id }}</span>
+                </div>
+                {% if entry.recordings %}
+                <div class="recordings">
+                    <div class="heading">Recordings of this song on this release ({{ entry.recordings|length }})</div>
+                    <ul>
+                    {% for rec in entry.recordings %}
+                    <li>
+                        {{ rec.title or '(no title)' }}
+                        {% if rec.leader %}<span class="leader">&mdash; {{ rec.leader }}</span>{% endif %}
+                    </li>
+                    {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+            {% else %}
+            <div class="empty-state">No unresolved releases — all releases with a Spotify album ID also have at least one track link.</div>
+            {% endif %}
+        </div>
+
+        {% set unmatched_rr = run.get('unmatched_recording_releases', []) %}
+        <div class="card">
+            <h2>
+                Unmatched recording-releases
+                <span class="count">({{ unmatched_rr|length }})</span>
+            </h2>
+            <p style="color: #666; font-size: 13px; margin-bottom: 12px;">
+                Individual recording-releases whose release <em>does</em> have a
+                Spotify album ID but the recording-release has no Spotify track link.
+                Roughly what the matcher counts as <code>tracks_no_match</code>.
+            </p>
+            {% if unmatched_rr %}
+            <table class="changes">
+                <thead>
+                    <tr>
+                        <th>Recording</th>
+                        <th>Release</th>
+                        <th>MB Release ID</th>
+                        <th>Spotify Album ID</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for entry in unmatched_rr %}
+                    <tr>
+                        <td>
+                            <div class="recording-title">{{ entry.recording.title or '(no title)' }}</div>
+                            {% if entry.recording.leader %}
+                            <div class="recording-leader">{{ entry.recording.leader }}</div>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="release-title">{{ entry.release.title or '(unknown release)' }}</div>
+                            {% if entry.release.year %}
+                            <div class="release-year">{{ entry.release.year }}</div>
+                            {% endif %}
+                        </td>
+                        <td class="mono">{{ mb_release_link(entry.release.musicbrainz_id) }}</td>
+                        <td class="mono">{{ spotify_album_link(entry.spotify_album_id) }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="empty-state">No unmatched recording-releases.</div>
+            {% endif %}
+        </div>
+
+        {% set log_lines = run.get('log_lines', []) %}
+        {% if log_lines %}
+        <div class="card">
+            <details class="log-details" open>
+                <summary>Matcher log<span class="count">({{ log_lines|length }} lines)</span></summary>
+                <input type="text" class="log-filter" id="log-filter"
+                       placeholder="Filter lines (case-insensitive substring)…">
+                <div class="log-body" id="log-body">
+                    {% for line in log_lines %}
+                    <div class="log-line {{ line.level }}">{{ line.message }}</div>
+                    {% endfor %}
+                </div>
+            </details>
+        </div>
+        <script>
+            (function () {
+                const input = document.getElementById('log-filter');
+                const body = document.getElementById('log-body');
+                if (!input || !body) return;
+                input.addEventListener('input', () => {
+                    const needle = input.value.trim().toLowerCase();
+                    body.querySelectorAll('.log-line').forEach((el) => {
+                        if (!needle || el.textContent.toLowerCase().includes(needle)) {
+                            el.style.display = '';
+                        } else {
+                            el.style.display = 'none';
+                        }
+                    });
+                });
+            })();
+        </script>
+        {% endif %}
+
+        {% set action_groups = [
+            ('track_added',       'Track links added',      'added'),
+            ('track_updated',     'Track links updated',    'updated'),
+            ('track_removed',     'Track links removed',    'removed'),
+            ('album_set',         'Album IDs set',          'set'),
+            ('album_updated',     'Album IDs updated',      'updated'),
+            ('album_cleared',     'Album IDs cleared',      'cleared'),
+            ('release_link_added',   'Release streaming link added',   'added'),
+            ('release_link_updated', 'Release streaming link updated', 'updated'),
+            ('release_link_removed', 'Release streaming link removed', 'removed'),
+            ('imagery_added',     'Spotify imagery added',   'added'),
+            ('imagery_updated',   'Spotify imagery updated', 'updated'),
+            ('imagery_removed',   'Spotify imagery removed', 'removed'),
+        ] %}
+
+        {% set any_changes = false %}
+        {% for action, _, _ in action_groups %}{% if grouped_changes.get(action) %}{% set any_changes = true %}{% endif %}{% endfor %}
+
+        {% if not any_changes %}
+        <div class="card">
+            <h2>Changes</h2>
+            <div class="empty-state">No changes — nothing was added, updated, or removed by this run.</div>
+        </div>
+        {% else %}
+        {% for action, heading, badge_class in action_groups %}
+            {% set items = grouped_changes.get(action, []) %}
+            {% if items %}
+            <div class="card">
+                <h2>
+                    <span class="action-badge {{ badge_class }}">{{ action.replace('_', ' ') }}</span>
+                    {{ heading }}
+                    <span class="count">({{ items|length }})</span>
+                </h2>
+                <table class="changes">
+                    <thead>
+                        <tr>
+                            {% if action.startswith('track_') %}
+                            <th>Recording</th>
+                            <th>Release</th>
+                            <th>MB Release ID</th>
+                            <th>Spotify Track ID</th>
+                            {% else %}
+                            <th>Release</th>
+                            <th>MB Release ID</th>
+                            <th>Spotify Album ID</th>
+                            {% endif %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for c in items %}
+                        <tr>
+                            {% if action.startswith('track_') %}
+                            <td>
+                                <div class="recording-title">{{ c.recording.title or '(no title)' }}</div>
+                                {% if c.recording.leader %}
+                                <div class="recording-leader">{{ c.recording.leader }}</div>
+                                {% endif %}
+                                {% if c.recording.id %}
+                                <div class="mono muted">{{ c.recording.id }}</div>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="release-title">{{ c.release.title or '(unknown release)' }}</div>
+                                {% if c.release.year %}
+                                <div class="release-year">{{ c.release.year }}</div>
+                                {% endif %}
+                            </td>
+                            <td class="mono">{{ mb_release_link(c.release.musicbrainz_id) }}</td>
+                            <td class="mono">
+                                {{ spotify_track_link(c.spotify_track_id.before) }}
+                                <span class="arrow">→</span>
+                                {{ spotify_track_link(c.spotify_track_id.after) }}
+                            </td>
+                            {% else %}
+                            <td>
+                                <div class="release-title">{{ c.release.title or '(unknown release)' }}</div>
+                                {% if c.release.year %}
+                                <div class="release-year">{{ c.release.year }}</div>
+                                {% endif %}
+                            </td>
+                            <td class="mono">{{ mb_release_link(c.release.musicbrainz_id) }}</td>
+                            <td class="mono">
+                                {{ spotify_album_link(c.spotify_album_id.before) }}
+                                <span class="arrow">→</span>
+                                {{ spotify_album_link(c.spotify_album_id.after) }}
+                            </td>
+                            {% endif %}
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% endif %}
+        {% endfor %}
+        {% endif %}
+        {% endif %}
+    </div>
+</body>
+</html>

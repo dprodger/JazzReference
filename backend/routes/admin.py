@@ -22,6 +22,13 @@ from integrations.musicbrainz.release_importer import MBReleaseImporter
 from integrations.musicbrainz.performer_importer import PerformerImporter
 from integrations.musicbrainz.utils import MusicBrainzSearcher
 from integrations.spotify.db import is_track_manual_override
+from core.spotify_rematch import (
+    run_spotify_rematch_for_song,
+    save_run,
+    list_runs_for_song,
+    list_all_runs,
+    load_run,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -2939,4 +2946,192 @@ def users_list():
         per_page=per_page,
         total=total,
         total_pages=total_pages,
+    )
+
+
+# ============================================================================
+# Spotify Rematch Diagnostics
+#
+# Admin tool that runs the Spotify track matcher (rematch_tracks=True) for a
+# single song and shows a before/after diff of Spotify state. The shared
+# logic lives in core.spotify_rematch; the backfill script uses it too.
+# ============================================================================
+
+@admin_bp.route('/spotify-rematch')
+def spotify_rematch_list():
+    """
+    Landing page: song picker + recent runs across all songs.
+
+    Matches the admin "stuck release" query from
+    scripts/backfill_spotify_track_links.py so the admin can see which songs
+    have releases with an album-level Spotify mapping but missing track-level
+    links.
+    """
+    search = (request.args.get('q') or '').strip()
+
+    with get_db_connection() as db:
+        with db.cursor() as cur:
+            if search:
+                cur.execute("""
+                    SELECT
+                        s.id,
+                        s.title,
+                        s.composer,
+                        COUNT(DISTINCT r.id) FILTER (
+                            WHERE r.spotify_album_id IS NOT NULL
+                              AND NOT EXISTS (
+                                  SELECT 1 FROM recording_release_streaming_links rrsl
+                                  WHERE rrsl.recording_release_id = rr.id
+                                    AND rrsl.service = 'spotify'
+                              )
+                        ) AS stuck_releases
+                    FROM songs s
+                    JOIN recordings rec ON rec.song_id = s.id
+                    JOIN recording_releases rr ON rr.recording_id = rec.id
+                    JOIN releases r ON r.id = rr.release_id
+                    WHERE LOWER(s.title) LIKE LOWER(%s)
+                    GROUP BY s.id, s.title, s.composer
+                    ORDER BY s.title
+                    LIMIT 100
+                """, (f'%{search}%',))
+            else:
+                # Default view: songs with the most stuck releases, as defined
+                # in backfill_spotify_track_links.py
+                cur.execute("""
+                    SELECT s.id, s.title, s.composer,
+                           COUNT(DISTINCT r.id) AS stuck_releases
+                    FROM songs s
+                    JOIN recordings rec ON rec.song_id = s.id
+                    JOIN recording_releases rr ON rr.recording_id = rec.id
+                    JOIN releases r ON r.id = rr.release_id
+                    WHERE r.spotify_album_id IS NOT NULL
+                      AND NOT EXISTS (
+                          SELECT 1 FROM recording_release_streaming_links rrsl
+                          WHERE rrsl.recording_release_id = rr.id
+                            AND rrsl.service = 'spotify'
+                      )
+                    GROUP BY s.id, s.title, s.composer
+                    ORDER BY COUNT(DISTINCT r.id) DESC, s.title
+                    LIMIT 100
+                """)
+            songs = [dict(row) for row in cur.fetchall()]
+
+    recent_runs = list_all_runs(limit=25)
+
+    return render_template(
+        'admin/spotify_rematch_list.html',
+        songs=songs,
+        search=search,
+        recent_runs=recent_runs,
+    )
+
+
+@admin_bp.route('/spotify-rematch/<song_id>')
+def spotify_rematch_detail(song_id):
+    """Song-specific page: current Spotify state summary + run history + run button."""
+    with get_db_connection() as db:
+        with db.cursor() as cur:
+            cur.execute("""
+                SELECT id, title, composer
+                FROM songs
+                WHERE id = %s
+            """, (song_id,))
+            song = cur.fetchone()
+            if not song:
+                return render_template(
+                    'admin/spotify_rematch_detail.html',
+                    song=None,
+                    summary=None,
+                    runs=[],
+                ), 404
+
+            # Current state summary — no snapshot, just aggregate counts.
+            cur.execute("""
+                SELECT
+                    COUNT(DISTINCT r.id) AS total_releases,
+                    COUNT(DISTINCT r.id) FILTER (
+                        WHERE r.spotify_album_id IS NOT NULL
+                    ) AS releases_with_album_id,
+                    COUNT(DISTINCT r.id) FILTER (
+                        WHERE r.spotify_album_id IS NOT NULL
+                          AND NOT EXISTS (
+                              SELECT 1 FROM recording_release_streaming_links rrsl
+                              WHERE rrsl.recording_release_id = rr.id
+                                AND rrsl.service = 'spotify'
+                          )
+                    ) AS stuck_releases,
+                    COUNT(DISTINCT rr.id) AS total_recording_releases,
+                    COUNT(DISTINCT rr.id) FILTER (
+                        WHERE EXISTS (
+                            SELECT 1 FROM recording_release_streaming_links rrsl
+                            WHERE rrsl.recording_release_id = rr.id
+                              AND rrsl.service = 'spotify'
+                        )
+                    ) AS recording_releases_with_spotify_track
+                FROM recordings rec
+                JOIN recording_releases rr ON rr.recording_id = rec.id
+                JOIN releases r ON r.id = rr.release_id
+                WHERE rec.song_id = %s
+            """, (song_id,))
+            summary = dict(cur.fetchone() or {})
+
+    runs = list_runs_for_song(song_id)
+
+    return render_template(
+        'admin/spotify_rematch_detail.html',
+        song=dict(song),
+        summary=summary,
+        runs=runs,
+    )
+
+
+@admin_bp.route('/spotify-rematch/<song_id>/run', methods=['POST'])
+def spotify_rematch_run(song_id):
+    """
+    Run the Spotify matcher for one song. Blocking — may take minutes for
+    songs with many releases. Persists a run record and returns a JSON
+    payload with the URL to view it.
+    """
+    try:
+        run_record = run_spotify_rematch_for_song(song_id, logger=logger)
+        save_run(run_record)
+        return jsonify({
+            'success': True,
+            'run_id': run_record['run_id'],
+            'run_url': url_for(
+                'admin.spotify_rematch_run_detail',
+                song_id=song_id,
+                run_id=run_record['run_id'],
+            ),
+            'stats': run_record['stats'],
+            'change_count': len(run_record['changes']),
+        })
+    except ValueError as e:
+        return jsonify({'success': False, 'error': str(e)}), 404
+    except Exception as e:
+        logger.error(f"Spotify rematch failed for song {song_id}: {e}", exc_info=True)
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@admin_bp.route('/spotify-rematch/<song_id>/run/<run_id>')
+def spotify_rematch_run_detail(song_id, run_id):
+    """Render a persisted run as a report."""
+    run = load_run(run_id)
+    if not run or run.get('song', {}).get('id') != song_id:
+        return render_template(
+            'admin/spotify_rematch_run.html',
+            run=None,
+            song_id=song_id,
+        ), 404
+
+    # Group changes by action for display
+    grouped = {}
+    for change in run.get('changes', []):
+        grouped.setdefault(change['action'], []).append(change)
+
+    return render_template(
+        'admin/spotify_rematch_run.html',
+        run=run,
+        grouped_changes=grouped,
+        song_id=song_id,
     )
