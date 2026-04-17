@@ -16,6 +16,7 @@ extension Notification.Name {
 struct SongCreationView: View {
     @Environment(\.dismiss) var dismiss
     @EnvironmentObject var authManager: AuthenticationManager
+    @EnvironmentObject var repertoireManager: RepertoireManager
 
     // Form fields - pre-populated with imported data
     @State private var title: String
@@ -23,10 +24,13 @@ struct SongCreationView: View {
     @State private var musicbrainzId: String
     @State private var workType: String
     @State private var key: String
-    
+
     @State private var isSaving = false
     @State private var showingError = false
     @State private var errorMessage = ""
+
+    @State private var createdSongId: String?
+    @State private var showAddToRepertoirePrompt = false
     
     // Initialize with imported data (or empty if creating manually)
     init(importedData: ImportedSongData? = nil) {
@@ -101,6 +105,20 @@ struct SongCreationView: View {
             } message: {
                 Text(errorMessage)
             }
+            .alert(
+                "Add to \"\(repertoireManager.selectedRepertoire.name)\"?",
+                isPresented: $showAddToRepertoirePrompt
+            ) {
+                Button("Add") {
+                    addNewSongToSelectedRepertoire()
+                }
+                Button("Just View It", role: .cancel) {
+                    repertoireManager.selectRepertoire(.allSongs)
+                    dismiss()
+                }
+            } message: {
+                Text("You're viewing the \"\(repertoireManager.selectedRepertoire.name)\" repertoire. Add \"\(title)\" to it? Choosing \"Just View It\" switches to All Songs so you can find the new song.")
+            }
         }
     }
     
@@ -111,20 +129,34 @@ struct SongCreationView: View {
             showingError = true
             return
         }
-        
+
         isSaving = true
-        
+
         // Save song to API
         Task {
             do {
-                try await saveSongToAPI()
-                
+                let newSongId = try await saveSongToAPI()
+
+                // Fire-and-forget: queue the new song for backend research so it
+                // starts enriching with MusicBrainz / Spotify / Apple Music data
+                // while the user is still deciding where to put it.
+                Task {
+                    _ = await ResearchService().refreshSongData(songId: newSongId)
+                }
+
                 await MainActor.run {
                     isSaving = false
                     Log.ui.info("Song saved successfully")
-                    // Notify SongsListView to refresh
                     NotificationCenter.default.post(name: .songCreated, object: nil)
-                    dismiss()
+
+                    // If the user is viewing a specific repertoire, prompt to add.
+                    // Otherwise just dismiss — they'll see the new song in All Songs.
+                    if repertoireManager.selectedRepertoire.id != "all" {
+                        createdSongId = newSongId
+                        showAddToRepertoirePrompt = true
+                    } else {
+                        dismiss()
+                    }
                 }
             } catch {
                 await MainActor.run {
@@ -135,10 +167,22 @@ struct SongCreationView: View {
             }
         }
     }
+
+    private func addNewSongToSelectedRepertoire() {
+        guard let songId = createdSongId else {
+            dismiss()
+            return
+        }
+        let repertoireId = repertoireManager.selectedRepertoire.id
+        Task {
+            _ = await repertoireManager.addSongToRepertoire(songId: songId, repertoireId: repertoireId)
+            await MainActor.run { dismiss() }
+        }
+    }
     
     // MARK: - API Integration
     
-    private func saveSongToAPI() async throws {
+    private func saveSongToAPI() async throws -> String {
         let url = URL.api(path: "/songs")
 
         var songData: [String: Any] = [
@@ -159,13 +203,24 @@ struct SongCreationView: View {
 
         Log.ui.debug("Sending song creation request: url=\(url, privacy: .private), title=\(title, privacy: .public), composer=\(composer, privacy: .public), musicbrainzId=\(musicbrainzId, privacy: .private)")
 
-        _ = try await authManager.makeAuthenticatedRequest(
+        let data = try await authManager.makeAuthenticatedRequest(
             url: url,
             method: "POST",
             body: body
         )
 
-        Log.ui.info("Song created successfully")
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let song = json["song"] as? [String: Any],
+              let songId = song["id"] as? String else {
+            throw NSError(
+                domain: "API",
+                code: -1,
+                userInfo: [NSLocalizedDescriptionKey: "Missing song ID in response"]
+            )
+        }
+
+        Log.ui.info("Song created successfully (id: \(songId, privacy: .private))")
+        return songId
     }
 }
 

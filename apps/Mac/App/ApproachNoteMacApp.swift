@@ -104,6 +104,7 @@ struct ApproachNoteMacApp: App {
                 .sheet(item: $importedSongData) { data in
                     MacSongCreationView(importedData: data)
                         .environmentObject(authManager)
+                        .environmentObject(repertoireManager)
                         .frame(minWidth: 400, minHeight: 400)
                 }
                 .sheet(item: $importedYouTubeData) { data in

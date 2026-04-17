@@ -11,6 +11,7 @@ import os
 struct MacSongCreationView: View {
     @Environment(\.dismiss) var dismiss
     @EnvironmentObject var authManager: AuthenticationManager
+    @EnvironmentObject var repertoireManager: RepertoireManager
 
     // Form fields - pre-populated with imported data
     @State private var title: String
@@ -22,6 +23,9 @@ struct MacSongCreationView: View {
     @State private var isSaving = false
     @State private var showingError = false
     @State private var errorMessage = ""
+
+    @State private var createdSongId: String?
+    @State private var showAddToRepertoirePrompt = false
 
     // Initialize with imported data
     init(importedData: ImportedSongData? = nil) {
@@ -104,6 +108,20 @@ struct MacSongCreationView: View {
         } message: {
             Text(errorMessage)
         }
+        .alert(
+            "Add to \"\(repertoireManager.selectedRepertoire.name)\"?",
+            isPresented: $showAddToRepertoirePrompt
+        ) {
+            Button("Add") {
+                addNewSongToSelectedRepertoire()
+            }
+            Button("Just View It", role: .cancel) {
+                repertoireManager.selectRepertoire(.allSongs)
+                dismiss()
+            }
+        } message: {
+            Text("You're viewing the \"\(repertoireManager.selectedRepertoire.name)\" repertoire. Add \"\(title)\" to it? Choosing \"Just View It\" switches to All Songs so you can find the new song.")
+        }
     }
 
     private func saveSong() {
@@ -117,13 +135,26 @@ struct MacSongCreationView: View {
 
         Task {
             do {
-                try await saveSongToAPI()
+                let newSongId = try await saveSongToAPI()
+
+                // Fire-and-forget: queue the new song for backend research so it
+                // starts enriching with MusicBrainz / Spotify / Apple Music data
+                // while the user is still deciding where to put it.
+                Task {
+                    _ = await ResearchService().refreshSongData(songId: newSongId)
+                }
 
                 await MainActor.run {
                     isSaving = false
                     Log.ui.info("Song saved successfully")
                     NotificationCenter.default.post(name: .songCreated, object: nil)
-                    dismiss()
+
+                    if repertoireManager.selectedRepertoire.id != "all" {
+                        createdSongId = newSongId
+                        showAddToRepertoirePrompt = true
+                    } else {
+                        dismiss()
+                    }
                 }
             } catch {
                 await MainActor.run {
@@ -135,7 +166,19 @@ struct MacSongCreationView: View {
         }
     }
 
-    private func saveSongToAPI() async throws {
+    private func addNewSongToSelectedRepertoire() {
+        guard let songId = createdSongId else {
+            dismiss()
+            return
+        }
+        let repertoireId = repertoireManager.selectedRepertoire.id
+        Task {
+            _ = await repertoireManager.addSongToRepertoire(songId: songId, repertoireId: repertoireId)
+            await MainActor.run { dismiss() }
+        }
+    }
+
+    private func saveSongToAPI() async throws -> String {
         let url = URL.api(path: "/songs")
 
         var songData: [String: Any] = [
@@ -156,13 +199,24 @@ struct MacSongCreationView: View {
 
         Log.ui.debug("Sending song creation request: url=\(url, privacy: .private), title=\(title, privacy: .public)")
 
-        _ = try await authManager.makeAuthenticatedRequest(
+        let data = try await authManager.makeAuthenticatedRequest(
             url: url,
             method: "POST",
             body: body
         )
 
-        Log.ui.info("Song created successfully")
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let song = json["song"] as? [String: Any],
+              let songId = song["id"] as? String else {
+            throw NSError(
+                domain: "API",
+                code: -1,
+                userInfo: [NSLocalizedDescriptionKey: "Missing song ID in response"]
+            )
+        }
+
+        Log.ui.info("Song created successfully (id: \(songId, privacy: .private))")
+        return songId
     }
 }
 
