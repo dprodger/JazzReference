@@ -462,48 +462,30 @@ class ShareViewController: UIViewController {
 
         NSLog("📡 Fetching: %{public}@", oembedURLString)
 
-        let task = URLSession.shared.dataTask(with: oembedURL) { [weak self] data, response, error in
+        Task { [weak self] in
             guard let self = self else { return }
-
-            if let error = error {
-                NSLog("❌ oEmbed fetch error: %{public}@", error.localizedDescription)
-                DispatchQueue.main.async {
-                    self.createYouTubeData(videoId: videoId, title: "YouTube Video", url: url, channelName: nil)
-                }
-                return
-            }
-
-            guard let data = data else {
-                NSLog("❌ No data from oEmbed")
-                DispatchQueue.main.async {
-                    self.createYouTubeData(videoId: videoId, title: "YouTube Video", url: url, channelName: nil)
-                }
-                return
-            }
-
-            do {
-                if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] {
-                    let title = json["title"] as? String ?? "YouTube Video"
-                    let authorName = json["author_name"] as? String
-                    NSLog("✅ oEmbed response - title: %{public}@, author: %{public}@", title, authorName ?? "(none)")
-
-                    DispatchQueue.main.async {
-                        self.createYouTubeData(videoId: videoId, title: title, url: url, channelName: authorName)
-                    }
-                } else {
-                    NSLog("❌ Failed to parse oEmbed JSON")
-                    DispatchQueue.main.async {
-                        self.createYouTubeData(videoId: videoId, title: "YouTube Video", url: url, channelName: nil)
-                    }
-                }
-            } catch {
-                NSLog("❌ JSON parse error: %{public}@", error.localizedDescription)
-                DispatchQueue.main.async {
-                    self.createYouTubeData(videoId: videoId, title: "YouTube Video", url: url, channelName: nil)
-                }
+            let (title, authorName) = await Self.fetchOEmbedMetadata(from: oembedURL)
+            await MainActor.run {
+                self.createYouTubeData(videoId: videoId, title: title, url: url, channelName: authorName)
             }
         }
-        task.resume()
+    }
+
+    private static func fetchOEmbedMetadata(from oembedURL: URL) async -> (title: String, author: String?) {
+        do {
+            let (data, _) = try await URLSession.shared.data(from: oembedURL)
+            guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                NSLog("❌ Failed to parse oEmbed JSON")
+                return ("YouTube Video", nil)
+            }
+            let title = json["title"] as? String ?? "YouTube Video"
+            let author = json["author_name"] as? String
+            NSLog("✅ oEmbed response - title: %{public}@, author: %{public}@", title, author ?? "(none)")
+            return (title, author)
+        } catch {
+            NSLog("❌ oEmbed fetch error: %{public}@", error.localizedDescription)
+            return ("YouTube Video", nil)
+        }
     }
 
     private func createYouTubeData(videoId: String, title: String, url: URL, channelName: String?) {
@@ -627,7 +609,7 @@ class ShareViewController: UIViewController {
         
         Task {
             do {
-                let result = try await ArtistDatabaseService.shared.checkArtistExists(
+                let result = try await ShareDatabaseService.shared.checkArtistExists(
                     name: artistData.name,
                     musicbrainzId: artistData.musicbrainzId
                 )
@@ -742,7 +724,7 @@ class ShareViewController: UIViewController {
         Task {
             do {
                 NSLog("🔍 Checking if song exists in database...")
-                let result = try await SongDatabaseService.shared.checkSongExists(
+                let result = try await ShareDatabaseService.shared.checkSongExists(
                     title: songData.title,
                     musicbrainzId: songData.musicbrainzId
                 )
