@@ -25,6 +25,45 @@ struct LoadingView: View {
 }
 
 
+struct LoginRequiredView: View {
+    let onDismiss: () -> Void
+
+    var body: some View {
+        VStack(spacing: 20) {
+            Image(systemName: "person.crop.circle.badge.exclamationmark")
+                .font(.system(size: 60))
+                .foregroundColor(.orange)
+
+            Text("Login Required")
+                .font(.title2)
+                .bold()
+
+            Text("Please open Approach Note and log in to import songs or artists.")
+                .font(.body)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal)
+
+            Spacer()
+
+            Button(action: onDismiss) {
+                Text("Close")
+                    .font(.headline)
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(Color.blue)
+                    .cornerRadius(12)
+            }
+            .padding(.horizontal)
+            .padding(.bottom, 20)
+        }
+        .padding(.top, 60)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color.white)
+    }
+}
+
 struct ErrorView: View {
     let message: String
     let onDismiss: () -> Void

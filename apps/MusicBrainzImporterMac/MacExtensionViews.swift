@@ -59,6 +59,41 @@ struct MacErrorView: View {
     }
 }
 
+struct MacLoginRequiredView: View {
+    let onDismiss: () -> Void
+
+    var body: some View {
+        VStack(spacing: 20) {
+            Image(systemName: "person.crop.circle.badge.exclamationmark")
+                .font(.system(size: 50))
+                .foregroundColor(.orange)
+
+            Text("Login Required")
+                .font(.title2)
+                .bold()
+
+            Text("Please open Approach Note and log in to import songs or artists.")
+                .font(.body)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal)
+
+            Spacer()
+
+            Button(action: onDismiss) {
+                Text("Close")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.large)
+            .padding(.horizontal)
+            .padding(.bottom, 20)
+        }
+        .padding(.top, 40)
+        .frame(width: 400, height: 350)
+    }
+}
+
 struct MacSuccessView: View {
     var body: some View {
         VStack(spacing: 20) {

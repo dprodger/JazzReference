@@ -24,8 +24,19 @@ import UIKit
 class AuthenticationManager: ObservableObject {
     // MARK: - Published Properties
     
-    @Published var isAuthenticated = false
-    @Published var currentUser: User?
+    @Published var isAuthenticated = false {
+        didSet {
+            SharedAuthState.isAuthenticated = isAuthenticated
+            if !isAuthenticated {
+                SharedAuthState.userDisplayName = nil
+            }
+        }
+    }
+    @Published var currentUser: User? {
+        didSet {
+            SharedAuthState.userDisplayName = currentUser?.displayName
+        }
+    }
     @Published var isLoading = false
     @Published var errorMessage: String?
     

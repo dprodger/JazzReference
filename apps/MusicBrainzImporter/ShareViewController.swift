@@ -31,9 +31,30 @@ class ShareViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .systemBackground
-        
+
+        // Bail out early if the user isn't signed in to the main app — avoids
+        // dragging them through the whole import flow only to 401 at the end.
+        guard isUserAuthenticated() else {
+            NSLog("🔒 User not authenticated — showing login-required view")
+            showLoginRequired()
+            return
+        }
+
         // First, detect if this is an artist or song page
         detectPageType()
+    }
+
+    private func isUserAuthenticated() -> Bool {
+        UserDefaults(suiteName: appGroupIdentifier)?.bool(forKey: "isAuthenticated") ?? false
+    }
+
+    private func showLoginRequired() {
+        let loginView = LoginRequiredView(
+            onDismiss: { [weak self] in
+                self?.cancelImport()
+            }
+        )
+        replaceCurrentView(with: loginView)
     }
 
     // MARK: - Data Extraction
