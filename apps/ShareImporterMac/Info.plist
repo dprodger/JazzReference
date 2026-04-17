@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
 	<key>CFBundleDisplayName</key>
-	<string>Import to Approach Note</string>
+	<string>ApproachNote</string>
 	<key>CFBundleIconFile</key>
 	<string>icon</string>
 	<key>LSApplicationQueriesSchemes</key>

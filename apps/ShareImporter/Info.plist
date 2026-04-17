@@ -5,7 +5,7 @@
 	<key>CFBundleExecutable</key>
 	<string></string>
 	<key>CFBundleDisplayName</key>
-	<string>Import to Approach Note</string>
+	<string>ApproachNote</string>
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
 		<string>approachnote</string>

@@ -23,7 +23,7 @@ Open `apps/Approach Note.xcodeproj` in Xcode.
    - **Product Name**: `JazzReferenceMac`
    - **Team**: Your development team (FX893D85BJ)
    - **Organization Identifier**: `me.rodger.david`
-   - **Bundle Identifier**: `me.rodger.david.JazzReferenceMac`
+   - **Bundle Identifier**: `com.approachnote.mac`
    - **Interface**: SwiftUI
    - **Language**: Swift
    - **Storage**: None

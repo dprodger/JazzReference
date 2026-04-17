@@ -14,7 +14,7 @@
 	<true/>
 	<key>keychain-access-groups</key>
 	<array>
-		<string>$(AppIdentifierPrefix)me.rodger.david.JazzReferenceMac</string>
+		<string>$(AppIdentifierPrefix)com.approachnote.mac</string>
 	</array>
 </dict>
 </plist>

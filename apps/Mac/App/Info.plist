@@ -38,7 +38,7 @@
 			<key>CFBundleTypeRole</key>
 			<string>Editor</string>
 			<key>CFBundleURLName</key>
-			<string>me.rodger.david.JazzReferenceMac</string>
+			<string>com.approachnote.mac</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>approachnote</string>

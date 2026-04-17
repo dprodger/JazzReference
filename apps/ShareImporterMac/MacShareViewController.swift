@@ -1049,7 +1049,7 @@ class MacShareViewController: NSViewController {
 
         // Check if the app is already running
         let runningApps = NSWorkspace.shared.runningApplications.filter {
-            $0.bundleIdentifier == "me.rodger.david.Jazz-Liner-Notes"
+            $0.bundleIdentifier == "com.approachnote.mac"
         }
 
         if let runningApp = runningApps.first {

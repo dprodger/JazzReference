@@ -31,7 +31,7 @@
             <key>CFBundleTypeRole</key>
             <string>Editor</string>
             <key>CFBundleURLName</key>
-            <string>me.rodger.david.JazzReference</string>
+            <string>com.approachnote.ios</string>
             <key>CFBundleURLSchemes</key>
             <array>
                 <string>approachnote</string>
