@@ -658,7 +658,9 @@ def apple_login():
 
                 if user:
                     user_id = user['id']
-                    if not user.get('apple_id'):
+                    stored_apple_id = user.get('apple_id')
+
+                    if not stored_apple_id:
                         # Linking an existing email/password or Google account.
                         logger.info(f"🔗 Linking Apple account to existing user: {user.get('email')}")
                         cur.execute(
@@ -671,6 +673,31 @@ def apple_login():
                             WHERE id = %s
                             """,
                             (apple_id, email_verified, user_id),
+                        )
+                    elif stored_apple_id != apple_id:
+                        # Same human, new `sub`. This happens when the app's
+                        # bundle ID changes and Apple issues a fresh subject
+                        # claim for the same user (#145). We only reach this
+                        # branch via the email-match arm of the lookup query,
+                        # so the user's identity by email is intact — re-link
+                        # the row to the new sub so future re-auths (which
+                        # send only `sub`, no email) still find this user
+                        # instead of spawning a duplicate account.
+                        logger.warning(
+                            "🔄 Apple sub changed for user %s "
+                            "(stored=%s, token=%s, email_verified=%s). "
+                            "Re-linking via email match.",
+                            user_id, stored_apple_id, apple_id, email_verified,
+                        )
+                        cur.execute(
+                            """
+                            UPDATE users
+                            SET apple_id = %s,
+                                last_login_at = NOW(),
+                                updated_at = CURRENT_TIMESTAMP
+                            WHERE id = %s
+                            """,
+                            (apple_id, user_id),
                         )
                     else:
                         cur.execute(
