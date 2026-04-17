@@ -140,10 +140,23 @@ There's also a legacy `me.rodger.david.JazzReference` baked into [apps/iOS/App/I
 |---|---|
 | iOS main | `com.approachnote.ios` |
 | Mac main | `com.approachnote.mac` |
-| iOS share | `com.approachnote.ios.MusicBrainzImporter` |
-| Mac share | `com.approachnote.mac.MusicBrainzImporter` |
+| iOS share | `com.approachnote.ios.ShareImporter` |
+| Mac share | `com.approachnote.mac.ShareImporter` |
 | iOS tests | `com.approachnote.ios.Tests` |
 | iOS UI tests | `com.approachnote.ios.UITests` |
+
+### Share-extension target + folder renames
+
+Rename the share extensions alongside the bundle-ID change. They handle more than MusicBrainz imports (general-purpose share-sheet entry point into the app), so the current name is misleading.
+
+| Current | New |
+|---|---|
+| `apps/MusicBrainzImporter/` | `apps/ShareImporter/` |
+| `apps/MusicBrainzImporterMac/` | `apps/ShareImporterMac/` |
+| Xcode target `MusicBrainzImporter` | `ShareImporter` |
+| Xcode target `MusicBrainzImporterMac` | `ShareImporterMac` |
+
+Filesystem moves via `git mv` to preserve history. pbxproj needs updates for `PRODUCT_NAME` / target-name entries, `path = MusicBrainzImporter*` group and file-reference entries, build-phase file references under the renamed groups, and the embed-app-extensions copy-files phase references from the main iOS/Mac targets. Grep for remaining literal references to `MusicBrainzImporter` / `MusicBrainzImporterMac` (Logger fallback strings, CLAUDE.md repo map, etc.) and update.
 
 ### Apple Developer portal actions required
 
