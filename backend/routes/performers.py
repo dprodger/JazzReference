@@ -1,8 +1,9 @@
 # routes/performers.py
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, g
 import logging
 import db_utils as db_tools
 from utils.helpers import safe_strip
+from middleware.auth_middleware import require_auth
 
 logger = logging.getLogger(__name__)
 performers_bp = Blueprint('performers', __name__)
@@ -88,18 +89,19 @@ def get_performers():
         return jsonify({'error': 'Failed to fetch performers', 'detail': str(e)}), 500
 
 @performers_bp.route('/performers', methods=['POST'])
+@require_auth
 def create_performer():
-    """Create a new performer from iOS app (typically from MusicBrainz import)"""
+    """Create a new performer (requires authentication; typically from MusicBrainz import)"""
     try:
         data = request.get_json()
-        
+
         # Validate required fields
         name = data.get('name')
         if not name or not name.strip():
             return jsonify({'error': 'Performer name is required'}), 400
-        
+
         name = name.strip()
-        
+
         # Optional fields - safely handle None values
         musicbrainz_id = safe_strip(data.get('musicbrainz_id'))
         biography = safe_strip(data.get('biography'))
@@ -107,6 +109,8 @@ def create_performer():
         death_date = safe_strip(data.get('death_date'))
         wikipedia_url = safe_strip(data.get('wikipedia_url'))
         instruments = data.get('instruments', [])
+
+        created_by = str(g.current_user['id'])
         
         # Start transaction
         with db_tools.get_db_connection() as conn:
@@ -140,12 +144,12 @@ def create_performer():
                 
                 # Insert the new performer
                 cur.execute("""
-                    INSERT INTO performers 
-                    (name, biography, birth_date, death_date, wikipedia_url, musicbrainz_id)
-                    VALUES (%s, %s, %s, %s, %s, %s)
-                    RETURNING id, name, biography, birth_date, death_date, 
+                    INSERT INTO performers
+                    (name, biography, birth_date, death_date, wikipedia_url, musicbrainz_id, created_by)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    RETURNING id, name, biography, birth_date, death_date,
                               wikipedia_url, musicbrainz_id
-                """, (name, biography, birth_date, death_date, wikipedia_url, musicbrainz_id))
+                """, (name, biography, birth_date, death_date, wikipedia_url, musicbrainz_id, created_by))
                 
                 new_performer = cur.fetchone()
                 performer_id = new_performer['id']

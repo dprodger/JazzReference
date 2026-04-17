@@ -16,7 +16,8 @@ extension Notification.Name {
 
 struct ArtistCreationView: View {
     @Environment(\.dismiss) var dismiss
-    
+    @EnvironmentObject var authManager: AuthenticationManager
+
     // Form fields - pre-populated with imported data (minimal set only)
     @State private var name: String
     @State private var musicbrainzId: String
@@ -130,84 +131,22 @@ struct ArtistCreationView: View {
     private func saveArtistToAPI() async throws {
         let url = URL.api(path: "/performers")
 
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        
-        // Build request body with only the minimal fields
-        // Backend will handle fetching additional details based on MusicBrainz ID
         let artistData: [String: Any] = [
             "name": name,
             "musicbrainz_id": musicbrainzId.isEmpty ? NSNull() : musicbrainzId,
         ]
-        
-        // Convert to JSON
-        request.httpBody = try JSONSerialization.data(withJSONObject: artistData)
-        
-        // Log the request (for debugging)
+
+        let body = try JSONSerialization.data(withJSONObject: artistData)
+
         Log.ui.debug("Sending artist creation request: url=\(url, privacy: .private), name=\(name, privacy: .public), musicbrainzId=\(musicbrainzId, privacy: .private)")
-        
-        // Perform request
-        let (data, response) = try await URLSession.shared.data(for: request)
-        
-        // Check response
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw URLError(.badServerResponse)
-        }
-        
-        Log.ui.debug("Response status: \(httpResponse.statusCode)")
-        
-        // Handle different status codes
-        switch httpResponse.statusCode {
-        case 200...299:
-            // Success
-            if (try? JSONSerialization.jsonObject(with: data)) != nil {
-                Log.ui.info("Artist creation success response received")
-            }
-            
-        case 409:
-            // Conflict - artist already exists
-            if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-               let error = json["error"] as? String {
-                throw ArtistCreationError.alreadyExists(error)
-            }
-            throw ArtistCreationError.alreadyExists("Artist already exists")
-            
-        case 400:
-            // Bad request - validation error
-            if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-               let error = json["error"] as? String {
-                throw ArtistCreationError.validationError(error)
-            }
-            throw ArtistCreationError.validationError("Invalid data")
-            
-        default:
-            // Other error
-            if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-               let error = json["error"] as? String {
-                throw ArtistCreationError.serverError(error)
-            }
-            throw ArtistCreationError.serverError("Server returned status \(httpResponse.statusCode)")
-        }
-    }
-}
 
-// MARK: - Error Types
+        _ = try await authManager.makeAuthenticatedRequest(
+            url: url,
+            method: "POST",
+            body: body
+        )
 
-enum ArtistCreationError: LocalizedError {
-    case alreadyExists(String)
-    case validationError(String)
-    case serverError(String)
-    
-    var errorDescription: String? {
-        switch self {
-        case .alreadyExists(let message):
-            return "Artist Already Exists: \(message)"
-        case .validationError(let message):
-            return "Validation Error: \(message)"
-        case .serverError(let message):
-            return "Server Error: \(message)"
-        }
+        Log.ui.info("Artist created successfully")
     }
 }
 

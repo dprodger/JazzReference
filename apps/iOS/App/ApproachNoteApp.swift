@@ -166,6 +166,7 @@ struct ApproachNoteApp: App {
                     NavigationStack {
                         ArtistCreationView(importedData: data)
                     }
+                    .environmentObject(authManager)
                 }
                 .sheet(item: $importedSongData) { data in
                     NavigationStack {

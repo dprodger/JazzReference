@@ -99,6 +99,7 @@ struct ApproachNoteMacApp: App {
                 // Import sheets
                 .sheet(item: $importedArtistData) { data in
                     MacArtistCreationView(importedData: data)
+                        .environmentObject(authManager)
                         .frame(minWidth: 400, minHeight: 300)
                 }
                 .sheet(item: $importedSongData) { data in
