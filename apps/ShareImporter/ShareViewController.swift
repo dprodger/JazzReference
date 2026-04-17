@@ -1,17 +1,21 @@
 //
-//  MacShareViewController.swift
-//  MusicBrainzImporterMac
+//  ShareViewController.swift
+//  ShareImporter
 //
-//  Safari Share Extension for importing MusicBrainz artist/song data into Jazz Reference (macOS)
+//  Safari Share Extension for importing artist, song, and YouTube data into Approach Note.
 //
 
-import Cocoa
+import UIKit
 import SwiftUI
+import Social
 import UniformTypeIdentifiers
+import os
 
-// MARK: - Mac Share View Controller
+// MARK: - Share View Controller
 
-class MacShareViewController: NSViewController {
+private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.approachnote.ShareImporter", category: "data")
+
+class ShareViewController: UIViewController {
 
     // MARK: - Properties
     private var artistData: ArtistData?
@@ -22,15 +26,11 @@ class MacShareViewController: NSViewController {
     private var isSongImport: Bool = false
     private var isYouTubeImport: Bool = false
     private let appGroupIdentifier = "group.com.approachnote.shared"
-
+    
     // MARK: - Lifecycle
-    override func loadView() {
-        // Create a view with reasonable default size for extension popover
-        self.view = NSView(frame: NSRect(x: 0, y: 0, width: 400, height: 450))
-    }
-
     override func viewDidLoad() {
         super.viewDidLoad()
+        view.backgroundColor = .systemBackground
 
         // Bail out early if the user isn't signed in to the main app — avoids
         // dragging them through the whole import flow only to 401 at the end.
@@ -49,7 +49,7 @@ class MacShareViewController: NSViewController {
     }
 
     private func showLoginRequired() {
-        let loginView = MacLoginRequiredView(
+        let loginView = LoginRequiredView(
             onDismiss: { [weak self] in
                 self?.cancelImport()
             }
@@ -58,12 +58,17 @@ class MacShareViewController: NSViewController {
     }
 
     // MARK: - Data Extraction
-
+    
     private func detectPageType() {
         NSLog("🔍 Starting data extraction...")
+        
+        // We can't reliably detect the page type before JavaScript preprocessing
+        // because the URL might not be available in the share extension context.
+        // Instead, we'll extract the data and let the JavaScript tell us what type it is
+        // based on the URL and fields it returns.
         extractData()
     }
-
+    
     private func extractData() {
         NSLog("🔍 Extracting page data...")
 
@@ -106,7 +111,7 @@ class MacShareViewController: NSViewController {
         let plainTextProvider = attachments.first { $0.hasItemConformingToTypeIdentifier("public.plain-text") }
         let urlProvider = attachments.first { $0.hasItemConformingToTypeIdentifier("public.url") }
 
-        // Try to extract title from extension item metadata
+        // Try to extract title from extension item metadata (works for some apps)
         let metadataTitle = self.extractTitleFromExtensionItem(extensionItem)
         if let title = metadataTitle {
             NSLog("📝 Found title from extension item metadata: %{public}@", title)
@@ -205,7 +210,7 @@ class MacShareViewController: NSViewController {
     }
 
     private func extractTitleFromExtensionItem(_ extensionItem: NSExtensionItem) -> String? {
-        // Log available metadata for debugging
+        // Log available metadata for debugging (use %{public}@ to avoid <private> redaction)
         NSLog("📋 Extension item metadata:")
         if let attributedContentText = extensionItem.attributedContentText {
             NSLog("   attributedContentText: %{public}@", attributedContentText.string)
@@ -238,7 +243,7 @@ class MacShareViewController: NSViewController {
             }
         }
 
-        // Try attributedContentText
+        // Try attributedContentText (YouTube often puts title here)
         if let attributedContentText = extensionItem.attributedContentText {
             let text = attributedContentText.string.trimmingCharacters(in: .whitespacesAndNewlines)
             // The content text might contain the title followed by the URL
@@ -531,7 +536,7 @@ class MacShareViewController: NSViewController {
 
         return nil
     }
-
+    
     // MARK: - Data Processing
     private func processExtractedData(_ data: [String: Any]) {
         NSLog("📄 Processing extracted data...")
@@ -544,9 +549,11 @@ class MacShareViewController: NSViewController {
         }
 
         // Detect page type based on the fields present in the JavaScript results
+        // YouTube pages have "pageType" = "youtube"
+        // Song/work pages have "title", artist pages have "name"
         if let pageType = data["pageType"] as? String, pageType == "youtube" {
             NSLog("📍 Detected: YouTube page")
-            processYouTubeDataFromJS(data)
+            processYouTubeData(data)
         } else if let _ = data["title"] as? String {
             NSLog("📍 Detected: Song/Work page (has 'title' field)")
             processSongData(data)
@@ -559,54 +566,54 @@ class MacShareViewController: NSViewController {
             showError("Could not extract data from this page")
         }
     }
-
+    
     private func processArtistData(_ data: [String: Any]) {
         NSLog("🎵 Processing artist data...")
-
+        
         // Extract ONLY minimal artist information from the JavaScript results
         let name = data["name"] as? String ?? ""
         let musicbrainzId = data["musicbrainzId"] as? String ?? ""
         let wikipediaUrl = data["wikipediaUrl"] as? String
         let sourceUrl = data["url"] as? String
-
+        
         let artistData = ArtistData(
             name: name,
             musicbrainzId: musicbrainzId,
             wikipediaUrl: wikipediaUrl,
             sourceUrl: sourceUrl
         )
-
+        
         NSLog("   Artist: \(artistData.name)")
         NSLog("   MusicBrainz ID: \(artistData.musicbrainzId)")
-
+        
         // Validate that we got at least a name and ID
         guard !artistData.name.isEmpty, !artistData.musicbrainzId.isEmpty else {
             NSLog("❌ Missing required fields - name: '\(artistData.name)', id: '\(artistData.musicbrainzId)'")
             showError("Could not extract artist information from this page")
             return
         }
-
+        
         self.artistData = artistData
         NSLog("✅ Artist data validation passed")
-
+        
         // Check if artist already exists in database
         checkArtistExistence(artistData)
     }
-
+    
     // MARK: - Database Checking
     private func checkArtistExistence(_ artistData: ArtistData) {
         NSLog("🔍 Checking if artist exists in database...")
-
+        
         // Show loading indicator
         showLoadingView()
-
+        
         Task {
             do {
                 let result = try await ShareDatabaseService.shared.checkArtistExists(
                     name: artistData.name,
                     musicbrainzId: artistData.musicbrainzId
                 )
-
+                
                 await MainActor.run {
                     NSLog("✅ Database check complete")
                     self.handleArtistMatchResult(result, artistData: artistData)
@@ -621,43 +628,43 @@ class MacShareViewController: NSViewController {
             }
         }
     }
-
+    
     private func handleArtistMatchResult(_ result: ArtistMatchResult, artistData: ArtistData) {
         switch result {
         case .notFound:
             NSLog("ℹ️ Artist not found - showing normal import")
             showConfirmationView(with: artistData)
-
+            
         case .exactMatch(let existingArtist):
             NSLog("ℹ️ Exact match found - artist already exists")
             self.existingArtist = existingArtist
             showExactMatchView(artistData: artistData, existingArtist: existingArtist)
-
+            
         case .nameMatchNoMbid(let existingArtist):
             NSLog("ℹ️ Name match with blank MusicBrainz ID")
             self.existingArtist = existingArtist
             showNameMatchNoMbidView(artistData: artistData, existingArtist: existingArtist)
-
+            
         case .nameMatchDifferentMbid(let existingArtist):
             NSLog("ℹ️ Name match with different MusicBrainz ID")
             self.existingArtist = existingArtist
             showNameMatchDifferentMbidView(artistData: artistData, existingArtist: existingArtist)
         }
     }
-
+    
     // MARK: - Song Processing
-
+    
     private func processSongData(_ data: [String: Any]) {
         NSLog("🎵 Processing song data...")
         NSLog("   Data keys: \(data.keys.joined(separator: ", "))")
-
+        
         // Check if there's an error from JavaScript
         if let error = data["error"] as? String {
             NSLog("❌ JavaScript error: \(error)")
             showError(error)
             return
         }
-
+        
         // Extract required fields
         guard let title = data["title"] as? String,
               !title.isEmpty else {
@@ -665,17 +672,17 @@ class MacShareViewController: NSViewController {
             showError("Could not extract song title from page")
             return
         }
-
+        
         guard let musicbrainzId = data["musicbrainzId"] as? String,
               !musicbrainzId.isEmpty else {
             NSLog("❌ Missing or empty MusicBrainz ID")
             showError("Could not extract MusicBrainz ID from page")
             return
         }
-
+        
         NSLog("   Title: \(title)")
         NSLog("   MusicBrainz ID: \(musicbrainzId)")
-
+        
         // Extract optional fields
         let composers = data["composers"] as? [String]
         let workType = data["workType"] as? String
@@ -683,7 +690,7 @@ class MacShareViewController: NSViewController {
         let annotation = data["annotation"] as? String
         let wikipediaUrl = data["wikipediaUrl"] as? String
         let sourceUrl = data["url"] as? String
-
+        
         // Log optional fields if present
         if let composers = composers, !composers.isEmpty {
             NSLog("   Composers: \(composers.joined(separator: ", "))")
@@ -691,7 +698,7 @@ class MacShareViewController: NSViewController {
         if let workType = workType {
             NSLog("   Work Type: \(workType)")
         }
-
+        
         // Create SongData
         let songData = SongData(
             title: title,
@@ -703,16 +710,16 @@ class MacShareViewController: NSViewController {
             wikipediaUrl: wikipediaUrl,
             sourceUrl: sourceUrl
         )
-
+        
         self.songData = songData
-
+        
         NSLog("✅ Song data validation passed")
-
+        
         // Check if song already exists in database
         showLoadingView()
         checkSongMatch(songData: songData)
     }
-
+    
     private func checkSongMatch(songData: SongData) {
         Task {
             do {
@@ -721,7 +728,7 @@ class MacShareViewController: NSViewController {
                     title: songData.title,
                     musicbrainzId: songData.musicbrainzId
                 )
-
+                
                 DispatchQueue.main.async {
                     self.processSongMatch(result: result, songData: songData)
                 }
@@ -735,7 +742,7 @@ class MacShareViewController: NSViewController {
             }
         }
     }
-
+    
     private func processSongMatch(result: SongMatchResult, songData: SongData) {
         switch result {
         case .notFound:
@@ -761,7 +768,7 @@ class MacShareViewController: NSViewController {
 
     // MARK: - YouTube Processing
 
-    private func processYouTubeDataFromJS(_ data: [String: Any]) {
+    private func processYouTubeData(_ data: [String: Any]) {
         NSLog("🎬 Processing YouTube data...")
         NSLog("   Data keys: \(data.keys.joined(separator: ", "))")
 
@@ -811,18 +818,18 @@ class MacShareViewController: NSViewController {
         // Show YouTube type selection view
         showYouTubeTypeSelectionView(with: youtubeData)
     }
-
+    
     // MARK: - UI Views
-
+    
     private func showLoadingView() {
-        let loadingView = MacLoadingView()
+        let loadingView = LoadingView()
         replaceCurrentView(with: loadingView)
     }
-
+    
     private func showConfirmationView(with artistData: ArtistData) {
         NSLog("🎨 Showing confirmation view")
-
-        let confirmationView = MacArtistImportConfirmationView(
+        
+        let confirmationView = ArtistImportConfirmationView(
             artistData: artistData,
             onImport: { [weak self] in
                 self?.importArtist()
@@ -831,14 +838,14 @@ class MacShareViewController: NSViewController {
                 self?.cancelImport()
             }
         )
-
+        
         replaceCurrentView(with: confirmationView)
     }
-
+    
     private func showExactMatchView(artistData: ArtistData, existingArtist: ExistingArtist) {
         NSLog("🎨 Showing exact match view")
-
-        let view = MacArtistExactMatchView(
+        
+        let view = ArtistExactMatchView(
             artistData: artistData,
             existingArtist: existingArtist,
             onOpenInApp: { [weak self] in
@@ -848,48 +855,50 @@ class MacShareViewController: NSViewController {
                 self?.cancelImport()
             }
         )
-
+        
         replaceCurrentView(with: view)
     }
-
+    
     private func showNameMatchNoMbidView(artistData: ArtistData, existingArtist: ExistingArtist) {
         NSLog("🎨 Showing name match (no MBID) view")
-
-        let view = MacArtistNameMatchNoMbidView(
+        
+        let view = ArtistNameMatchNoMbidView(
             artistData: artistData,
             existingArtist: existingArtist,
             onAssociate: { [weak self] in
+                // TODO: Implement association logic
                 self?.showNotImplementedAlert("Associate MusicBrainz ID")
             },
             onCancel: { [weak self] in
                 self?.cancelImport()
             }
         )
-
+        
         replaceCurrentView(with: view)
     }
-
+    
     private func showNameMatchDifferentMbidView(artistData: ArtistData, existingArtist: ExistingArtist) {
         NSLog("🎨 Showing name match (different MBID) view")
-
-        let view = MacArtistNameMatchDifferentMbidView(
+        
+        let view = ArtistNameMatchDifferentMbidView(
             artistData: artistData,
             existingArtist: existingArtist,
             onOverwrite: { [weak self] in
+                // TODO: Implement overwrite logic
                 self?.showNotImplementedAlert("Overwrite MusicBrainz ID")
             },
             onCancel: { [weak self] in
                 self?.cancelImport()
             }
         )
-
+        
         replaceCurrentView(with: view)
     }
-
+    
     private func showSongConfirmationView(with songData: SongData) {
         NSLog("🎨 Showing song confirmation view")
-
-        let confirmationView = MacSongImportConfirmationView(
+        
+        let confirmationView = SongImportConfirmationView(
             songData: songData,
             onImport: { [weak self] in
                 self?.importSong()
@@ -898,14 +907,14 @@ class MacShareViewController: NSViewController {
                 self?.cancelImport()
             }
         )
-
+        
         replaceCurrentView(with: confirmationView)
     }
-
+    
     private func showSongExactMatchView(songData: SongData, existingSong: ExistingSong) {
         NSLog("🎨 Showing song exact match view")
-
-        let view = MacSongExactMatchView(
+        
+        let view = SongExactMatchView(
             songData: songData,
             existingSong: existingSong,
             onOpenInApp: { [weak self] in
@@ -915,14 +924,14 @@ class MacShareViewController: NSViewController {
                 self?.cancelImport()
             }
         )
-
+        
         replaceCurrentView(with: view)
     }
-
+    
     private func showSongTitleMatchNoMbidView(songData: SongData, existingSong: ExistingSong) {
         NSLog("🎨 Showing song title match (no MBID) view")
-
-        let view = MacSongTitleMatchNoMbidView(
+        
+        let view = SongTitleMatchNoMbidView(
             songData: songData,
             existingSong: existingSong,
             onAssociate: { [weak self] in
@@ -932,14 +941,14 @@ class MacShareViewController: NSViewController {
                 self?.cancelImport()
             }
         )
-
+        
         replaceCurrentView(with: view)
     }
-
+    
     private func showSongTitleMatchDifferentMbidView(songData: SongData, existingSong: ExistingSong) {
         NSLog("🎨 Showing song title match (different MBID) view")
-
-        let view = MacSongTitleMatchDifferentMbidView(
+        
+        let view = SongTitleMatchDifferentMbidView(
             songData: songData,
             existingSong: existingSong,
             onOverwrite: { [weak self] in
@@ -949,7 +958,7 @@ class MacShareViewController: NSViewController {
                 self?.cancelImport()
             }
         )
-
+        
         replaceCurrentView(with: view)
     }
 
@@ -958,7 +967,7 @@ class MacShareViewController: NSViewController {
     private func showYouTubeTypeSelectionView(with youtubeData: YouTubeData) {
         NSLog("🎨 Showing YouTube type selection view")
 
-        let view = MacYouTubeTypeSelectionView(
+        let view = YouTubeTypeSelectionView(
             youtubeData: youtubeData,
             onSelectType: { [weak self] selectedType in
                 self?.handleYouTubeTypeSelected(youtubeData: youtubeData, type: selectedType)
@@ -989,36 +998,36 @@ class MacShareViewController: NSViewController {
 
     private func showError(_ message: String) {
         NSLog("⚠️ Showing error: \(message)")
-
-        let errorView = MacErrorView(
+        
+        let errorView = ErrorView(
             message: message,
             onDismiss: { [weak self] in
                 self?.cancelImport()
             }
         )
-
+        
         replaceCurrentView(with: errorView)
     }
-
+    
     private func replaceCurrentView<Content: View>(with swiftUIView: Content) {
-        // Remove all existing subviews
+        // Remove all existing views
         view.subviews.forEach { $0.removeFromSuperview() }
-
-        // Create hosting view for SwiftUI
-        let hostingView = NSHostingView(rootView: swiftUIView)
-        hostingView.translatesAutoresizingMaskIntoConstraints = false
-
-        view.addSubview(hostingView)
-
-        NSLayoutConstraint.activate([
-            hostingView.topAnchor.constraint(equalTo: view.topAnchor),
-            hostingView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
-            hostingView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            hostingView.trailingAnchor.constraint(equalTo: view.trailingAnchor)
-        ])
+        children.forEach { $0.removeFromParent() }
+        
+        // Create hosting controller
+        let hostingController = UIHostingController(rootView: swiftUIView)
+        
+        // Add as child view controller
+        addChild(hostingController)
+        view.addSubview(hostingController.view)
+        hostingController.view.frame = view.bounds
+        hostingController.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        hostingController.didMove(toParent: self)
     }
-
+    
     // MARK: - Actions
+    // UPDATED importArtist() using NSLog instead of NSLog()
+    // NSLog is more reliable for extension debugging
 
     private func importArtist() {
         NSLog("🎯 importArtist() called")
@@ -1035,105 +1044,124 @@ class MacShareViewController: NSViewController {
         // Try to open the main app directly
         openMainApp(path: "import-artist")
     }
-
+    
     private func openMainApp(path: String) {
-        NSLog("🔗 Opening main app with path: %@", path)
+        logger.debug("Opening main app with path: \(path, privacy: .public)")
 
         guard let url = URL(string: "approachnote://\(path)") else {
-            NSLog("❌ Invalid URL scheme")
+            logger.error("Invalid URL scheme")
             fallbackToManualOpen(path: path)
             return
         }
 
-        NSLog("🔗 Attempting to open URL: %@", url.absoluteString)
+        logger.debug("Attempting to open URL: \(url.absoluteString, privacy: .private)")
 
-        // Check if the app is already running
-        let runningApps = NSWorkspace.shared.runningApplications.filter {
-            $0.bundleIdentifier == "me.rodger.david.Jazz-Liner-Notes"
-        }
+        // Method 1: Try NSExtensionContext.open (works on iOS 16+ for some extension types)
+        if #available(iOS 16.0, *) {
+            logger.debug("Trying extensionContext.open()")
+            extensionContext?.open(url) { [weak self] success in
+                logger.debug("extensionContext.open completed, success: \(success)")
 
-        if let runningApp = runningApps.first {
-            NSLog("📱 App is already running, activating existing instance")
-            runningApp.activate()
-
-            // Open the URL to trigger the deep link handler
-            let configuration = NSWorkspace.OpenConfiguration()
-            configuration.activates = false // Don't create new window, just handle URL
-            NSWorkspace.shared.open(url, configuration: configuration) { [weak self] _, error in
-                if let error = error {
-                    NSLog("⚠️ URL open error (app already active): \(error.localizedDescription)")
-                } else {
-                    NSLog("✅ URL sent to running app")
-                }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                    self?.extensionContext?.completeRequest(returningItems: nil, completionHandler: nil)
-                }
-            }
-        } else {
-            NSLog("📱 App not running, launching with URL")
-            // App not running, launch it with the URL
-            let configuration = NSWorkspace.OpenConfiguration()
-            configuration.activates = true
-            NSWorkspace.shared.open(url, configuration: configuration) { [weak self] app, error in
-                if let _ = app {
-                    NSLog("✅ Successfully launched main app")
+                if success {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                         self?.extensionContext?.completeRequest(returningItems: nil, completionHandler: nil)
                     }
                 } else {
-                    NSLog("❌ Failed to open URL: \(error?.localizedDescription ?? "unknown error")")
+                    // Fall back to responder chain
                     DispatchQueue.main.async {
-                        self?.fallbackToManualOpen(path: path)
+                        self?.tryResponderChain(url: url, path: path)
                     }
                 }
             }
+            return
         }
+
+        // For older iOS, go straight to responder chain
+        tryResponderChain(url: url, path: path)
+    }
+
+    private func tryResponderChain(url: URL, path: String) {
+        logger.debug("Trying responder chain approach")
+
+        var responder: UIResponder? = self
+
+        while let r = responder {
+            let responderType = String(describing: type(of: r))
+            logger.debug("Checking responder: \(responderType, privacy: .public)")
+
+            // Check if this responder is UIApplication (or can open URLs)
+            // We need to use the modern open(_:options:completionHandler:) API
+            if let application = r as? UIApplication {
+                logger.info("Found UIApplication, using modern open API")
+
+                application.open(url, options: [:]) { [weak self] success in
+                    logger.debug("UIApplication.open completed, success: \(success)")
+
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        self?.extensionContext?.completeRequest(returningItems: nil, completionHandler: nil)
+                    }
+                }
+                return
+            }
+            responder = r.next
+        }
+
+        logger.warning("Responder chain failed - no UIApplication found")
+        fallbackToManualOpen(path: path)
     }
 
     private func fallbackToManualOpen(path: String) {
-        NSLog("⚠️ Using fallback manual open")
+        logger.warning("Using fallback manual open")
 
         DispatchQueue.main.async { [weak self] in
-            let alert = NSAlert()
-            alert.messageText = "Data Saved"
-            alert.informativeText = "Open Approach Note to complete the import."
-            alert.alertStyle = .informational
-            alert.addButton(withTitle: "OK")
+            let alert = UIAlertController(
+                title: "Data Saved",
+                message: "Open Approach Note to complete the import.",
+                preferredStyle: .alert
+            )
 
-            alert.runModal()
+            alert.addAction(UIAlertAction(title: "OK", style: .default) { [weak self] _ in
+                self?.extensionContext?.completeRequest(returningItems: nil, completionHandler: nil)
+            })
 
-            self?.extensionContext?.completeRequest(returningItems: nil, completionHandler: nil)
+            self?.present(alert, animated: true)
         }
     }
 
+    @objc private func openURL(_ url: URL) {
+        // Placeholder for selector - actual implementation is in UIApplication
+    }
+    
     private func openArtistInApp(artistId: String) {
         NSLog("🔗 Opening artist in app: \(artistId)")
         openMainApp(path: "artist/\(artistId)")
     }
-
+    
     private func importSong() {
-        NSLog("💾 importSong() called")
+        logger.debug("importSong() called")
 
         guard let songData = songData else {
+            logger.error("No song data")
             showError("No song data to import")
             return
         }
 
-        NSLog("💾 Saving song data to shared container: %@", songData.title)
+        let songTitle = songData.title
+        logger.debug("Saving song: \(songTitle, privacy: .public)")
         SharedSongData.saveSharedData(songData, appGroup: appGroupIdentifier)
-        NSLog("✅ Data saved successfully, opening main app")
+        logger.info("Data saved, now opening main app")
 
         // Try to open the main app directly
         openMainApp(path: "import-song")
     }
-
+    
     private func openSongInApp(songId: String) {
         NSLog("🔗 Opening song in app: \(songId)")
         openMainApp(path: "song/\(songId)")
     }
-
+    
     private func showNotImplementedAlert(_ feature: String) {
-        let alertView = MacNotImplementedView(
+        let alertView = NotImplementedView(
             feature: feature,
             onDismiss: { [weak self] in
                 self?.cancelImport()
@@ -1141,19 +1169,19 @@ class MacShareViewController: NSViewController {
         )
         replaceCurrentView(with: alertView)
     }
-
+    
     private func cancelImport() {
         NSLog("❌ User cancelled import")
         extensionContext?.completeRequest(returningItems: nil, completionHandler: nil)
     }
-
+    
     private func showSuccessAndClose() {
         NSLog("✅ Showing success message")
-
+        
         // Show brief success message
-        let successView = MacSuccessView()
+        let successView = SuccessView()
         replaceCurrentView(with: successView)
-
+        
         // Close after a brief delay
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
             NSLog("👋 Closing extension")

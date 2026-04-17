@@ -12,7 +12,8 @@ This document assesses the current code sharing between the iOS and Mac apps and
 Single Xcode project with multiple targets:
 - `Approach Note` (iOS app)
 - `Approach Note Mac` (macOS app)
-- `MusicBrainzImporter` (share extension)
+- `ShareImporter` (iOS share extension)
+- `ShareImporterMac` (macOS share extension)
 
 ```
 apps/
@@ -41,7 +42,8 @@ apps/
 │   ├── App/
 │   ├── Auth/                # Mac auth views
 │   └── Views/
-└── MusicBrainzImporter/     # Share extension
+├── ShareImporter/          # iOS share extension
+└── ShareImporterMac/       # macOS share extension
 ```
 
 ### What's Shared (in `Shared/`)

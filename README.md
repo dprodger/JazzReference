@@ -17,7 +17,7 @@ The public API is deployed at **<https://api.approachnote.com>**.
 ## Project layout
 
 - **`backend/`** — Flask API (Python 3.13) serving data from PostgreSQL, plus an in-process research worker that enriches songs/recordings from external sources.
-- **`apps/`** — SwiftUI clients for iOS and macOS, with shared code under `apps/Shared/`. A `MusicBrainzImporter` share extension is included.
+- **`apps/`** — SwiftUI clients for iOS and macOS, with shared code under `apps/Shared/`. A `ShareImporter` / `ShareImporterMac` share extension is included on each platform.
 - **`sql/`** — schema and reference data.
 - **`doc/`** — design notes, architecture reviews, and operational runbooks.
 

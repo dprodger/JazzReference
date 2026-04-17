@@ -30,8 +30,8 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "B4911D292EB316F600326CA7"
-               BuildableName = "MusicBrainzImporter.appex"
-               BlueprintName = "MusicBrainzImporter"
+               BuildableName = "ShareImporter.appex"
+               BlueprintName = "ShareImporter"
                ReferencedContainer = "container:Approach Note.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>

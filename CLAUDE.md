@@ -115,7 +115,8 @@ apps/
 │   │   └── ApproachNoteMacApp.swift
 │   ├── Auth/                    # Mac auth views
 │   └── Views/                   # Mac views
-└── MusicBrainzImporter/         # Share extension
+├── ShareImporter/               # iOS share extension
+└── ShareImporterMac/            # macOS share extension
 ```
 
 ### Model Changes Checklist
@@ -155,9 +156,9 @@ Log.auth.info("Login: \(email, privacy: .private)")
 Log.network.debug("Status: \(statusCode, privacy: .public)")
 ```
 
-For the `MusicBrainzImporter` target (separate target, can't access `Log`), create a local `Logger`:
+For the `ShareImporter` / `ShareImporterMac` targets (separate targets, can't access `Log`), create a local `Logger`:
 ```swift
-private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.approachnote.MusicBrainzImporter", category: "data")
+private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.approachnote.ShareImporter", category: "data")
 ```
 
 **Services architecture**: API calls live in per-domain services under `Shared/Services/` (not in views or view models):

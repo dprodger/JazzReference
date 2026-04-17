@@ -35,7 +35,7 @@
 		B45A16B12F08876C00259452 /* MacCreateRepertoireView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B45A16AF2F08876C00259452 /* MacCreateRepertoireView.swift */; };
 		B47FCC1F2F16C937006281D7 /* MacCommunityDataSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = B47FCC1C2F16C937006281D7 /* MacCommunityDataSection.swift */; };
 		B47FCC202F16C937006281D7 /* MacRecordingContributionEditView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B47FCC1D2F16C937006281D7 /* MacRecordingContributionEditView.swift */; };
-		B486B2FE2F1D922B005E6644 /* MusicBrainzImporterMac.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = B486B2F22F1D922B005E6644 /* MusicBrainzImporterMac.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		B486B2FE2F1D922B005E6644 /* ShareImporterMac.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = B486B2F22F1D922B005E6644 /* ShareImporterMac.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		B486B3152F1D93C4005E6644 /* MacSongCreationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B486B3122F1D93C4005E6644 /* MacSongCreationView.swift */; };
 		B486B3162F1D93C4005E6644 /* MacYouTubeImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B486B3132F1D93C4005E6644 /* MacYouTubeImportView.swift */; };
 		B486B3172F1D93C4005E6644 /* MacArtistCreationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B486B3112F1D93C4005E6644 /* MacArtistCreationView.swift */; };
@@ -45,7 +45,7 @@
 		B4C535842ECE5FFF0030A127 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = B4C535832ECE5FFF0030A127 /* GoogleSignIn */; };
 		B4C535862ECE5FFF0030A127 /* GoogleSignInSwift in Frameworks */ = {isa = PBXBuildFile; productRef = B4C535852ECE5FFF0030A127 /* GoogleSignInSwift */; };
 		B4D3BAB12F0D7983007CB0DD /* MacSearchBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4D3BAB02F0D7983007CB0DD /* MacSearchBar.swift */; };
-		B4EE328C2EB3ED5E00C643D1 /* MusicBrainzImporter.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = B4911D2A2EB316F600326CA7 /* MusicBrainzImporter.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		B4EE328C2EB3ED5E00C643D1 /* ShareImporter.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = B4911D2A2EB316F600326CA7 /* ShareImporter.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		B4F38C242EC166A800231130 /* YouTubePlayerKit in Frameworks */ = {isa = PBXBuildFile; productRef = B4F38C232EC166A800231130 /* YouTubePlayerKit */; };
 /* End PBXBuildFile section */
 
@@ -55,7 +55,7 @@
 			containerPortal = B4C160382E91B03600EB8D2C /* Project object */;
 			proxyType = 1;
 			remoteGlobalIDString = B486B2F12F1D922B005E6644;
-			remoteInfo = MusicBrainzImporterMac;
+			remoteInfo = ShareImporterMac;
 		};
 		B4C1604E2E91B03700EB8D2C /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -76,7 +76,7 @@
 			containerPortal = B4C160382E91B03600EB8D2C /* Project object */;
 			proxyType = 1;
 			remoteGlobalIDString = B4911D292EB316F600326CA7;
-			remoteInfo = MusicBrainzImporter;
+			remoteInfo = ShareImporter;
 		};
 /* End PBXContainerItemProxy section */
 
@@ -87,7 +87,7 @@
 			dstPath = "";
 			dstSubfolderSpec = 13;
 			files = (
-				B486B2FE2F1D922B005E6644 /* MusicBrainzImporterMac.appex in Embed Foundation Extensions */,
+				B486B2FE2F1D922B005E6644 /* ShareImporterMac.appex in Embed Foundation Extensions */,
 			);
 			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -98,7 +98,7 @@
 			dstPath = "";
 			dstSubfolderSpec = 13;
 			files = (
-				B4EE328C2EB3ED5E00C643D1 /* MusicBrainzImporter.appex in Embed Foundation Extensions */,
+				B4EE328C2EB3ED5E00C643D1 /* ShareImporter.appex in Embed Foundation Extensions */,
 			);
 			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -135,12 +135,12 @@
 		B45A16AF2F08876C00259452 /* MacCreateRepertoireView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = MacCreateRepertoireView.swift; path = Repertoire/MacCreateRepertoireView.swift; sourceTree = "<group>"; };
 		B47FCC1C2F16C937006281D7 /* MacCommunityDataSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacCommunityDataSection.swift; sourceTree = "<group>"; };
 		B47FCC1D2F16C937006281D7 /* MacRecordingContributionEditView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacRecordingContributionEditView.swift; sourceTree = "<group>"; };
-		B486B2F22F1D922B005E6644 /* MusicBrainzImporterMac.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = MusicBrainzImporterMac.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		B486B2F22F1D922B005E6644 /* ShareImporterMac.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = ShareImporterMac.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		B486B3112F1D93C4005E6644 /* MacArtistCreationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacArtistCreationView.swift; sourceTree = "<group>"; };
 		B486B3122F1D93C4005E6644 /* MacSongCreationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacSongCreationView.swift; sourceTree = "<group>"; };
 		B486B3132F1D93C4005E6644 /* MacYouTubeImportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacYouTubeImportView.swift; sourceTree = "<group>"; };
 		B486B3182F1D9743005E6644 /* Approach Note MacRelease.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "Approach Note MacRelease.entitlements"; sourceTree = "<group>"; };
-		B4911D2A2EB316F600326CA7 /* MusicBrainzImporter.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = MusicBrainzImporter.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		B4911D2A2EB316F600326CA7 /* ShareImporter.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = ShareImporter.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		B4B9C4BF2F1AEC0100159A28 /* MusicBrainzSearchSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusicBrainzSearchSheet.swift; sourceTree = "<group>"; };
 		B4BE01002F3600000000BE01 /* SongBulkEditRecordingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SongBulkEditRecordingsView.swift; sourceTree = "<group>"; };
 		B4C160402E91B03600EB8D2C /* Approach Note.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Approach Note.app"; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -158,14 +158,14 @@
 			);
 			target = B4C1603F2E91B03600EB8D2C /* Approach Note */;
 		};
-		B486B3022F1D922B005E6644 /* Exceptions for "MusicBrainzImporterMac" folder in "MusicBrainzImporterMac" target */ = {
+		B486B3022F1D922B005E6644 /* Exceptions for "ShareImporterMac" folder in "ShareImporterMac" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
 			);
-			target = B486B2F12F1D922B005E6644 /* MusicBrainzImporterMac */;
+			target = B486B2F12F1D922B005E6644 /* ShareImporterMac */;
 		};
-		B486B30A2F1D92E9005E6644 /* Exceptions for "MusicBrainzImporter" folder in "MusicBrainzImporterMac" target */ = {
+		B486B30A2F1D92E9005E6644 /* Exceptions for "ShareImporter" folder in "ShareImporterMac" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				ArtistData.swift,
@@ -173,33 +173,33 @@
 				ExtractMusicBrainzData.js,
 				SharedDataManagers.swift,
 			);
-			target = B486B2F12F1D922B005E6644 /* MusicBrainzImporterMac */;
+			target = B486B2F12F1D922B005E6644 /* ShareImporterMac */;
 		};
-		B4911D382EB316F700326CA7 /* Exceptions for "MusicBrainzImporter" folder in "MusicBrainzImporter" target */ = {
+		B4911D382EB316F700326CA7 /* Exceptions for "ShareImporter" folder in "ShareImporter" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
 			);
-			target = B4911D292EB316F600326CA7 /* MusicBrainzImporter */;
+			target = B4911D292EB316F600326CA7 /* ShareImporter */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		B486B2F32F1D922B005E6644 /* MusicBrainzImporterMac */ = {
+		B486B2F32F1D922B005E6644 /* ShareImporterMac */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				B486B3022F1D922B005E6644 /* Exceptions for "MusicBrainzImporterMac" folder in "MusicBrainzImporterMac" target */,
+				B486B3022F1D922B005E6644 /* Exceptions for "ShareImporterMac" folder in "ShareImporterMac" target */,
 			);
-			path = MusicBrainzImporterMac;
+			path = ShareImporterMac;
 			sourceTree = "<group>";
 		};
-		B4911D2B2EB316F600326CA7 /* MusicBrainzImporter */ = {
+		B4911D2B2EB316F600326CA7 /* ShareImporter */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				B4911D382EB316F700326CA7 /* Exceptions for "MusicBrainzImporter" folder in "MusicBrainzImporter" target */,
-				B486B30A2F1D92E9005E6644 /* Exceptions for "MusicBrainzImporter" folder in "MusicBrainzImporterMac" target */,
+				B4911D382EB316F700326CA7 /* Exceptions for "ShareImporter" folder in "ShareImporter" target */,
+				B486B30A2F1D92E9005E6644 /* Exceptions for "ShareImporter" folder in "ShareImporterMac" target */,
 			);
-			path = MusicBrainzImporter;
+			path = ShareImporter;
 			sourceTree = "<group>";
 		};
 		B4C160422E91B03600EB8D2C /* iOS */ = {
@@ -370,8 +370,8 @@
 				B42A1D702F10A06C00DAC930 /* Mac */,
 				B4C160422E91B03600EB8D2C /* iOS */,
 				B4SHARED012F10C00000000001 /* Shared */,
-				B4911D2B2EB316F600326CA7 /* MusicBrainzImporter */,
-				B486B2F32F1D922B005E6644 /* MusicBrainzImporterMac */,
+				B4911D2B2EB316F600326CA7 /* ShareImporter */,
+				B486B2F32F1D922B005E6644 /* ShareImporterMac */,
 				B4C160412E91B03600EB8D2C /* Products */,
 			);
 			sourceTree = "<group>";
@@ -382,9 +382,9 @@
 				B4C160402E91B03600EB8D2C /* Approach Note.app */,
 				B4C1604D2E91B03700EB8D2C /* ApproachNoteTests.xctest */,
 				B4C160572E91B03700EB8D2C /* ApproachNoteUITests.xctest */,
-				B4911D2A2EB316F600326CA7 /* MusicBrainzImporter.appex */,
+				B4911D2A2EB316F600326CA7 /* ShareImporter.appex */,
 				B41D0F972EE6337400DB427C /* Approach Note.app */,
-				B486B2F22F1D922B005E6644 /* MusicBrainzImporterMac.appex */,
+				B486B2F22F1D922B005E6644 /* ShareImporterMac.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -418,9 +418,9 @@
 			productReference = B41D0F972EE6337400DB427C /* Approach Note.app */;
 			productType = "com.apple.product-type.application";
 		};
-		B486B2F12F1D922B005E6644 /* MusicBrainzImporterMac */ = {
+		B486B2F12F1D922B005E6644 /* ShareImporterMac */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = B486B3032F1D922B005E6644 /* Build configuration list for PBXNativeTarget "MusicBrainzImporterMac" */;
+			buildConfigurationList = B486B3032F1D922B005E6644 /* Build configuration list for PBXNativeTarget "ShareImporterMac" */;
 			buildPhases = (
 				B486B2EE2F1D922B005E6644 /* Sources */,
 				B486B2EF2F1D922B005E6644 /* Frameworks */,
@@ -431,18 +431,18 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				B486B2F32F1D922B005E6644 /* MusicBrainzImporterMac */,
+				B486B2F32F1D922B005E6644 /* ShareImporterMac */,
 			);
-			name = MusicBrainzImporterMac;
+			name = ShareImporterMac;
 			packageProductDependencies = (
 			);
-			productName = MusicBrainzImporterMac;
-			productReference = B486B2F22F1D922B005E6644 /* MusicBrainzImporterMac.appex */;
+			productName = ShareImporterMac;
+			productReference = B486B2F22F1D922B005E6644 /* ShareImporterMac.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
-		B4911D292EB316F600326CA7 /* MusicBrainzImporter */ = {
+		B4911D292EB316F600326CA7 /* ShareImporter */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = B4911D392EB316F700326CA7 /* Build configuration list for PBXNativeTarget "MusicBrainzImporter" */;
+			buildConfigurationList = B4911D392EB316F700326CA7 /* Build configuration list for PBXNativeTarget "ShareImporter" */;
 			buildPhases = (
 				B4911D262EB316F600326CA7 /* Sources */,
 				B4911D272EB316F600326CA7 /* Frameworks */,
@@ -453,13 +453,13 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				B4911D2B2EB316F600326CA7 /* MusicBrainzImporter */,
+				B4911D2B2EB316F600326CA7 /* ShareImporter */,
 			);
-			name = MusicBrainzImporter;
+			name = ShareImporter;
 			packageProductDependencies = (
 			);
-			productName = MusicBrainzImporter;
-			productReference = B4911D2A2EB316F600326CA7 /* MusicBrainzImporter.appex */;
+			productName = ShareImporter;
+			productReference = B4911D2A2EB316F600326CA7 /* ShareImporter.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
 		B4C1603F2E91B03600EB8D2C /* Approach Note */ = {
@@ -583,9 +583,9 @@
 				B4C1603F2E91B03600EB8D2C /* Approach Note */,
 				B4C1604C2E91B03700EB8D2C /* ApproachNoteTests */,
 				B4C160562E91B03700EB8D2C /* ApproachNoteUITests */,
-				B4911D292EB316F600326CA7 /* MusicBrainzImporter */,
+				B4911D292EB316F600326CA7 /* ShareImporter */,
 				B41D0F962EE6337400DB427C /* Approach Note Mac */,
-				B486B2F12F1D922B005E6644 /* MusicBrainzImporterMac */,
+				B486B2F12F1D922B005E6644 /* ShareImporterMac */,
 			);
 		};
 /* End PBXProject section */
@@ -716,7 +716,7 @@
 /* Begin PBXTargetDependency section */
 		B486B2FD2F1D922B005E6644 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = B486B2F12F1D922B005E6644 /* MusicBrainzImporterMac */;
+			target = B486B2F12F1D922B005E6644 /* ShareImporterMac */;
 			targetProxy = B486B2FC2F1D922B005E6644 /* PBXContainerItemProxy */;
 		};
 		B4C1604F2E91B03700EB8D2C /* PBXTargetDependency */ = {
@@ -731,7 +731,7 @@
 		};
 		B4EE328E2EB3F95000C643D1 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = B4911D292EB316F600326CA7 /* MusicBrainzImporter */;
+			target = B4911D292EB316F600326CA7 /* ShareImporter */;
 			targetProxy = B4EE328D2EB3F95000C643D1 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
@@ -846,7 +846,7 @@
 		B486B3002F1D922B005E6644 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CODE_SIGN_ENTITLEMENTS = MusicBrainzImporterMac/MusicBrainzImporterMacRelease.entitlements;
+				CODE_SIGN_ENTITLEMENTS = ShareImporterMac/ShareImporterMacRelease.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
@@ -856,8 +856,8 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = MusicBrainzImporterMac/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = MusicBrainzImporterMac;
+				INFOPLIST_FILE = ShareImporterMac/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = ShareImporterMac;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -882,7 +882,7 @@
 		B486B3012F1D922B005E6644 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CODE_SIGN_ENTITLEMENTS = MusicBrainzImporterMac/MusicBrainzImporterMacRelease.entitlements;
+				CODE_SIGN_ENTITLEMENTS = ShareImporterMac/ShareImporterMacRelease.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
@@ -892,8 +892,8 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = MusicBrainzImporterMac/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = MusicBrainzImporterMac;
+				INFOPLIST_FILE = ShareImporterMac/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = ShareImporterMac;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -918,12 +918,12 @@
 		B4911D362EB316F700326CA7 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CODE_SIGN_ENTITLEMENTS = MusicBrainzImporter/MusicBrainzImporter.entitlements;
+				CODE_SIGN_ENTITLEMENTS = ShareImporter/ShareImporter.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = MusicBrainzImporter/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = MusicBrainzImporter;
+				INFOPLIST_FILE = ShareImporter/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = ShareImporter;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -947,12 +947,12 @@
 		B4911D372EB316F700326CA7 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CODE_SIGN_ENTITLEMENTS = MusicBrainzImporter/MusicBrainzImporter.entitlements;
+				CODE_SIGN_ENTITLEMENTS = ShareImporter/ShareImporter.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = MusicBrainzImporter/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = MusicBrainzImporter;
+				INFOPLIST_FILE = ShareImporter/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = ShareImporter;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -1256,7 +1256,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		B486B3032F1D922B005E6644 /* Build configuration list for PBXNativeTarget "MusicBrainzImporterMac" */ = {
+		B486B3032F1D922B005E6644 /* Build configuration list for PBXNativeTarget "ShareImporterMac" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				B486B3002F1D922B005E6644 /* Debug */,
@@ -1265,7 +1265,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		B4911D392EB316F700326CA7 /* Build configuration list for PBXNativeTarget "MusicBrainzImporter" */ = {
+		B4911D392EB316F700326CA7 /* Build configuration list for PBXNativeTarget "ShareImporter" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				B4911D362EB316F700326CA7 /* Debug */,

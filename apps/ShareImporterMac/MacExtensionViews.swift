@@ -1,6 +1,6 @@
 //
 //  MacExtensionViews.swift
-//  MusicBrainzImporterMac
+//  ShareImporterMac
 //
 //  SwiftUI views for the macOS Share Extension
 //

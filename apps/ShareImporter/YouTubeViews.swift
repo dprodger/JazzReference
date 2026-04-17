@@ -1,6 +1,6 @@
 //
 //  YouTubeViews.swift
-//  MusicBrainzImporter
+//  ShareImporter
 //
 //  Views for importing YouTube videos as transcriptions or backing tracks
 //
@@ -8,7 +8,7 @@
 import SwiftUI
 import os
 
-private let uiLogger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.approachnote.MusicBrainzImporter", category: "ui")
+private let uiLogger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.approachnote.ShareImporter", category: "ui")
 
 // MARK: - YouTube Type Selection View
 

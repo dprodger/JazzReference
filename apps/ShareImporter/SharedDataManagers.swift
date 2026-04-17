@@ -8,7 +8,7 @@
 import Foundation
 import os
 
-private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.approachnote.MusicBrainzImporter", category: "data")
+private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.approachnote.ShareImporter", category: "data")
 
 // MARK: - Shared Data Manager
 
