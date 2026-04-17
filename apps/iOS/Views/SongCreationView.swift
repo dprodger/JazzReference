@@ -15,7 +15,8 @@ extension Notification.Name {
 
 struct SongCreationView: View {
     @Environment(\.dismiss) var dismiss
-    
+    @EnvironmentObject var authManager: AuthenticationManager
+
     // Form fields - pre-populated with imported data
     @State private var title: String
     @State private var composer: String
@@ -140,16 +141,10 @@ struct SongCreationView: View {
     private func saveSongToAPI() async throws {
         let url = URL.api(path: "/songs")
 
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        
-        // Build request body
         var songData: [String: Any] = [
             "title": title,
         ]
-        
-        // Add optional fields only if they're not empty
+
         if !composer.isEmpty {
             songData["composer"] = composer
         }
@@ -157,39 +152,20 @@ struct SongCreationView: View {
             songData["musicbrainz_id"] = musicbrainzId
         }
         if !workType.isEmpty {
-            // Store work type in external_references as metadata
             songData["external_references"] = ["work_type": workType]
         }
-        if !key.isEmpty {
-            // Could add key to structure field or external_references
-            // For now, we'll skip it as the schema doesn't have a dedicated key field
-        }
-        
-        // Convert to JSON
-        request.httpBody = try JSONSerialization.data(withJSONObject: songData)
-        
-        // Log the request (for debugging)
+
+        let body = try JSONSerialization.data(withJSONObject: songData)
+
         Log.ui.debug("Sending song creation request: url=\(url, privacy: .private), title=\(title, privacy: .public), composer=\(composer, privacy: .public), musicbrainzId=\(musicbrainzId, privacy: .private)")
-        
-        // Perform request
-        let (data, response) = try await URLSession.shared.data(for: request)
-        
-        // Check response
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw URLError(.badServerResponse)
-        }
-        
-        guard httpResponse.statusCode == 201 || httpResponse.statusCode == 200 else {
-            // Try to parse error message from response
-            if let errorDict = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-               let errorMsg = errorDict["error"] as? String {
-                throw NSError(domain: "API", code: httpResponse.statusCode,
-                            userInfo: [NSLocalizedDescriptionKey: errorMsg])
-            }
-            throw URLError(.badServerResponse)
-        }
-        
-        Log.ui.info("Song created successfully (status: \(httpResponse.statusCode))")
+
+        _ = try await authManager.makeAuthenticatedRequest(
+            url: url,
+            method: "POST",
+            body: body
+        )
+
+        Log.ui.info("Song created successfully")
     }
 }
 

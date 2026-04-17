@@ -10,6 +10,7 @@ import os
 
 struct MacSongCreationView: View {
     @Environment(\.dismiss) var dismiss
+    @EnvironmentObject var authManager: AuthenticationManager
 
     // Form fields - pre-populated with imported data
     @State private var title: String
@@ -137,10 +138,6 @@ struct MacSongCreationView: View {
     private func saveSongToAPI() async throws {
         let url = URL.api(path: "/songs")
 
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-
         var songData: [String: Any] = [
             "title": title,
         ]
@@ -155,26 +152,17 @@ struct MacSongCreationView: View {
             songData["external_references"] = ["work_type": workType]
         }
 
-        request.httpBody = try JSONSerialization.data(withJSONObject: songData)
+        let body = try JSONSerialization.data(withJSONObject: songData)
 
         Log.ui.debug("Sending song creation request: url=\(url, privacy: .private), title=\(title, privacy: .public)")
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        _ = try await authManager.makeAuthenticatedRequest(
+            url: url,
+            method: "POST",
+            body: body
+        )
 
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw URLError(.badServerResponse)
-        }
-
-        guard httpResponse.statusCode == 201 || httpResponse.statusCode == 200 else {
-            if let errorDict = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-               let errorMsg = errorDict["error"] as? String {
-                throw NSError(domain: "API", code: httpResponse.statusCode,
-                            userInfo: [NSLocalizedDescriptionKey: errorMsg])
-            }
-            throw URLError(.badServerResponse)
-        }
-
-        Log.ui.info("Song created successfully (status: \(httpResponse.statusCode))")
+        Log.ui.info("Song created successfully")
     }
 }
 

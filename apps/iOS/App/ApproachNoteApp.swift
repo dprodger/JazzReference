@@ -171,6 +171,7 @@ struct ApproachNoteApp: App {
                     NavigationStack {
                         SongCreationView(importedData: data)
                     }
+                    .environmentObject(authManager)
                 }
                 .sheet(item: Binding(
                     get: { resetPasswordToken.map { ResetPasswordData(token: $0) } },
