@@ -2875,3 +2875,68 @@ def duration_mismatches_delete():
     except Exception as e:
         logger.error(f"Error deleting streaming links: {e}")
         return jsonify({'error': str(e)}), 500
+
+
+@admin_bp.route('/users')
+def users_list():
+    """List user accounts with email search and pagination."""
+    search = request.args.get('search', '').strip()
+
+    try:
+        page = max(1, int(request.args.get('page', 1)))
+    except ValueError:
+        page = 1
+
+    try:
+        per_page = int(request.args.get('per_page', 50))
+    except ValueError:
+        per_page = 50
+    per_page = max(10, min(per_page, 200))
+
+    offset = (page - 1) * per_page
+
+    where_sql = ''
+    params = []
+    if search:
+        where_sql = 'WHERE email ILIKE %s'
+        params.append(f'%{search}%')
+
+    with get_db_connection() as db:
+        with db.cursor() as cur:
+            cur.execute(f'SELECT COUNT(*) AS total FROM users {where_sql}', params)
+            total = cur.fetchone()['total']
+
+            cur.execute(
+                f"""
+                SELECT
+                    id,
+                    email,
+                    display_name,
+                    is_admin,
+                    is_active,
+                    account_locked,
+                    email_verified,
+                    google_id IS NOT NULL AS has_google,
+                    apple_id IS NOT NULL AS has_apple,
+                    last_login_at,
+                    created_at
+                FROM users
+                {where_sql}
+                ORDER BY last_login_at DESC NULLS LAST, created_at DESC
+                LIMIT %s OFFSET %s
+                """,
+                params + [per_page, offset],
+            )
+            users = [dict(row) for row in cur.fetchall()]
+
+    total_pages = max(1, (total + per_page - 1) // per_page)
+
+    return render_template(
+        'admin/users_list.html',
+        users=users,
+        search=search,
+        page=page,
+        per_page=per_page,
+        total=total,
+        total_pages=total_pages,
+    )

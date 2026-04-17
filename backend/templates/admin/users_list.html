@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Users - Admin</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f7;
+            color: #333;
+            line-height: 1.6;
+            padding: 20px;
+        }
+        .container { max-width: 1200px; margin: 0 auto; }
+        h1 { color: #1d1d1f; margin-bottom: 10px; }
+        .subtitle { color: #666; margin-bottom: 24px; }
+        .toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        .search-form { display: flex; gap: 8px; flex: 1; min-width: 260px; }
+        .search-form input[type="text"] {
+            flex: 1;
+            padding: 8px 12px;
+            border: 1px solid #d0d0d0;
+            border-radius: 8px;
+            font-size: 0.95em;
+            background: #fff;
+        }
+        .search-form button, .search-form a.clear {
+            padding: 8px 16px;
+            border: 1px solid #d0d0d0;
+            border-radius: 8px;
+            background: #fff;
+            color: #333;
+            font-size: 0.9em;
+            cursor: pointer;
+            text-decoration: none;
+        }
+        .search-form button {
+            background: #0066cc;
+            color: #fff;
+            border-color: #0066cc;
+        }
+        .search-form button:hover { background: #0052a3; }
+        .summary { color: #666; font-size: 0.9em; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: #fff;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        th, td {
+            padding: 10px 14px;
+            text-align: left;
+            border-bottom: 1px solid #e0e0e0;
+            font-size: 0.92em;
+        }
+        th { background: #fafafa; color: #1d1d1f; font-weight: 600; }
+        tr:hover { background: #f9f9fb; }
+        .email { font-weight: 500; color: #1d1d1f; }
+        .display-name { color: #666; font-size: 0.85em; }
+        .muted { color: #999; }
+        .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            margin-right: 4px;
+        }
+        .badge-admin { background: #6a1b9a; color: #fff; }
+        .badge-locked { background: #e74c3c; color: #fff; }
+        .badge-inactive { background: #95a5a6; color: #fff; }
+        .badge-unverified { background: #f39c12; color: #000; }
+        .badge-google { background: #4285f4; color: #fff; }
+        .badge-apple { background: #000; color: #fff; }
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #666;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+        .pagination a, .pagination span {
+            padding: 6px 12px;
+            border: 1px solid #d0d0d0;
+            border-radius: 6px;
+            background: #fff;
+            color: #0066cc;
+            text-decoration: none;
+            font-size: 0.9em;
+        }
+        .pagination a:hover { background: #f0f0f5; }
+        .pagination .current {
+            background: #0066cc;
+            color: #fff;
+            border-color: #0066cc;
+        }
+        .pagination .disabled { color: #bbb; background: #fafafa; }
+        code {
+            font-family: 'SF Mono', Monaco, monospace;
+            font-size: 0.85em;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    {% include 'admin/_nav.html' %}
+    <div class="container">
+        <h1>Users</h1>
+        <p class="subtitle">Registered accounts, sorted by most recent login.</p>
+
+        <div class="toolbar">
+            <form class="search-form" method="get" action="/admin/users">
+                <input type="text" name="search" value="{{ search }}" placeholder="Search by email (partial match)">
+                <input type="hidden" name="per_page" value="{{ per_page }}">
+                <button type="submit">Search</button>
+                {% if search %}
+                <a class="clear" href="/admin/users">Clear</a>
+                {% endif %}
+            </form>
+            <div class="summary">
+                {% if total == 0 %}
+                    No users found
+                {% else %}
+                    Showing {{ ((page - 1) * per_page) + 1 }}&ndash;{{ [page * per_page, total] | min }} of {{ total }}
+                {% endif %}
+            </div>
+        </div>
+
+        {% if users %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Email</th>
+                    <th>Status</th>
+                    <th>Auth</th>
+                    <th>Last login</th>
+                    <th>Created</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for user in users %}
+                <tr>
+                    <td>
+                        <div class="email">{{ user.email }}</div>
+                        {% if user.display_name %}
+                        <div class="display-name">{{ user.display_name }}</div>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if user.is_admin %}<span class="badge badge-admin">admin</span>{% endif %}
+                        {% if user.account_locked %}<span class="badge badge-locked">locked</span>{% endif %}
+                        {% if not user.is_active %}<span class="badge badge-inactive">inactive</span>{% endif %}
+                        {% if not user.email_verified %}<span class="badge badge-unverified">unverified</span>{% endif %}
+                        {% if user.is_admin is sameas false and not user.account_locked and user.is_active and user.email_verified %}
+                        <span class="muted">&mdash;</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if user.has_google %}<span class="badge badge-google">Google</span>{% endif %}
+                        {% if user.has_apple %}<span class="badge badge-apple">Apple</span>{% endif %}
+                        {% if not user.has_google and not user.has_apple %}
+                        <span class="muted">password</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if user.last_login_at %}
+                            {{ user.last_login_at.strftime('%Y-%m-%d %H:%M UTC') }}
+                        {% else %}
+                            <span class="muted">never</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if user.created_at %}
+                            {{ user.created_at.strftime('%Y-%m-%d') }}
+                        {% else %}
+                            <span class="muted">&mdash;</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        {% if total_pages > 1 %}
+        {% set qs_search = ('&search=' ~ search) if search else '' %}
+        {% set qs_per = '&per_page=' ~ per_page %}
+        <div class="pagination">
+            {% if page > 1 %}
+            <a href="?page={{ page - 1 }}{{ qs_search }}{{ qs_per }}">&laquo; Prev</a>
+            {% else %}
+            <span class="disabled">&laquo; Prev</span>
+            {% endif %}
+
+            <span class="current">Page {{ page }} of {{ total_pages }}</span>
+
+            {% if page < total_pages %}
+            <a href="?page={{ page + 1 }}{{ qs_search }}{{ qs_per }}">Next &raquo;</a>
+            {% else %}
+            <span class="disabled">Next &raquo;</span>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        {% else %}
+        <div class="empty-state">
+            <h2>No users found</h2>
+            {% if search %}
+            <p>No accounts match <code>{{ search }}</code>. <a href="/admin/users">Clear search</a>.</p>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+</body>
+</html>
